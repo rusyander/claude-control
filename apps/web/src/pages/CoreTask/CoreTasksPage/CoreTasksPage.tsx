@@ -1,6 +1,7 @@
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import { CoreHopsNotice, coreRefusalOf, useCoreTasks } from '@entities/CoreTask';
+import { CoreHopsNotice, coreRefusalOf, taskStateLabel, useCoreTasks } from '@entities/CoreTask';
+import { CoreAutostartToggle, CoreFaultCard } from '@features/CoreFault';
 import { CORE_TASKS_ROUTE } from '@shared/config/routes';
 import { Badge } from '@shared/ui/badge';
 import { Button } from '@shared/ui/button';
@@ -12,7 +13,6 @@ import { PageHeader } from '@shared/ui/page-header';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
-import { CoreRefusalCard } from '../CoreRefusalCard/CoreRefusalCard';
 import { CoreTaskPage } from '../CoreTaskPage/CoreTaskPage';
 import { isRunning } from '../model/taskPage';
 
@@ -61,8 +61,9 @@ function CoreTaskList() {
         }
       />
       <CoreHopsNotice />
+      {data && <CoreAutostartToggle />}
       {isLoading && <SkeletonList rows={3} />}
-      {refusal && <CoreRefusalCard refusal={refusal} />}
+      {refusal && <CoreFaultCard refusal={refusal} />}
       {error && !refusal && (
         <LoadErrorCard title={t('coreTimeline.loadError')} onRetry={() => void refetch()} />
       )}
@@ -87,7 +88,7 @@ function CoreTaskList() {
                   <Badge tone={isRunning(task) ? 'accent' : 'neutral'}>
                     {isRunning(task) ? t('coreTimeline.task.live') : t('coreTimeline.task.stored')}
                   </Badge>
-                  <Badge tone="neutral">{task.state}</Badge>
+                  <Badge tone="neutral">{taskStateLabel(t, task.state)}</Badge>
                   <Link
                     to={CORE_TASKS_ROUTE}
                     search={{ id: task.taskId } as never}

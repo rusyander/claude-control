@@ -73,7 +73,6 @@ function html(over: Partial<LocalModelsInfo> & Record<string, unknown> = {}): st
     },
     catalog: { version: 1, checkedAt: '2026-10', models: [MODEL] },
     installed: [INSTALLED],
-    importable: [],
     jobs: [],
     connect: { model: '' },
     device: 'gpu',
@@ -89,7 +88,6 @@ function html(over: Partial<LocalModelsInfo> & Record<string, unknown> = {}): st
       serverReady
       busy={{ pull: false, bench: false, connect: false }}
       onPull={() => undefined}
-      onImport={() => undefined}
       onConnect={() => undefined}
       onBench={() => undefined}
       onRemove={() => undefined}

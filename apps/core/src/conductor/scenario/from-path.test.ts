@@ -181,6 +181,62 @@ describe('fromPath (P100)', () => {
     ]);
   });
 
+  describe('titles come in one language — the one the panel asks for — never a mix', () => {
+    const steps = [
+      step('own', { anchor: 'plan', title: T('Check the build', 'Проверить сборку') }),
+      step('half', { anchor: 'work', title: { ru: 'Только по-русски', en: '' } }),
+      step('gated', { anchor: 'work', order: 1, gate: T('tests are green', 'тесты зелёные') }),
+    ];
+    const titles = (lang?: 'ru' | 'en'): string[] =>
+      (
+        fromPath({ id: 'grp', title: 'Группа', path: { steps }, ...(lang ? { lang } : {}) })
+          .scenario?.steps ?? []
+      ).map((s) => s.title);
+
+    it('ru: stage titles and own titles are the Russian side', () => {
+      expect(titles('ru')).toEqual([
+        'Разбор запроса',
+        'План',
+        'Проверить сборку',
+        'Работа',
+        'Только по-русски',
+        'title gated',
+        'Ревью',
+        'Правки по ревью',
+        'Финальная проверка',
+        'Публикация',
+      ]);
+    });
+
+    it('en: stage titles and own titles are the English side; an empty en side falls back to ru', () => {
+      expect(titles('en')).toEqual([
+        'Intake',
+        'Plan',
+        'Check the build',
+        'Work',
+        'Только по-русски',
+        'title gated',
+        'Review',
+        'Review fixes',
+        'Final check',
+        'Publish',
+      ]);
+    });
+
+    it('no lang: Russian, the same as the built-in presets', () => {
+      expect(titles()).toEqual(titles('ru'));
+    });
+
+    it('what the model reads (prompt text, gate criterion) stays the English side in both languages', () => {
+      for (const lang of ['ru', 'en'] as const) {
+        const got = fromPath({ id: 'grp', title: 'Группа', path: { steps }, lang });
+        const gated = byId(got.scenario?.steps ?? [], got.ids.gated as string);
+        expect(gated.gate).toEqual([{ kind: 'text', criterion: 'tests are green' }]);
+        expect(gated.knowledge.text).toBe('do gated');
+      }
+    });
+  });
+
   it('an empty path is the conveyor alone', () => {
     const got = fromPath({ id: 'grp', title: '', path: { steps: [] } });
     expect(got.problems).toEqual([]);

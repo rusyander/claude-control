@@ -178,10 +178,6 @@ export const opencodeProvider: ConfigProvider = {
       // Срока кэша у OpenCode нет ни ключом, ни переменной.
       cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
-      // Провайдер — выбор человека в OpenCode: цены и срока его кэша панель не знает.
-      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
-      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
       workHabits: { support: 'emulated' },
     },
   },

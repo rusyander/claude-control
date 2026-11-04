@@ -5,8 +5,10 @@
  * (`kimi plugin list --json`) и читали каталог плагинов Claude; песочница поднимала
  * настоящий `claude` при любом активном CLI; у Cursor (нет неинтерактивного запуска)
  * разговор заводился и падал на первом вопросе невнятным «нет ни ключа, ни CLI».
- * Стало: 409 с кодом (`plugins-provider-unsupported`, `sandbox-provider-unsupported`,
- * `provider-chat-unsupported`) и ни одного запуска.
+ * Стало: 409 с кодом (`plugins-provider-unsupported`, `sandbox-provider-unsupported`) и ни
+ * одного запуска. Разговор чужого CLI панель больше не заводит ни у одного CLI (этап 10, F2c: чат
+ * идёт задачей ядра `/core/chat`) — `POST /api/provider-chat/chats` отвечает 410
+ * `provider-chat-core`, и тоже без запуска.
  *
  * Проверка идёт в настоящий экземпляр панели (`apps/server/src/index.ts`) на
  * одноразовом доме (`throwaway-stand.mjs`), без фронта. Вместо CLI — фальшивые под
@@ -92,14 +94,14 @@ await runOnStand(
       );
     };
 
-    /** Запрос, на который ждём 409 с кодом и ни одного запуска CLI за время запроса. */
-    const expectRefusal = async (label, method, path, body, code) => {
+    /** Запрос, на который ждём отказ с кодом (409, если не сказано иное) и ни одного запуска CLI. */
+    const expectRefusal = async (label, method, path, body, code, status = 409) => {
       const before = calls().length;
       const answer = await send(method, path, body);
       const during = calls().slice(before);
       check(
-        `${label}: ${method} /api${path} — 409 ${code}`,
-        answer.status === 409 && answer.body?.messageCode === code,
+        `${label}: ${method} /api${path} — ${status} ${code}`,
+        answer.status === status && answer.body?.messageCode === code,
         `${answer.status} ${answer.text.slice(0, 300)}`,
       );
       check(
@@ -128,24 +130,21 @@ await runOnStand(
     const sandboxDir = join(stand.home, '.agentdeck', 'sandboxes', SANDBOX_ID);
     check('песочница не собрана на диске', !existsSync(sandboxDir), sandboxDir);
 
-    console.log('Cursor активен: чат');
-    await switchTo('cursor');
-    await expectRefusal('cursor', 'POST', '/provider-chat/chats', {}, 'provider-chat-unsupported');
-    const list = await send('GET', '/provider-chat/chats');
-    check(
-      'cursor: разговор не заведён (список пуст)',
-      list.status === 200 && Array.isArray(list.body) && list.body.length === 0,
-      `${list.status} ${list.text.slice(0, 200)}`,
-    );
+    // Прежний исполнитель чата снят (этап 10, F2c): разговор панели не заводится ни у Cursor, ни
+    // у CLI, у которого чат был (Gemini), — отказ 410 с причиной, процесса нет.
+    for (const provider of ['cursor', 'gemini']) {
+      console.log(`${provider} активен: прежний чат панели`);
+      await switchTo(provider);
+      await expectRefusal(provider, 'POST', '/provider-chat/chats', {}, 'provider-chat-core', 410);
+      const list = await send('GET', '/provider-chat/chats');
+      check(
+        `${provider}: разговор не заведён (список пуст)`,
+        list.status === 200 && Array.isArray(list.body) && list.body.length === 0,
+        `${list.status} ${list.text.slice(0, 200)}`,
+      );
+    }
 
     console.log('Контроль: там, где раздел есть, отказа нет');
-    await switchTo('gemini');
-    const gemini = await send('POST', '/provider-chat/chats', {});
-    check(
-      'gemini (чат ready): разговор заводится — 200',
-      gemini.status === 200 && typeof gemini.body?.id === 'string',
-      `${gemini.status} ${gemini.text.slice(0, 200)}`,
-    );
     await switchTo('claude');
     const before = calls().length;
     const claude = await send('GET', '/plugins');

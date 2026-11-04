@@ -6,7 +6,7 @@ import type { DlpJournalEntry, DlpRule } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import { saveRules, type DlpProxy } from '../../../domains/dlp/dlp.ts';
-import { appendJournal, readJournal } from '../../../domains/dlp/journal.ts';
+import { appendJournal, readJournal } from '@agentdeck/dlp/journal';
 import { registerDlpRoutes } from '../../dlp-routes/dlp-routes.ts';
 import { manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 

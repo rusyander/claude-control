@@ -1,7 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { AgentStopResult } from '@agentdeck/contracts';
 import type { ServerContext } from '../../../context.ts';
-import type { ControlReply } from '../../../domains/chat/live-session/control-requests.ts';
 import {
   AGENT_ID,
   readAgentExtensions,
@@ -21,9 +19,8 @@ import { projectsDir } from '../paths.ts';
 const DEFAULT_STEPS = 200;
 const MAX_STEPS = 1000;
 
-/** Что панели нужно от реестра прогонов: остановка субагента живого процесса. */
+/** Что панели нужно от реестра прогонов. */
 export interface SubagentControl {
-  stopSubagent(chatId: string, agentId: string): Promise<ControlReply | 'absent'>;
   /** Жив ли процесс CLI разговора — для «сейчас работают» истории агентов. */
   isProcessAlive?(chatId: string): boolean;
 }
@@ -46,12 +43,9 @@ function stepWindow(query: WindowQuery): StepWindow {
 const BAD_ID = { message: 'Неверный id субагента', messageCode: 'agent-id-invalid' } as const;
 
 /**
- * Ход субагента (только чтение) и его остановка.
- *
- * Ход — окно шагов его транскрипта `subagents/agent-<id>.jsonl`. Остановка —
- * `stop_task` в stdin живого процесса CLI, как «Stop agent» у расширения
- * VS Code; без живого процесса — `absent`, кнопки у такого разговора нет
- * (`canStopAgents` в прогрессе).
+ * Ход субагента (только чтение) — окно шагов его транскрипта
+ * `subagents/agent-<id>.jsonl`. Остановки нет: CLI — потомок ядра, stdin у панели
+ * нет (s10, 03.11.2026).
  */
 export function registerSubagentRoutes(
   app: FastifyInstance,
@@ -132,22 +126,6 @@ export function registerSubagentRoutes(
           .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
       }
       return transcript;
-    },
-  );
-
-  app.post<{ Params: { chatId: string; agentId: string } }>(
-    '/api/chat/:chatId/agents/:agentId/stop',
-    async (request, reply): Promise<AgentStopResult | undefined> => {
-      const { chatId, agentId } = request.params;
-      if (!AGENT_ID.test(agentId)) {
-        await reply.code(400).send(BAD_ID);
-        return undefined;
-      }
-      const result = await control.stopSubagent(chatId, agentId);
-      if (result === 'absent') return { outcome: 'absent' };
-      if (result.outcome === 'ok') return { outcome: 'requested' };
-      if (result.outcome === 'error') return { outcome: 'refused', message: result.message };
-      return { outcome: 'unconfirmed' };
     },
   );
 }

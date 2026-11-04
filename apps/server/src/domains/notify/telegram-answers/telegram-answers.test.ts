@@ -42,8 +42,7 @@ function inboxOf(chats: InboxChat[], deferred: ChatInbox['deferred'] = []): Chat
   return { generatedAt: '2026-10-23T10:00:00.000Z', chats, deferred };
 }
 
-const collectOf = (inbox: ChatInbox) =>
-  collectPendingAsks({ inbox, foreign: [], defaultCli: 'Claude Code', cliName: (id) => id });
+const collectOf = (inbox: ChatInbox) => collectPendingAsks({ inbox, defaultCli: 'Claude Code' });
 
 describe('callback-data', () => {
   it('подпись сходится только со своей солью и укладывается в 64 байта', () => {

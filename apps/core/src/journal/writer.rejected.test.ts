@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import { newId } from '../lib/ids/uuidv7.ts';
 import { deps, fakeClock, openFresh, tempDir } from './__fixtures__/journal-harness.ts';
 import type { LiveTask } from './resume.ts';
@@ -113,5 +114,29 @@ describe('journal writer onRejected hook', () => {
     expect(() => task.append(BAD_SIGNAL)).toThrow(JournalInputError);
     expect(readJournalLines(task.dir, taskId).lines).toHaveLength(before);
     task.close();
+  });
+});
+
+/**
+ * Лишнее поле в данных (cli-x7-001): текст отказа называет поле так, что маска секретов его не
+ * трогает — у zod это `Unrecognized key: "losses"`, и маска прятала имя как значение ключа.
+ */
+describe('journal refusal of an unknown field survives the secret mask', () => {
+  it('names the field as «unrecognized field losses»; the masked message still says losses', () => {
+    const { writer } = writerIn(tempDir('writer-unknown-field-'), undefined);
+    const extra = {
+      ...GOOD_SIGNAL,
+      data: { ...GOOD_SIGNAL.data, losses: ['hooks'] },
+    } as unknown as AppendInput<'signal'>;
+    let caught: unknown;
+    try {
+      writer.append(extra);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(JournalInputError);
+    const message = (caught as JournalInputError).message;
+    expect((caught as JournalInputError).issues).toEqual(['(data): unrecognized field losses']);
+    expect(maskSecretsInText(`session not journaled: ${message}`)).toContain('losses');
   });
 });

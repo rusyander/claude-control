@@ -1,21 +1,6 @@
 import type { LimitShare } from '@agentdeck/contracts';
 import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
-import type {
-  ChatTreeView,
-  SplitGroupCleaned,
-  SplitGroupReviewClose,
-  SplitGroupStatusView,
-  SplitGroupTokenFlag,
-  SplitGroupTokenLedger,
-  SplitGroupWait,
-  SplitPlanView,
-} from '@agentdeck/contracts/chat-handoff';
-import type { CodedFields, CodedList } from '@agentdeck/contracts/server-messages';
-import type { GroupSignal, GroupWatchCoverage } from '@agentdeck/contracts/group-watch';
-import type { GroupControlState } from './GroupControl.types';
-import type { GroupAcceptanceState } from './GroupAcceptance.types';
-import type { GroupRecheckState } from './GroupRecheck.types';
-import type { GroupAutoNoticesState } from './GroupAutoNotices.types';
+import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import type { ChildQuestion } from './ChildQuestion.types';
 import type { ChildPermission } from './ChildPermission.types';
 
@@ -26,11 +11,6 @@ import type { ChildPermission } from './ChildPermission.types';
  * на всё разделение), и все они живут в одной копии. Строка сводки описывает
  * ГРУППУ, а не разговор: `chatId` — это последнее её звено, то самое, которое
  * человек и хочет открыть.
- *
- * Группа, у которой чата ещё НЕТ (ждёт разбора, предшественников или ответа
- * человека — Т1), тоже строка: иначе сводка показывала бы три группы из пяти и
- * молчала о том, почему остальных не видно. У такой строки `chatId` пустой и
- * открывать нечего.
  */
 export interface ChildStageGroup {
   chatId: string;
@@ -69,11 +49,6 @@ export interface ChildStageGroup {
   /** Прогон группы стоит на запросе прав — ждёт решения человека. */
   awaitingPermission?: boolean;
   /**
-   * Состояние группы по записи конвейера (Д3). Нужно сводке хаба: «готово» по
-   * строке с чатом иначе не отличить от «стоит».
-   */
-  status?: SplitGroupStatusView;
-  /**
    * Чат группы, отброшенной перезапуском разделения (L20): связь с родителем
    * сохранена, но работа не продолжается. Строкой группы не считается — хаб
    * показывает такие чаты внизу, под «Неактивно».
@@ -88,128 +63,12 @@ export interface ChildStageGroup {
   retiredAccepted?: boolean;
   /** Дерево стоит на паузе — группа остановлена и ждёт «Продолжить всё». */
   isPaused?: boolean;
-  /** Паузу поставил сторож групп (F1) по сигналу этого правила; снимает только человек. */
-  pausedByWatch?: string;
   /**
-   * Чата ещё нет: чего группа ждёт. `pending` — итога разбора, `waiting` —
-   * конца предшественников (`waitsFor`), `held` — ответа человека (`hold`).
-   * `failed` без чата — копия не завелась вовсе (`error`). `queued` — разбор
-   * прошёл, группа ждёт места в очереди (настройка «групп разом»). `setup` —
-   * группа стартовала, панель готовит копию (ветка, установка зависимостей —
-   * минуты, живой прогон 29.09). `paused` — на паузе до своего чата.
-   * `interrupted` — оборвалась до своего чата: продолжать нечего.
+   * Звено спросило человека инструментом и стоит (Д16) — из транскрипта. Без
+   * этого такая группа в хабе выглядела просто остановившейся.
    */
-  pending?:
-    'pending' | 'queued' | 'waiting' | 'held' | 'failed' | 'setup' | 'paused' | 'interrupted';
-  /**
-   * Номер группы в конвейере. Есть только у строки БЕЗ чата: обе двери к
-   * стоящей группе (ответ на вопрос разбора и «отпустить») адресуются родителю
-   * с этим номером — чата, которым можно было бы её назвать, ещё нет.
-   */
-  groupIndex?: number;
-  /** Названия групп, чьи цепочки должны кончиться раньше этой. */
-  waitsFor?: string[];
-  /**
-   * Вопрос разбора человеку — группа стоит, пока он не ответит. Код есть,
-   * только когда вопрос писала панель: свой текст она переводит, текст агента
-   * показывает как есть.
-   */
-  hold?: CodedFields<'question'> & { index: number; question: string };
-  /** Ответ уже дан — группа стартует сама, как только кончатся предшественники. */
-  holdAnswered?: boolean;
-  /** От какой ветки отведена копия — когда это не ветка проекта по умолчанию. */
-  base?: string;
-  /** Почему копия или прогон не завелись. */
-  error?: string;
-  /** Код причины, если её писала панель: показ — `serverFieldText(group, 'error')`. */
-  errorCode?: CodedFields<'error'>['errorCode'];
-  errorParams?: CodedFields<'error'>['errorParams'];
-  /**
-   * Чата группа есть, а ход кончился ожиданием (Д3, Д16): вопроса человеку,
-   * решения по ревью, фоновой работы, повтора. Без этого такая группа в хабе
-   * выглядела просто остановившейся.
-   */
-  waitingFor?: SplitGroupWait;
-  /**
-   * Что группа сделала — по фактам копии, не по словам агента (Д5): «проверено,
-   * правок не было» и «правки внесены» не должны читаться одинаково «готово».
-   */
-  result?: SplitGroupResult;
-  /** Хвост последнего ответа — о чём группа спросила текстом или чем кончила (Д16). */
-  tail?: string;
-  /** MR группы — последняя ссылка на MR/PR в её ответе (доставка). */
-  mr?: string;
-  /** Сколько раз панель сама продолжила упавший ход группы (Д10). */
-  retries?: number;
-  /**
-   * Чего не хватило до доставки по фактам git (ветка не отправлена, нет MR с её
-   * головой, незакоммиченное) — и сколько раз панель уже напомнила группе.
-   */
-  deliveryMissing?: string[];
-  /** Коды строк `deliveryMissing` по индексу — показ `serverFieldList`. */
-  deliveryMissingCodes?: CodedList<'deliveryMissing'>['deliveryMissingCodes'];
-  deliveryNudges?: number;
-  /** Чем проверена работа: блок «Тесты» копии группы (решение владельца 29.09). */
-  testsVerdict?: { cases: number; passed: number; runId?: string; runAt?: string };
-  /** Итог закрытия группы ревью по её копии (T13, T6/T11). */
-  reviewClose?: SplitGroupReviewClose;
-  /** Счёт токенов закрытой группы (E4) — флаги против медианы проекта. */
-  tokens?: {
-    ledger: SplitGroupTokenLedger;
-    flags: SplitGroupTokenFlag[];
-    median?: number;
-  };
-  /**
-   * Копия закрытой группы (Д19): её можно убрать кнопкой, адресуясь родителю с
-   * номером группы. `cleaned` — уже убрана, и чем кончилось с веткой.
-   */
-  copy?: { index: number; cleaned?: SplitGroupCleaned['branch'] };
-  /**
-   * Процесс группы оборвался посреди хода (WP1c): номер группы для «Продолжить»,
-   * когда оборвался и сколько раз панель уже продолжила её сама.
-   */
-  interrupted?: { index: number; at: string; resumes?: number };
-  /** Пауза, продолжение или «запустить сейчас» одной группы (журнал 81, 89). */
-  control?: GroupControlState;
-  /** Что группа разрешила себе по строке «с отметкой» — до «Убрать» (аудит 25.09, L51). */
-  autoNotices?: GroupAutoNoticesState;
-  /** Сигналы сторожа группы (фаза 2, W): новые первыми, закрытые — с `clearedAt`. */
-  watchSignals?: GroupSignal[];
-  /** Охват сторожа живой группы: чем он её видит и каких источников нет. */
-  watchCoverage?: GroupWatchCoverage;
-  /**
-   * Ручная приёмка доставленной группы (TK-accepted): есть у группы, которую
-   * конвейер закрыл «готово», или у уже принятой. `acceptedAt` — когда приняли.
-   */
-  acceptance?: GroupAcceptanceState;
-  /**
-   * «Перепроверить MR» доставленной группы (владелец 05.10): есть у группы с
-   * доставленным MR и живой копией. Идёт перепроверка — `requestedAt`; последняя
-   * кончилась доставкой — `checkedAt`, и кнопка зелёная с этим временем.
-   */
-  recheck?: GroupRecheckState;
-  /** «Перевести задачи» (G4): у группы есть MR и задачи трекера, Jira подключена. */
-  taskMove?: { index: number; keys: string[]; connected: boolean };
-  /** MR группы влит или закрыт — по чтению форджа. */
-  mrClosed?: 'merged' | 'closed';
-  /**
-   * Место MR группы в очереди слияния (G3): «мержить 2-м из 5». Нет — у группы
-   * нет своего MR, он влит или закрыт, либо порядок из записи не выводится.
-   */
-  mergeOrder?: GroupMergeOrder;
+  waitingFor?: 'question';
 }
-
-/** Место MR группы в очереди слияния и кого влить раньше. */
-export interface GroupMergeOrder {
-  /** Номер в очереди, с единицы. */
-  position: number;
-  /** Сколько MR в очереди. */
-  total: number;
-  /** Названия групп, чьи MR влить раньше этого, — в порядке очереди. */
-  before: string[];
-}
-
-type SplitGroupResult = NonNullable<SplitPlanView['groups'][number]['result']>;
 
 export interface ChildStagesProps {
   groups: ChildStageGroup[];
@@ -238,41 +97,11 @@ export interface ChildStagesProps {
    */
   providerId?: string;
   /**
-   * Ответ на вопрос разбора (Т1): уходит родителю с номером группы, а не в чат
-   * группы — его ещё нет. Без обработчика форма ответа не показывается.
-   */
-  onAnswerHold?: (index: number, answer: string) => void;
-  /** Ответ в пути — кнопка крутится, второй клик не уходит. */
-  holdBusy?: boolean;
-  /**
-   * «Отпустить» группу, которая ждёт предшественников (Т1): уходит родителю с
-   * номером группы. Вторая дверь к стоящей группе и единственная, когда цепочка
-   * предшественника не кончится уже никогда. Без обработчика кнопки нет.
-   */
-  onRelease?: (index: number) => void;
-  /** Запрос в пути — кнопка крутится, второй клик не уходит. */
-  releaseBusy?: boolean;
-  /**
-   * Пересчитать пересечения веток (Т6). Без обработчика раздел пересечений
-   * показывается только с тем, что панель насчитала сама, — кнопки нет.
-   */
-  onCheckOverlap?: () => void;
-  /** Сверка в пути — кнопка крутится, второй клик не уходит. */
-  overlapBusy?: boolean;
-  /**
    * Разделы под карточками групп (пересечения, шаги человеку, тикеты,
    * «Неактивно») открыты при первом показе. В панели они свёрнуты; открытыми их
    * рисуют проверки содержимого.
    */
   sectionsOpen?: boolean;
-  /**
-   * «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну.
-   * После выключения машины один клик поднимает всё, что оборвалось. Без
-   * обработчика кнопок нет.
-   */
-  onResumeInterrupted?: (index?: number) => void;
-  /** Запрос в пути — кнопка крутится, второй клик не уходит. */
-  resumeInterruptedBusy?: boolean;
   /** Вопросы агентов по ключу чата карточки (карточка 27) — каждый в своей карточке. */
   questions?: ReadonlyMap<string, ChildQuestion[]>;
   /** Ответ на вопрос группы — уходит в её чат. */

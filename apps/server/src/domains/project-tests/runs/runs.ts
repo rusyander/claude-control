@@ -14,9 +14,8 @@ import type {
 } from '@agentdeck/contracts';
 import { pointId, summarize as summarizeResults } from '@agentdeck/contracts/test-format';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { ChatRun } from '../../chat/ChatRunner/ChatRunner.ts';
-import type { RunNotice } from '../../chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { PlatformRunRoute } from '../../platform/routing/routing.ts';
+import type { RunNotice } from '../../notify/run-notice.types.ts';
+import type { CoreChatPort } from '../../chat/core-run/core-run.types.ts';
 import { forgetOtherSpellings, ProjectTestsLockedError, projectEntry } from '../files.ts';
 import {
   ProjectTestsError,
@@ -36,31 +35,32 @@ import { writeRun } from '../runs-store/runs-store.ts';
 import { contentStamps, stampInputs, stampsOf } from '../content-stamp/content-stamp.ts';
 import {
   runScope,
-  startPermissionGate,
-  type RunPermissionGate,
+  scopeClause,
+  scopeSession,
   type RunScope,
 } from '../run-permissions/run-permissions.ts';
+import { auditScope, scopeBaseline, type ScopeBaseline } from '../run-permissions/scope-audit.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 import { e2eFolderView } from '../e2e-folder/e2e-folder.ts';
 import { e2eCommand, shellLine } from '../e2e-command/e2e-command.ts';
 import { E2E_JUNIT_REPORT } from '../e2e-scaffold.ts';
 import { syncE2eFolder } from '../e2e-sync/e2e-sync.ts';
 import { importResultsIntoRun } from '../import-results/import-results.ts';
-import type { TestsAgentEvent, TestsAgentRun } from '../agent/agent-run.types.ts';
-import { makeAgentRun, type TestsAgentProvider } from '../agent/agent-runs.ts';
-import { decideQwenCall } from '../agent/foreign-gate.ts';
+import type { TestsAgentEvent } from '../agent/agent-run.types.ts';
+import { defaultTestsCorePort, type TestsAgentProvider } from '../agent/agent-runs.ts';
 import {
-  PanelAgentProcesses,
-  reapPanelAgentOrphans,
-  type ReapDeps,
-} from '../../panel-agent/processes/processes.ts';
+  TESTS_CORE_ORPHAN_REASON,
+  TestsCoreRun,
+  taskEnvOf,
+  type TestsCoreStart,
+} from '../agent/core-run.ts';
+import { reapPanelAgentOrphans, type ReapDeps } from '../../panel-agent/processes/processes.ts';
+import type { CarryOutcome } from '../../chat/core-run/session-carry.ts';
 
 /**
- * Журнал процессов агентских прогонов в каталоге данных панели. `node --watch`
- * на Windows убивает панель без обработчиков, а CLI прогона живёт дальше: висит
- * до суток на мёртвом приёмнике прав вместе с браузером под тестом, пока история
- * пишет «агент остановился». Усыновлять его некуда — реестр в памяти, — поэтому
- * на старте живое убивается, как у агента панели.
+ * Журнал процессов агентских прогонов прежней панели (до этапа 10). Теперь CLI прогона — потомок
+ * хоста сеанса ядра, и его жизнь ведёт ядро (сверка процессов на своём старте); панель в журнал
+ * больше не пишет, но старт снимает то, что в нём осталось от панели прежней версии.
  */
 export const PROJECT_TEST_PROCESS_LEDGER = 'project-test-runs.json';
 
@@ -126,8 +126,9 @@ export class ProjectTestRunRegistry {
     string,
     {
       view: ProjectTestRun;
-      run: ChatRun | TestsAgentRun;
-      gate?: RunPermissionGate;
+      run: TestsCoreRun;
+      /** Границы прогона и состояние рабочего дерева на старте — для сверки на финише. */
+      audit?: { scope: RunScope; baseline: ScopeBaseline };
       /** Принимать черновик генерации без просмотра — решение человека на старте. */
       autoAccept?: boolean;
       /** Затирание доступов стенда во всём, что выходит наружу. */
@@ -142,10 +143,31 @@ export class ProjectTestRunRegistry {
       stamps?: Map<string, string>;
       /** Папка e2e генерации с кодом тестов: после конца — сверка и отчёт junit. */
       e2e?: { dir: string; junit: string };
-      /** Журнал процесса CLI — есть, когда маршрут назвал каталог данных панели. */
-      processes?: PanelAgentProcesses;
     }
   >();
+
+  /**
+   * Порт ядра: прогон идёт задачей ядра (`agent/core-run.ts`). По умолчанию — запись ядра в его
+   * доме; тесты подставляют управляемое ядро.
+   */
+  private corePort: () => CoreChatPort = (() => {
+    let port: CoreChatPort | undefined;
+    return () => (port ??= defaultTestsCorePort());
+  })();
+
+  setCorePort(port: CoreChatPort): void {
+    this.corePort = () => port;
+  }
+
+  /**
+   * Снять задачу ядра прогона, пережившего прошлую жизнь панели. Без ответа: ядро не
+   * поднято или задача уже кончилась — снимать нечего, а чтение раздела ждать не должно.
+   */
+  cancelOrphanCoreTask(taskId: string): void {
+    void this.corePort()
+      .command(taskId, 'cancel', { reason: TESTS_CORE_ORPHAN_REASON })
+      .catch(() => undefined);
+  }
 
   /**
    * Куда сообщить, что прогон кончился. Тот же отправитель, что у чатов:
@@ -158,33 +180,23 @@ export class ProjectTestRunRegistry {
     this.notify = notify;
   }
 
-  /**
-   * Маршрут контура для агента тестов (Т3) — тем же приёмом, что и у чатов:
-   * реестр знает, что прогон его, а про контуры не знает ничего. Потребитель
-   * здесь всегда один («тесты»), поэтому и спрашивается без аргументов.
-   */
-  private platformRouting?: () => PlatformRunRoute;
-
-  setPlatformRouting(resolve: () => PlatformRunRoute): void {
-    this.platformRouting = resolve;
-  }
-
-  /**
-   * Идёт ли агент тестов через контур (или контур обязателен и отказывает).
-   * Маршрут контура собран под Claude (`runRoute('tests')`): чужой CLI через
-   * него не ходит, и прогон на нём через контур — отказ до старта, а не уход в
-   * облако вендора мимо выбранного контура.
-   */
-  routesThroughContour(): boolean {
-    const route = this.platformRouting?.();
-    return Boolean(route?.refusal) || Object.keys(route?.env ?? {}).length > 0;
-  }
-
   /** Язык панели: на нём имя сессии прогона в списке разговоров. */
   private language: () => 'ru' | 'en' = () => 'ru';
 
   setLanguage(language: () => 'ru' | 'en'): void {
     this.language = language;
+  }
+
+  /**
+   * Слой панели агенту тестов на Claude (этап 10, G13): флаги наших слоёв и набор, которые прежний
+   * прогон брал из маршрута `tests` (`carryOfTestsRoute`). Спрашивается на КАЖДОМ старте: снятая
+   * галочка или сменённый режим набора действуют со следующего прогона. Чужие CLI прежде слоя не
+   * получали — не получают и сейчас. Нет решателя — прогон без слоя (тесты домена).
+   */
+  private layerCarry?: () => CarryOutcome;
+
+  setLayerCarry(resolve: () => CarryOutcome): void {
+    this.layerCarry = resolve;
   }
 
   /** Прогон проекта: идущий или последний завершившийся. */
@@ -232,10 +244,18 @@ export class ProjectTestRunRegistry {
      * `ensureE2e` — завести папку e2e (пишет маршрут: домен про запись панели не
      * знает). Зовётся ПОСЛЕ всех отказов старта: отказанный прогон («уже идёт»,
      * «кейсов нет») папку на диске не оставляет.
+     *
+     * `routes` — маршрут контура, когда у активного контура включена галочка «tests»
+     * (`coreContourRoutes`): разрешённый набор задачи ядра. Нет — набор ядра по умолчанию.
      */
-    options: { appData?: string; ensureE2e?: () => void; provider?: TestsAgentProvider } = {},
+    options: {
+      appData?: string;
+      ensureE2e?: () => void;
+      provider?: TestsAgentProvider;
+      routes?: TestsCoreStart['routes'];
+    } = {},
   ): ProjectTestRun {
-    const provider: TestsAgentProvider = options.provider ?? { id: 'claude' };
+    const provider: TestsAgentProvider = options.provider ?? { id: 'claude', name: 'Claude Code' };
     const root = request.projectPath;
     if (!existsSync(root))
       throw coded(new ProjectTestsError('Каталог проекта не найден.'), 'project-dir-not-found');
@@ -372,7 +392,7 @@ export class ProjectTestRunRegistry {
     // галочки прошлого прогона, которые человек только что попросил забыть.
     const groups = request.full ? readGroups(root) : all;
     const environment = environments.find((item) => item.id === environmentId);
-    // Доступы стенда: значения уедут переменными окружения процесса CLI, а в
+    // Доступы стенда: значения уедут окружением задачи ядра (переменные процесса CLI), а в
     // задании агент увидит только их ИМЕНА — прочитать их он может сам.
     const secrets = resolveSecrets?.(environment) ?? { values: {}, missing: [] };
     const context: PromptContext = {
@@ -396,7 +416,20 @@ export class ProjectTestRunRegistry {
       context,
     );
 
-    const run = makeAgentRun(provider);
+    const run = new TestsCoreRun({
+      port: this.corePort(),
+      onDeny: (tool, message) => this.note(root, tool, message),
+    });
+    // Автоматизации — папка e2e проекта (своя или заведённая панелью): первый
+    // спек кейса без `automation.file` иначе писать было бы некуда (живая проверка 08.10).
+    const automateDir =
+      request.mode === 'automate' ? e2eFolderView(root, options.appData).dir : undefined;
+    const scope = runScope(
+      root,
+      request.mode,
+      scoped.flatMap((group) => group.cases),
+      e2e?.dir ?? automateDir,
+    );
     forgetOtherSpellings(this.runs, root);
     this.runs.set(root, {
       view,
@@ -410,15 +443,7 @@ export class ProjectTestRunRegistry {
       ...(recordsResults(request.mode)
         ? { stamps: startStamps(root, groups, request.groupId, caseIds) }
         : {}),
-      ...(options.appData
-        ? {
-            processes: new PanelAgentProcesses(
-              () => options.appData as string,
-              undefined,
-              PROJECT_TEST_PROCESS_LEDGER,
-            ),
-          }
-        : {}),
+      audit: { scope, baseline: scopeBaseline(root) },
     });
     // Нехватка доступа прогон не отменяет, но молчать о ней нельзя: провал
     // входа иначе выглядит как поломка приложения.
@@ -430,199 +455,121 @@ export class ProjectTestRunRegistry {
           'заполните её в доступах окружения, иначе вход в стенд не выполнится',
       );
     }
+    // Доступы стенда — окружение задачи ядра: имена в журнал задачи, значения только в память
+    // ядра до конца задачи. Имя, которое ядро отказало бы (своё ядра, негодное, сверх потолка),
+    // называется здесь, а не роняет оценку целиком.
+    // Слой панели (G13) — только Claude, как прежде; его переменные занимают места в потолке ядра.
+    const layer = provider.id === 'claude' ? this.layerCarry?.() : undefined;
+    const layerEnv = layer?.ok ? layer.carry.env : {};
+    const taskEnv = taskEnvOf(secrets.values, Object.keys(layerEnv).length);
+    for (const name of taskEnv.dropped) {
+      this.note(
+        root,
+        'окружение',
+        `переменная ${name} в прогон не передана: ядро такое имя окружения задаче не даёт — ` +
+          'вход в стенд с ней не выполнится',
+      );
+    }
     if (request.e2e && !e2e) {
       this.note(root, 'e2e', 'папки e2e в проекте нет — генерация напишет только кейсы');
     }
     this.persist(root, view, this.runs.get(root)?.stamps);
 
-    // Автоматизации — папка e2e проекта (своя или заведённая панелью): первый
-    // спек кейса без `automation.file` иначе писать было бы некуда (живая проверка 08.10).
-    const automateDir =
-      request.mode === 'automate' ? e2eFolderView(root, options.appData).dir : undefined;
-    const scope = runScope(
-      root,
-      request.mode,
-      scoped.flatMap((group) => group.cases),
-      e2e?.dir ?? automateDir,
-    );
     const name = runName(request, scoped, this.language());
-    if (provider.id === 'claude' && run instanceof ChatRun) {
-      void this.launch(root, run, prompt, name, scope, secrets.values);
-    } else if (provider.id !== 'claude' && !(run instanceof ChatRun)) {
-      void this.launchForeign(root, run, provider, prompt, scope, secrets.values);
-    }
+    // Границы режима держит судья ядра (`session.scope`); в задании они же словами — модель
+    // держит правило, о котором знает, — а сверка на финише ловит правку командой оболочки.
+    // Слой — полями сеанса рядом с границами; имена его переменных `sessionOf` берёт из `env`.
+    const { env: _layerNames, ...layerSession } = layer?.ok ? layer.carry.session : {};
+    const env = { ...taskEnv.env, ...layerEnv };
+    void this.launch(
+      root,
+      run,
+      provider,
+      `${prompt}\n\n${scopeClause(scope)}`,
+      name,
+      {
+        session: { ...layerSession, scope: scopeSession(scope) },
+        ...(Object.keys(env).length > 0 ? { env } : {}),
+        ...(options.routes?.length ? { routes: options.routes } : {}),
+      },
+      layer && !layer.ok ? layer.reason : undefined,
+    );
 
     return view;
   }
 
   /**
-   * Запуск агента с правами прогона.
-   *
-   * Прав спрашивать не у кого — человек прогон не сторожит, — поэтому решения
-   * принимает сама панель: под прогон поднимается приёмник брокера прав
-   * (`run-permissions.ts`), и каждый вызов инструмента сверяется с границами
-   * режима. `bypassPermissions` остаётся ТОЛЬКО аварийным запасным путём: если
-   * приёмник не поднялся, прогон должен всё равно состояться — иначе безопасность
-   * превращается в «панель больше не гоняет тесты».
+   * Запуск прогона задачей ядра. Права решает судья ядра: правка — только в корне проекта (без
+   * `.git`, настроек CLI и дорог публикации) и только в границах режима (`session.scope`), команды
+   * git, двигающие историю, — отказ; вопрос права, поднятый ядром, получает отказ за отсутствующего
+   * человека (`core-run.ts`). Сверка на финише (`scope-audit.ts`) ловит файлы, тронутые оболочкой.
    */
   private async launch(
     root: string,
-    run: ChatRun,
+    run: TestsCoreRun,
+    provider: TestsAgentProvider,
     prompt: string,
     name: string,
-    scope: RunScope,
-    env: Record<string, string>,
+    extra: Pick<TestsCoreStart, 'session' | 'env' | 'routes'>,
+    /** Слой панели не переносится в сеанс ядра — прогон не идёт, причина в его итоге (как прежде). */
+    layerRefusal?: string,
   ): Promise<void> {
-    let gate: RunPermissionGate | undefined;
-    try {
-      gate = await startPermissionGate(scope, (tool, message) => this.note(root, tool, message));
-    } catch (error) {
-      this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
-    }
-    if (!this.adoptGate(root, run, gate)) return;
-
-    // Маршрут контура — на КАЖДОМ запуске: снятая галочка обязана действовать
-    // со следующего прогона.
-    const route = this.platformRouting?.() ?? { env: {} };
-    try {
-      // Обязательный контур без шлюза или ключа: мимо него агент не идёт.
-      if (route.refusal) throw new Error(route.refusal);
-      const started = run.start(
-        {
-          prompt,
-          cwd: root,
-          name,
-          // Доступы стенда идут ТОЛЬКО так: переменные процесса CLI не видны ни
-          // в задании, ни в записи прогона, ни в чужом ответе API.
-          ...(Object.keys(env).length > 0 ? { env } : {}),
-          // Маршрут контура — отдельным полем и на КАЖДОМ запуске: снятая
-          // галочка обязана действовать со следующего прогона.
-          platformEnv: { ...route.env, ...route.kit?.env },
-          // Модель и глубина маршрута — тем же правилом, что в реестре чата (Т6).
-          // Сегодня модель доезжает и переменной окружения, но флаг `--model`
-          // сильнее её: первый же выбор модели в этом запуске обошёл бы перевод
-          // контура и повторил дефект Т3 в третьем месте запуска (ревью Т6, m9).
-          ...(route.model?.model ? { model: route.model.model } : {}),
-          ...(route.effort === false ? { effort: '' } : {}),
-          // Свой промпт контура — и агенту тестов тоже: через контур ходит
-          // модель среднего класса, и полный промпт CLI топит её одинаково,
-          // о чём бы её ни просили (Т5.4а).
-          platformSystemPrompt: route.systemPrompt ?? '',
-          // И наши слои (Т8): агент тестов ходит тем же маршрутом, и снятые
-          // правила обязаны сниматься и у него — иначе «прогон без наших слоёв»
-          // означал бы «без них в чате, со всеми в тестах».
-          platformArgs: [...(route.layers?.args ?? []), ...(route.kit?.args ?? [])],
-          // С приёмником — обычный режим: каждый вызов инструмента проходит через
-          // границы прогона. Без него — прежний полный доступ, но об этом сказано
-          // в логе прогона, а не молчком.
-          permissionMode: gate ? 'default' : 'bypassPermissions',
-          ...(gate ? { permissionPrompt: { runId: gate.runId, baseUrl: gate.baseUrl } } : {}),
-        },
-        (event) => this.consume(root, event),
-      );
-      // Номер процесса известен сразу после `start` — запуск идёт до первого
-      // ожидания; в журнал он уходит до того, как панель успеет умереть.
-      const entry = this.runs.get(root);
-      const running = entry?.run === run && entry.view.status === 'running';
-      if (running && entry.processes && run.pid !== undefined) {
-        entry.processes.started(entry.view.id, run.pid, root);
-      }
-      await started;
-    } catch (error) {
-      this.finish(root, 'error', (error as Error).message);
-    }
-  }
-
-  /**
-   * Запуск агента на чужом CLI (Qwen Code, Codex). Отличие от Claude одно и
-   * принципиальное: без приёмника прав прогона НЕТ. Запасного полного доступа,
-   * как у Claude, здесь не бывает — Qwen идёт в `yolo`, и без проверки агент
-   * писал бы куда угодно.
-   */
-  private async launchForeign(
-    root: string,
-    run: TestsAgentRun,
-    provider: Exclude<TestsAgentProvider, { id: 'claude' }>,
-    prompt: string,
-    scope: RunScope,
-    env: Record<string, string>,
-  ): Promise<void> {
-    let gate: RunPermissionGate;
-    try {
-      gate = await startPermissionGate(
-        scope,
-        (tool, message) => this.note(root, tool, message),
-        // У Qwen хук приносит имена Qwen; у Codex приёмник не спрашивают вовсе —
-        // он решает на месте (`codex-run.ts`), но правила те же.
-        provider.id === 'qwen' ? decideQwenCall : undefined,
-      );
-    } catch (error) {
-      this.note(root, 'права', `приёмник прав не поднялся (${(error as Error).message})`);
-      this.finish(
-        root,
-        'error',
-        `Прогон на ${provider.name} не запущен: панель не смогла поднять проверку прав, а без неё агент писал бы куда угодно. Повторите запуск; не помогло — перезапустите панель.`,
-        { messageCode: 'tests-agent-gate-unavailable', params: { provider: provider.name } },
-      );
-      return;
-    }
-    if (!this.adoptGate(root, run, gate)) return;
-
-    // Контур — на КАЖДОМ запуске, как у Claude: маршрут собран под Claude, и
-    // чужой CLI через него не ходит. Маршрут проверил и старт; здесь — на случай,
-    // если галочку поставили между стартом и запуском.
-    if (this.routesThroughContour()) {
-      this.finish(
-        root,
-        'error',
-        `Через контур агент блока «Тесты» ходит только с Claude Code, а активный CLI — ${provider.name}. Прогон не запущен, чтобы не уйти в облако вендора.`,
-        { messageCode: 'tests-agent-contour-foreign', params: { provider: provider.name } },
-      );
+    // Вид прогона уходит клиенту раньше первого события: старт дописывает заметки и сохраняет вид
+    // синхронно, а событие до этого закрыло бы прогон посреди записи. «Стоп» в эту паузу — ядро
+    // не зовём вовсе: задачи ещё нет, снимать нечего.
+    await Promise.resolve();
+    const current = this.runs.get(root);
+    if (current?.run !== run || current.view.status !== 'running') return;
+    if (layerRefusal !== undefined) {
+      this.finish(root, 'error', layerRefusal);
       return;
     }
     try {
-      const started = run.start(
+      await run.start(
         {
-          command: provider.command,
+          adapter: provider.id,
           providerName: provider.name,
           prompt,
           cwd: root,
-          env,
-          gate,
-          scope,
-          onDeny: (tool, message) => this.note(root, tool, message),
+          title: name,
+          lang: this.language(),
+          ...extra,
         },
         (event) => this.consume(root, event),
       );
-      const current = this.runs.get(root);
-      const running = current?.run === run && current.view.status === 'running';
-      if (running && current.processes && run.pid !== undefined) {
-        current.processes.started(current.view.id, run.pid, root);
+      // Ход кончился без итога (ядро закрыло сеанс молча) — прогон не висит «идёт».
+      const entry = this.runs.get(root);
+      if (entry?.run === run && entry.view.status === 'running') {
+        this.finish(root, 'error', 'Ядро закончило прогон без итога.');
       }
-      await started;
     } catch (error) {
       this.finish(root, 'error', (error as Error).message);
     }
   }
 
-  /**
-   * Отдать поднятый приёмник прав прогону — если прогон ещё ждёт запуска.
-   * «Стоп», нажатый, пока приёмник поднимался, прогон уже закрыл: запуск
-   * после него стартовал бы CLI, которого больше никто не остановит, а
-   * приёмник остался бы открытым портом. Такой запуск только гасит приёмник.
-   */
-  private adoptGate(
-    root: string,
-    run: ChatRun | TestsAgentRun,
-    gate: RunPermissionGate | undefined,
-  ): boolean {
-    const entry = this.runs.get(root);
-    if (entry?.run !== run || entry.view.status !== 'running') {
-      gate?.close();
-      return false;
+  /** Сверка границ прогона на финише (`scope-audit.ts`) — строками в лог. */
+  private noteAudit(root: string, audit: { scope: RunScope; baseline: ScopeBaseline }): void {
+    const found = auditScope(root, audit.scope, audit.baseline);
+    if (found.skipped) {
+      this.note(root, 'границы', `сверка рабочего дерева не выполнена: ${found.skipped}`);
+      return;
     }
-    if (gate) entry.gate = gate;
-    return true;
+    if (found.total > 0) {
+      const more =
+        found.total > found.outside.length ? ` и ещё ${found.total - found.outside.length}` : '';
+      this.note(
+        root,
+        'границы',
+        `за прогон тронуты файлы вне границ режима: ${found.outside.join(', ')}${more} — проверьте дифф`,
+      );
+    }
+    if (found.headMoved) {
+      this.note(
+        root,
+        'границы',
+        'за прогон сдвинулась голова ветки (коммит, сброс или переключение)',
+      );
+    }
   }
 
   /** Строка от панели в лог прогона — отказ прав или причина, почему их нет. */
@@ -722,7 +669,16 @@ export class ProjectTestRunRegistry {
     // видит человек, он же уезжает на телефон уведомлением.
     const hide = entry.redact ?? ((value: string) => value);
 
-    if (event.kind === 'session') view.sessionId = event.sessionId;
+    if (event.kind === 'session') {
+      view.sessionId = event.sessionId;
+      // Задача ядра — сразу в запись на диске: панель, перезапущенная посреди прогона,
+      // снимает по ней задачу, которая иначе работала бы дальше без хозяина.
+      const coreTaskId = entry.run.taskId();
+      if (coreTaskId && view.coreTaskId !== coreTaskId) {
+        view.coreTaskId = coreTaskId;
+        this.persist(projectPath, view, entry.stamps);
+      }
+    }
     if (event.kind === 'text') view.log = tail(view.log + hide(event.text));
     if (event.kind === 'tool') {
       view.log = tail(`${view.log}\n· ${event.name} ${hide(firstArg(event.input))}\n`);
@@ -754,12 +710,8 @@ export class ProjectTestRunRegistry {
   ): void {
     const entry = this.runs.get(projectPath);
     if (!entry || entry.view.status !== 'running') return;
-    // Приёмник прав живёт ровно столько, сколько прогон: открытый порт после
-    // конца работы — это чужая дверь в решения о правах.
-    entry.gate?.close();
-    entry.gate = undefined;
-    // Прогон кончился в этом процессе панели — убирать на старте нечего.
-    entry.processes?.exited(entry.view.id);
+    // Границы режима — по факту дерева, ДО записей самой панели (черновик, сверка e2e).
+    if (entry.audit) this.noteAudit(projectPath, entry.audit);
     entry.view.status = status;
     entry.view.finishedAt = new Date().toISOString();
     if (error) entry.view.error = entry.redact ? entry.redact(error) : error;
@@ -930,6 +882,7 @@ export class ProjectTestRunRegistry {
       tokens: view.tokens,
       costUsd: view.costUsd,
       sessionId: view.sessionId,
+      ...(view.coreTaskId ? { coreTaskId: view.coreTaskId } : {}),
       results: view.results ?? [],
       summary: view.summary ?? summarizeResults(view.results ?? []),
       draft: view.draft,

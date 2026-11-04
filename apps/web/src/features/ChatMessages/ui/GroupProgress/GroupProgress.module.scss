@@ -13,15 +13,9 @@
   --progress-tone: var(--color-accent);
   --progress-bg: var(--color-accent-subtle);
 
-  &[data-group-progress='queued'],
   &[data-group-progress='permission'] {
     --progress-tone: var(--color-warning);
     --progress-bg: var(--color-warning-subtle);
-  }
-
-  &[data-group-progress='finished'] {
-    --progress-tone: var(--color-success);
-    --progress-bg: var(--color-success-subtle);
   }
 
   &[data-group-progress='stalled'] {

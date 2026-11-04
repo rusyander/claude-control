@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { ChatAutoModeView, ChatSummary } from '@agentdeck/contracts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
-import type { SplitOverlapView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { encode, readRoute } from '../action-kit/action-kit.ts';
 import {
   assertClaudeChat,
@@ -12,13 +11,11 @@ import {
   findChat,
   maskedTitle,
   planFields,
-  readTree,
   runningOf,
   sendOutcome,
   sendRefusal,
   stateField,
 } from '../actions-chat-kit.ts';
-import { resolveTarget, copyRef, projectRef, targetLabel, pageFor } from '../project-target.ts';
 import {
   definePanelAction,
   fingerprintOf,
@@ -26,16 +23,13 @@ import {
   type InjectRoute,
 } from '../registry.ts';
 import { maskResult } from '../result-net/result-net.ts';
-import { dataField, summaryText, textField } from '../texts/texts.ts';
+import { summaryText, textField } from '../texts/texts.ts';
 
 /**
  * Чат, которого агенту не хватало (дорожка A, 28.09): режимы и расход чата,
- * «Закрыть этап», подбор модели под задачу, понижённые прогоны, пересечения
- * веток разделения, приёмка доставленной группы и «Продолжить» оборванных.
- * Каждое — тем же маршрутом, что кнопка окна чата; правки — по карточке.
- *
- * Человеку остаются: «Начать сейчас» и «Перезапустить» разделения (применение
- * плана, `human:split-apply`), решения по правам и ревью.
+ * «Закрыть этап», понижённые прогоны. Каждое — тем же
+ * маршрутом, что кнопка окна чата; правки — по карточке. Человеку остаются
+ * решения по правам и ревью.
  */
 
 const chatRef = z
@@ -218,148 +212,6 @@ const requestChatHandoff = definePanelAction({
   page: (input) => chatPage(input),
 });
 
-// ── read_model_cascade / set_model_cascade ────────────────────────────────
-
-const cascadeInput = { project: projectRef, copy: copyRef };
-
-interface CascadeView {
-  enabled: boolean;
-  reviewAfterWork: boolean;
-  project: string;
-}
-
-const readModelCascade = definePanelAction({
-  name: 'read_model_cascade',
-  section: 'chat',
-  risk: 'read',
-  description:
-    'Whether «Подбирать модель под задачу» is on for a project: its chats (and chats in its ' +
-    'working copies) pick the model per kind of work instead of the chosen one. Also ' +
-    '`reviewAfterWork` — «Ревью после работы»: whether a split group gets a ceiling review ' +
-    'after its work. Both switches are remembered per project.',
-  input: z.object(cascadeInput),
-  route: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    return { method: 'GET', url: `/api/chat/cascade?path=${encode(target.dir)}` };
-  },
-  shape: (_input, body) => {
-    const view = body as CascadeView;
-    return { enabled: view.enabled, reviewAfterWork: view.reviewAfterWork, project: view.project };
-  },
-  summary: 'journal-read-model-cascade',
-});
-
-const cascadeOf = async (inject: InjectRoute, dir: string): Promise<CascadeView> =>
-  readRoute<CascadeView>(inject, `/api/chat/cascade?path=${encode(dir)}`);
-
-const setModelCascade = definePanelAction({
-  name: 'set_model_cascade',
-  section: 'chat',
-  risk: 'change',
-  title: 'journal-set-model-cascade',
-  description:
-    'Turn «Подбирать модель под задачу» on or off for a project — the switch in the chat menu. ' +
-    'Applies to the next runs of the project’s chats and of its working copies. Needs the ' +
-    'human’s confirmation.',
-  input: z.object({ ...cascadeInput, enabled: z.boolean().describe('true = on, false = off') }),
-  route: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    return {
-      method: 'PUT',
-      url: '/api/chat/cascade',
-      body: { path: target.dir, enabled: input.enabled },
-    };
-  },
-  fingerprint: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    return fingerprintOf(await cascadeOf(inject, target.dir));
-  },
-  preview: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    const current = await cascadeOf(inject, target.dir);
-    if (current.enabled === input.enabled) {
-      throw new Error(
-        `Nothing would change: the switch is already ${input.enabled ? 'on' : 'off'} for this project.`,
-      );
-    }
-    return {
-      ...summaryText(
-        input.enabled ? 'summary-set-model-cascade-on' : 'summary-set-model-cascade-off',
-        { name: target.project.name },
-      ),
-      fields: [
-        dataField('label-project', targetLabel(target)),
-        textField(
-          'label-what-happens',
-          input.enabled ? 'value-model-cascade-on' : 'value-model-cascade-off',
-        ),
-      ],
-    };
-  },
-  shape: (_input, body) => {
-    const view = body as CascadeView;
-    return { enabled: view.enabled, project: view.project };
-  },
-  page: (input) => pageFor(input),
-});
-
-// Второй тумблер того же правила проекта — отдельным действием, а не полем
-// set_model_cascade: у карточки один переключатель, своё название в журнале и
-// свой отказ «уже так», а маршрут PUT пишет только названное поле.
-const setReviewAfterWork = definePanelAction({
-  name: 'set_review_after_work',
-  section: 'chat',
-  risk: 'change',
-  title: 'journal-set-review-after-work',
-  description:
-    'Turn «Ревью после работы» on or off for a project — the switch in the chat menu under ' +
-    'model picking. Off: a split group’s work goes straight to delivery with no ceiling review. ' +
-    'Captured when a split starts — running groups keep theirs. Needs the human’s confirmation.',
-  input: z.object({
-    ...cascadeInput,
-    enabled: z.boolean().describe('true = review after work, false = straight to delivery'),
-  }),
-  route: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    return {
-      method: 'PUT',
-      url: '/api/chat/cascade',
-      body: { path: target.dir, reviewAfterWork: input.enabled },
-    };
-  },
-  fingerprint: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    return fingerprintOf(await cascadeOf(inject, target.dir));
-  },
-  preview: async (input, inject) => {
-    const target = await resolveTarget(inject, input);
-    const current = await cascadeOf(inject, target.dir);
-    if (current.reviewAfterWork === input.enabled) {
-      throw new Error(
-        `Nothing would change: review after work is already ${input.enabled ? 'on' : 'off'} for this project.`,
-      );
-    }
-    return {
-      ...summaryText(
-        input.enabled ? 'summary-set-review-after-work-on' : 'summary-set-review-after-work-off',
-        { name: target.project.name },
-      ),
-      fields: [
-        dataField('label-project', targetLabel(target)),
-        textField(
-          'label-what-happens',
-          input.enabled ? 'value-review-after-work-on' : 'value-review-after-work-off',
-        ),
-      ],
-    };
-  },
-  shape: (_input, body) => {
-    const view = body as CascadeView;
-    return { reviewAfterWork: view.reviewAfterWork, project: view.project };
-  },
-  page: (input) => pageFor(input),
-});
-
 // ── list_lowered_runs ─────────────────────────────────────────────────────
 
 const listLoweredRuns = definePanelAction({
@@ -395,257 +247,10 @@ const listLoweredRuns = definePanelAction({
   summary: 'journal-list-lowered-runs',
 });
 
-// ── разделение: пересечения, приёмка, «Продолжить» ───────────────────────
-
-type PlanGroup = SplitPlanView['groups'][number];
-
-/** План разделения дерева чата или отказ словами для модели. */
-async function planOf(inject: InjectRoute, ref: string) {
-  const chat = await findChat(inject, ref);
-  const plan = (await readTree(inject, chat.id)).split;
-  if (!plan) throw new Error(`Chat «${maskedTitle(chat)}» has no split plan in its tree.`);
-  return { chat, plan };
-}
-
-function groupOf(plan: SplitPlanView, wanted: number | string): PlanGroup {
-  const found =
-    typeof wanted === 'number'
-      ? plan.groups.find((group) => group.index === wanted)
-      : plan.groups.find(
-          (group) => group.title.trim().toLowerCase() === wanted.trim().toLowerCase(),
-        );
-  if (!found) {
-    throw new Error(
-      `No split group «${wanted}»; groups: ${plan.groups.map((group) => `${group.index} ${maskedTitle(group)}`).join(', ')}.`,
-    );
-  }
-  return found;
-}
-
-const groupRef = z
-  .union([z.number().int().min(0), z.string().min(1)])
-  .describe('Group index (from read_chat split.groups) or exact title');
-
-const titles = (plan: SplitPlanView) =>
-  Object.fromEntries(plan.groups.map((group) => [group.index, maskedTitle(group)]));
-
-/** План вызова — между `route` и `shape`. */
-const planFor = new WeakMap<object, SplitPlanView>();
-
-const readSplitOverlap = definePanelAction({
-  name: 'read_split_overlap',
-  section: 'chat',
-  risk: 'read',
-  description:
-    'Files touched by more than one group of a split (and by groups outside their declared ' +
-    'ownership), the suggested merge order and branches that could not be read — the hub’s ' +
-    '«Пересечения» check. It recomputes exactly what opening that check does: the result is ' +
-    'saved on the split and a newly found overlap is announced once in the parent chat. No ' +
-    'branch, file or group is changed; merging stays with the human.',
-  input: z.object({
-    chat: chatRef.describe('The chat that asked for the split (or any chat of its tree)'),
-  }),
-  route: async (input, inject) => {
-    const { chat, plan } = await planOf(inject, input.chat);
-    chatOf.set(input, chat);
-    planFor.set(input, plan);
-    return {
-      method: 'GET',
-      url: `/api/chat/split/${encode(plan.parentChatId)}/overlap`,
-    };
-  },
-  shape: (input, body) => {
-    const view = body as SplitOverlapView;
-    const plan = planFor.get(input);
-    return maskResult({
-      at: view.at,
-      groups: plan ? titles(plan) : undefined,
-      files: view.files.slice(0, 100),
-      ...(view.files.length > 100 ? { filesTotal: view.files.length } : {}),
-      mergeOrder: view.mergeOrder,
-      counted: view.counted.map(({ index, files }) => ({ index, files })),
-      unread: view.unread,
-    });
-  },
-  summary: 'journal-read-split-overlap',
-});
-
-const acceptInput = z.object({
-  chat: chatRef.describe('The chat that asked for the split (or any chat of its tree)'),
-  group: groupRef,
-  accepted: z
-    .boolean()
-    .default(true)
-    .describe(
-      'true = accept a delivered group, or mark a stopped/stuck one done by hand; false = remove the mark (a hand-marked group returns to its previous state)',
-    ),
-});
-type AcceptInput = z.infer<typeof acceptInput>;
-
-async function acceptTarget(inject: InjectRoute, input: AcceptInput) {
-  const { chat, plan } = await planOf(inject, input.chat);
-  if (plan.cancelledAt) throw new Error('This split plan was cancelled by the human.');
-  const group = groupOf(plan, input.group);
-  if (input.accepted && (group.status === 'started' || group.status === 'background')) {
-    throw new Error(
-      `Group «${maskedTitle(group)}» is working right now (status ${group.status}): a running group is neither accepted nor marked done.`,
-    );
-  }
-  if (input.accepted === Boolean(group.acceptedAt)) {
-    throw new Error(
-      `Nothing would change: group «${maskedTitle(group)}» is ${group.acceptedAt ? 'already' : 'not'} accepted.`,
-    );
-  }
-  return { chat, plan, group };
-}
-
-const splitAcceptGroup = definePanelAction({
-  name: 'split_accept_group',
-  section: 'chat',
-  risk: 'change',
-  title: 'journal-split-accept-group',
-  description:
-    'Mark a delivered (done) split group accepted — the hub’s «Принять»; a stopped, stuck or failed ' +
-    'one is marked done by hand («Отметить готовой»: it becomes done + accepted and its waiters start). ' +
-    'accepted=false removes the mark ' +
-    '(accepted=false, «Снять отметку»). Only the plan’s mark changes; branch, copy and chat stay. ' +
-    'Needs the human’s confirmation.',
-  input: acceptInput,
-  route: async (input, inject) => {
-    const { chat, plan, group } = await acceptTarget(inject, input);
-    chatOf.set(input, chat);
-    return {
-      method: 'POST',
-      url: `/api/chat/split/${encode(plan.parentChatId)}/accept`,
-      body: { index: group.index, accepted: input.accepted },
-    };
-  },
-  fingerprint: async (input, inject) => {
-    const { plan, group } = await acceptTarget(inject, input);
-    return fingerprintOf({
-      parent: plan.parentChatId,
-      index: group.index,
-      status: group.status,
-      acceptedAt: group.acceptedAt,
-    });
-  },
-  preview: async (input, inject) => {
-    const { chat, group } = await acceptTarget(inject, input);
-    return {
-      ...summaryText(input.accepted ? 'summary-split-accept' : 'summary-split-unaccept', {
-        chat: maskedTitle(chat),
-        group: maskedTitle(group),
-      }),
-      fields: [
-        chatField(chat),
-        dataField('label-group', `${group.index} — ${maskedTitle(group)}`),
-        textField(
-          'label-what-happens',
-          input.accepted ? 'value-split-accept-effect' : 'value-split-unaccept-effect',
-        ),
-      ],
-    };
-  },
-  shape: (_input, body) => {
-    const answer = body as { index: number; acceptedAt?: string };
-    return {
-      index: answer.index,
-      accepted: Boolean(answer.acceptedAt),
-      acceptedAt: answer.acceptedAt,
-    };
-  },
-  page: (input) => chatPage(input),
-});
-
-const resumeInput = z.object({
-  chat: chatRef.describe('The chat that asked for the split (or any chat of its tree)'),
-  group: groupRef.optional().describe('One interrupted group; omit = every interrupted group'),
-});
-type ResumeInput = z.infer<typeof resumeInput>;
-
-const isInterrupted = (group: PlanGroup): boolean =>
-  group.status === 'awaiting' && group.waitingFor === 'interrupted';
-
-async function resumeTarget(inject: InjectRoute, input: ResumeInput) {
-  const { chat, plan } = await planOf(inject, input.chat);
-  if (plan.cancelledAt) throw new Error('This split plan was cancelled by the human.');
-  const one = input.group === undefined ? undefined : groupOf(plan, input.group);
-  if (one && !isInterrupted(one)) {
-    throw new Error(
-      `Group «${maskedTitle(one)}» was not interrupted (status ${one.status}); nothing to resume.`,
-    );
-  }
-  const groups = one ? [one] : plan.groups.filter(isInterrupted);
-  if (groups.length === 0) {
-    throw new Error('No group of this split was interrupted: nothing to resume.');
-  }
-  return { chat, plan, one, groups };
-}
-
-const splitResumeInterrupted = definePanelAction({
-  name: 'split_resume_interrupted',
-  section: 'chat',
-  risk: 'change',
-  title: 'journal-split-resume-interrupted',
-  description:
-    'Resume split groups whose process died mid-turn (panel restart, machine off, CLI crash) — ' +
-    'the hub’s «Продолжить» for interrupted groups: one group or all of them. Each continues its ' +
-    'own session; spends subscription turns. Not for paused groups (split_control). Needs the ' +
-    'human’s confirmation.',
-  input: resumeInput,
-  route: async (input, inject) => {
-    const { chat, plan, one } = await resumeTarget(inject, input);
-    chatOf.set(input, chat);
-    return {
-      method: 'POST',
-      url: `/api/chat/split/${encode(plan.parentChatId)}/resume`,
-      body: one ? { index: one.index } : {},
-    };
-  },
-  fingerprint: async (input, inject) => {
-    const { plan, groups } = await resumeTarget(inject, input);
-    return fingerprintOf({
-      parent: plan.parentChatId,
-      groups: groups.map((group) => ({ index: group.index, at: group.interruptedAt })),
-    });
-  },
-  preview: async (input, inject) => {
-    const { chat, groups } = await resumeTarget(inject, input);
-    return {
-      ...summaryText('summary-split-resume-interrupted', { chat: maskedTitle(chat) }),
-      fields: [
-        chatField(chat),
-        dataField(
-          'label-split-interrupted-groups',
-          groups.map((group) => `${group.index} — ${maskedTitle(group)}`).join(', '),
-        ),
-        textField('label-what-happens', 'value-split-resume-interrupted-effect'),
-      ],
-    };
-  },
-  shape: (_input, body) => {
-    const answer = body as { resumed: number[]; refused: number[] };
-    return {
-      resumed: answer.resumed,
-      refused: answer.refused,
-      ...(answer.refused.length
-        ? { note: 'Refused groups could not be restarted (no chat or copy); tell the human.' }
-        : {}),
-    };
-  },
-  page: (input) => chatPage(input),
-});
-
 /** Действия чата дорожки A в порядке показа. */
 export const GAPS_CHAT_ACTIONS: readonly AnyPanelAction[] = [
   readChatModes,
   readChatSpend,
   requestChatHandoff,
-  readModelCascade,
-  setModelCascade,
-  setReviewAfterWork,
   listLoweredRuns,
-  readSplitOverlap,
-  splitAcceptGroup,
-  splitResumeInterrupted,
 ];

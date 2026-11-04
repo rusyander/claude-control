@@ -1,12 +1,9 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AgentStopResult } from '@agentdeck/contracts';
 import {
-  agentState,
   buildAgentTree,
   openAgentPane,
   useAgentPane,
-  useStopAgent,
   visibleNodes,
   type AgentTreeNode,
 } from '@entities/AgentTree';
@@ -26,7 +23,6 @@ export function AgentTree({
   agents,
   isRunning,
   processAlive,
-  canStop,
   now,
   onExtensions,
 }: AgentTreeProps) {
@@ -34,9 +30,7 @@ export function AgentTree({
   const roots = useMemo(() => buildAgentTree(agents), [agents]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [focused, setFocused] = useState<string>();
-  const [notes, setNotes] = useState<ReadonlyMap<string, string>>(() => new Map());
   const pane = useAgentPane(chatId);
-  const stopAgent = useStopAgent(chatId ?? '');
   const treeRef = useRef<HTMLUListElement>(null);
   const visible = visibleNodes(roots, collapsed);
   const tabStop = visible.find((node) => nodeKey(node) === focused) ?? visible[0];
@@ -64,24 +58,8 @@ export function AgentTree({
     openAgentPane(chatId, node.agent.agentId);
   };
 
-  const noteOf = (result: AgentStopResult): string =>
-    t(`agentTree.stopState.${result.outcome}`, { message: result.message ?? '' });
-
-  const stop = (agentId: string): void => {
-    stopAgent.mutate(agentId, {
-      onSuccess: (result) => setNotes((current) => new Map(current).set(agentId, noteOf(result))),
-      onError: (error) =>
-        setNotes((current) =>
-          new Map(current).set(
-            agentId,
-            t('agentTree.stopState.failed', { message: error.message }),
-          ),
-        ),
-    });
-  };
-
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>): void => {
-    // Клавиши кнопок внутри узла (результат, «Остановить») — их собственные.
+    // Клавиши кнопок внутри узла (результат) — их собственные.
     const target = event.target as HTMLElement;
     if (target.getAttribute('role') !== 'treeitem') return;
     const current = visible.find((node) => nodeKey(node) === target.dataset.agentNode);
@@ -96,13 +74,10 @@ export function AgentTree({
 
   const renderNode = (node: AgentTreeNode) => {
     const { agent } = node;
-    const view = agentState(agent, isRunning, processAlive);
     const hasChildren = node.children.length > 0;
     const isOpen = hasChildren && !collapsed.has(agent.id);
     const key = nodeKey(node);
     const agentId = agent.agentId;
-    const stoppable = canStop && Boolean(chatId) && agentId !== undefined && view === 'running';
-    const note = agentId && view === 'running' ? notes.get(agentId) : undefined;
     return (
       <AgentRow
         key={agent.id}
@@ -117,10 +92,7 @@ export function AgentTree({
           isSelected: pane !== undefined && pane.agentId === agentId,
           onToggle: () => toggle(node),
           ...(agentId && chatId ? { onOpen: () => open(node) } : {}),
-          ...(stoppable && agentId ? { onStop: () => stop(agentId) } : {}),
           ...(onExtensions && agentId ? { onExtensions: () => onExtensions(agentId) } : {}),
-          isStopping: stopAgent.isPending && stopAgent.variables === agentId,
-          ...(note ? { stopNote: note } : {}),
         }}
       >
         {isOpen && (

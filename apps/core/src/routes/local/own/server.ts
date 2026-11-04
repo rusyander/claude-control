@@ -32,7 +32,15 @@ const UNREAD_START = 'unread:';
 export interface PresetModel {
   id: string;
   path: string;
+  /**
+   * Аргументы экземпляра модели строками пресета (`ctx-size = 65536`): окно, кеш, выгрузка —
+   * то, с чем панель поднимала модель сама. Ключ — имя аргумента без дефисов впереди.
+   */
+  args?: Readonly<Record<string, string>>;
 }
+
+/** Ключ пресета — имя аргумента llama-server: строчные, цифры, дефис; `model` занят путём. */
+const PRESET_KEY = /^[a-z][a-z0-9-]*$/;
 
 export interface RouterServerSpec {
   /** Имя или путь бинаря сервера; ищется по PATH окружения запуска. */
@@ -79,7 +87,18 @@ export function presetIni(models: readonly PresetModel[]): string {
         throw new Error(
           `preset entry ${JSON.stringify(model.id)} has an INI comment character (; or #) in its id or path`,
         );
-      return `[${model.id}]\nmodel = ${model.path}\n`;
+      const args = Object.entries(model.args ?? {}).map(([key, value]) => {
+        // Ключ мимо формы или значение с переводом строки / знаком комментария дописали бы
+        // пресету чужую строку — тот же разбор, что срезал бы путь (F-117).
+        if (!PRESET_KEY.test(key) || key === 'model')
+          throw new Error(`preset entry ${JSON.stringify(model.id)} has a bad argument ${key}`);
+        if (/[\r\n;#]/.test(value))
+          throw new Error(
+            `preset entry ${JSON.stringify(model.id)} argument ${key} has a line break or an INI comment character`,
+          );
+        return `${key} = ${value}\n`;
+      });
+      return `[${model.id}]\nmodel = ${model.path}\n${args.join('')}`;
     })
     .join('\n');
 }

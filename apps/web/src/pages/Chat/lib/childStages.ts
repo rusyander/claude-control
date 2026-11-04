@@ -1,8 +1,7 @@
 import { sumLimitShares, type ChatSummary, type LimitShare } from '@agentdeck/contracts';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { CASCADE_STAGES, type CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
-import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
+import { splitGroupKey, type ChildStageGroup } from '@features/ChatMessages';
 
 /**
  * Сводка «кто на чём работает» для родительского разговора.
@@ -24,27 +23,20 @@ import { mergeSplitGroups, splitGroupKey, type ChildStageGroup } from '@features
  * выглядела стоящей. Порядок внутри группы — по
  * времени заведения разговора: панель заводит звенья строго друг за другом, и
  * это единственный порядок, в котором они бывают.
- *
- * Конвейер уровней (Т1) добавляет то, чего в списке чатов нет вовсе: группы,
- * у которых чата ЕЩЁ НЕТ, — они ждут разбора, предшественников или ответа
- * человека. Их строки идут из вида конвейера (`split`), в его порядке старта;
- * разбор — первой строкой, он общий.
  */
 export function collectChildStages(
   chats: ChatSummary[],
   parentChatId: string | undefined,
   runs: ActiveRunView[],
-  split?: SplitPlanView,
 ): ChildStageGroup[] {
   if (!parentChatId) return [];
 
-  // Чаты групп, отброшенных перезапуском разделения (L20), — отдельно: в
-  // склейку с конвейером их пускать нельзя. Ветка у них та же, что у
-  // перезапущенной группы, и группа в очереди «занимала» строку мёртвого чата.
+  // Чаты групп, отброшенных перезапуском разделения (L20), — отдельно: ветка у
+  // них та же, что у перезапущенной группы, и склейка заняла бы её строку.
   const kids = chats.filter((chat) => chat.parentId === parentChatId);
   const children = kids.filter((chat) => !chat.retired);
   const retired = kids.filter((chat) => chat.retired).map((chat) => retiredRow(chat, runs));
-  if (children.length === 0 && !split) return retired;
+  if (children.length === 0) return retired;
 
   // Заголовок чата ключом не годится: это текст его первого сообщения, а он у
   // работы, её ревью и правок разный — три звена разъехались бы по трём строкам.
@@ -61,10 +53,7 @@ export function collectChildStages(
     const row = groupRow(key, list, runs);
     if (row) byKey.set(key, row);
   }
-  if (!split) return [...byKey.values(), ...retired];
-  // Порядок старта и группы без чата — общее с лентой чужого CLI: тот же счёт
-  // по той же записи конвейера, разный только источник готовых строк.
-  return [...mergeSplitGroups(byKey, split), ...retired];
+  return [...byKey.values(), ...retired];
 }
 
 /**

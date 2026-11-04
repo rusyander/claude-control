@@ -60,12 +60,7 @@ export async function shootLocal(browser, web, scenario, { panel, upstream }) {
       ],
     });
     await openSettingsTab(page, web, 'models', 3000);
-    await page
-      .locator(box)
-      .getByLabel(/^(Название|Name)$/)
-      .first()
-      .fill('Шлюз отдела');
-    await page.waitForTimeout(600);
+    await fillUntilSaved(page, box, panel, 'Шлюз отдела');
     // Вид API — не украшение: от него зависит и смысл адреса, и то, какие CLI
     // вообще смогут этот профиль принять.
     await page
@@ -155,6 +150,29 @@ export async function shootLocal(browser, web, scenario, { panel, upstream }) {
 /** Строка одного CLI в списке «куда применить» — вложенная карточка поменьше. */
 const targetRow = (name) =>
   `xpath=//*[normalize-space(text())="${name}"]/ancestor::div[contains(@class,"padding-sm")][1]`;
+
+/**
+ * Название профиля — в поле, и ждать, пока сервер его запомнит. Каждая правка поля шлёт
+ * весь список профилей из кэша страницы, а кэш обновляется только ответом: под нагрузкой
+ * правка настроек отвечает дольше паузы, следующая правка (вид API) уходила со старым
+ * именем и затирала новое — профиль оставался «Профиль 1», и шаг 07 падал на выборе
+ * «Шлюз отдела» (03.11.2026). Не запомнил за 6 с — поле заполняется ещё раз.
+ */
+async function fillUntilSaved(page, box, panel, name) {
+  const field = page
+    .locator(box)
+    .getByLabel(/^(Название|Name)$/)
+    .first();
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await field.fill(name);
+    for (let wait = 0; wait < 30; wait += 1) {
+      await page.waitForTimeout(200);
+      const settings = await fetch(`${panel}/api/settings`).then((res) => res.json());
+      if (settings.endpointProfiles?.some((item) => item.name === name)) return;
+    }
+  }
+  throw new Error(`название профиля «${name}» сервер так и не запомнил`);
+}
 
 async function patch(panel, body) {
   const response = await fetch(`${panel}/api/settings`, {

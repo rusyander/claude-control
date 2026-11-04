@@ -5,18 +5,15 @@ import { tmpdir } from 'node:os';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import type { RunLike } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { ProviderChatRunLike } from '../../domains/provider-chat/ProviderChatRun/ProviderChatRun.ts';
-import type { ConfigProvider } from '../../providers/types/types.ts';
 import { readRunInputs } from '../../domains/chat/run-input/run-input.ts';
-import { createChat } from '../../domains/provider-chat/store/store.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
 
 /**
  * «Что получил агент» (U8) на настоящей сборке: \`createRuntime\` сам связывает
- * реестр прогонов и службу чужих чатов с хранилищем в каталоге данных. Подменён
- * только процесс CLI. Проверяется проводка, которой юнит-тесты не видят: вход
- * первого хода нового разговора доезжает до настоящего \`sessionId\`, а вход
- * чужого CLI ложится под ключом связи \`<провайдер>:<id>\`.
+ * реестр прогонов с хранилищем в каталоге данных. Подменён только процесс CLI.
+ * Проверяется проводка, которой юнит-тесты не видят: вход первого хода нового
+ * разговора доезжает до настоящего \`sessionId\`. Ход чужого CLI ведёт ядро —
+ * его вход пишет журнал задачи, а не этот каталог.
  */
 describe('runtime: «что получил агент» пишется в каталог данных', () => {
   let root: string;
@@ -71,30 +68,5 @@ describe('runtime: «что получил агент» пишется в кат
 
     expect(readRunInputs(appData, 'sess-real').map((run) => run.prompt)).toEqual(['Задание звена']);
     expect(readRunInputs(appData, 'new-1')).toEqual([]);
-  });
-
-  it('чужой CLI: вход — под ключом связи «провайдер:id»', () => {
-    // Вход сообщает прогон — тем, что ушло CLI (TQ-09); подменный сообщает реплику.
-    const fake = (): ProviderChatRunLike => ({
-      start: (options) => {
-        options.onInput?.(options.history.at(-1)?.content ?? '');
-        return new Promise<void>(() => undefined);
-      },
-      stop: () => undefined,
-    });
-    (runtime.providerChats as unknown as { createRun: () => ProviderChatRunLike }).createRun = fake;
-    createChat(appData, 'codex', { id: 'chat' });
-
-    runtime.providerChats.send(
-      appData,
-      'codex',
-      'chat',
-      { text: 'Слова человека' },
-      { provider: { id: 'codex', name: 'Codex' } as ConfigProvider },
-    );
-
-    expect(readRunInputs(appData, 'codex:chat').map((run) => run.prompt)).toEqual([
-      'Слова человека',
-    ]);
   });
 });

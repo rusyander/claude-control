@@ -6,6 +6,7 @@
  */
 import { expect } from 'vitest';
 import type { DialectId, RouteRequest, Step, StubModel } from './index.d.mts';
+import { STUB_CAPS } from './index.mjs';
 import type { Reply, RequestOptions } from './clients/index.ts';
 import { dataJson, parseSse } from './clients/sse.ts';
 
@@ -71,6 +72,14 @@ function textDeltas(dialect: DialectId, text: string): string[] {
     return events
       .filter((event) => event.event === 'response.output_text.delta')
       .map((event) => String(dataJson(event).delta));
+  if (dialect === 'google-genai')
+    return events
+      .flatMap((event) => {
+        const candidate = (dataJson(event).candidates as Record<string, unknown>[])[0];
+        return (candidate?.content as { parts: { text?: string }[] }).parts;
+      })
+      .map((part) => part.text)
+      .filter((text): text is string => typeof text === 'string' && text !== '');
   return events
     .map((event) => (dataJson(event).choices as Record<string, unknown>[] | undefined)?.[0])
     .map((choice) => (choice?.delta as Record<string, unknown> | undefined)?.content)
@@ -100,6 +109,8 @@ const STOP: Record<DialectId, { text: string; tool: string }> = {
   'anthropic-messages': { text: 'end_turn', tool: 'tool_use' },
   'openai-chat': { text: 'stop', tool: 'tool_calls' },
   'openai-responses': { text: 'completed', tool: 'completed' },
+  // У Gemini отдельной причины «вызов инструмента» нет: и у вызова — STOP.
+  'google-genai': { text: 'STOP', tool: 'STOP' },
 };
 
 const textCase = (cap: string, stream: boolean): Case => ({
@@ -197,30 +208,7 @@ export function casesFor(dialect: DialectId): Case[] {
         });
       },
     },
-    {
-      cap: 'window',
-      name: 'window / rate-limit headers',
-      request: { ...ASK, stream: true },
-      step: {
-        text: 'ok',
-        window: { utilization: 0.9, resetsAt: 4_102_444_800, status: 'allowed_warning' },
-      },
-      check(outcome, d) {
-        message(outcome);
-        if (d === 'anthropic-messages') {
-          expect(outcome.headers.get('anthropic-ratelimit-unified-status')).toBe('allowed_warning');
-          expect(outcome.headers.get('anthropic-ratelimit-unified-reset')).toBe('4102444800');
-          expect(outcome.headers.get('anthropic-ratelimit-unified-5h-utilization')).toBe('0.9');
-          expect(outcome.headers.get('anthropic-ratelimit-unified-representative-claim')).toBe(
-            'five_hour',
-          );
-        } else {
-          expect(outcome.headers.get('x-ratelimit-remaining-requests')).toBe('10');
-          expect(outcome.headers.get('x-ratelimit-limit-requests')).toBe('100');
-          expect(outcome.headers.get('x-ratelimit-reset-requests')).toMatch(/^\d+s$/);
-        }
-      },
-    },
+    ...(STUB_CAPS.window.includes(dialect) ? [windowCase] : []),
     {
       cap: 'hold',
       name: 'hold before the first byte',
@@ -358,5 +346,79 @@ export function casesFor(dialect: DialectId): Case[] {
           ]);
         },
       });
+  if (dialect === 'google-genai') cases.push(...googleCases());
   return cases;
 }
+
+/**
+ * Свои случаи Google сверх общего набора: модель и поток — из пути, результат инструмента
+ * (`functionResponse`) виден заглушке, пауза 429 — деталью `RetryInfo`, а не только заголовком.
+ */
+function googleCases(): Case[] {
+  return [
+    {
+      cap: 'streaming',
+      name: 'model and stream come from the path; functionResponse counts as a tool result',
+      request: { ...ASK, stream: true, tool: true, toolResult: true },
+      step: { text: 'after tool' },
+      check(outcome, _d, { stub }) {
+        expect(message(outcome).parts).toEqual([{ kind: 'text', text: 'after tool' }]);
+        const record = stub.requests.at(-1)!;
+        expect(record).toMatchObject({
+          dialect: 'google-genai',
+          model: 'gemini-test',
+          stream: true,
+          tools: ['run_shell_command'],
+          hasToolResult: true,
+          userTexts: ['hello stub'],
+        });
+        // Конца `[DONE]` у Google нет; последний кадр — с finishReason и расходом.
+        const frames = parseSse(outcome.text);
+        expect(frames.some((f) => f.data === '[DONE]')).toBe(false);
+        const last = dataJson(frames.at(-1)!);
+        expect(last.usageMetadata).toMatchObject({ totalTokenCount: 12 });
+      },
+    },
+    {
+      cap: 'error:429',
+      name: '429 carries google.rpc.RetryInfo with the scripted delay',
+      request: { ...ASK, stream: true },
+      step: { error: { status: 429, message: 'quota', retryAfter: 17 } },
+      check(outcome) {
+        expect(outcome.reply).toMatchObject({ kind: 'error', type: 'resource_exhausted' });
+        const body = JSON.parse(outcome.text) as {
+          error: { code: number; details: { '@type': string; retryDelay: string }[] };
+        };
+        expect(body.error.code).toBe(429);
+        expect(body.error.details).toEqual([
+          { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '17s' },
+        ]);
+      },
+    },
+  ];
+}
+
+const windowCase: Case = {
+  cap: 'window',
+  name: 'window / rate-limit headers',
+  request: { ...ASK, stream: true },
+  step: {
+    text: 'ok',
+    window: { utilization: 0.9, resetsAt: 4_102_444_800, status: 'allowed_warning' },
+  },
+  check(outcome, d) {
+    message(outcome);
+    if (d === 'anthropic-messages') {
+      expect(outcome.headers.get('anthropic-ratelimit-unified-status')).toBe('allowed_warning');
+      expect(outcome.headers.get('anthropic-ratelimit-unified-reset')).toBe('4102444800');
+      expect(outcome.headers.get('anthropic-ratelimit-unified-5h-utilization')).toBe('0.9');
+      expect(outcome.headers.get('anthropic-ratelimit-unified-representative-claim')).toBe(
+        'five_hour',
+      );
+    } else {
+      expect(outcome.headers.get('x-ratelimit-remaining-requests')).toBe('10');
+      expect(outcome.headers.get('x-ratelimit-limit-requests')).toBe('100');
+      expect(outcome.headers.get('x-ratelimit-reset-requests')).toMatch(/^\d+s$/);
+    }
+  },
+};

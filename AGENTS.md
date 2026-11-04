@@ -42,7 +42,7 @@ default and the only verified one. No database — **source of truth = Claude Co
 - `packages/providers` — run facts per CLI (binary, vendor API, endpoint channels, effort, model ladder, limits),
   pure, no IO; the server catalog maps them (`providers/catalog/run-facts.ts`), a new CLI starts here
 - `packages/stub-model` — THE scripted model stub (plain ESM, no build, zero deps): anthropic-messages,
-  openai-chat, openai-responses; steps text/tool/custom/error/hold/stall/window; trace file; loopback,
+  openai-chat, openai-responses, google-genai; steps text/tool/custom/error/hold/stall/window; trace file; loopback,
   refuses 5170–5180. Every new model stub is a scenario over it, never its own SSE code (P120)
 - `tools/` — `doctor.mjs`, `qa/*.mjs` (Playwright, one area each), `tailscale-serve.mjs` (`pnpm remote`/`off`),
   `keepalive.mjs` (`pnpm keepalive[:install|:off|:status]`, watchdog over both dev halves), mobile
@@ -51,8 +51,8 @@ default and the only verified one. No database — **source of truth = Claude Co
   > build + that mirror; the build sweeps them, `--keep-build` opts out, `--dry` measures), `make-mobile-icons.mjs`
   > (one SVG → every icon/splash); `tests-cli.mjs` (`pnpm tests list|show|run|import|export|report|lint|diff|plan|
 case|record|gaps|delivery` — QA workspace without the panel; exit 1: `report` failure outside quarantine, `diff`
-  > NEW failures only, `lint` only with `--fail-on`, `gaps`/`delivery` any gap — same code as the panel's delivery
-  > check); `docs/` PDF guides: `shots-{chat,tests}-guide.mjs` shoot a stubbed panel, `build-guide.mjs` prints via
+  > NEW failures only, `lint` only with `--fail-on`, `gaps`/`delivery` any gap — the delivery check itself, which
+  > the panel no longer runs after a turn); `docs/` PDF guides: `shots-{chat,tests}-guide.mjs` shoot a stubbed panel, `build-guide.mjs` prints via
   > Chromium → `docs/{CHAT,TESTS}-GUIDE.ru.pdf`; sources/frames `.agent/{chat,tests}-guide/`, out of git (fresh clone
   > re-shoots on a running stand); `PAGES=<dir>` rasterises — every page looked at before a PDF is handed over
 

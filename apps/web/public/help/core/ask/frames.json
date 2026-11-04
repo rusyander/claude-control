@@ -6,34 +6,50 @@
       "id": "01-launch",
       "side": "panel",
       "file": "01-launch.png",
-      "masked": 4,
+      "masked": 12,
       "width": 988,
-      "height": 160,
-      "shotAt": "2026-11-01T17:09:16.050Z",
-      "text": "Пункт 10 запуск Launch the task? Split: one unit (no split). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу",
+      "height": 190,
+      "shotAt": "2026-11-03T18:58:00.182Z",
+      "text": "Ждёт человека Пункт 10 запуск Запустить задачу? Деление: одна единица (без деления). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу",
       "en": {
         "file": "01-launch.en.png",
-        "masked": 4,
+        "masked": 15,
         "width": 988,
-        "height": 160,
-        "shotAt": "2026-11-01T17:09:19.515Z",
-        "text": "Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task"
+        "height": 190,
+        "shotAt": "2026-11-03T18:58:03.599Z",
+        "text": "Waiting for a human Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task",
+        "seal": {
+          "png": "6dedd7df0525011a",
+          "text": "e1bd38b6265fb08a"
+        }
       },
       "dark": {
         "file": "01-launch.dark.png",
-        "masked": 4,
+        "masked": 12,
         "width": 988,
-        "height": 160,
-        "shotAt": "2026-11-01T17:09:22.898Z",
-        "text": "Пункт 10 запуск Launch the task? Split: one unit (no split). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу"
+        "height": 190,
+        "shotAt": "2026-11-03T18:58:07.065Z",
+        "text": "Ждёт человека Пункт 10 запуск Запустить задачу? Деление: одна единица (без деления). Одобрить разбиение Правка разбиения — на экране запуска Отменить задачу",
+        "seal": {
+          "png": "62a9bcd5b544ce33",
+          "text": "4cadf3bafb7a375b"
+        }
       },
       "darkEn": {
         "file": "01-launch.dark.en.png",
-        "masked": 4,
+        "masked": 15,
         "width": 988,
-        "height": 160,
-        "shotAt": "2026-11-01T17:09:26.648Z",
-        "text": "Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task"
+        "height": 190,
+        "shotAt": "2026-11-03T18:58:09.881Z",
+        "text": "Waiting for a human Item 10 launch Launch the task? Split: one unit (no split). Approve the split Editing the split is on the launch screen Cancel the task",
+        "seal": {
+          "png": "ac5ba211ba872ed7",
+          "text": "e1bd38b6265fb08a"
+        }
+      },
+      "seal": {
+        "png": "ee8fb6edbb5f49dd",
+        "text": "4cadf3bafb7a375b"
       }
     }
   ]

@@ -31,11 +31,10 @@ afterAll(() => {
 const BASE = {
   ...process.env,
   AGENTDECK_KIT_VARIANT: '',
-  AGENTDECK_HEAVY_QUEUE_DIR: '',
+  AGENTDECK_STEP_KIND: '',
   AGENTDECK_KIT_STATE: STATE,
-  AGENTDECK_USER_MEMORY_OFF: '',
 };
-const envOf = (child: boolean) => ({ ...BASE, AGENTDECK_SPLIT_CHILD: child ? '1' : '' });
+const envOf = (child: boolean) => ({ ...BASE, AGENTDECK_STEP_KIND: child ? 'implement' : '' });
 
 type HookOut = {
   hookSpecificOutput?: {
@@ -164,7 +163,7 @@ describe('rule-injector: карточки правил сразу после с�
     const g = session('kcompact-b');
     const edit = pre('kcompact-b', 'Edit', uiEdit, transcript(g.after));
     expect(denied(edit), reason(edit)).toBe(false);
-    expect(ctx(edit)).not.toMatch(/— card \(split group/);
+    expect(ctx(edit)).not.toMatch(/— card \(task step/);
     expect(readFileSync(RULE_FILE, 'utf8')).toContain('# Before/after shots');
   });
 

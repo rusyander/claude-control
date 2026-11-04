@@ -163,23 +163,3 @@ export const agentTranscriptSchema = object({
 });
 
 export type AgentTranscript = Infer<typeof agentTranscriptSchema>;
-
-/** Итог «Остановить субагента». */
-export const agentStopResultSchema = object({
-  /**
-   * `requested` — CLI принял запрос. Это не «остановлен»: на чужой id CLI
-   * отвечает так же (замер claude 2.1.310), — снят ли субагент, скажет его итог
-   * в транскрипте (`stopped` у узла). `absent` — живого процесса нет; `refused`
-   * — CLI ответил ошибкой; `unconfirmed` — запрос ушёл, ответа не дождались.
-   */
-  outcome: union([
-    literal('requested'),
-    literal('absent'),
-    literal('refused'),
-    literal('unconfirmed'),
-  ]),
-  /** Текст ошибки CLI у `refused`. */
-  message: string().optional(),
-});
-
-export type AgentStopResult = Infer<typeof agentStopResultSchema>;

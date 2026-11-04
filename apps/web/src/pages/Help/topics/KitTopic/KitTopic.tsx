@@ -52,6 +52,9 @@ export function KitTopic() {
         <Callout tone="info" title={tr('pathTextTitle')}>
           {tr('pathTextText')}
         </Callout>
+        <Callout tone="warning" title={tr('limitCoreTitle')}>
+          {tr('limitCoreText')}
+        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('modesTitle')} caption={tr('modesCaption')}>
@@ -84,7 +87,7 @@ export function KitTopic() {
         />
       </HelpSection>
 
-      {/* Наблюдение — отдельно от таблицы хуков: человек ищет «как следить за группами на другой машине», а не хук. */}
+      {/* Наблюдение — отдельно от таблицы хуков: человек ищет «как следить за работой агентов на другой машине», а не хук. */}
       <HelpSection title={tr('watchTitle')} caption={tr('watchCaption')}>
         <Stack gap="var(--spacing-xs)">
           <Callout tone="info" title={tr('watchStartTitle')}>

@@ -65,7 +65,6 @@ function rowHtml(
     },
     catalog: { version: 1, checkedAt: '2026-10', models: [MODEL] },
     installed: [],
-    importable: [],
     jobs: [],
     connect: { model: '' },
     device: 'gpu',

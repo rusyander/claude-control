@@ -6,28 +6,19 @@
       "name": "message-path",
       "file": "message-path.png",
       "page": 1,
-      "source": "6510a7b9b932e4bf",
+      "source": "dca4810b4d582895",
       "width": 1101,
       "height": 1452,
-      "exportedAt": "2026-10-23T18:09:42.026Z"
-    },
-    {
-      "name": "split-conveyor",
-      "file": "split-conveyor.png",
-      "page": 2,
-      "source": "be03254b2338468c",
-      "width": 1989,
-      "height": 1102,
-      "exportedAt": "2026-10-23T18:09:45.141Z"
+      "exportedAt": "2026-11-03T15:46:23.561Z"
     },
     {
       "name": "deferred-asks",
       "file": "deferred-asks.png",
-      "page": 3,
-      "source": "7eda816ec59635eb",
+      "page": 2,
+      "source": "0a66e175a6ee0e1c",
       "width": 1141,
-      "height": 1622,
-      "exportedAt": "2026-10-23T18:09:48.193Z"
+      "height": 1612,
+      "exportedAt": "2026-11-03T15:46:26.839Z"
     }
   ]
 }

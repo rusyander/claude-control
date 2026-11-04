@@ -32,7 +32,7 @@ describe('маршрут истории агентов', () => {
       store: { getChatLinks: () => fx.links },
     } as unknown as ServerContext;
     app = Fastify();
-    registerSubagentRoutes(app, ctx, { stopSubagent: () => Promise.resolve('absent') });
+    registerSubagentRoutes(app, ctx, {});
     await app.ready();
   });
 
@@ -83,7 +83,6 @@ describe('маршрут истории агентов', () => {
     } as unknown as ServerContext;
     app = Fastify();
     registerSubagentRoutes(app, ctx, {
-      stopSubagent: () => Promise.resolve('absent'),
       isProcessAlive: (chatId) => {
         alive.push(chatId);
         return chatId === 's-fix';

@@ -1,5 +1,14 @@
 import { redactSecrets } from '@agentdeck/dlp/redact';
+import { createCaStreamFetch } from '../platform/net/ca-fetch.ts';
 import { hopText } from './gateway/texts.ts';
+
+/**
+ * Без поданного `fetchImpl` — встроенный `fetch`, кроме имён под `.localhost` (`api.localhost`
+ * стенда в k8s): о них встроенный спрашивает ОС, а резолвер Windows их не знает — шлюз отвечал
+ * «Нет связи с контуром», хотя проба того же адреса проходила. Пустое окружение: прокси и свой
+ * корень здесь не включаются, это дело маршрута контура.
+ */
+const defaultFetch = createCaStreamFetch('', {});
 
 /**
  * Поход наверх — единственное место звена, где ключ попадает в запрос (перенос
@@ -124,7 +133,7 @@ async function attempt(call: HopUpstreamCall): Promise<Response> {
   if (call.signal.aborted) controller.abort(call.signal.reason);
   else call.signal.addEventListener('abort', onAbort, { once: true });
   try {
-    const response = await (call.fetchImpl ?? fetch)(call.url, {
+    const response = await (call.fetchImpl ?? defaultFetch)(call.url, {
       method: call.method,
       headers: call.headers,
       ...(call.body !== undefined ? { body: call.body } : {}),

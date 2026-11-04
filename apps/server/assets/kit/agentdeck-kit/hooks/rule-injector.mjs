@@ -25,7 +25,7 @@ export const hooks = {
     clearRuleStamps(input?.session_id);
     markCompaction(input);
   },
-  // SessionStart:compact in a split child: the cards the ended generation needed, gates armed.
+  // SessionStart:compact in a core task step: the cards the ended generation needed, gates armed.
   // `kit_room` = what the earlier SessionStart items left of the block's cap (items.mjs).
   session: (input) =>
     compactCards(input, Math.min(PRESEND_MAX, Number(input?.kit_room) || PRESEND_MAX)),

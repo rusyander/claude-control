@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { panelHomeDir } from '../../lib/brand.mjs';
-import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { readGroups } from '../../domains/project-tests/store/store.ts';
 import { createE2eFolder } from '../../domains/project-tests/e2e-folder/e2e-folder.ts';
 import { E2eRunRegistry } from '../../domains/project-tests/e2e-run/e2e-run.ts';
@@ -26,7 +25,6 @@ import {
 } from '../../domains/project-tests/__fixtures__/fake-runners.ts';
 import {
   projectTestsBusy,
-  testsChatEnv,
   testsChatFinished,
   testsChatNote,
   testsCliPath,
@@ -140,94 +138,25 @@ describe('bootstrap/tests-chat-wiring', () => {
   });
 
   it('подключается к реестру чатов одним слушателем по каталогу', () => {
-    let resolve: ((cwd: string, run: { group: boolean }) => string | undefined) | undefined;
+    let resolve: ((cwd: string) => string | undefined) | undefined;
     wireTestsChatNote({
       appData,
       chatRuns: { setWorkspaceNote: (fn) => (resolve = fn) },
     });
-    const chat = resolve?.(root, { group: false });
+    const chat = resolve?.(root);
     expect(chat).toContain('QA workspace of this project');
     expect(chat).toContain('Ask the user once');
-    // Группе разделения — её редакция строки (1.4): без вопроса на старте.
-    const group = resolve?.(root, { group: true });
-    expect(group).toContain('QA workspace of this project');
-    expect(group).not.toContain('Ask the user once');
-    expect(group).toContain('from the group task and the project notes');
   });
 
-  /**
-   * X1: путь копии в строке о тестах делал системный промпт каждой копии своим,
-   * и второй старт той же группы в другой копии писал его в кэш заново.
-   */
-  it('группа Claude: строка без путей, одна на все копии; проект — в окружении', () => {
-    let note: ((cwd: string, run: { group: boolean }) => string | undefined) | undefined;
-    let env: ((cwd: string) => Record<string, string> | undefined) | undefined;
-    wireTestsChatNote({
-      appData,
-      chatRuns: { setWorkspaceNote: (fn) => (note = fn), setWorkspaceEnv: (fn) => (env = fn) },
-    });
-    const other = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-chat-e2e-other-')));
-    try {
-      spawnSync('git', ['init', '-q'], { cwd: other });
-      for (const dir of [root, other]) createE2eFolder(appData, dir, '2026-09-26T10:00:00.000Z');
-      const one = note?.(root, { group: true }) ?? '';
-      expect(one).toContain('e2e folder "e2e"');
-      expect(one).toContain(`node "${testsCliPath()}" sync; run them:`);
-      expect(one).toContain('AGENTDECK_TESTS_PROJECT');
-      expect(one).not.toContain('--project "');
-      expect(one).not.toContain(root);
-      expect(note?.(other, { group: true })).toBe(one);
-      expect(env?.(root)).toEqual({ AGENTDECK_TESTS_PROJECT: root });
-      expect(env?.(other)).toEqual({ AGENTDECK_TESTS_PROJECT: other });
-      // Чат человека — как прежде: команды с путём, без строки об окружении.
-      const chat = note?.(root, { group: false }) ?? '';
-      expect(chat).toContain(`sync --project "${root}"`);
-      expect(chat).not.toContain('AGENTDECK_TESTS_PROJECT');
-      // Не проект — ни строки, ни окружения.
-      expect(env?.(join(root, 'nope'))).toBeUndefined();
-    } finally {
-      dropTemp(other);
-    }
-  });
-
-  it('чужие CLI получают тот же решатель; конец хода отдаётся наружу', () => {
-    let claude: ((cwd: string, run: { group: boolean }) => string | undefined) | undefined;
-    let foreign: ((cwd: string, run?: { group: boolean }) => string | undefined) | undefined;
-    let system: Parameters<ProviderChatService['setSystemNote']>[0] | undefined;
-    let limits: Parameters<ProviderChatService['setLocalLimits']>[0] | undefined;
+  it('решатель уходит реестру прогонов; конец хода отдаётся наружу', () => {
+    let claude: ((cwd: string) => string | undefined) | undefined;
     const wired = wireTestsChatNote({
       appData,
       chatRuns: { setWorkspaceNote: (fn) => (claude = fn) },
-      providerChats: {
-        setWorkspaceNote: (fn) => (foreign = fn),
-        setSystemNote: (fn) => (system = fn),
-        setLocalLimits: (fn) => (limits = fn),
-      },
     });
-    expect(foreign?.(root)).toBe(claude?.(root, { group: false }));
-    expect(foreign?.(root)).toContain('QA workspace of this project');
-    // Группа чужого CLI — редакцией группы, без вопроса человеку (ревью A2-F10),
-    // но с путями: канала окружения к её строке нет, она не делит кэш копий (X1).
-    expect(foreign?.(root, { group: true })).toBe(
-      testsChatNote({ appData, chatRuns: {} as never }, root, true),
-    );
-    expect(foreign?.(root, { group: true })).not.toContain('Ask the user once');
-    expect(foreign?.(root, { group: true })).toContain(`--project "${root}"`);
-    expect(claude?.(root, { group: true })).not.toContain(root);
+    expect(claude?.(root)).toContain('QA workspace of this project');
     // Папки нет — сверять нечего, и конец хода ничего не пишет.
     expect(wired.finished(root, Date.now() - 60_000)).toBeUndefined();
-    // Системный канал — только у CLI со слоем системных настроек (Qwen).
-    const qwen = system?.('qwen', 'QA note', {});
-    expect(qwen?.QWEN_CODE_SYSTEM_SETTINGS_PATH).toContain(join(appData, 'qwen-note-layers'));
-    expect(system?.('codex', 'QA note', {})).toBeUndefined();
-    expect(system?.('claude', 'QA note', {})).toBeUndefined();
-    // Окно локальной модели — тоже только у Qwen и тем же файлом настроек.
-    const window = { contextWindow: 65_536, timeoutMs: 600_000, idleMs: 300_000 };
-    expect(limits?.('qwen', window, {})?.QWEN_CODE_SYSTEM_SETTINGS_PATH).toContain(
-      join(appData, 'qwen-limit-layers'),
-    );
-    expect(limits?.('codex', window, {})).toBeUndefined();
-    expect(limits?.('claude', window, {})).toBeUndefined();
   });
 
   it('конец хода: агент написал тест — кейс заведён; идёт прогон — сверка ждёт', () => {
@@ -318,8 +247,6 @@ describe('bootstrap/tests-chat-wiring', () => {
       const note = testsChatNote(deps, copy);
       expect(note).toContain(`--project "${root}"`);
       expect(note).not.toContain(copy);
-      // Группа Claude в той же копии — проект оригинала окружением (X1).
-      expect(testsChatEnv(deps, copy)).toEqual({ AGENTDECK_TESTS_PROJECT: root });
       const startedAt = Date.now();
       writeFileSync(
         join(copy, 'e2e', 'pay.spec.ts'),
@@ -361,13 +288,6 @@ describe('bootstrap/tests-chat-wiring', () => {
       expect(note).toContain('"npm test -- {files}"');
       expect(note).toContain(`run --project "${copy}"`);
       expect(note).not.toContain(`--project "${root}"`);
-      // Окружение группы называет тот же проект, что назвала бы строка, — копию.
-      expect(testsChatEnv(deps, copy)).toEqual({ AGENTDECK_TESTS_PROJECT: copy });
-      const group = testsChatNote(deps, copy, true, true) ?? '';
-      expect(group).toContain(
-        `node "${testsCliPath()}" run [--group <group> | --case <group>:<id>,…]`,
-      );
-      expect(group).not.toContain(copy);
     } finally {
       if (process.platform === 'win32') rmdirSync(join(copy, 'e2e'));
       else unlinkSync(join(copy, 'e2e'));

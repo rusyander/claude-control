@@ -9,6 +9,7 @@
  * настоящий `claude` и файл на диске настоящие, и файл проверяется здесь же:
  * кадр «вызов выполнен» без файла был бы рисунком, а не снимком.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
@@ -124,30 +125,69 @@ async function createScripted(page, url) {
   await pause(3000);
 }
 
-/** Новый чат, прогон до конца; попутно разрешить запись, если CLI о ней спросит. */
-async function runChat(page, web, text) {
-  // `/chat` открывает последний разговор — без нового чата кадр нёс бы хвост
-  // прошлого прогона на другом контуре.
-  await page.goto(`${web}/chat`, { waitUntil: 'domcontentloaded' });
-  await pause(3000);
-  await button(page, 'Новый чат', 'New chat').click();
-  await pause(1500);
-  const box = page.locator('textarea').first();
-  await box.fill(text);
-  await box.press('Enter');
-  let allowed = false;
-  for (let i = 0; i < 80; i += 1) {
-    await pause(2500);
-    const allow = page.getByRole('button', { name: /^(Разрешить|Allow)/ });
-    if (!allowed && (await allow.count())) {
-      await allow.first().click();
-      allowed = true;
-      continue;
+/**
+ * Новый чат через ядро, первый ход до конца. Путь человека: «Новый чат» в `/chat` открывает «Чат
+ * через ядро» (`/core/chat`); папка проекта здесь подставлена адресом, как её подставляет открытый
+ * проект, — у одноразовой панели проектов нет. Ход кончен, когда строка состояния говорит «ждёт
+ * вашего сообщения» и в ленте уже есть ответ модели; отказ ядра или ошибка хода — исключение со
+ * словами экрана, а не кадр.
+ */
+async function runChat(page, web, folder, text) {
+  await page.goto(`${web}/core/chat?project=${encodeURIComponent(folder)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
+  await page.locator('[data-core-chat-first] textarea').fill(text);
+  // Ответы панели на старт — причина отказа: экран мог назвать лишь код статуса.
+  const answers = [];
+  const listen = async (response) => {
+    if (!/\/api\/(chat\/core-start|core\/)/.test(response.url()) || response.status() < 400) return;
+    const body = await response.text().catch(() => '');
+    answers.push(`${response.status()} ${response.url().split('/api/')[1]}: ${body.slice(0, 600)}`);
+  };
+  page.on('response', listen);
+  await page.locator('[data-core-chat-submit]').click();
+  await page
+    .waitForURL(/[?&]id=/, { timeout: 60_000 })
+    .catch(async () => {
+      const why = await page
+        .locator('[data-core-chat-start-failed]')
+        .innerText()
+        .catch(() => '');
+      throw new Error(
+        `чат через ядро не начался: ${why || 'адрес задачи не появился'}\n  ${answers.join('\n  ')}`,
+      );
+    })
+    .finally(() => page.off('response', listen));
+  for (let i = 0; i < 240; i += 1) {
+    await pause(1000);
+    const refused = page.locator('[data-core-chat-launch-refused], [data-core-chat-error-line]');
+    if (await refused.count())
+      throw new Error(`ядро отказало: ${await refused.first().innerText()}`);
+    if (await page.locator('[data-core-chat-turn-failed], [data-core-chat-error]').count())
+      throw new Error(
+        `ход кончился ошибкой: ${await page.locator('[data-core-chat-thread]').innerText()}`,
+      );
+    const status = await page
+      .locator('[data-core-chat-status]')
+      .first()
+      .getAttribute('data-core-chat-status')
+      .catch(() => null);
+    const answered = await page.locator('[data-core-chat-assistant]').count();
+    if (status === 'waiting' && answered > 0) {
+      // Съёмка сама сторожит живую ленту, без перезагрузки: ход человека, записанный ядром
+      // после того, как первый опрос сеанса прошёл его место, раньше в ленту не попадал вовсе
+      // («живьём 0, после перезагрузки 1»). Пауза — чтобы следующие опросы успели показать
+      // повтор, если бы он был.
+      await pause(1500);
+      const humans = await page.locator('[data-core-chat-human]').count();
+      console.log(`  чат: реплик человека в живой ленте ${humans}`);
+      if (humans !== 1)
+        throw new Error(`в живой ленте реплик человека ${humans}, ждали одну — кадр плавал бы`);
+      return;
     }
-    const running = await page.getByRole('button', { name: /Остановить|Stop/ }).count();
-    if (i > 2 && !running) break;
   }
-  await pause(1500);
+  throw new Error('ход чата через ядро не кончился за 4 минуты');
 }
 
 async function setDefaultModel(page, web, model) {
@@ -164,13 +204,22 @@ async function setDefaultModel(page, web, model) {
   await pause(2000);
 }
 
-export async function shootScripted({ page, web, shots }) {
+export async function shootScripted({ page, web, shots, leftovers = [] }) {
   const { scripted } = shots;
   let stub = await startStubPlatform({ port: STUB_PORT, png: lighthousePng() });
   // Путь виден в кадре — он стоит прямо в тексте просьбы. Временная папка
   // профиля унесла бы в публичное дерево имя учётной записи машины, поэтому
   // каталог берётся нейтральный (`shotHome`).
   const folder = shotHome('shim-');
+  // Чат через ядро идёт в папке ПРОЕКТА, и оценка ядра отказывает папке без git («not a git
+  // repository»): папка съёмки — репозиторий с одним пустым коммитом, как у человека.
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'user.name=shots', '-c', 'user.email=shots@example.com', ...args], {
+      cwd: folder,
+      stdio: 'ignore',
+    });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'init');
 
   try {
     // ── Сценарный контур: тот же мастер, без кадров ─────────────────────────
@@ -192,7 +241,13 @@ export async function shootScripted({ page, web, shots }) {
     await setDefaultModel(page, web, 'stub-tool-shim');
     const done = join(folder, 'hello.txt').replace(/\\/g, '/');
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await runChat(page, web, L(`Запиши файл. ФАЙЛ: ${done}`, `Write the file. ФАЙЛ: ${done}`));
+    await runChat(
+      page,
+      web,
+      folder,
+      // «ЯЗЫК: en» — метка стаба-контура: без неё английский кадр показывал русский ответ модели.
+      L(`Запиши файл. ФАЙЛ: ${done}`, `Write the file. ФАЙЛ: ${done} ЯЗЫК: en`),
+    );
     if (!existsSync(done))
       throw new Error(`вызов через прослойку не создал ${done} — кадр был бы неправдой`);
     await scripted.shot(page, '01-shim-call');
@@ -204,9 +259,10 @@ export async function shootScripted({ page, web, shots }) {
     await runChat(
       page,
       web,
+      folder,
       L(
         `Покажи, как выглядит вызов. ФАЙЛ: ${quoted}`,
-        `Show what a call looks like. ФАЙЛ: ${quoted}`,
+        `Show what a call looks like. ФАЙЛ: ${quoted} ЯЗЫК: en`,
       ),
     );
     if (existsSync(quoted))
@@ -257,13 +313,23 @@ export async function shootScripted({ page, web, shots }) {
     await page.setViewportSize({ width: 1280, height: 1400 });
     await page.goto(`${web}/platform`, { waitUntil: 'domcontentloaded' });
     await pause(3000);
-    area = await frameArea(page, await mark(page, standTitle, 'stand-card'));
+    // Липкая полоса вкладок раздела: без отступа заголовок карточки с кнопкой «Сделать активным» —
+    // то, ради чего кадр, — уходил под неё.
+    area = await frameArea(page, await mark(page, standTitle, 'stand-card'), { margin: 70 });
     await scripted.shot(page, '06-switch-button', { clip: area });
     await page
       .locator('[data-shot="stand-card"]')
       .getByRole('button', { name: exact('Сделать активным', 'Make it active') })
       .click();
-    await waitInCard(page, '[data-shot="stand-card"]', SMOKE_OK, 90);
+    // Итог пробного запроса стенда в кадр не идёт: кадру 07 нужно лишь, чтобы сценарный контур
+    // перестал быть активным. Ответ живой модели стенда — отдельный вопрос (этап 15), и красный
+    // пробный запрос стенда съёмку не роняет.
+    await waitInCard(
+      page,
+      '[data-shot="stand-card"]',
+      new RegExp(`${SMOKE_OK.source}|${SMOKE_FAILED.source}`),
+      90,
+    );
     await pause(1500);
 
     // ── Красный пробный запрос: контур перестал отвечать ────────────────────
@@ -278,10 +344,25 @@ export async function shootScripted({ page, web, shots }) {
       .click();
     await waitInCard(page, '[data-shot="scripted-card"]', SMOKE_FAILED, 90);
     await pause(800);
-    area = await frameArea(page, '[data-shot="scripted-card"]');
+    area = await frameArea(page, '[data-shot="scripted-card"]', { margin: 70 });
+    // Тост «Контур активен, но пробный запрос не прошёл» прикреплён к низу окна, а окно подогнано
+    // под карточку — он ложился на её низ. Карточка говорит то же сама; тост закрывается кнопкой.
+    for (const close of await page
+      .locator('ol[aria-label="Уведомления"], ol[aria-label="Notifications"]')
+      .getByRole('button', { name: exact('Закрыть', 'Close') })
+      .all())
+      await close.click().catch(() => {});
+    await pause(600);
     await scripted.shot(page, '07-smoke-red', { clip: area });
   } finally {
     if (stub) await stopStub(stub);
-    rmSync(folder, { recursive: true, force: true });
+    // Чат ядра живёт, пока жив стенд, и держит папку проекта открытой (EBUSY на Windows), а
+    // упавшая здесь уборка прятала настоящую ошибку кадра: папку уберёт съёмщик после остановки
+    // стенда (`leftovers`).
+    try {
+      rmSync(folder, { recursive: true, force: true });
+    } catch {
+      leftovers.push(folder);
+    }
   }
 }

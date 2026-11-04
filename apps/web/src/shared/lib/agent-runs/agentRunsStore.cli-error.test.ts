@@ -71,6 +71,32 @@ describe('ошибка CLI с кодом', () => {
     expect(getRun('cli-err-1').errorOverflow).toBeUndefined();
   });
 
+  it('s10 G7: текст самой панели по коду (отказ ядра) — переводом кода на языке интерфейса, а не строкой сервера', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        sseResponse([
+          frame({
+            kind: 'error',
+            message: 'RAW-SERVER-LINE',
+            seq: 1,
+            code: 'core-chat-contour-down',
+            params: { contour: 'c1' },
+            panel: true,
+          }),
+        ]),
+      ),
+    );
+
+    await agentRuns.start({ chatId: 'cli-err-3', prompt: 'привет' });
+    await settle();
+
+    const run = getRun('cli-err-3');
+    expect(run.errorCode).toBe('core-chat-contour-down');
+    expect(run.error).not.toBe('RAW-SERVER-LINE');
+    expect(run.error).toContain('обязательный контур c1 недоступен');
+  });
+
   it('ошибка без кода — ни кода, ни переполнения', async () => {
     vi.stubGlobal(
       'fetch',

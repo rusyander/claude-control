@@ -126,6 +126,9 @@ describe('boot: api-key and gateway routes from the panel app data (W2b)', () =>
       upstreamRooted: true,
       // Объявленное пресетом едет к звену: база его не знает.
       manifest: { anthropicMessages: 'messages' },
+      // Правила тела верха (этап 10, C3): совместимому шлюзу полей не ставится; перевод в поток —
+      // общая настройка `platformGateway.forceStream`, без записи «да», как у шлюза панели прежде.
+      requestRules: { forceStream: true, set: [], streamless: [] },
     });
     expect(routeHopFacts(profiles, 'gateway:c2').dlpRequired).toBe(false);
     expect(routeHopFacts(profiles, 'api-key:endpoint:own-1').manifest).toBeNull();
@@ -193,6 +196,12 @@ describe('boot: api-key and gateway routes from the panel app data (W2b)', () =>
     const home = tempDir('panel-home-');
     expect(panelAppDataDir({ AGENTDECK_PANEL_DATA: '/x/data' }, home)).toBe('/x/data');
     expect(panelAppDataDir({ AGENTDECK_CORE_HOME: '/stand/core' }, home)).toBeUndefined();
+    expect(
+      panelAppDataDir(
+        { AGENTDECK_CORE_HOME: '/stand/core', AGENTDECK_PANEL_DATA: '/x/data' },
+        home,
+      ),
+    ).toBe('/x/data');
     expect(panelAppDataDir({}, home)).toBeUndefined();
     const standalone = join(home, '.agentdeck', 'data');
     mkdirSync(standalone, { recursive: true });

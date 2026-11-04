@@ -5,15 +5,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { buildGroupPrompt, environmentPreamble } from '@agentdeck/contracts/task-split';
-import { reviewStagePrompt } from '@agentdeck/contracts/model-cascade';
-import { workAfterPlanPrompt, planStagePrompt } from '@agentdeck/contracts/split-plan';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
-import { groupIdentityLine } from '../../../domains/chat/panel-preamble.ts';
 import { buildHandoffPrompt } from '@agentdeck/contracts/chat-handoff';
-import { coldResumeBrief, lostConversationBrief } from '../../../domains/chat/split-continue.ts';
-import { withStageTask } from '../../../domains/chat/cold-continuation/cold-continuation.ts';
+import { lostConversationBrief } from '../../../domains/chat/split-continue.ts';
 
 /**
  * Название чата группы в списке (живой стенд 25.09.2026): звено, чья первая
@@ -79,11 +75,13 @@ describe('GET /api/chats — название звена группы', () => {
     return new Map(chats.map((chat) => [chat.id, chat]));
   }
 
-  const REVIEW = reviewStagePrompt({
-    task: 'Поправь вход',
-    model: 'claude-opus-4-8',
-    branch: 'fix/login',
-  });
+  // Задание звена ревью — как лежит в транскриптах на диске: построитель уехал в
+  // ядро вместе с планировщиком звеньев (этап 10), первая строка — его дословно.
+  const REVIEW = [
+    'This is a new session: the work was done by the model claude-opus-4-8 on the branch fix/login; you do not have its context — read the code and the diff.',
+    'Task of the work:',
+    'Поправь вход',
+  ].join('\n');
 
   it('звено, написанное панелью целиком, называется именем группы', async () => {
     transcript('review-1', REVIEW);
@@ -122,9 +120,12 @@ ${buildGroupPrompt({
 })}`;
     transcript(
       'work-2',
-      `${groupIdentityLine('fix/login', ['PROJ-7'])}
+      // Транскрипт с диска, записанный до ухода групп в ядро: строка ветки — как её писала панель.
+      `Group branch: fix/login. Group tasks: PROJ-7.
 
-${workAfterPlanPrompt({ task })}`,
+${task}
+
+The panel did not receive this group's plan (the plan run gave no block or did not finish) — plan yourself: first the code analysis and references, then steps with a check after each.`,
     );
     store.setChatLink('work-2', { ...link('Форма входа'), stage: 'work' });
 
@@ -144,9 +145,18 @@ ${workAfterPlanPrompt({ task })}`,
   });
 
   it('звено плана называется именем группы, а не «План работы для группы…»', async () => {
+    // Задание звена плана панель больше не пишет (план уехал в ядро) — чат на
+    // диске хранит его начало в последней редакции.
     transcript(
       'plan-1',
-      planStagePrompt({ title: 'Форма входа', task: 'Поправь вход', branch: 'fix/login' }),
+      [
+        'Work plan for the group "Форма входа" on branch fix/login.',
+        'This is preparation BEFORE the work: a separate run does the work, it will not have your context.',
+        'EDIT NOTHING: read code, search, run read-only checks. Edits are not your stage.',
+        '',
+        "The group's task:",
+        'Поправь вход',
+      ].join('\n'),
     );
     store.setChatLink('plan-1', { ...link('Форма входа'), stage: 'plan' });
 
@@ -206,28 +216,6 @@ ${workAfterPlanPrompt({ task })}`,
     const title = (await list()).get('handoff-1')?.title;
 
     expect(title).toBe('Форма входа');
-  });
-
-  // Живой прогон 23.10: группа после долгой паузы пошла новым разговором, и он
-  // назывался первой строкой вводной панели — «The panel started a new
-  // conversation instead of continuing the previou…» в карточке запроса прав, в
-  // списке и в уведомлениях. Вводная, факты копии и задание стадии собраны
-  // панелью целиком; ответ человека за ними — не название группы.
-  it('новый разговор вместо остывшего называется именем группы', async () => {
-    const brief = withStageTask(
-      coldResumeBrief({ branch: 'fix/login' }, ['Поправь валидацию формы входа']),
-      'Поправь валидацию формы входа',
-    );
-    transcript(
-      'cold-1',
-      `${brief}\n\nGit: 3 commits on fix/login since main.\n\nПродолжай по .agent/PROGRESS.md`,
-    );
-    store.setChatLink('cold-1', { ...link('Форма входа'), stage: 'work' });
-
-    const chat = (await list()).get('cold-1');
-
-    expect(chat?.title).toBe('Форма входа');
-    expect(chat?.title).not.toContain('The panel started');
   });
 
   it('новый разговор вместо пропавшего транскрипта называется именем группы', async () => {

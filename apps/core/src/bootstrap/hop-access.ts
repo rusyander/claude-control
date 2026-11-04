@@ -1,5 +1,6 @@
 import {
   ensureHopHost,
+  findHopHost,
   type EnsureHopHostOptions,
   type HopHostHandle,
 } from '../routes/hops/hops.ts';
@@ -12,6 +13,11 @@ import {
  */
 export interface HopAccess {
   handle(): Promise<HopHostHandle>;
+  /**
+   * Только живой хост, без запуска (`undefined` — хоста нет): читателю, которому без трафика
+   * читать нечего (извещения о бюджете), незачем заводить процесс.
+   */
+  live(): Promise<HopHostHandle | undefined>;
   /** Хост ответил отказом связи — забыть его, следующий зов найдёт или поднимет заново. */
   forget(): void;
   /** Каталог данных панели, с которым ядро поднимает хост (ключи `panel-store`, правила). */
@@ -28,6 +34,10 @@ export function createHopAccess(options: EnsureHopHostOptions): HopAccess {
         throw error;
       });
       return pending;
+    },
+    live: async () => {
+      if (pending) return await pending.catch(() => undefined);
+      return await findHopHost(options);
     },
     forget: () => {
       pending = undefined;

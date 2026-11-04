@@ -9,15 +9,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:29:31.153Z",
-      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 1 работает Вопросы: ждут ответа 1 1 ждёт вас 1 проект Новый чат Новый чат Все разговоры Все разговоры , Новый чат — без проекта, сменить  Новый чат — без проекта сменить shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 8 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests сейчас работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
+      "shotAt": "2026-11-04T08:02:30.534Z",
+      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 1 работает Вопросы: ждут ответа 1 1 ждёт вас 1 проект Новый чат Новый чат Все разговоры Все разговоры , Новый чат — без проекта, сменить  Новый чат — без проекта сменить Задачи ядра Задачи ядра shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 9 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests 1 мин работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
       "en": {
         "file": "01-home.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:32:02.223Z",
-        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 1 running Questions: 1 waiting for an answer 1 needs you 1 project New chat New chat All conversations All conversations , New chat — no project, change  New chat — no project change shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 11 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 3 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:05:12.770Z",
+        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 1 running Questions: 1 waiting for an answer 1 needs you 1 project New chat New chat All conversations All conversations , New chat — no project, change  New chat — no project change Core tasks Core tasks shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 12 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 3 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "db75d5b3014da9be",
+          "text": "7929e7ea2ce4071c"
+        }
+      },
+      "seal": {
+        "png": "7b801c1b4c8dfc44",
+        "text": "f1325a13a5d42702"
       }
     },
     {
@@ -27,15 +35,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:29:43.549Z",
-      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Add sign-in by QR code to the mobile layout Открыть чат Открыть чат shop-app · 9 мин Ответить отсюда нельзя: запрос ждёт в окне терминала или VS Code. Чтобы решать с телефона, включите «Агент на компьютере» в настройках и добавьте хуки панели. Default Which sign-in stays the default? • QR code — Camera opens first • Email and password — QR is a secondary button Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
+      "shotAt": "2026-11-04T08:02:41.833Z",
+      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Add sign-in by QR code to the mobile layout shop-app · 9 мин Открыть чат Открыть чат Claude Code · вне панели Ответить отсюда нельзя: запрос ждёт в окне терминала или VS Code. Чтобы решать с телефона, включите «Агент на компьютере» в настройках и добавьте хуки панели. Default Which sign-in stays the default? • QR code — Camera opens first • Email and password — QR is a secondary button Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
       "en": {
         "file": "02-questions.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:32:13.642Z",
-        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 Add sign-in by QR code to the mobile layout Open chat Open chat shop-app · 11 min DEFAULT Which sign-in stays the default? QR code, Camera opens first QR code Camera opens first Email and password, QR is a secondary button Email and password QR is a secondary button Other Other Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:05:24.001Z",
+        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 Add sign-in by QR code to the mobile layout shop-app · 12 min Open chat Open chat Claude Code · panel DEFAULT Which sign-in stays the default? QR code, Camera opens first QR code Camera opens first Email and password, QR is a secondary button Email and password QR is a secondary button Other Other Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "8e5abee6136075e4",
+          "text": "7890f2cd6f30eac3"
+        }
+      },
+      "seal": {
+        "png": "1f506cea492d443f",
+        "text": "0ccdea32eb23deb2"
       }
     },
     {
@@ -45,15 +61,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:29:56.120Z",
-      "text": "Назад ‹ shop-app Разговоры Разговоры Код Код Тесты Тесты Группа: авто · автономно Add sign-in by QR code to the mobile layout Reading the current sign-in form first. Read src/auth/SignIn.tsx Расход шага 151.6k +15.9k 40с AskUserQuestion Which sign-in stays the default? Расход шага 127.3k +20.5k 1м 00с Waiting for your answer. Расход шага 107.7k +19.1k 2с Σ 1м 42с Add sign-in by QR code to the mobile layout shop-app · 9 мин Ответить отсюда нельзя: запрос ждёт в окне терминала или VS Code. Чтобы решать с телефона, включите «Агент на компьютере» в настройках и добавьте хуки панели. Default Which sign-in stays the default? • QR code — Camera opens first • Email and password — QR is a secondary button  Агент работает на компьютере — в терминале или VS Code. Шаги появляются здесь сами; написанное отсюда агент прочтёт после ближайшего шага. Написать агенту посреди работы Отправить ",
+      "shotAt": "2026-11-04T08:02:54.323Z",
+      "text": "Назад ‹ shop-app Разговоры Разговоры Код Код Тесты Тесты Add sign-in by QR code to the mobile layout Reading the current sign-in form first. Read src/auth/SignIn.tsx Расход шага 151.6k +15.9k 40с AskUserQuestion Which sign-in stays the default? Расход шага 127.3k +20.5k 1м 00с Waiting for your answer. Расход шага 107.7k +19.1k 2с Σ 1м 42с Add sign-in by QR code to the mobile layout shop-app · 10 мин Claude Code · панель DEFAULT Which sign-in stays the default? QR code, Camera opens first QR code Camera opens first Email and password, QR is a secondary button Email and password QR is a secondary button Другое Другое Перезапустить в чистой сессии Перезапустить в чистой сессии ⚙ ⚙ Приложить снимок  Что сделать? Голосом  Отправить ",
       "en": {
         "file": "03-chat.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:32:26.355Z",
-        "text": "Back ‹ shop-app Conversations Conversations Code Code Tests Tests Group: auto · autonomous Add sign-in by QR code to the mobile layout Reading the current sign-in form first. Read src/auth/SignIn.tsx Step spend 151.6k +15.9k 40s AskUserQuestion Which sign-in stays the default? Step spend 127.3k +20.5k 1m 00s Waiting for your answer. Step spend 107.7k +19.1k 2s Σ 1m 42s Add sign-in by QR code to the mobile layout shop-app · 12 min DEFAULT Which sign-in stays the default? QR code, Camera opens first QR code Camera opens first Email and password, QR is a secondary button Email and password QR is a secondary button Other Other Restart in a clean session Restart in a clean session ⚙ ⚙ Attach an image  What should be done? Voice  Send "
+        "shotAt": "2026-11-04T08:05:37.267Z",
+        "text": "Back ‹ shop-app Conversations Conversations Code Code Tests Tests Add sign-in by QR code to the mobile layout Reading the current sign-in form first. Read src/auth/SignIn.tsx Step spend 151.6k +15.9k 40s AskUserQuestion Which sign-in stays the default? Step spend 127.3k +20.5k 1m 00s Waiting for your answer. Step spend 107.7k +19.1k 2s Σ 1m 42s Add sign-in by QR code to the mobile layout shop-app · 12 min Claude Code · panel DEFAULT Which sign-in stays the default? QR code, Camera opens first QR code Camera opens first Email and password, QR is a secondary button Email and password QR is a secondary button Other Other Restart in a clean session Restart in a clean session ⚙ ⚙ Attach an image  What should be done? Voice  Send ",
+        "seal": {
+          "png": "2d67c5eda2247ddc",
+          "text": "1b505458043dae5c"
+        }
+      },
+      "seal": {
+        "png": "f72ae55ce2ec889c",
+        "text": "29847618efc7d4a2"
       }
     },
     {
@@ -63,15 +87,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:30:38.981Z",
+      "shotAt": "2026-11-04T08:03:37.052Z",
       "text": "Агент панели Пишите или диктуйте — агент делает это в панели. Любое изменение ждёт вашего решения. Разговор Разговор История История След След  Проект: C:\\demo\\shop-app  Что сделать в панели? Например: «Создай проект C:/work/demo». Страницы панели агент открывает на компьютере. Что сделать в панели? Голосом  Отправить  Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
       "en": {
         "file": "04-agent.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:33:09.146Z",
-        "text": "Panel agent Type or dictate — the agent does it in the panel. Every change waits for your decision. Conversation Conversation History History Trail Trail  Project: C:\\demo\\shop-app  What should be done in the panel? For example: “Create project C:/work/demo”. The agent opens panel pages on the computer. What should be done in the panel? Voice  Send  Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:06:19.094Z",
+        "text": "Panel agent Type or dictate — the agent does it in the panel. Every change waits for your decision. Conversation Conversation History History Trail Trail  Project: C:\\demo\\shop-app  What should be done in the panel? For example: “Create project C:/work/demo”. The agent opens panel pages on the computer. What should be done in the panel? Voice  Send  Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "2afe81f04f0eefe8",
+          "text": "98e973f6270e4c56"
+        }
+      },
+      "seal": {
+        "png": "114de53757857a96",
+        "text": "ca06ba9f69f75c9d"
       }
     },
     {
@@ -81,15 +113,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:30:47.563Z",
+      "shotAt": "2026-11-04T08:03:45.723Z",
       "text": "Проекты Проекты Папки Папки Проект shop-app shop-app открыт S C:\\demo\\shop-app 11 чатов · 10 мин работает: 1 ждёт: 1 Новый чат в shop-app  Продолжить: Add sign-in by QR code to the mobile layout  Продолжить Add sign-in by QR code to the mobile layout 10 мин Проект docs-site D docs-site C:\\demo\\docs-site 5 чатов · 1 дн Новый чат в docs-site  Продолжить: Update the install guide for Node 22  Продолжить Update the install guide for Node 22 1 дн Главная, ждут ответа: 1  1 Главная , Проекты Проекты  , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
       "en": {
         "file": "05-projects.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:33:17.608Z",
-        "text": "Projects Projects Folders Folders Project shop-app shop-app open S C:\\demo\\shop-app 11 chats · 13 min running: 1 waiting: 1 New chat in shop-app  Continue: Add sign-in by QR code to the mobile layout  Continue Add sign-in by QR code to the mobile layout 13 min Project docs-site D docs-site C:\\demo\\docs-site 5 chats · 1 d New chat in docs-site  Continue: Update the install guide for Node 22  Continue Update the install guide for Node 22 1 d Home, 1 waiting for an answer  1 Home , Projects Projects  , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:06:27.266Z",
+        "text": "Projects Projects Folders Folders Project shop-app shop-app open S C:\\demo\\shop-app 11 chats · 13 min running: 1 waiting: 1 New chat in shop-app  Continue: Add sign-in by QR code to the mobile layout  Continue Add sign-in by QR code to the mobile layout 13 min Project docs-site D docs-site C:\\demo\\docs-site 5 chats · 1 d New chat in docs-site  Continue: Update the install guide for Node 22  Continue Update the install guide for Node 22 1 d Home, 1 waiting for an answer  1 Home , Projects Projects  , Analytics  Analytics Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "bd5f709fff6ac001",
+          "text": "a8d1025f3a246dc0"
+        }
+      },
+      "seal": {
+        "png": "404ff8b022da6c7b",
+        "text": "fcde59134a3fb8e5"
       }
     },
     {
@@ -99,15 +139,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:30:28.776Z",
-      "text": "Navigate up Тест-кейсы проекта Пройти руками Пройти руками История прогонов История прогонов Прогон идёт на компьютере: агент поднимает приложение там же, где лежит код. Из чата кейсы не ведутся Вписать соглашение в CLAUDE.md Вписать соглашение в CLAUDE.md Sign-in (3) Sign-in (3) Checkout (2) Checkout (2) Sign-in Добавить тест Добавить тест 2 пройдено · 1 провалено · 0 осталось Последний прогон: 16.10.2026, 06:28:25 Отбор любой любой провален провален пройден пройден не проверялся не проверялся пропущен пропущен заблокирован заблокирован любой любой блокер блокер высокая высокая средняя средняя низкая низкая ☐ ☐ ✓, Sign in with email and password, кейс · высокая ✓ Sign in with email and password кейс · высокая ☐ ☐ ✕, Sign in by QR code, кейс · высокая ✕ Sign in by QR code кейс · высокая ☐ ☐ ✓, Wrong password shows a message, кейс · средняя ✓ Wrong password shows a message кейс · средняя",
+      "shotAt": "2026-11-04T08:03:26.434Z",
+      "text": "Navigate up Тест-кейсы проекта Пройти руками Пройти руками История прогонов История прогонов Прогон идёт на компьютере: агент поднимает приложение там же, где лежит код. Из чата кейсы не ведутся Вписать соглашение в CLAUDE.md Вписать соглашение в CLAUDE.md Sign-in (3) Sign-in (3) Checkout (2) Checkout (2) Sign-in Добавить тест Добавить тест 2 пройдено · 1 провалено · 0 осталось Последний прогон: 04.11.2026, 07:01:02 Отбор любой любой провален провален пройден пройден не проверялся не проверялся пропущен пропущен заблокирован заблокирован любой любой блокер блокер высокая высокая средняя средняя низкая низкая ☐ ☐ ✓, Sign in with email and password, кейс · высокая ✓ Sign in with email and password кейс · высокая ☐ ☐ ✕, Sign in by QR code, кейс · высокая ✕ Sign in by QR code кейс · высокая ☐ ☐ ✓, Wrong password shows a message, кейс · средняя ✓ Wrong password shows a message кейс · средняя",
       "en": {
         "file": "06-tests.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:32:58.907Z",
-        "text": "Navigate up Project test cases Generate Run Full retest Full retest Run by hand Run by hand Run history Run history The run happens on the computer: the agent starts the app where the code lives. Chat does not keep the cases Write the convention into CLAUDE.md Write the convention into CLAUDE.md Sign-in (3) Sign-in (3) Checkout (2) Checkout (2) Sign-in Add a test Add a test 2 passed · 1 failed · 0 left Last run: 10/16/2026, 6:28:25 AM Filter any any failed failed passed passed not run not run skipped skipped blocked blocked any any blocker blocker high high medium medium low low ☐ ☐ ✓, Sign in with email and password, case · high ✓ Sign in with email and password case · high ☐ ☐ ✕, Sign in by QR code, case · high ✕ Sign in by QR code case · high ☐ ☐ ✓, Wrong password shows a message, case · medium ✓ Wrong password shows a message case · medium"
+        "shotAt": "2026-11-04T08:06:08.995Z",
+        "text": "Navigate up Project test cases Generate Run Full retest Full retest Run by hand Run by hand Run history Run history The run happens on the computer: the agent starts the app where the code lives. Chat does not keep the cases Write the convention into CLAUDE.md Write the convention into CLAUDE.md Sign-in (3) Sign-in (3) Checkout (2) Checkout (2) Sign-in Add a test Add a test 2 passed · 1 failed · 0 left Last run: 11/4/2026, 7:01:02 AM Filter any any failed failed passed passed not run not run skipped skipped blocked blocked any any blocker blocker high high medium medium low low ☐ ☐ ✓, Sign in with email and password, case · high ✓ Sign in with email and password case · high ☐ ☐ ✕, Sign in by QR code, case · high ✕ Sign in by QR code case · high ☐ ☐ ✓, Wrong password shows a message, case · medium ✓ Wrong password shows a message case · medium",
+        "seal": {
+          "png": "8d9a850b14705c22",
+          "text": "f4c52c5bba54a26e"
+        }
+      },
+      "seal": {
+        "png": "43f432c4c03ae40c",
+        "text": "9fb79ca7ad9f523c"
       }
     },
     {
@@ -117,15 +165,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T07:30:57.792Z",
-      "text": "Обзор Обзор Расход Расход Инструменты Инструменты Сессии Сессии Сегодня Сегодня 7 дней 7 дней 30 дней 30 дней 90 дней 90 дней Всё время Всё время , с даты  с даты — , по дату  по дату $10.52 2026-10-09 — 2026-10-16 · оценка по тарифам API 5.2M 52 Токенов Запросов 88% 0 Из кэша Сессий сейчас По дням 2026-10-16 587.9k ток. $1.08 2026-10-10 10 2026-10-11 11 2026-10-12 12 2026-10-13 13 2026-10-14 14 2026-10-15 15 2026-10-16 16 Нажмите на столбик, чтобы увидеть день. По часам Запросы к модели за период — в какие часы суток идёт работа. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика Аналитика  Агент  Агент , Настройки  Настройки",
+      "shotAt": "2026-11-04T08:03:55.854Z",
+      "text": "Обзор Обзор Расход Расход Инструменты Инструменты Сессии Сессии Сегодня Сегодня 7 дней 7 дней 30 дней 30 дней 90 дней 90 дней Всё время Всё время , с даты  с даты — , по дату  по дату $10.52 2026-10-28 — 2026-11-04 · оценка по тарифам API 5.2M 52 Токенов Запросов 88% 0 Из кэша Сессий сейчас По дням 2026-11-04 587.9k ток. $1.08 2026-10-29 29 2026-10-30 30 2026-10-31 31 2026-11-01 01 2026-11-02 02 2026-11-03 03 2026-11-04 04 Нажмите на столбик, чтобы увидеть день. По часам Запросы к модели за период — в какие часы суток идёт работа. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика Аналитика  Агент  Агент , Настройки  Настройки",
       "en": {
         "file": "07-analytics.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T07:33:28.046Z",
-        "text": "Overview Overview Spend Spend Tools Tools Sessions Sessions Today Today 7 days 7 days 30 days 30 days 90 days 90 days All time All time , from  from — , to  to $10.52 2026-10-09 — 2026-10-16 · estimated at API rates 5.2M 52 Tokens Requests 88% 0 From cache Sessions now By day 2026-10-16 587.9k tok. $1.08 2026-10-10 10 2026-10-11 11 2026-10-12 12 2026-10-13 13 2026-10-14 14 2026-10-15 15 2026-10-16 16 Tap a bar to see that day. By hour Model requests over the period — which hours of the day the work happens. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics Analytics  Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:06:37.377Z",
+        "text": "Overview Overview Spend Spend Tools Tools Sessions Sessions Today Today 7 days 7 days 30 days 30 days 90 days 90 days All time All time , from  from — , to  to $10.52 2026-10-28 — 2026-11-04 · estimated at API rates 5.2M 52 Tokens Requests 88% 0 From cache Sessions now By day 2026-11-04 587.9k tok. $1.08 2026-10-29 29 2026-10-30 30 2026-10-31 31 2026-11-01 01 2026-11-02 02 2026-11-03 03 2026-11-04 04 Tap a bar to see that day. By hour Model requests over the period — which hours of the day the work happens. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics Analytics  Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "7b3f5b5041569034",
+          "text": "ea6aa60653bbed98"
+        }
+      },
+      "seal": {
+        "png": "0b29918f26bbe378",
+        "text": "afe283420f315b1e"
       }
     }
   ]

@@ -26,7 +26,13 @@ import { compatFactsOf } from './compat-gate.ts';
 
 const adapter: CompatAdapter = {
   id: 'claude',
-  caps: { login: 'account', channels: [], limitsChannel: null },
+  caps: {
+    login: 'account',
+    channels: [],
+    limitsChannel: null,
+    preToolHooks: true,
+    denyOverlay: true,
+  },
   bypassActive: {},
 };
 const policy = (modelPattern: string, route = 'cli-login:claude'): CompatPolicy => ({

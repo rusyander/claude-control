@@ -4,6 +4,7 @@ import type {
   PlatformConsumerReason,
   PlatformModelChoice,
   PlatformRunPlan,
+  PlatformSpendRecord,
 } from '@agentdeck/contracts';
 import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import {
@@ -62,6 +63,11 @@ export interface PlatformRoutingDeps {
    * и в активации: записанный в состоянии порт — след прошлого запуска.
    */
   gatewayPort: () => number;
+  /**
+   * Учёт расхода по контурам — его ведёт звено ядра (C3b), панель держит последний ответ.
+   * Нет — отметки «бюджет исчерпан» не видно, и план прогона её не несёт (тесты без ядра).
+   */
+  contourSpend?: () => Record<string, PlatformSpendRecord>;
   /**
    * Настройка самого Claude, уводящая его прогоны мимо шлюза: `env` из
    * settings.json перекрывает окружение процесса (замер 07.10, claude 2.1.286), и
@@ -497,7 +503,7 @@ export function resolveRunRoute(
     model,
     ...(modelMapKeys.length > 0 ? { modelMapKeys } : {}),
     ...(modelContext && modelContext > 0 ? { modelContext } : {}),
-    ...(deps.store.getPlatformSpend()[platform.id]?.exhaustedAt ? { budgetExhausted: true } : {}),
+    ...(deps.contourSpend?.()[platform.id]?.exhaustedAt ? { budgetExhausted: true } : {}),
     // compromise: no-effort — драйвер не объявил приём усилия, и прогон уходит без `--effort`
     effort: effortAccepted(platform),
     ...(systemPrompt.trim() ? { systemPrompt } : {}),

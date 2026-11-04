@@ -24,8 +24,14 @@ import type {
   StopOutcome,
 } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { withProcessSnapshot } from '../../../lib/process-tree/process-tree.ts';
-import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
 import type { AutoApproveState } from '../ChatSession/ChatSession.ts';
+
+/**
+ * Параметры прогона реестра панели — от самого реестра: дерево откладывает и запускает
+ * ровно то, что принимает `ChatRunRegistry.start`, и уходит вместе с ним.
+ */
+export type TreeRunOptions = Parameters<ChatRunRegistry['start']>[1];
+type RunOptions = TreeRunOptions;
 
 /**
  * Пауза дерева разговоров: «Остановить всё» у родителя.
@@ -116,15 +122,6 @@ export interface TreePauseDeps {
    * вопросов и запросов прав. Нет — узлы без них, как раньше.
    */
   asksOf?: (keys: readonly string[]) => ChatTreeAsk[];
-  /**
-   * Группа разделения между ходами с идущим фоном (23.10, N1a): хода нет, и
-   * остановка прогонов её не видит, а конец фона будил CLI в стоящем дереве.
-   * `snapshot` — чем её продолжить, `close` — погасить процесс. Нет — как раньше.
-   */
-  idle?: {
-    snapshot(chatId: string): RunSnapshot | undefined;
-    close(chatId: string): StopOutcome;
-  };
   /** После паузы — по ключам снятых разговоров (добор процессов копий групп). */
   afterPause?: (keys: readonly string[]) => void;
   /**
@@ -311,18 +308,6 @@ export class TreePause implements TreeStartGate {
         if (!run || seen.has(run.key) || run.status !== 'running') continue;
         seen.add(run.key);
         hold(run, () => this.deps.runs.stop(run.key));
-      }
-      // Группы разделения между ходами — как пауза одной группы (N1a, 23.10):
-      // процесс с фоном гасится сразу, а «Продолжить всё» продолжает его той же
-      // сессией. Прочие разговоры дерева без хода сами не просыпаются.
-      const idle = this.deps.idle;
-      if (!idle) return;
-      for (const key of keys) {
-        if (links[key]?.groupIndex === undefined) continue;
-        const run = idle.snapshot(key);
-        if (!run || seen.has(run.key) || record.chats[run.key]) continue;
-        seen.add(run.key);
-        hold(run, () => idle.close(key));
       }
     });
 

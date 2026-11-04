@@ -17,9 +17,7 @@ type GapsTexts = { [C in PanelTextCode]?: string } & {
 export const panelTextsGapsEn = {
   'journal-read-chat-modes': 'Chat modes',
   'journal-read-chat-spend': 'Chat spend this session',
-  'journal-read-model-cascade': 'Model picked per task',
   'journal-list-lowered-runs': 'Lowered runs',
-  'journal-read-split-overlap': 'Split branch overlaps',
   'journal-read-model-pricing': 'Model prices',
   'journal-list-editors': 'Code editors',
   'journal-browse-folders': 'Folder browser',
@@ -41,33 +39,6 @@ export const panelTextsGapsEn = {
     'The standard request of the “Close stage” button: sum up and prepare the continuation',
   'value-handoff-request-next':
     'The chat’s agent answers with a continuation block; moving to a new session is your call (or the panel agent’s at your request — a separate card)',
-  'journal-set-model-cascade': 'Model picked per task',
-  'summary-set-model-cascade-on': 'Turn on picking the model per task in project “{{name}}”',
-  'summary-set-model-cascade-off': 'Turn off picking the model per task in project “{{name}}”',
-  'value-model-cascade-on':
-    'The next chat runs of this project (and its copies) pick the model for the kind of work themselves',
-  'value-model-cascade-off':
-    'The next chat runs of this project (and its copies) use the model you chose',
-  'journal-set-review-after-work': 'Review after work',
-  'summary-set-review-after-work-on': 'Turn on review after work in project “{{name}}”',
-  'summary-set-review-after-work-off': 'Turn off review after work in project “{{name}}”',
-  'value-review-after-work-on':
-    'Groups of this project’s next splits (and its copies’) get a ceiling review after their work',
-  'value-review-after-work-off':
-    'Groups of this project’s next splits (and its copies’) go straight to delivery after their work, with no review',
-  'journal-split-accept-group': 'Accepting a split group',
-  'summary-split-accept': 'Accept the delivered group “{{group}}” of chat “{{chat}}”’s split',
-  'summary-split-unaccept':
-    'Remove the “accepted” mark from group “{{group}}” of chat “{{chat}}”’s split',
-  'value-split-accept-effect':
-    'The group is marked “accepted” in the split plan; its branch, copy and chat stay as they are',
-  'value-split-unaccept-effect':
-    'The “accepted” mark is removed; the group’s branch, copy and chat stay as they are',
-  'journal-split-resume-interrupted': 'Resuming interrupted split groups',
-  'summary-split-resume-interrupted': 'Resume the interrupted split groups of chat “{{chat}}”',
-  'label-split-interrupted-groups': 'Interrupted groups',
-  'value-split-resume-interrupted-effect':
-    'Each group resumes in its own session with its state restored; the turn spends the subscription limit',
   'journal-run-provider-check': 'Provider check',
   'summary-run-provider-check': 'Check provider “{{name}}” on this machine',
   'label-provider-check-model-call': 'Model call',
@@ -75,11 +46,6 @@ export const panelTextsGapsEn = {
   'value-provider-check-model-call-off': 'No — only the CLI, files and settings',
   'value-provider-check-effect':
     'Writing and reading are checked on a temporary copy; your files do not change, the result is saved as a badge',
-  'journal-summarize-resource': 'Short resource description',
-  'summary-summarize-resource': 'Describe “{{name}}” briefly',
-  'label-resource-kind': 'Resource kind',
-  'value-summarize-resource-effect':
-    'If there is no description yet, the panel makes one cheap model call (spends the limit) and remembers the answer',
   'journal-refresh-defect-states': 'Refreshing defect states',
   'summary-refresh-defect-states':
     'Refresh the defect states of project “{{name}}” from the tracker',

@@ -71,6 +71,9 @@ export async function shootConnect({ page, web, shots, contourUrl }) {
   // Последний шаг выше окна: под списком потребителей стоят режим, бюджет и
   // день сброса — в 820px они уходят под срез.
   await page.setViewportSize({ width: 1280, height: 1400 });
+  // Окно перецентрируется после смены высоты: щелчок в середине переезда однажды (тёмная тема,
+  // 03.11) ушёл мимо окна и закрыл мастер — кадр 14 ждал окно, которого уже не было.
+  await pause(500);
   await button(page, 'Далее', 'Next').click();
   await pause(1200);
   const chat = page
@@ -81,8 +84,20 @@ export async function shootConnect({ page, web, shots, contourUrl }) {
   await pause(300);
   await connect.shot(page, '14-wizard-targets', { clip: '[role="dialog"]' });
 
-  await button(page, 'Поднять шлюз', 'Start the gateway').click();
-  await pause(3000);
+  // Кнопка «Поднять шлюз» есть только у лёгшего шлюза: ядро под надзором панели держит его
+  // поднятым с запуска, и шаг сразу говорит «шлюз поднят». Кадр — строка шлюза в окне.
+  const start = button(page, 'Поднять шлюз', 'Start the gateway');
+  if (await start.isVisible().catch(() => false)) {
+    await start.click();
+    await pause(3000);
+  }
+  await waitText(page, new RegExp(L('шлюз поднят', 'gateway is up'), 'i'), 30);
+  await page
+    .locator('[role="dialog"]')
+    .getByText(new RegExp(L('шлюз поднят', 'gateway is up'), 'i'))
+    .first()
+    .scrollIntoViewIfNeeded();
+  await pause(400);
   await connect.shot(page, '15-wizard-gateway', { clip: '[role="dialog"]' });
 
   await page.setViewportSize({ width: 1280, height: 820 });
@@ -244,9 +259,9 @@ export async function shootMedia({ page, web, shots }) {
   let area = await frameArea(
     page,
     await mark(page, L('Рисование картинок', 'Image generation'), 'draw-row', 1),
-    {
-      min: 300,
-    },
+    // Строка, прокрученная к самому верху, уходила под липкую полосу вкладок раздела, и кадр
+    // выходил полосой «Контуры · Модель · Правила…» вместо строки (до 03.11 — во всех четырёх).
+    { min: 300, margin: 160 },
   );
   await media.shot(page, '01-capability-row', { clip: area, padding: 6 });
 

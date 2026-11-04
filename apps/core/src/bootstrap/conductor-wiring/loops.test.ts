@@ -66,7 +66,10 @@ function fakeRoad(calls: string[]): SessionRoad {
       };
     },
     searchPath: async () => '',
-    releaseTask: async () => ({}) as never,
+    releaseTask: async (task) => {
+      calls.push(`release:${task.taskId}`);
+      return { verified: [], leaks: [], unread: [] };
+    },
   } as SessionRoad;
 }
 
@@ -267,6 +270,10 @@ describe('product loops over the live task registry', () => {
     });
     task.append({ kind: 'task.ended', actor: 'core', data: { outcome: 'cancelled' } });
     await until(() => s.loops.running().length === 0, 'runner dropped');
+    // Ресурсы и аренды конца задачи снимает дорога — после снятия сессий, один раз.
+    await until(() => s.calls.includes(`release:${task.taskId}`), 'task-end release');
+    await s.loops.sweep();
+    expect(s.calls.filter((c) => c === `release:${task.taskId}`)).toHaveLength(1);
     await s.loops.stop();
     const late = await draft(s.registry);
     launch(late);
@@ -279,10 +286,27 @@ describe('product loops over the live task registry', () => {
     // Крючок конца без отчёта: «закрыт» помнит только обход — повтор был бы виден вторым вызовом.
     const s = await stand(new Map(), [{ onTaskEnd: async (taskId) => void ends.push(taskId) }]);
     const drafted = await draft(s.registry);
+    // Неснятая строка ресурса: без исполнителя её снимает тот же конец дороги, один раз; задача
+    // без неснятого обход не будит.
+    drafted.append({
+      kind: 'resource.created',
+      actor: 'core',
+      data: {
+        rid: newId(),
+        kind: 'tmpdir',
+        owner: 'core',
+        release: 'task-end',
+        ref: tempDir('loops-tmp-'),
+      },
+    });
+    const bare = await draft(s.registry);
     end(drafted, 'draft');
+    end(bare, 'draft');
     await s.loops.sweep();
     await s.loops.sweep();
-    expect(ends).toEqual([drafted.taskId]);
+    expect(ends).toEqual([drafted.taskId, bare.taskId]);
+    expect(s.calls.filter((c) => c.startsWith('release:'))).toEqual([`release:${drafted.taskId}`]);
+    ends.splice(1);
     expect(s.loops.running()).toEqual([]);
 
     const running = await draft(s.registry);

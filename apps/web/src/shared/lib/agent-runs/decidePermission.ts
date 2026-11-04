@@ -21,13 +21,10 @@ export function decidePermission(
   // Локально убираем карточку сразу — не ждём эха с сервера.
   const current = runs.get(key);
   const removed = current?.permissions.find((p) => p.toolUseId === toolUseId);
-  const removedDeferred = current?.deferredPermissions?.find((p) => p.toolUseId === toolUseId);
   if (current) {
     runs.set(key, {
       ...current,
       permissions: current.permissions.filter((p) => p.toolUseId !== toolUseId),
-      // Отложенная карточка отвечается тем же маршрутом: сервер решает её D-n.
-      deferredPermissions: current.deferredPermissions?.filter((p) => p.toolUseId !== toolUseId),
     });
     rebuildStatuses();
     emit();
@@ -43,7 +40,7 @@ export function decidePermission(
       // карточка возвращается — «Запретить» с неё по-прежнему проходит.
       const refusal = signatureRefusalText(error);
       if (refusal !== undefined) {
-        restoreCard(key, removed, removedDeferred);
+        restoreCard(key, removed);
         toast.error(refusal);
         return undefined;
       }
@@ -55,25 +52,11 @@ export function decidePermission(
 }
 
 /** Вернуть снятую карточку, если её ещё нет (эхо сервера могло вернуть раньше). */
-function restoreCard(
-  key: string,
-  permission: PendingPermission | undefined,
-  deferred: PendingPermission | undefined,
-): void {
+function restoreCard(key: string, permission: PendingPermission | undefined): void {
   const run = runs.get(key);
-  if (!run || (!permission && !deferred)) return;
-  const missing = (list: PendingPermission[] | undefined, item: PendingPermission) =>
-    !list?.some((p) => p.toolUseId === item.toolUseId);
-  runs.set(key, {
-    ...run,
-    permissions:
-      permission && missing(run.permissions, permission)
-        ? [...run.permissions, permission]
-        : run.permissions,
-    ...(deferred && missing(run.deferredPermissions, deferred)
-      ? { deferredPermissions: [...(run.deferredPermissions ?? []), deferred] }
-      : {}),
-  });
+  if (!run || !permission) return;
+  if (run.permissions.some((p) => p.toolUseId === permission.toolUseId)) return;
+  runs.set(key, { ...run, permissions: [...run.permissions, permission] });
   rebuildStatuses();
   emit();
 }

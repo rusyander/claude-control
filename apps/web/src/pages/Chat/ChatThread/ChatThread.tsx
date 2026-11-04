@@ -4,7 +4,7 @@ import { toast } from '@shared/lib/toast';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatEmptyState } from '../ChatEmptyState/ChatEmptyState';
 import { answerChild } from '../lib/answerChild';
-import { followBranchCopy } from '../lib/followBranchCopy';
+import { coreCardOf, decideCorePermit } from '../lib/corePermit';
 import type { ChatThreadProps } from './ChatThread.types';
 
 /**
@@ -28,8 +28,6 @@ export function ChatThread({
   localRun,
   chatId,
   permissions,
-  deferredPermissions,
-  branchGates,
   queued,
   onCancelQueued,
   child,
@@ -39,7 +37,6 @@ export function ChatThread({
   childAnswerOptions,
   costUnit,
   effort,
-  taskSplit,
   onContinue,
   onCompact,
   onFreshSession,
@@ -89,18 +86,14 @@ export function ChatThread({
       runStartedAt={runStartedAt}
       localRun={localRun}
       permissions={permissions}
-      {...(deferredPermissions?.length ? { deferredPermissions } : {})}
-      branchGates={branchGates}
       queued={queued}
       onCancelQueued={onCancelQueued}
-      onPermissionDecide={(toolUseId, behavior, message) =>
-        chatId && agentRuns.decidePermission(chatId, toolUseId, behavior, message)
-      }
-      onBranchDecide={async (toolUseId, choice, branch) => {
-        if (!chatId) return { ok: false };
-        const answer = await agentRuns.decideBranchGate(chatId, toolUseId, choice, branch);
-        if (answer.ok && answer.path) followBranchCopy(answer.path, conversationId ?? chatId);
-        return answer;
+      onPermissionDecide={(toolUseId, behavior, message) => {
+        // Вопрос права задачи ядра: ответ шлёт это окно командой ядра (сервер панели не вправе).
+        // Номер чата ему не нужен — у хода ядра его может и не быть (сессию ведёт ядро).
+        const core = coreCardOf(permissions, toolUseId);
+        if (core) void decideCorePermit(core, behavior);
+        else if (chatId) agentRuns.decidePermission(chatId, toolUseId, behavior, message);
       }}
       childStages={child.stages}
       onOpenChild={onOpenChild}
@@ -108,29 +101,18 @@ export function ChatThread({
       onPauseTree={child.pauseAll}
       onResumeTree={child.resumeAll}
       treeBusy={child.treeBusy}
-      onAnswerHold={child.answerHold}
-      holdBusy={child.holdBusy}
-      onRelease={child.release}
-      releaseBusy={child.releaseBusy}
-      onResumeInterrupted={child.resumeInterrupted}
-      resumeInterruptedBusy={child.resumeInterruptedBusy}
-      onCheckOverlap={child.checkOverlap}
-      overlapBusy={child.overlapBusy}
-      // Ревью чужих MR (Т7): в родителе — карточки всех групп, в самой группе —
-      // её собственная. Решение оттуда и отсюда одно и то же: состояние живёт в
-      // связи чата, а не во вкладке.
-      reviews={child.reviews}
-      onReviewDecide={child.reviewDecide}
-      onReviewPush={child.reviewPush}
-      onReviewRetry={child.reviewRetry}
-      reviewBusy={child.reviewBusy}
       childPermissions={child.permissions}
       // Решение по правам ребёнка уходит в ЕГО прогон — тем же путём, что и
       // своё: брокер ждёт ответа по ключу прогона, и родительский разговор об
-      // этом не узнаёт вовсе.
-      onChildPermissionDecide={(childId, toolUseId, behavior) =>
-        agentRuns.decidePermission(childId, toolUseId, behavior)
-      }
+      // этом не узнаёт вовсе. Вопрос права задачи ядра у ребёнка — командой ядра из окна, как свой.
+      onChildPermissionDecide={(childId, toolUseId, behavior) => {
+        const core = coreCardOf(
+          child.permissions.flatMap((c) => c.permissions),
+          toolUseId,
+        );
+        if (core) void decideCorePermit(core, behavior);
+        else agentRuns.decidePermission(childId, toolUseId, behavior);
+      }}
       childQuestions={child.questions}
       // Ответ уходит в ЧАТ РЕБЁНКА обычным сообщением: другого канала нет —
       // вызов `AskUserQuestion` в пакетном режиме возвращается ошибкой сразу и
@@ -171,16 +153,6 @@ export function ChatThread({
       {...(mediaTopic ? { mediaTopic } : {})}
       {...(mediaRevision ? { mediaRevision } : {})}
       effort={effort}
-      onSplit={taskSplit.split}
-      onKeepHere={taskSplit.keepHere}
-      isSplitPending={taskSplit.isPending}
-      // Потолок разговора: карточка предложения показывает по нему класс,
-      // модель и глубину каждой группы — тем же расчётом, каким сервер их и
-      // назначит. Пусто — подбор в проекте выключен, и про модели она молчит.
-      splitCeiling={taskSplit.ceiling}
-      // Ветки уже заведённых детей — по ним карточка предложения понимает, что
-      // разделение состоялось, и убирает кнопку.
-      childBranches={child.branches}
       handoff={handoff}
     />
   );

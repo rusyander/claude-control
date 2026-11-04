@@ -1,0 +1,56 @@
+{
+  "topic": "core",
+  "scenario": "fault",
+  "frames": [
+    {
+      "id": "01-fault",
+      "side": "panel",
+      "file": "01-fault.png",
+      "masked": 0,
+      "width": 1004,
+      "height": 467,
+      "shotAt": "2026-11-03T18:55:00.800Z",
+      "text": "Ядро задач не запускается Панель поднимала ядро несколько раз подряд, и каждый раз оно падало. Причина — в хвосте его журнала ниже. Перезапусков за 10 минут: 5 Последний выход: код 1 Хвост журнала ядра (секреты скрыты) [core] boot: reading config.json [core] boot: config.json: Unexpected token } in JSON at position 412 [core] exit 1 Перезапустить Запускать ядро при входе в систему",
+      "en": {
+        "file": "01-fault.en.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 467,
+        "shotAt": "2026-11-03T18:55:03.444Z",
+        "text": "The task core does not start The panel started the core several times in a row and it crashed every time. The cause is in the tail of its log below. Restarts within 10 minutes: 5 Last exit: code 1 Core log tail (secrets masked) [core] boot: reading config.json [core] boot: config.json: Unexpected token } in JSON at position 412 [core] exit 1 Restart Start the core when I sign in",
+        "seal": {
+          "png": "aa7c112be0b1ac2e",
+          "text": "3211f2e5eb38d3ec"
+        }
+      },
+      "dark": {
+        "file": "01-fault.dark.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 467,
+        "shotAt": "2026-11-03T18:55:06.260Z",
+        "text": "Ядро задач не запускается Панель поднимала ядро несколько раз подряд, и каждый раз оно падало. Причина — в хвосте его журнала ниже. Перезапусков за 10 минут: 5 Последний выход: код 1 Хвост журнала ядра (секреты скрыты) [core] boot: reading config.json [core] boot: config.json: Unexpected token } in JSON at position 412 [core] exit 1 Перезапустить Запускать ядро при входе в систему",
+        "seal": {
+          "png": "64e4e6f9932874b5",
+          "text": "f964169b14f5b480"
+        }
+      },
+      "darkEn": {
+        "file": "01-fault.dark.en.png",
+        "masked": 0,
+        "width": 1004,
+        "height": 467,
+        "shotAt": "2026-11-03T18:55:09.113Z",
+        "text": "The task core does not start The panel started the core several times in a row and it crashed every time. The cause is in the tail of its log below. Restarts within 10 minutes: 5 Last exit: code 1 Core log tail (secrets masked) [core] boot: reading config.json [core] boot: config.json: Unexpected token } in JSON at position 412 [core] exit 1 Restart Start the core when I sign in",
+        "seal": {
+          "png": "a92da68439aa188b",
+          "text": "3211f2e5eb38d3ec"
+        }
+      },
+      "seal": {
+        "png": "ae8650d7d450b167",
+        "text": "f964169b14f5b480"
+      }
+    }
+  ]
+}

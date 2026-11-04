@@ -46,12 +46,10 @@ export function TestsE2eSection() {
           <GuideStep title={e('mutation')} text={e('mutationText')}>
             <HelpShot topic="tests" scenario="e2e" frame="11-mutation-result" side="panel" />
           </GuideStep>
-          <GuideStep title={e('chatTest')} text={e('chatTestText')}>
-            <HelpShot topic="tests" scenario="e2e" frame="07-chat-test" side="panel" />
-          </GuideStep>
-          <GuideStep title={e('chatCase')} text={e('chatCaseText')}>
-            <HelpShot topic="tests" scenario="e2e" frame="08-chat-case" side="panel" />
-          </GuideStep>
+          {/* Кадров у двух шагов нет: ход чата идёт задачей ядра, а стенд съёмки тестов ядра не
+              поднимает (tools/help-shots/tests-panel.mjs) — прежние кадры показывали чат до ядра. */}
+          <GuideStep title={e('chatTest')} text={e('chatTestText')} />
+          <GuideStep title={e('chatCase')} text={e('chatCaseText')} />
         </GuideSteps>
       </HelpSection>
 

@@ -22,6 +22,7 @@ export function startBackups(
         backupsDir: layout.backups,
         tasksDir: layout.tasks,
         profilesDir: layout.profiles,
+        attachmentsDir: layout.attachments,
         activeTaskIds: live,
         at: Date.now(),
       });

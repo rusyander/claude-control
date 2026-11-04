@@ -18,4 +18,8 @@ export const systemMessageParams = {
   'core-absent': [],
   'core-unverified': [],
   'core-unreachable': [],
+  'core-starting': [],
+  'core-fault': [],
+  'core-link-missing': ['reason'],
+  'core-link-unreachable': ['reason'],
 } as const satisfies Record<string, readonly string[]>;

@@ -34,9 +34,9 @@ const MANUAL = 'qa-asks-manual';
 const NESTED = 'qa-asks-nested';
 
 const GROUPS = [
-  { index: 0, title: 'Вход', branch: 'feature/login', status: 'started' },
-  { index: 1, title: 'Отчёты', branch: 'feature/reports', status: 'started' },
-  { index: 2, title: 'Схема', branch: 'feature/schema', status: 'done' },
+  { index: 0, title: 'Вход', branch: 'feature/login' },
+  { index: 1, title: 'Отчёты', branch: 'feature/reports' },
+  { index: 2, title: 'Схема', branch: 'feature/schema' },
 ];
 
 const chatIdOf = (group) => `qa-asks-${group.index}`;
@@ -118,27 +118,9 @@ const asksOf = {
   [NESTED]: [permission(`new-${NESTED}`, 'tu-perm-nested', 'npm publish')],
 };
 
-const split = () => ({
-  parentChatId: PARENT,
-  order: GROUPS.map((group) => group.index),
-  groups: GROUPS.map((group) => ({
-    index: group.index,
-    title: group.title,
-    branch: group.branch,
-    after: [],
-    chatId: chatIdOf(group),
-    path: copyOf(group),
-    seated: true,
-    deliver: true,
-    status: group.status,
-    ...(group.status === 'done' ? { result: { kind: 'pushed', commits: 1 } } : {}),
-  })),
-});
-
 const tree = () => ({
   root: PARENT,
   running: 2,
-  split: split(),
   nodes: chats
     .filter((item) => item.parentId)
     .map((item) => ({

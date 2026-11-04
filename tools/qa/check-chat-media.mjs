@@ -1,9 +1,9 @@
 /**
- * Картинки чата НА ПРОВОДЕ: весь путь панель → свой шлюз → контур → файл на диске.
+ * Картинки чата НА ПРОВОДЕ: весь путь панель → звено ядра → контур → файл на диске.
  *
  * Чем это отличается от соседей. Модульные тесты `domains/media/*` подставляют
  * транспорт и кормят домен готовыми кадрами; интеграция маршрутов поднимает свою
- * ручку, но не поднимает шлюз. Здесь не подменяется ничего, кроме самой
+ * ручку, но не поднимает ядро. Здесь не подменяется ничего, кроме самой
  * корпоративной платформы: над панелью стоит `stub-platform.mjs` — настоящий
  * HTTP-сервер, отвечающий в форме справочника, — а панель поднимается своя,
  * одноразовая, с каталогом настроек во временной папке. Рабочий стенд человека не
@@ -15,9 +15,9 @@
  * Что прогоняется (каждая строка — обещание панели человеку):
  *   1. план дороги: модель с объявленной генерацией найдена в каталоге ключа,
  *      названы контур, модель и то, что промпт режима уезжает;
- *   2. рисование через СВОЙ шлюз: запрос к контуру ушёл с промптом режима, а
+ *   2. рисование через звено ядра (C3b): запрос к контуру ушёл с промптом режима, а
  *      картинка легла файлом — байт в байт с тем, что отдал стаб;
- *   3. след запроса шлюза несёт РАЗМЕР картинки и ни байта её содержимого;
+ *   3. след запроса несёт РАЗМЕР картинки и ни байта её содержимого;
  *   4. настройки панели (`state.json`) не содержат картинки вовсе;
  *   5. отдача файла: тот же адрес, тип из байтов, запрет угадывания, `inline`;
  *   6. чужой идентификатор за каталог данных не выводит;
@@ -31,7 +31,10 @@
  *      и в обоих случаях наружу не ушло ни запроса;
  *  13. колода из блока: файлы на диске, показ с `default-src 'none'`, русское имя
  *      в заголовке скачивания не рушит ответ (оно не лезет в latin1);
- *  14. колода через КОНТУР: запрос ушёл своим шлюзом, ответ разобран блоком.
+ *  14. колода через КОНТУР: запрос ушёл звеном ядра, ответ разобран блоком.
+ *
+ * Ядро и хост звеньев одноразовая панель поднимает сама в подменённом доме; снимаются они по
+ * записям дома ядра в конце прогона.
  *
  * Запуск: `node tools/qa/check-chat-media.mjs`
  * Своего окружения не требует: стаб и панель поднимаются здесь же.
@@ -41,6 +44,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DECK_JSON, startStubPlatform } from './stub-platform.mjs';
+import { reapCoreSessions } from './throwaway-stand.mjs';
 
 const PANEL_PORT = Number(process.env.MEDIA_PANEL_PORT ?? 5195);
 const GATEWAY_PORT = Number(process.env.MEDIA_GATEWAY_PORT ?? 5196);
@@ -112,11 +116,30 @@ async function main() {
   writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
   writeFileSync(join(home, 'CLAUDE.md'), '# проверка\n', 'utf8');
 
+  // Свой домашний каталог: запрос в контур идёт через звено ядра (C3b), а ядро панель поднимает
+  // сама в доме пользователя — без подмены дома она нашла бы ядро человека с ЕГО контурами.
+  const user = join(home, 'user');
+  for (const dir of [join(user, 'AppData/Roaming'), join(user, 'AppData/Local')]) {
+    mkdirSync(dir, { recursive: true });
+  }
+  const homeEnv = {
+    HOME: user,
+    USERPROFILE: user,
+    CLAUDE_CONFIG_DIR: home,
+    APPDATA: join(user, 'AppData/Roaming'),
+    LOCALAPPDATA: join(user, 'AppData/Local'),
+  };
+  const base = Object.fromEntries(
+    Object.entries(process.env).filter(
+      ([key]) => !Object.keys(homeEnv).includes(key.toUpperCase()),
+    ),
+  );
+
   const panel = spawn(
     process.execPath,
     ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
     {
-      env: { ...process.env, CLAUDE_CONFIG_DIR: home, PORT: String(PANEL_PORT) },
+      env: { ...base, ...homeEnv, PORT: String(PANEL_PORT) },
       stdio: 'ignore',
       shell: false,
     },
@@ -130,8 +153,26 @@ async function main() {
     await run(stub, appData);
   } finally {
     panel.kill();
+    // Ядро панель поднимает отвязанным — снятие панели его не уносит; хост звеньев и хосты сессий
+    // ядро держит и после себя. Снимаются по записям дома ядра, не по имени.
+    const coreHome = join(user, '.agentdeck', 'core');
+    let procs;
+    try {
+      procs = JSON.parse(readFileSync(join(coreHome, 'procs.json'), 'utf8'));
+    } catch {
+      procs = undefined;
+    }
+    for (const core of procs?.cores ?? []) {
+      try {
+        if (Number.isInteger(core?.pid) && core.pid > 0) process.kill(core.pid);
+      } catch {
+        // уже вышло
+      }
+    }
+    reapCoreSessions(coreHome);
     await stub.close();
-    rmSync(home, { recursive: true, force: true });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    rmSync(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   }
 
   console.log(failures === 0 ? '\nВсё сходится.' : `\nПровалов: ${failures}`);
@@ -139,7 +180,16 @@ async function main() {
 }
 
 async function run(stub, appData) {
-  // ── Контур, проба, шлюз ──────────────────────────────────────────────────
+  // ── Контур, проба ───────────────────────────────────────────────────────
+  // Картинки и колоды контура идут через звено ядра (C3b) и шлюза панели не ждут. Активация
+  // пока сама поднимает шлюз панели (уходит на этапе (v)) — порт задан свой, чтобы одноразовая
+  // панель не заняла адрес стенда человека.
+  await api('/settings', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      platformGateway: { enabled: false, port: GATEWAY_PORT, forceStream: true },
+    }),
+  });
   await api(`/platforms/${encodeURIComponent(CONTOUR)}`, {
     method: 'PUT',
     body: JSON.stringify({
@@ -173,19 +223,6 @@ async function run(stub, appData) {
     JSON.stringify((health?.models ?? []).find((model) => model.id === 'stub-image')),
   );
 
-  await api('/settings', {
-    method: 'PATCH',
-    body: JSON.stringify({
-      platformGateway: { enabled: true, port: GATEWAY_PORT, forceStream: true },
-    }),
-  });
-  const restarted = await api('/platforms/gateway/restart', { method: 'POST', body: '{}' });
-  check(
-    'шлюз поднят: без него дорога «частью ответа» заперта по своей причине',
-    restarted.body?.status?.running === true,
-    JSON.stringify(restarted.body?.status).slice(0, 200),
-  );
-
   // ── 1. План дороги ──────────────────────────────────────────────────────
   const plan = await api('/media/images/plan');
   check(
@@ -198,7 +235,7 @@ async function run(stub, appData) {
     JSON.stringify(plan.body),
   );
 
-  // ── 2. Рисование через свой шлюз ────────────────────────────────────────
+  // ── 2. Рисование через звено ядра ───────────────────────────────────────
   const before = stub.calls.length;
   const drawn = await api('/media/images', {
     method: 'POST',
@@ -217,8 +254,8 @@ async function run(stub, appData) {
       sent?.messages?.[1]?.content === 'кот на подоконнике',
     JSON.stringify(sent).slice(0, 300),
   );
-  // Через СВОЙ шлюз, а не напрямую: ключ остался в панели, и заголовок контуру
-  // подставила она сама.
+  // Через звено ядра, а не напрямую: панель шлёт заглушку, а ключ контуру подставляет
+  // звено — из хранилища панели.
   check(
     'ключ контура ушёл заголовком драйвера, а не из запроса панели',
     chatCall?.authorization === `Bearer ${KEY}`,
@@ -260,14 +297,14 @@ async function run(stub, appData) {
 
   // ── 3. След запроса ─────────────────────────────────────────────────────
   const status = await api('/platforms/gateway');
-  // След — новые первыми. С тех пор как активация сама поднимает шлюз, её
+  // След — новые первыми. Активация поднимает шлюз панели, и её
   // пробный запрос тоже ложится в след (`/v1/messages`), и «последний в списке»
   // читал его, а не рисование. Рисование — самый свежий обычный чат контура.
   const event = (status.body?.status?.events ?? []).find(
     (item) => item.platformId === CONTOUR && item.path.endsWith('/chat/completions'),
   );
   check(
-    'рисование прошло через свой шлюз и попало в след запроса',
+    'рисование прошло через звено ядра и попало в след запроса контура',
     Boolean(event) && event.status === 200,
     JSON.stringify(event).slice(0, 200),
   );
@@ -415,11 +452,13 @@ async function run(stub, appData) {
 }
 
 /**
- * 6б. Ручка картинок КОНТУРА (`images: { api }`) — тоже через свой шлюз.
+ * 6б. Ручка картинок КОНТУРА (`images: { api }`) — тоже через звено ядра (C3b; до него — свой шлюз).
  *
  * До 17.09.2026 эта дорога шла напрямую ключом контура: ни следа, ни расхода, ни
  * перевода отказов, ни защиты данных. Доказательство здесь — строка в следе
- * шлюза с путём ручки картинок: мимо шлюза её не записал бы никто. Отказ 451
+ * контура с путём ручки картинок: мимо звена её не записал бы никто. Манифест с ручкой
+ * объявляется ПОСЛЕ первого рисования — звено обязано взять новые факты карточки, а не
+ * отдать записанное раньше (404 «ручка не объявлена»). Отказ 451
  * обязан прийти переведённым и помеченным как отказ проверок, а 503 — ровно ОДНИМ
  * запросом наверх: платная картинка повтором рисуется и списывается дважды.
  */
@@ -467,7 +506,7 @@ async function contourImagesViaGateway(stub, appData) {
     ? readFileSync(join(appData, 'media', `${drawn.body.id}.png`))
     : undefined;
   check(
-    'ручка контура: запрос с просьбой о байтах, ключ подставлен шлюзом, файл байт в байт',
+    'ручка контура: запрос с просьбой о байтах, ключ подставлен звеном, файл байт в байт',
     drawn.status === 200 &&
       drawn.body?.source === 'contour-images' &&
       sent?.prompt === 'маяк на скале' &&
@@ -484,7 +523,7 @@ async function contourImagesViaGateway(stub, appData) {
   );
   const event = imageEvents[0];
   check(
-    'рисование ручкой контура прошло через СВОЙ шлюз: в следе путь ручки, размер и «расход не сообщён»',
+    'рисование ручкой контура прошло через звено ядра: в следе путь ручки, размер и «расход не сообщён»',
     event?.status === 200 &&
       (event?.imageBytes ?? 0) > 0 &&
       event?.usageUnreported === true &&
@@ -502,7 +541,7 @@ async function contourImagesViaGateway(stub, appData) {
     (item) => item.platformId === CONTOUR && item.path.endsWith('/v1/images/generations'),
   );
   check(
-    'отказ проверок ручки картинок переведён шлюзом: причина словами, в следе «заблокировано» и имена правил',
+    'отказ проверок ручки картинок переведён звеном: причина словами, в следе «заблокировано» и имена правил',
     refused.status === 502 &&
       String(refused.body?.message ?? '').includes('AgentDeck') &&
       !String(refused.body?.message ?? '').includes('Иванов') &&
@@ -732,7 +771,7 @@ async function mediaEverywhere(stub, appData) {
   const deckCall = stub.calls.slice(mark).find((call) => call.path.endsWith('/chat/completions'));
   const sentDeck = deckCall ? JSON.parse(deckCall.body) : undefined;
   check(
-    'запрос ушёл контуру своим шлюзом: правила каталога системным сообщением, тема человека, ключ от драйвера',
+    'запрос ушёл контуру звеном ядра: правила каталога системным сообщением, тема человека, ключ от драйвера',
     sentDeck?.model === 'stub-deck' &&
       sentDeck?.messages?.[0]?.role === 'system' &&
       String(sentDeck?.messages?.at(-1)?.content).includes('итоги партии') &&

@@ -151,6 +151,26 @@ await page.route('**/api/project-git*', (route) =>
     json: { isRepo: false, detached: false, unborn: false, branches: [], changes: [] },
   }),
 );
+// Настройки доставки проекта: без заглушки запрос с выдуманным каталогом уходил
+// настоящему серверу и падал 400 в консоль.
+await page.route('**/api/project-git/split-settings*', (route) =>
+  route.fulfill({
+    json: {
+      deliver: false,
+      parallel: 2,
+      parallelAuto: true,
+      profile: {
+        enabled: false,
+        repo: false,
+        remote: false,
+        bootstrapConfigured: false,
+        heavy: false,
+      },
+      permissions: {},
+      permissionsOwn: [],
+    },
+  }),
+);
 
 await page.route('**/api/chats/projects*', (route) =>
   route.fulfill({
@@ -172,57 +192,12 @@ const treeCalls = [];
 await page.route('**/api/chats', (route) =>
   route.fulfill({ json: treePaused ? CHATS.map((c) => ({ ...c, paused: true })) : CHATS }),
 );
-/**
- * Пересечения веток (Т6). Заглушка ведёт себя как сервер: до первой сверки поля
- * нет вовсе, кнопка его заводит. Один файл нарушает границы владения (красный),
- * второй задет двумя законными владельцами — на глаз это разные вещи.
- */
-let overlap;
-const overlapCalls = [];
-const OVERLAP = {
-  at: '2026-09-02T10:07:00.000Z',
-  files: [
-    { path: 'src/shared/api/client.ts', groups: [0, 1], outside: [1] },
-    { path: 'src/entities/User/model.ts', groups: [0, 1], outside: [] },
-  ],
-  mergeOrder: [0, 1],
-  counted: [
-    { index: 0, files: 12 },
-    { index: 1, files: 7 },
-  ],
-  unread: [],
-};
-
 await page.route('**/api/chat/*/tree', (route) =>
   route.fulfill({
     json: {
       root: PARENT,
       running: treePaused ? 0 : 3,
       ...(treePaused ? { paused: { at: '2026-09-02T10:06:00.000Z', chats: 3, pending: 1 } } : {}),
-      split: {
-        parentChatId: PARENT,
-        order: [0, 1],
-        triage: { at: '2026-09-02T10:00:30.000Z', received: true, repairs: [], conflicts: [] },
-        ...(overlap ? { overlap } : {}),
-        groups: [
-          {
-            index: 0,
-            title: 'Форма входа',
-            branch: 'feature/login',
-            after: [],
-            status: 'started',
-            chatId: CHILD,
-          },
-          {
-            index: 1,
-            title: 'Сборка',
-            branch: 'feature/build',
-            after: [],
-            status: 'started',
-            chatId: KID2,
-          },
-        ],
-      },
       nodes: [
         {
           chatId: CHILD,
@@ -251,11 +226,6 @@ await page.route('**/api/chat/*/tree/resume', (route) => {
   });
   treePaused = false;
   return route.fulfill({ json: { root: PARENT, wasPaused: true, resumed: 3, flushed: 1 } });
-});
-await page.route('**/api/chat/split/*/overlap', (route) => {
-  overlapCalls.push(new URL(route.request().url()).pathname.split('/').at(-2));
-  overlap = OVERLAP;
-  return route.fulfill({ json: OVERLAP });
 });
 await page.route(`**/api/chats/${PARENT}/messages*`, (route) => route.fulfill({ json: MESSAGES }));
 await page.route(`**/api/chats/${CHILD}/messages*`, (route) =>
@@ -328,8 +298,17 @@ await page.route('**/api/chat/*/permission-decision', (route) => {
 
 // Ответ на вопрос уходит обычным сообщением: другого канала у него нет — вызов
 // `AskUserQuestion` в пакетном режиме возвращается ошибкой сразу и никого не ждёт.
+/** Слова «на ходу» (Ф12): ответ занятому агенту уходит в его живую сессию сразу. */
+const steered = [];
 await page.route('**/api/chat/send', (route) => {
-  sent.push(route.request().postDataJSON());
+  const body = route.request().postDataJSON();
+  // Как сервер: слово в живой прогон — `steered`; старт с `queueIfBusy` у стоящего
+  // разговора — новый ход потоком.
+  if (body?.steer && !body.queueIfBusy) {
+    steered.push(body);
+    return route.fulfill({ json: { steered: true } });
+  }
+  sent.push(body);
   return route.fulfill({
     status: 200,
     headers: { 'content-type': 'text/event-stream' },
@@ -369,13 +348,16 @@ await page.waitForTimeout(2000);
 
 const cards = page.locator('[class*="_question_"]').filter({ hasText: 'Нужен ваш выбор' });
 check((await cards.count()) === 2, `карточек в ленте две — своя и детская: ${await cards.count()}`);
+const loginCard = page.locator('[data-hub-row]').filter({ hasText: 'Форма входа' });
+const buildCard = page.locator('[data-hub-row]').filter({ hasText: 'Сборка' });
 check(
   (await page.getByText('Чем закрывать модалку?').count()) === 1,
   'свой вопрос показан ОДИН раз, а не дважды (поток + запрос прав)',
 );
 check(
-  (await page.getByText(/Спрашивает .*Форма входа/).count()) === 1,
-  'вопрос ребёнка подписан, чей он',
+  (await loginCard.locator('[data-group-ask]').getByText('Какой формат даты в списке?').count()) ===
+    1 && (await loginCard.getByText(/Агент спрашивает · .*чат qa-hub-c/).count()) === 1,
+  'вопрос ребёнка стоит в карточке его группы и подписан его чатом (карточка 27)',
 );
 
 // Права ребёнка — здесь же. Пока их показывал только его собственный чат, агент
@@ -386,8 +368,9 @@ check(
   'запрос прав ребёнка виден в родительском чате',
 );
 check(
-  (await page.getByText(/Просит .*Сборка/).count()) === 1,
-  'запрос прав подписан, кто именно просит',
+  (await buildCard.locator('[data-group-permission]').count()) === 1 &&
+    (await buildCard.getByText(/Агент ждёт разрешения · .*чат qa-hub-c/).count()) === 1,
+  'запрос прав стоит в карточке группы, которая просит, и подписан её чатом',
 );
 check(
   (await page.getByText(/rm -rf dist/).count()) === 1,
@@ -443,73 +426,6 @@ check(
 );
 await shot('07_дерево-продолжено_AFTER');
 
-// Пересечения веток (Т6). До сверки панель ничего не утверждает: раздел говорит
-// «не сверялись» — «пересечений нет» на месте непроверенного было бы враньём.
-const overlapPanel = page.locator('[data-hub-overlap]');
-check(
-  (await overlapPanel.getAttribute('data-hub-overlap')) === 'idle',
-  'до сверки раздел пересечений честно говорит, что не считал',
-);
-check(
-  (await page.getByText('Пересечения веток не сверялись').count()) === 1,
-  'подпись раздела до сверки на месте',
-);
-await shot('08_пересечения-не-сверялись_BEFORE');
-
-await page.getByRole('button', { name: 'Сверить ветки' }).click();
-await page.getByText(/Пересечения веток: 2 файла/).waitFor({ timeout: 8000 });
-check(
-  overlapCalls.length === 1 && overlapCalls[0] === PARENT,
-  `сверка ушла одним запросом и адресована родителю: ${JSON.stringify(overlapCalls)}`,
-);
-
-// Раздел свёрнут до заголовка (владелец 22.10.2026): строки — по нажатию на него.
-check(
-  (await page.locator('[data-overlap-file]').count()) === 0,
-  'после сверки раздел свёрнут: строк файлов не видно',
-);
-await page.locator('[data-hub-overlap] button[aria-expanded="false"]').click();
-
-// Файл — группы: строка отвечает на «кто ещё это трогал», не заставляя человека
-// открывать ветки.
-const shared = page.locator('[data-overlap-file]');
-check((await shared.count()) === 2, `в списке обе строки пересечения: ${await shared.count()}`);
-check(
-  (await page.locator('[data-overlap-file="outside"]').count()) === 1,
-  'файл вне владения помечен отдельно — он и красный',
-);
-const outsideRow = page.locator('[data-overlap-file="outside"]');
-check(
-  (await outsideRow.innerText()).includes('src/shared/api/client.ts'),
-  'у нарушения назван файл',
-);
-check(
-  /Форма входа.*Сборка/s.test(await outsideRow.innerText()),
-  'у файла названы ОБЕ группы, а не номера',
-);
-check(
-  (await outsideRow.innerText()).includes('вне владения: Сборка'),
-  'названа группа, вышедшая за свои границы',
-);
-// Красное — только у нарушения границ: два законных владельца одного файла это
-// работа для слияния, а не нарушение, и красить их одинаково значило бы врать.
-const badColor = await outsideRow.evaluate((node) => getComputedStyle(node).backgroundColor);
-const okColor = await page
-  .locator('[data-overlap-file="shared"]')
-  .evaluate((node) => getComputedStyle(node).backgroundColor);
-check(badColor !== okColor, `нарушение выделено фоном: ${badColor} против ${okColor}`);
-
-check(
-  (await page.getByText('Порядок слияния: Форма входа → Сборка').count()) === 1,
-  'порядок слияния подсказан рядом',
-);
-// Кнопки слияния тут нет и быть не должно: сводить ветки — шаг человека.
-check(
-  (await page.getByRole('button', { name: /Слить|Влить|Merge/ }).count()) === 0,
-  'кнопки слияния в хабе нет — панель ветки не трогает',
-);
-await shot('09_пересечения-посчитаны_AFTER');
-
 // Решение по правам ребёнка — из родителя, и уходит брокеру ЕГО прогона: ответ
 // сообщением здесь не годится вовсе, агент стоит на вызове и ждёт вердикта.
 // Раньше остальных проверок намеренно: тосты про конец хода ребёнка живут
@@ -523,7 +439,7 @@ check(decisions[0]?.toolUseId === KID2_TOOL, `решение про его вы�
 check(decisions[0]?.behavior === 'allow', `ушло «разрешить»: ${decisions[0]?.behavior}`);
 check(sent.length === 0, 'решение по правам не превратилось в сообщение в чат');
 check(
-  (await page.getByText(/Просит .*Сборка/).count()) === 0,
+  (await page.locator('[data-group-permission]').count()) === 0,
   'решённый запрос прав убран из родительской ленты',
 );
 await shot('05_права-ребёнка-решены-из-родителя_AFTER');
@@ -537,22 +453,13 @@ await own.first().click();
 await page.waitForTimeout(800);
 await shot('02_свой-вопрос-отвечен_AFTER');
 
-// Агент занят, значит ответ уходит В ОЧЕРЕДЬ его прогона — тем же путём, что и
-// дописанное в занятый чат. Ход не прерывается, ответ не теряется.
-const queue = page.locator('[data-chat-queue]');
-check(await queue.isVisible(), 'ответ занятому агенту встал в очередь, а не пропал');
+// Агент занят, значит ответ уходит словом «на ходу» (Ф12) в его живую сессию:
+// ход не прерывается и не ждёт конца, ответ не теряется. Очередь — запасной путь.
 check(
-  (await queue.getByText('Escape и клик вне').count()) === 1,
-  'в очереди лежит именно выбранный вариант',
+  steered.length === 1 && steered[0].chatId === PARENT && steered[0].prompt === 'Escape и клик вне',
+  `ответ занятому агенту ушёл в его живую сессию: ${JSON.stringify(steered)}`,
 );
-check(sent.length === 0, `пока агент занят, отправки нет: ${JSON.stringify(sent)}`);
-// Подпись карточки обязана говорить правду о судьбе ответа: «агент думает» про
-// ответ, который ещё лежит в очереди, — ровно та ложь, из-за которой человек
-// ждёт реакции, которой не будет до конца хода.
-check(
-  (await page.getByText(/Ответ в очереди/).count()) === 1,
-  'карточка честно говорит, что ответ ждёт конца хода',
-);
+check(sent.length === 0, `пока агент занят, нового хода нет: ${JSON.stringify(sent)}`);
 
 // Вопрос ребёнка — из родителя, ответ уходит ЕМУ.
 const kid = page.getByRole('button', { name: /ISO 8601/ });
@@ -560,15 +467,17 @@ check((await kid.count()) === 1, 'вариант детского вопроса
 await kid.first().click();
 await page.waitForTimeout(1000);
 
-check(sent.length === 1, `ответ ребёнку ушёл одной отправкой: ${sent.length}`);
-check(sent[0]?.chatId === CHILD, `отправка адресована РЕБЁНКУ: ${sent[0]?.chatId}`);
-check(sent[0]?.prompt === 'ISO 8601', `ушёл выбранный вариант: ${JSON.stringify(sent[0]?.prompt)}`);
+// Новым ходом или словом «на ходу» — канал решает состояние прогона ребёнка;
+// судим по тому, КУДА ушёл ответ.
+const toKid = [...sent, ...steered].filter((body) => body.prompt === 'ISO 8601');
+check(toKid.length === 1, `ответ ребёнку ушёл одной отправкой: ${JSON.stringify(toKid)}`);
+check(toKid[0]?.chatId === CHILD, `отправка адресована РЕБЁНКУ: ${toKid[0]?.chatId}`);
 check(
-  sent[0]?.projectPath === `${PROJECT.path}-worktrees/feature-login`,
-  `ребёнок отвечает в СВОЕЙ копии репозитория: ${sent[0]?.projectPath}`,
+  toKid[0]?.projectPath === `${PROJECT.path}-worktrees/feature-login`,
+  `ребёнок отвечает в СВОЕЙ копии репозитория: ${toKid[0]?.projectPath}`,
 );
 check(
-  (await queue.getByText('ISO 8601').count()) === 0,
+  ![...sent, ...steered].some((body) => body.chatId === PARENT && body.prompt === 'ISO 8601'),
   'родительский разговор за детский ответ ходом не заплатил',
 );
 // Ответ ребёнку в родительской ленте следа не оставляет — ход тратит он. След

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import type { OurRules, Platform } from '@agentdeck/contracts';
-import { LEAN_TOOLS, layerOn, lightWindowLayers, runLayers, userMemoryExcludes } from './layers.ts';
+import { LEAN_TOOLS, layerOn, runLayers } from './layers.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
@@ -9,8 +9,10 @@ import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transpor
  *
  * Проверяется не «функция вернула массив», а то, чем этот массив становится в
  * запуске: КАКОЙ флаг стоит за каждой галочкой. Что эти флаги делают с настоящим
- * CLI, доказывает не таблица, а живая проба — `tools/qa/check-run-layers.mjs`
- * (настоящий `claude` против стаба, метки слоёв ищутся в теле запроса наверх):
+ * CLI, доказывает не таблица, а живая проба ядра — флаги панель переводит в поля
+ * сеанса (`session-carry.test.ts`), поля на настоящем `claude` против стаба проверяют
+ * `apps/core/src/adapters/claude/claude.carry.live.integration.test.ts` и
+ * `claude.mcp.live.integration.test.ts` (метки слоёв ищутся в теле запроса наверх):
  * таблица проверяет НАШУ половину — что панель просит ровно то, о чём написано
  * на карточке.
  */
@@ -84,19 +86,6 @@ describe('наши слои в прогоне через контур', () => {
     expect(layers.systemPrompt).toBe(false);
   });
 
-  it('лёгкое окно агента панели: всё снято, и проектный источник тоже', () => {
-    const layers = lightWindowLayers();
-    // Тот же набор, что у общего выключателя, кроме `project`: иначе
-    // `~/.claude/CLAUDE.md` доезжает поиском вверх (check-run-layers, случай 7).
-    expect(layers.args).toEqual([
-      '--setting-sources',
-      'local',
-      '--disable-slash-commands',
-      '--strict-mcp-config',
-    ]);
-    expect(layers.dropped).toEqual(runLayers(withOurs({ enabled: false })).dropped);
-  });
-
   it('облегчённый набор инструментов: белый список рабочих, не зависит от общего выключателя', () => {
     const lean = runLayers(withOurs({ tools: false }));
     expect(lean.args).toEqual(['--tools', LEAN_TOOLS.join(',')]);
@@ -111,8 +100,6 @@ describe('наши слои в прогоне через контур', () => {
     // Общий выключатель слой инструментов не трогает: он не из `~/.claude`.
     expect(runLayers(withOurs({ enabled: false })).args).not.toContain('--tools');
     expect(layerOn({ ...defaultOurRules(), enabled: false }, 'tools')).toBe(true);
-    // Лёгкое окно агента панели задаёт свои инструменты (`--tools ''`) само.
-    expect(lightWindowLayers().args).not.toContain('--tools');
     // Запись, сохранённая до появления слоя, — полный набор.
     const older = { ...defaultOurRules() } as Partial<OurRules>;
     delete older.tools;
@@ -122,97 +109,5 @@ describe('наши слои в прогоне через контур', () => {
   it('частная галочка не переспоривает общий выключатель', () => {
     expect(layerOn({ ...defaultOurRules(), enabled: false }, 'settings')).toBe(false);
     expect(layerOn({ ...defaultOurRules(), settings: false }, 'skills')).toBe(true);
-  });
-});
-
-/**
- * Личный `CLAUDE.md`, прочитанный CLI как проектный (проект под домом). Что
- * исключение действительно срабатывает в настоящем CLI, доказывает
- * `check-run-layers.mjs`, случай 8; здесь — что панель просит ровно нужные файлы.
- */
-describe('исключение личного CLAUDE.md при снятых настройках', () => {
-  const excludes = userMemoryExcludes;
-  const settingsOff = runLayers(withOurs({ settings: false })).args;
-
-  it('слой настроек на месте или проекта нет вовсе — исключать нечего', () => {
-    const place = {
-      cwd: '/home/u/work/app',
-      env: {},
-      platform: 'linux' as const,
-      fallbackHome: '/home/u',
-    };
-    expect(userMemoryExcludes(runLayers(PLATFORM).args, place)).toBeUndefined();
-    expect(userMemoryExcludes(runLayers(withOurs({ skills: false })).args, place)).toBeUndefined();
-    // Лёгкое окно агента панели снимает `project` целиком — то же правило, ответ «нечего».
-    expect(userMemoryExcludes(lightWindowLayers().args, place)).toBeUndefined();
-  });
-
-  it('linux: дом и каталог конфигурации, CLAUDE.md монорепозитория не задет', () => {
-    const list = excludes(settingsOff, {
-      cwd: '/home/u/mono/app',
-      env: { HOME: '/home/u' },
-      platform: 'linux',
-      fallbackHome: '/root',
-    });
-    // ВСЕ имена, которые CLI ищет вверх: с 2.1.277 личные правила приезжают и
-    // через `AGENTS.md`, а `CLAUDE.local.md` он читает всегда. Исключение под
-    // одним именем оставляло бы остальные двери открытыми (П2.7).
-    expect(list).toEqual([
-      '/home/u/.claude/CLAUDE.md',
-      '/home/u/.claude/CLAUDE.local.md',
-      '/home/u/.claude/AGENTS.md',
-    ]);
-    expect(list?.some((file) => file.startsWith('/home/u/mono'))).toBe(false);
-  });
-
-  it('свой CLAUDE_CONFIG_DIR и предок, который и есть этот каталог', () => {
-    const list = excludes(settingsOff, {
-      cwd: '/cfg/sandbox/app',
-      env: { HOME: '/home/u', CLAUDE_CONFIG_DIR: '/cfg' },
-      platform: 'linux',
-      fallbackHome: '/root',
-    });
-    expect(list).toEqual([
-      '/cfg/CLAUDE.md',
-      '/cfg/CLAUDE.local.md',
-      '/cfg/AGENTS.md',
-      '/home/u/.claude/CLAUDE.md',
-      '/home/u/.claude/CLAUDE.local.md',
-      '/home/u/.claude/AGENTS.md',
-    ]);
-  });
-
-  it('windows: написание рабочего каталога, прямые слэши и шаблон без учёта регистра', () => {
-    const list = excludes(settingsOff, {
-      cwd: 'c:\\users\\ivan (work)\\mono\\app',
-      env: { USERPROFILE: 'C:\\Users\\Ivan (Work)', HOME: '/ignored' },
-      platform: 'win32',
-      fallbackHome: 'C:\\Users\\other',
-    });
-    expect(list).toEqual([
-      'C:/Users/Ivan (Work)/.claude/CLAUDE.md',
-      'C:/Users/Ivan (Work)/.claude/CLAUDE.local.md',
-      'C:/Users/Ivan (Work)/.claude/AGENTS.md',
-      'c:/users/ivan (work)/.claude/CLAUDE.md',
-      'c:/users/ivan (work)/.claude/CLAUDE.local.md',
-      'c:/users/ivan (work)/.claude/AGENTS.md',
-      '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[cC][lL][aA][uU][dD][eE].[mM][dD]',
-      '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[cC][lL][aA][uU][dD][eE].[lL][oO][cC][aA][lL].[mM][dD]',
-      '[cC]:/[uU][sS][eE][rR][sS]/[iI][vV][aA][nN] [(][wW][oO][rR][kK][)]/.[cC][lL][aA][uU][dD][eE]/[aA][gG][eE][nN][tT][sS].[mM][dD]',
-    ]);
-  });
-
-  it('windows: путь с `[` остаётся только буквальным — класс сломал бы шаблон', () => {
-    const list = excludes(settingsOff, {
-      cwd: 'D:\\p[1]\\app',
-      env: { USERPROFILE: 'D:\\p[1]' },
-      platform: 'win32',
-      fallbackHome: 'C:\\Users\\other',
-    });
-    expect(list).toEqual([
-      'D:/p[1]/.claude/CLAUDE.md',
-      'D:/p[1]/.claude/CLAUDE.local.md',
-      'D:/p[1]/.claude/AGENTS.md',
-    ]);
   });
 });

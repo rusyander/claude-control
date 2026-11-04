@@ -138,6 +138,28 @@ function intakeClaim(task: LiveTask, s: StepCtx, refs: string[]): StepDoneCall {
 }
 
 describe('split flow', () => {
+  // Вопрос запуска стоял английским в русской рамке ленты (кадр вопроса запуска, проход s10):
+  // язык панели приходит полем оценки и ложится в `task.created`, вопрос пишется на нём. Нет
+  // языка (задача до этапа 10, клиент без поля) — русский, как у всех вопросов ядра (этап 10, F4).
+  describe('point 10 question in the launching panel language', () => {
+    it.each([
+      ['ru', 'Запустить задачу? Деление: единиц: 2 — review-1 → review-2.'],
+      ['en', 'Launch the task? Split: 2 units: review-1 → review-2.'],
+      [undefined, 'Запустить задачу? Деление: единиц: 2 — review-1 → review-2.'],
+    ] as const)('lang %s', async (lang, question) => {
+      const repo = gitRepo(root, `lang-${lang ?? 'none'}`);
+      const task = await estimated([repo], {
+        scenario: { preset: 'review-only' },
+        ...(lang ? { lang } : {}),
+      });
+      expect(of(task, 'task.created')[0]?.data.lang).toBe(lang);
+      const intake = ctx(task, stepDef('review-only', 'intake'));
+      await hooks.postStep?.(intake, intakeClaim(task, intake, ['!21', '!22']));
+      expect(task.state.task).toBe('awaiting-launch');
+      expect(env.raised.at(-1)).toMatchObject({ source: 'launch', point: 10, question });
+    });
+  });
+
   it('P95 review-only: two MRs → split offered, awaiting launch, point 10 asked; no unit start before split.decided; one MR → edit refused', async () => {
     const repo = gitRepo(root, 'rev');
     const task = await estimated([repo], { scenario: { preset: 'review-only' } });

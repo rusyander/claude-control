@@ -9,7 +9,7 @@ import { samePath } from '../../platform/paths.ts';
 import type { SplitEnv } from '../estimate/estimate.types.ts';
 import { closeLaunchAsks } from '../human/launch-ask.ts';
 import { journalPreflight, publishesOf, runTaskPreflight } from '../estimate/preflight-run.ts';
-import { resolveScenario, scenarioPrecedence } from '../scenario/index.ts';
+import { resolveScenario, scenarioPrecedence, titleLangOf } from '../scenario/index.ts';
 import { decideSplit, type SplitCheckDecision, type SplitUnit } from '../split-check/index.ts';
 import { unitsOfSplit } from '../units/index.ts';
 import { latestSplit, linesOf, type SplitRecordView } from './journal-view.ts';
@@ -178,7 +178,10 @@ function closeUnit(task: LiveTask, unitId: string, cause: number, cmdId?: string
 async function scenarioOfTask(
   task: LiveTask,
   env: SplitEnv,
-): Promise<{ publishes: boolean | undefined; precedence: ReturnType<typeof scenarioPrecedence> | null }> {
+): Promise<{
+  publishes: boolean | undefined;
+  precedence: ReturnType<typeof scenarioPrecedence> | null;
+}> {
   const created = task.state.created;
   if (!created) return { publishes: undefined, precedence: null };
   const ref = task.state.scenario?.ref ?? created.scenario;
@@ -281,16 +284,41 @@ export async function afterAccept(
   return askLaunch(task, outcome, env, []);
 }
 
+/**
+ * Вопрос запуска — на языке панели, с которой задача запущена (`task.created.lang`, тот же
+ * источник, что у заголовков шагов «из Пути»): человек читает его на ленте среди своих строк.
+ * Причины предпроверки — проза ядра, дословно. Нет языка — русский (`titleLangOf`, как у всех
+ * вопросов ядра: задача до этапа 10 читается так, как писалась).
+ */
+const LAUNCH_WORDS = {
+  en: {
+    refused: 'refused',
+    solo: 'one unit (no split)',
+    units: (order: string[]) => `${order.length} units: ${order.join(' → ')}`,
+    ask: (plan: string) => `Launch the task? Split: ${plan}.`,
+    blocked: (why: string[], plan: string) =>
+      `Launch blocked by preflight: ${why.join('; ')}. Split: ${plan}.`,
+  },
+  ru: {
+    refused: 'отказано',
+    solo: 'одна единица (без деления)',
+    units: (order: string[]) => `единиц: ${order.length} — ${order.join(' → ')}`,
+    ask: (plan: string) => `Запустить задачу? Деление: ${plan}.`,
+    blocked: (why: string[], plan: string) =>
+      `Запуск остановлен предпроверкой: ${why.join('; ')}. Деление: ${plan}.`,
+  },
+} as const;
+
 function askLaunch(
   task: LiveTask,
   outcome: SplitOutcome,
   env: SplitEnv,
   blocked: string[],
 ): AfterAccept {
+  const words = LAUNCH_WORDS[titleLangOf(task.state.created?.lang)];
   const d = outcome.decision;
-  let plan = 'refused';
-  if (d.verdict === 'accepted')
-    plan = d.solo ? 'one unit (no split)' : `${d.order.length} units: ${d.order.join(' → ')}`;
+  let plan: string = words.refused;
+  if (d.verdict === 'accepted') plan = d.solo ? words.solo : words.units(d.order);
   const raised = env.raise(task, {
     source: 'launch',
     stepId: null,
@@ -298,10 +326,7 @@ function askLaunch(
     action: { kind: 'launch', target: outcome.splitId },
     point: 10,
     dedupe: `split:${outcome.splitId}`,
-    question:
-      blocked.length > 0
-        ? `Launch blocked by preflight: ${blocked.join('; ')}. Split: ${plan}.`
-        : `Launch the task? Split: ${plan}.`,
+    question: blocked.length > 0 ? words.blocked(blocked, plan) : words.ask(plan),
     options: ['approve-split', 'edit-split', 'cancel'],
     recommendation: blocked.length > 0 ? 'fix the named roads, then approve' : 'approve-split',
     blocking: true,

@@ -70,7 +70,7 @@ describe('LONG_TIMEOUTS', () => {
   // Клиент, который сдаётся раньше сервера, показывает несуществующую ошибку:
   // прогон доходит до конца и результат записан, а пользователь видит таймаут.
   it('перекрывают бюджеты сервера', () => {
-    expect(LONG_TIMEOUTS.assistantRun).toBeGreaterThan(180_000); // assistant-runner
+    expect(LONG_TIMEOUTS.assistantRun).toBeGreaterThan(180_000); // core-ask one-shot
     expect(LONG_TIMEOUTS.providerCheck).toBeGreaterThan(90_000); // provider-check
     expect(LONG_TIMEOUTS.mcpHealth).toBeGreaterThan(180_000); // checkMcpHealth
   });

@@ -3,9 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import ts from 'typescript';
 import {
-  SPLIT_SYSTEM_PROMPT,
   chatDeliveryPrompt,
-  deliveryPreamble,
   environmentPreamble,
   splitTicketPreamble,
 } from '@agentdeck/contracts/task-split';
@@ -16,31 +14,14 @@ import {
   continueFromCheckpoint,
   restartRequestPrompt,
 } from '@agentdeck/contracts/chat-handoff';
-import {
-  composeGroupNotes,
-  planStagePrompt,
-  triageStagePrompt,
-  workAfterPlanPrompt,
-} from '@agentdeck/contracts/split-plan';
-import { initiativePrompt, childAppend } from '../domains/chat/initiative/initiative.ts';
-import { childrenBrief } from '../domains/chat/children-brief/children-brief.ts';
-import { tellPrompt } from '../domains/chat/child-tell/child-tell.ts';
-import { mrWatchPrompt } from '../domains/chat/mr-watch/mr-watch.ts';
+import { initiativePrompt } from '../domains/chat/initiative/initiative.ts';
 import { retryPrompt } from '../domains/chat/run-retry/run-retry.ts';
-import { groupIdentityLine } from '../domains/chat/panel-preamble.ts';
-import {
-  deliveryNudgePrompt,
-  interruptResumePrompt,
-  limitResumePrompt,
-  pauseResumePrompt,
-} from '../domains/chat/split-conveyor/split-conveyor.ts';
 import { buildPrompt } from '../domains/project-tests/prompt/prompt.ts';
 import {
-  decidePermission,
   describeScope,
   runScope,
+  scopeClause,
 } from '../domains/project-tests/run-permissions/run-permissions.ts';
-import { serverText } from '../lib/server-texts/server-texts.ts';
 import { sealFooter } from '@agentdeck/contracts/panel-agent-feed';
 
 /**
@@ -84,17 +65,11 @@ const MODEL_FILES: ModelFile[] = [
       'overflowHandoffProposal',
     ],
   },
-  // Починки разбора — лента человека (`repairs`), не задание.
-  { path: join(CONTRACTS, 'split-plan.ts'), human: ['applySplitPlan'] },
+  { path: join(CONTRACTS, 'split-plan.ts') },
   { path: join(SRC, 'domains/chat/initiative/initiative.ts') },
   { path: join(SRC, 'domains/chat/children-brief/children-brief.ts') },
-  { path: join(SRC, 'domains/chat/child-tell/child-tell.ts') },
-  { path: join(SRC, 'domains/chat/mr-watch/mr-watch.ts') },
   { path: join(SRC, 'domains/chat/run-retry/run-retry.ts') },
-  { path: join(SRC, 'domains/chat/ChatBranchGate/ChatBranchGate.ts') },
   { path: join(SRC, 'domains/chat/ChatPermissions/ChatPermissions.ts') },
-  // Мост прав: отказы уходят агенту результатом вызова (F-51).
-  { path: join(SRC, 'domains/chat/permission-prompt-server.mjs') },
   // Хвост запечатанного ответа агента панели уходит модели следующим ходом (F-50).
   { path: join(CONTRACTS, 'panel-agent-feed.ts') },
   {
@@ -105,7 +80,6 @@ const MODEL_FILES: ModelFile[] = [
   { path: join(SRC, 'domains/integrations/links.ts'), human: ['requirePath'] },
   { path: join(SRC, 'domains/provider-check/steps-assistant.ts') },
   { path: join(SRC, 'domains/resources/ResourceAssistant.ts'), human: ['assistStructure'] },
-  { path: join(SRC, 'domains/provider-chat/prompt/prompt.ts') },
   { path: join(SRC, 'domains/project-tests/convention/convention.ts') },
   // Имя прогона — название в списке чатов. Метка регресса — данные библиотеки на
   // её языке (F-63): по ней человек отбирает кейсы, и «regression» в русской
@@ -114,8 +88,6 @@ const MODEL_FILES: ModelFile[] = [
     path: join(SRC, 'domains/project-tests/prompt/prompt.ts'),
     human: ['runName', 'RUN_NAME_WORDS', 'regressionTag', 'REGRESSION_TAGS'],
   },
-  { path: join(SRC, 'domains/portability/supervisor/skills-router.ts') },
-  { path: join(SRC, 'domains/portability/supervisor/subagents.ts') },
   { path: join(SRC, 'routes/panel-agent/actions-projects/actions-projects.ts') },
   { path: join(SRC, 'routes/panel-agent/actions-contour/actions-contour.ts') },
   { path: join(SRC, 'routes/panel-agent/actions-tests-library.ts') },
@@ -195,19 +167,7 @@ describe('всё, что панель шлёт модели, — по-англи
 
   it('собранные задания — без кириллицы, даже со строками панели внутри', () => {
     // Входы — латиница: слова человека в задании законно русские, проверяется
-    // только то, что дописала панель. Строка недостачи доставки — настоящий
-    // русский серверный текст: он обязан приехать к модели переведённым.
-    const gap = serverText('delivery-gap-fix-missing', { count: 2 });
-    const group = {
-      index: 0,
-      title: 'Header',
-      branch: 'feature/header',
-      after: [],
-      status: 'failed' as const,
-      error: 'copy failed',
-      retries: 2,
-      chatId: 'work-1',
-    };
+    // только то, что дописала панель.
     const cases = [
       {
         id: 'gui-001',
@@ -229,13 +189,9 @@ describe('всё, что панель шлёт модели, — по-англи
     } as never;
 
     const built: Record<string, string | undefined> = {
-      SPLIT_SYSTEM_PROMPT,
       HANDOFF_SYSTEM_PROMPT,
       chatDelivery: chatDeliveryPrompt({}),
       chatDeliveryForeign: chatDeliveryPrompt({ foreign: true, skill: 'x-delivery' }),
-      delivery: deliveryPreamble({ branch: 'feature/header' }),
-      deliveryHuman: deliveryPreamble({ branch: 'b', mergeRequest: 'u', questions: 'human' }),
-      deliveryWork: deliveryPreamble({ branch: 'b', mergeRequest: 'u', deliverLater: true }),
       environment: environmentPreamble({}),
       environmentFailed: environmentPreamble({
         mirror: 'Local layer: 3 copied',
@@ -247,61 +203,18 @@ describe('всё, что панель шлёт модели, — по-англи
       treeResume: buildTreeResumePrompt(),
       continue: continueFromCheckpoint('.agent/PROGRESS.md'),
       restart: restartRequestPrompt('.agent/PROGRESS.md'),
-      triage: triageStagePrompt({
-        shared: 'Shared',
-        groups: [
-          { title: 'Header', branch: 'feature/header', tasks: ['align'], kind: 'mechanical' },
-        ],
-      }),
-      plan: planStagePrompt({
-        title: 'Header',
-        branch: 'b',
-        task: 't',
-        owns: ['a.ts'],
-        workModel: 'sonnet',
-      }),
-      workWithPlan: workAfterPlanPrompt({ task: 't', plan: 'p' }),
-      workNoPlan: workAfterPlanPrompt({ task: 't', notes: 'n' }),
-      notes: composeGroupNotes({
-        predecessors: [
-          { title: 'A', branch: 'a', failed: true, files: ['x.ts'], filesTotal: 3 },
-          { title: 'B', branch: 'b', unfinished: true, filesTotal: 2 },
-        ],
-        base: 'a',
-        holdAnswer: { question: 'q', answer: 'a' },
-      }),
-      initiative: initiativePrompt({ taskSplitInitiative: true, handoffInitiative: true }),
-      initiativeBare: initiativePrompt({ taskSplitInitiative: false, handoffInitiative: false }),
-      child: childAppend(undefined),
-      children: childrenBrief({ parentChatId: 'p', order: [0], groups: [group] } as never),
-      tell: tellPrompt('hello'),
-      mrWatch: mrWatchPrompt({
-        branch: 'b',
-        mr: 'u',
-        threads: [],
-        red: { id: 1, status: 'failed' } as never,
-      }),
+      initiative: initiativePrompt({ handoffInitiative: true }),
+      initiativeBare: initiativePrompt({ handoffInitiative: false }),
       retry: retryPrompt('boom'),
-      identity: groupIdentityLine('b', ['PROJ-1']),
-      nudge: deliveryNudgePrompt('b', [gap]),
-      nudgeReport: deliveryNudgePrompt('b', [
-        serverText('tests-gap-unrun', { cases: 'a-1', command: 'node t.mjs run --case g:a-1' }),
-      ]),
-      interrupt: interruptResumePrompt('b'),
-      limit: limitResumePrompt('b'),
-      pause: pauseResumePrompt('b'),
       testsGenerate: buildPrompt(groups, { projectPath: '/p', mode: 'generate', groupId: 'gui' }),
       testsRun: buildPrompt(groups, { projectPath: '/p', mode: 'run' }),
       testsExplore: buildPrompt(groups, { projectPath: '/p', mode: 'explore' }),
       testsAutomate: buildPrompt(groups, { projectPath: '/p', mode: 'automate' }),
       scope: describeScope(scope),
-      denyAsk: decidePermission(scope, 'AskUserQuestion', {}).message,
+      scopeClause: scopeClause(scope),
       sealed: sealFooter({ reason: 'restart', actions: ['toggle_rule', 'where_am_i (failed)'] }),
       sealedFailed: sealFooter({ reason: 'failed', actions: [], detail: 'The CLI exited' }),
-      denyWrite: decidePermission(scope, 'Write', { file_path: '/elsewhere/x.ts' }).message,
-      denyGit: decidePermission(scope, 'Bash', { command: 'git push' }).message,
     };
-    expect(CYRILLIC.test(gap)).toBe(true);
     expect(russianIn(built)).toEqual([]);
   });
 

@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ChatRunRegistry, type RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from './ChatSession.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * Тумблеры и права по обоим написаниям ключа разговора.

@@ -134,7 +134,11 @@ export function createAcquire(
       resources.push(await createResource(record, 'model-slot', `slot:${slotKey}`, releaseSpec));
       const memory = await ctx.readGpu();
       const fit = decideFit({
-        model: { id: model.id, sizeBytes: model.sizeBytes },
+        model: {
+          id: model.id,
+          sizeBytes: model.sizeBytes,
+          ...(model.needBytes === undefined ? {} : { needBytes: model.needBytes }),
+        },
         gpu: memory,
         ram: ctx.ram(),
         overheadBytes: options.overheadBytes ?? 1024 * MIB,
@@ -166,7 +170,7 @@ export function createAcquire(
         ...(options.server.extraArgs ? { extraArgs: options.server.extraArgs } : {}),
         ...(Object.keys(env).length > 0 ? { env } : {}),
         workDir: entry.workDir,
-        models: [{ id: model.id, path: model.path }],
+        models: [{ id: model.id, path: model.path, ...(model.args ? { args: model.args } : {}) }],
         marker: serverRid,
         ...(options.startTimeoutMs ? { startTimeoutMs: options.startTimeoutMs } : {}),
         ...(spec.signal ? { signal: spec.signal } : {}),

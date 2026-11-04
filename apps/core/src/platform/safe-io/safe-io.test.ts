@@ -1,6 +1,7 @@
 import {
   existsSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   renameSync,
@@ -80,6 +81,47 @@ describe('safe-io', () => {
       }, NO_SLEEP),
     ).toThrow(/ENOSPC/);
     expect(other).toBe(1);
+  });
+
+  it('P68 exclusive create: EPERM/EBUSY of a name being released is retried; a rival winning meanwhile is «exists»; a lasting EPERM surfaces', () => {
+    const dir = tempDir();
+    const ebusy = (): Error => Object.assign(new Error('EBUSY: open'), { code: 'EBUSY' });
+    let fails = 2;
+    const created = createExclusive(join(dir, 'a.lock'), 'x', 0o644, {
+      retry: NO_SLEEP,
+      open: (path, flags, mode) => {
+        if (fails-- > 0) throw eperm();
+        return openSync(path, flags, mode);
+      },
+    });
+    expect(created).toBe('created');
+    expect(readFileSync(join(dir, 'a.lock'), 'utf8')).toBe('x');
+    let first = true;
+    const lost = createExclusive(join(dir, 'b.lock'), 'mine', 0o644, {
+      retry: NO_SLEEP,
+      open: (path, flags, mode) => {
+        if (first) {
+          first = false;
+          writeFileSync(path, 'rival');
+          throw ebusy();
+        }
+        return openSync(path, flags, mode);
+      },
+    });
+    expect(lost).toBe('exists');
+    expect(readFileSync(join(dir, 'b.lock'), 'utf8')).toBe('rival');
+    let calls = 0;
+    expect(() =>
+      createExclusive(join(dir, 'c.lock'), 'x', 0o644, {
+        retry: NO_SLEEP,
+        open: () => {
+          calls += 1;
+          throw eperm();
+        },
+      }),
+    ).toThrow(/EPERM/);
+    expect(calls).toBe(NO_SLEEP.attempts);
+    expect(existsSync(join(dir, 'c.lock'))).toBe(false);
   });
 
   it('P26 removal that reports success but leaves the path is read back as not removed', () => {

@@ -84,22 +84,41 @@ export function listDir(path: string): Fact<string[]> {
   }
 }
 
+export interface CreateExclusiveOptions {
+  retry?: RetryPolicy;
+  /** Подмена открытия — только для тестов отказов. */
+  open?: (path: string, flags: string, mode: number) => number;
+}
+
 /**
  * Создать файл, только если его нет (`wx`), с fsync файла и каталога. Ответ — `created` или
  * `exists`; прочие ошибки — наверх. Это единственная CAS-операция файловой системы, на
  * которой стоят аренда и замок procs.json (rename поверх цели условным не бывает).
+ * На Windows имя, которое соперник в этот миг отпускает, пока файл держит сканер или
+ * читатель, отвечает на `wx` EPERM, а не EEXIST (P68: 4 процесса на одном ключе роняли захват
+ * исключением) — EPERM/EBUSY повторяются ограниченно, как у чтений; после границы — наверх.
  */
-export function createExclusive(path: string, text: string, mode = 0o644): 'created' | 'exists' {
+export function createExclusive(
+  path: string,
+  text: string | Uint8Array,
+  mode = 0o644,
+  options: CreateExclusiveOptions = {},
+): 'created' | 'exists' {
   mkdirSync(dirname(path), { recursive: true });
+  const open = options.open ?? openSync;
   let fd: number;
   try {
-    fd = openSync(path, 'wx', mode);
+    fd = retryTransient(
+      () => open(path, 'wx', mode),
+      options.retry ?? DEFAULT_RETRY,
+      READ_TRANSIENT_CODES,
+    );
   } catch (error) {
     if (errorCode(error) === 'EEXIST') return 'exists';
     throw error;
   }
   try {
-    const buffer = Buffer.from(text, 'utf8');
+    const buffer = typeof text === 'string' ? Buffer.from(text, 'utf8') : Buffer.from(text);
     let written = 0;
     while (written < buffer.length)
       written += writeSync(fd, buffer, written, buffer.length - written);

@@ -3,7 +3,6 @@
 // висит, а внук (как демон Gradle) живёт своим процессом: отмена должна снять обоих.
 // Внук отвязан: java, запущенная через gradlew.bat, не входит в задание (job) Node и
 // не гаснет со смертью сборщика — неотвязанный внук ушёл бы и при снятии одного корня.
-/* global process, setTimeout */
 import { spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 

@@ -13,6 +13,7 @@ import {
   useRevokePhoneKey,
   type PhoneSigningDevice,
 } from '@entities/PhoneSigning';
+import { failureOf, failureReason, useAdoptPhoneKeys } from '@entities/CoreTask';
 import styles from './PhoneSigningCard.module.scss';
 
 /**
@@ -25,6 +26,7 @@ export function PhoneSigningCard() {
   const { t, i18n } = useTranslation();
   const { data: view, isError, refetch } = usePhoneSigning();
   const revoke = useRevokePhoneKey();
+  const adopt = useAdoptPhoneKeys();
   const [pending, setPending] = useState<PhoneSigningDevice | undefined>(undefined);
 
   if (isError || !view) {
@@ -160,6 +162,42 @@ export function PhoneSigningCard() {
             </>
           )}
         </Stack>
+
+        {/* Ядро задач проверяет подпись телефона своими ключами и номером машины панели:
+            без переноса ответ с телефона на вопрос ядра отклоняется (`signature-invalid`). */}
+        {view.devices.length > 0 ? (
+          <Stack gap="var(--spacing-2xs)">
+            <Typography variant="body-sm" weight="medium">
+              {t('phoneSigning.coreTitle')}
+            </Typography>
+            <Typography variant="body-sm" color="subtle" className="prose">
+              {t('phoneSigning.coreExplain')}
+            </Typography>
+            <div>
+              <Button
+                variant="secondary"
+                size="sm"
+                data-core-adopt
+                isLoading={adopt.isPending}
+                onClick={() => adopt.mutate({ machineId: view.machineId, devices: view.devices })}
+              >
+                {t('phoneSigning.coreAdopt')}
+              </Button>
+            </div>
+            {adopt.isSuccess ? (
+              <Typography variant="body-sm" color="success" data-core-adopt-result role="status">
+                {t('phoneSigning.coreAdopted', { count: adopt.data.adopted.length })}
+              </Typography>
+            ) : null}
+            {adopt.isError ? (
+              <Typography variant="body-sm" color="danger" data-core-adopt-result role="alert">
+                {t('phoneSigning.coreAdoptFailed', {
+                  reason: failureReason(failureOf(adopt.error)),
+                })}
+              </Typography>
+            ) : null}
+          </Stack>
+        ) : null}
       </Stack>
 
       <ConfirmDialog

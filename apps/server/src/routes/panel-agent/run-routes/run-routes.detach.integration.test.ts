@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { PanelAgentConversation, PanelAgentRunEvent } from '@agentdeck/contracts/panel-agent';
-import { PANEL_AGENT_BRIDGE_ID } from '@agentdeck/contracts/panel-agent';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
-import { resetCliLookupCache } from '../../../providers/detect/detect.ts';
+import { createBridgeTokenLedger } from '../../../lib/bridge-tokens/bridge-tokens.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
-import { PANEL_AGENT_PROCESS_LEDGER } from '../../../domains/panel-agent/processes/processes.ts';
+import { createCoreAskPort } from '../../../domains/core-ask/core-ask.ts';
+import { startFakeCore, type FakeCore } from '../../../domains/core-ask/__fixtures__/fake-core.ts';
 import { registerPanelAgentRunRoutes, type PanelAgentRunRouteDeps } from './run-routes.ts';
 
 /**
@@ -17,25 +17,10 @@ import { registerPanelAgentRunRoutes, type PanelAgentRunRouteDeps } from './run-
  * поток хода рвётся — и ход агента панели умирал вместе с запросом. Ход с
  * `detach` переживает обрыв, клиент возвращается за кадрами по номеру.
  *
- * Настоящий маршрут на настоящем сокете (`listen` + `fetch` с обрывом), настоящий
- * запуск процесса, фальшивый `claude` на PATH — тот же, что у соседнего теста
- * маршрута: действие, пауза, ответ.
+ * Настоящий маршрут на настоящем сокете (`listen` + `fetch` с обрывом). Ход идёт сессией
+ * ядра (этап 10, F2): ядро — заглушка на настоящем HTTP, «процесс жив» = сессия заглушки
+ * ещё идёт, «ход снят» = ядру пришла команда `cancel` и сессия кончилась.
  */
-const isWindows = process.platform === 'win32';
-
-const FAKE = `
-import { existsSync, readFileSync } from 'node:fs';
-const SLOW_AFTER = new URL('./slow-after-ms.txt', import.meta.url);
-for await (const _chunk of process.stdin) { /* ввод хода — не нужен */ }
-const out = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
-out({ type: 'system', subtype: 'init' });
-out({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'mcp__${PANEL_AGENT_BRIDGE_ID}__where_am_i', input: {} }] } });
-out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false, content: [{ type: 'text', text: 'Done.' }] }] } });
-if (existsSync(SLOW_AFTER)) await new Promise((done) => setTimeout(done, Number(readFileSync(SLOW_AFTER, 'utf8'))));
-out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Вы в разделе проектов.' }] } });
-out({ type: 'result', subtype: 'success', is_error: false, result: 'Вы в разделе проектов.' });
-`;
-
 interface Frame {
   seq?: number;
   event: PanelAgentRunEvent;
@@ -59,22 +44,26 @@ function parseFrames(text: string): Frame[] {
 }
 
 const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
+const REPLY = 'Вы в разделе проектов.';
 
 describe('ход агента панели переживает обрыв (detach)', () => {
   let appData: string;
-  let bin: string;
   let store: AppStore;
   let app: FastifyInstance;
   let base: string;
-  const savedPath = process.env.PATH;
+  let core: FakeCore;
+  /** Пауза сессии после действия, до ответа. */
+  let slowAfterMs = 0;
 
   const build = async (extra: Partial<PanelAgentRunRouteDeps> = {}): Promise<void> => {
     const ctx = { store, location: { paths: { appData } } } as unknown as ServerContext;
     app = Fastify();
     registerPanelAgentRunRoutes(app, ctx, {
       selfBaseUrl: 'http://127.0.0.1:5211',
-      gatewayPort: () => 0,
+      ask: createCoreAskPort(() => core.home, core.identity),
+      bridges: createBridgeTokenLedger(),
       pending: new PanelPendingActions(10_000),
+      pollMs: 20,
       ...extra,
     });
     base = await app.listen({ host: '127.0.0.1', port: 0 });
@@ -82,36 +71,27 @@ describe('ход агента панели переживает обрыв (deta
 
   beforeEach(async () => {
     appData = mkdtempSync(join(tmpdir(), 'cc-agent-detach-appdata-'));
-    bin = mkdtempSync(join(tmpdir(), 'cc-agent-detach-bin-'));
-    const script = join(bin, 'fake-claude.mjs');
-    writeFileSync(script, FAKE, 'utf8');
-    if (isWindows) {
-      writeFileSync(
-        join(bin, 'claude.cmd'),
-        `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`,
-      );
-      const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
-      process.env.PATH = `${bin}${delimiter}${system32}`;
-    } else {
-      writeFileSync(
-        join(bin, 'claude'),
-        `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`,
-        {
-          mode: 0o755,
-        },
-      );
-      process.env.PATH = `${bin}${delimiter}/usr/bin${delimiter}/bin`;
-    }
-    resetCliLookupCache();
     store = new AppStore(appData);
+    slowAfterMs = 0;
+    core = await startFakeCore({
+      turn: async ({ emit, cancelled }) => {
+        emit({
+          kind: 'tool-call',
+          data: { toolUseId: 't1', name: 'mcp__panel-bridge__where_am_i', input: {} },
+        });
+        emit({ kind: 'tool-result', data: { toolUseId: 't1', isError: false } });
+        const stop = cancelled.then(() => 'cancelled' as const);
+        if (slowAfterMs && (await Promise.race([wait(slowAfterMs), stop]))) return;
+        emit({ kind: 'assistant-text', data: { text: REPLY } });
+        emit({ kind: 'turn-end', data: { isError: false, numTurns: 1 } });
+      },
+    });
   });
 
   afterEach(async () => {
     await app.close();
-    process.env.PATH = savedPath;
-    resetCliLookupCache();
+    await core.close();
     rmSync(appData, { recursive: true, force: true });
-    rmSync(bin, { recursive: true, force: true });
   });
 
   const body = (detach: boolean) => ({
@@ -133,7 +113,7 @@ describe('ход агента панели переживает обрыв (deta
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let text = '';
-    // До результата действия: ход идёт, ответа ещё нет (пауза фальшивого CLI).
+    // До результата действия: ход идёт, ответа ещё нет (пауза сессии).
     while (!parseFrames(text).some((frame) => frame.event.kind === 'tool-result')) {
       const chunk = await reader.read();
       if (chunk.done) break;
@@ -144,9 +124,8 @@ describe('ход агента панели переживает обрыв (deta
     return parseFrames(text);
   }
 
-  const ledger = () => {
-    const path = join(appData, PANEL_AGENT_PROCESS_LEDGER);
-    return existsSync(path) ? (JSON.parse(readFileSync(path, 'utf8')) as unknown[]) : [];
+  const settled = async (): Promise<void> => {
+    for (let i = 0; i < 150 && core.running.size > 0; i += 1) await wait(20);
   };
   const stored = () =>
     JSON.parse(
@@ -154,60 +133,63 @@ describe('ход агента панели переживает обрыв (deta
     ) as PanelAgentConversation;
 
   it('обрыв не снимает ход; вернувшийся клиент получает кадры после своего номера и ответ', async () => {
-    writeFileSync(join(bin, 'slow-after-ms.txt'), '1500');
+    slowAfterMs = 1500;
     await build();
     const seen = await startAndDrop(true);
     expect(seen.every((frame) => typeof frame.seq === 'number')).toBe(true);
     const last = seen.at(-1)!.seq!;
     await wait(300);
-    expect(ledger()).toHaveLength(1); // процесс жив после обрыва
+    expect(core.running.size).toBe(1); // сессия жива после обрыва
+    expect(core.cancels).toEqual([]);
 
     const response = await fetch(`${base}/api/agent/run/conv-d/stream?fromSeq=${last}`);
     expect(response.status).toBe(200);
     const rest = parseFrames(await response.text());
     expect(rest[0]?.seq).toBe(last + 1);
     expect(rest.map((frame) => frame.event.kind)).toContain('done');
-    expect(stored().messages.at(-1)).toMatchObject({
-      role: 'assistant',
-      content: 'Вы в разделе проектов.',
-    });
+    expect(stored().messages.at(-1)).toMatchObject({ role: 'assistant', content: REPLY });
   });
 
   it('без detach обрыв снимает ход, как прежде, и кадры идут без номеров', async () => {
-    writeFileSync(join(bin, 'slow-after-ms.txt'), '1500');
+    slowAfterMs = 1500;
     await build();
     const seen = await startAndDrop(false);
     expect(seen.some((frame) => frame.seq !== undefined)).toBe(false);
-    for (let i = 0; i < 100 && ledger().length > 0; i += 1) await wait(20);
-    expect(ledger()).toEqual([]);
+    await settled();
+    expect(core.running.size).toBe(0);
+    expect(core.cancels).toHaveLength(1);
     expect((await fetch(`${base}/api/agent/run/conv-d/stream?fromSeq=0`)).status).toBe(404);
-    expect(stored().messages.at(-1)?.content).not.toBe('Вы в разделе проектов.');
+    expect(stored().messages.at(-1)?.content).not.toBe(REPLY);
   });
 
   it('никто не вернулся за срок — ход снят сам', async () => {
-    writeFileSync(join(bin, 'slow-after-ms.txt'), '4000');
+    slowAfterMs = 4000;
     await build({ detachGraceMs: 200 });
     await startAndDrop(true);
-    for (let i = 0; i < 100 && ledger().length > 0; i += 1) await wait(20);
-    expect(ledger()).toEqual([]);
-    expect(stored().messages.at(-1)?.content).not.toBe('Вы в разделе проектов.');
+    await settled();
+    expect(core.running.size).toBe(0);
+    expect(core.cancels).toHaveLength(1);
+    expect(stored().messages.at(-1)?.content).not.toBe(REPLY);
   });
 
   it('«Стоп» отцепленного хода — отдельным запросом', async () => {
-    writeFileSync(join(bin, 'slow-after-ms.txt'), '4000');
+    slowAfterMs = 4000;
     await build();
     await startAndDrop(true);
     const stop = await fetch(`${base}/api/agent/run/conv-d/stop`, { method: 'POST' });
     expect(stop.status).toBe(200);
-    for (let i = 0; i < 100 && ledger().length > 0; i += 1) await wait(20);
-    expect(ledger()).toEqual([]);
+    await settled();
+    expect(core.running.size).toBe(0);
+    expect(core.cancels).toHaveLength(1);
+    await wait(50);
     expect((await fetch(`${base}/api/agent/run/conv-d/stop`, { method: 'POST' })).status).toBe(404);
   });
 
   it('законченный ход ещё отдаёт кадры опоздавшему; чужой разговор — 404', async () => {
     await build();
     await startAndDrop(true);
-    for (let i = 0; i < 150 && ledger().length > 0; i += 1) await wait(20);
+    await settled();
+    await wait(50);
     const late = parseFrames(
       await (await fetch(`${base}/api/agent/run/conv-d/stream?fromSeq=0`)).text(),
     );

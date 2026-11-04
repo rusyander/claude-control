@@ -2,8 +2,8 @@
 
 Same contract as [backend.md](backend.md): the canon first; a canon rule contradicting a line here
 wins, noted once in the profile journal. A hit is a candidate, proven at its P-rung or struck with its
-reason. !778's frontend misses were all diff-visible: an unencoded route param, a reset eating input,
-a tab unmount, a page kept on filter change, raw codes on screen, an `_other`-only plural.
+reason. Frontend misses are mostly diff-visible: an unencoded route param, a reset eating input, a
+tab unmount, a page kept on filter change, raw codes on screen, an `_other`-only plural.
 
 ## Sweep — added lines, `file:line` (backend.md's awk, pathspec `'*.ts' '*.tsx'`, then `grep -P`)
 

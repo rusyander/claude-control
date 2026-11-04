@@ -1,16 +1,15 @@
 import type { CliRunFacts } from './types.ts';
 
 /**
- * Qwen Code. Источники — каталог панели `providers/catalog/qwen.ts` до переезда,
- * `domains/provider-chat/system-note/system-note.ts` (пределы локальной модели) и
- * `domains/groups/qwen-layer/qwen-layer.ts` (файл настроек на прогон).
+ * Qwen Code. Источники — каталог панели `providers/catalog/qwen.ts` до переезда и
+ * `domains/provider-chat/system-note/system-note.ts` (пределы локальной модели).
  */
 export const qwenRunFacts: CliRunFacts = {
   id: 'qwen',
   name: 'Qwen Code',
   status: 'experimental',
   binary: { command: 'qwen', windowsCommand: 'qwen.cmd' },
-  // Вход Qwen OAuth — способ `qwen-oauth` (`domains/provider-chat/economy-run/qwen.ts`).
+  // Вход Qwen OAuth — способ `qwen-oauth` (`apps/server/src/domains/provider-chat/own-endpoint/qwen-settings.ts`).
   login: 'account',
   // API — совместимое с OpenAI; у ModelStudio/DashScope ключ `DASHSCOPE_API_KEY`.
   vendorApi: { kind: 'openai-compat', keyVars: ['OPENAI_API_KEY', 'DASHSCOPE_API_KEY'] },

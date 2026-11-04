@@ -11,4 +11,12 @@ export const dlpEn: Record<DlpMessageCode, string> = {
   'dlp-upstream-unparsed': 'address “{{value}}” does not parse',
   'dlp-upstream-scheme': 'the address must start with http:// or https://',
   'dlp-no-rules': 'there is no enabled rule',
+  'dlp-core-missing': 'the core was not found ({{reason}})',
+  'dlp-core-unverified': 'the core entry did not verify ({{reason}})',
+  'dlp-core-unverified-bare': 'the core entry did not verify',
+  'dlp-core-http': 'the core answered {{status}} to {{path}}',
+  'dlp-core-down': 'Data protection is held by the core, and it does not answer: {{reason}}',
+  'dlp-core-port-waiting': 'the port is busy',
+  'dlp-core-port-busy': 'port {{port}} is busy ({{reason}})',
+  'dlp-core-listener-silent': 'no answer from the listener',
 };

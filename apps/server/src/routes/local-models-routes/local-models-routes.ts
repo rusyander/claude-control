@@ -175,12 +175,6 @@ export function registerLocalModelsRoutes(
     }
   });
 
-  app.post<{ Body: unknown }>('/api/local-models/import', (request, reply) => {
-    const body = parseBody(localPullBodySchema, request.body, reply);
-    if (!body) return reply;
-    return local.importFromSystem(body.tag);
-  });
-
   /**
    * Удалить скачанное: `?quant=` — одно квантование, без него — модель целиком. Файл, который
    * держит сервер моделей или поднимет после идущего прогона, — 409 с причиной: сервер

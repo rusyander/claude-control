@@ -221,50 +221,6 @@
         "height": 900
       }
     },
-    "e2e/07-chat-test": {
-      "light-ru": {
-        "file": "07-chat-test.png",
-        "width": 1440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "07-chat-test.en.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "07-chat-test.dark.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "07-chat-test.dark.en.png",
-        "width": 1440,
-        "height": 900
-      }
-    },
-    "e2e/08-chat-case": {
-      "light-ru": {
-        "file": "08-chat-case.png",
-        "width": 1440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "08-chat-case.en.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "08-chat-case.dark.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "08-chat-case.dark.en.png",
-        "width": 1440,
-        "height": 900
-      }
-    },
     "e2e/09-retry-quarantine": {
       "light-ru": {
         "file": "09-retry-quarantine.png",

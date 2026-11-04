@@ -11,7 +11,7 @@ import { withoutDeferredWaitLines } from '@agentdeck/contracts/deferred-asks';
 import { scanReviewBlocks } from '@agentdeck/contracts/model-cascade';
 import { scanSieveBlocks, stampSieveRows, withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
-import type { ChainOutcome } from '../split-conveyor/split-conveyor.ts';
+import type { ChainOutcome } from './chain-outcome.types.ts';
 import { humanAsksOf } from '../split-continue.ts';
 
 /**

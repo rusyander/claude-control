@@ -9,21 +9,39 @@ import { LaunchCard } from './LaunchCard/LaunchCard';
 import { LaunchForm } from './LaunchForm/LaunchForm';
 import { LayerCard } from './LayerCard/LayerCard';
 import { RejectedCard } from './RejectedCard/RejectedCard';
+import { ReviewLinkForm } from './ReviewLinkForm/ReviewLinkForm';
 import { RoadsCard } from './RoadsCard/RoadsCard';
 import { SplitEditor } from './SplitEditor/SplitEditor';
+import type { LaunchDraft } from '../model/launch.types';
+
+interface CoreLaunchScreenProps {
+  /** Начальный черновик формы: страница «Группы» открывает запуск со сценарием из «Пути» группы. */
+  initial?: Partial<LaunchDraft>;
+}
 
 /**
  * Экран запуска целиком: форма → ответ оценки (числа, дороги, отвергнутые правки, слой, гранты)
  * → деление из ленты задачи → запуск. Блоки ответа появляются только после ответа ядра: до него
  * показывать нечего, а пустые карточки выглядели бы «всё в порядке».
  */
-export function CoreLaunchScreen() {
+export function CoreLaunchScreen({ initial }: CoreLaunchScreenProps = {}) {
   const flow = useLaunchFlow();
   const { reply } = flow;
   const closed = flow.blockers.includes('refused') || flow.blockers.includes('launched');
   return (
     <Stack gap="var(--spacing-md)" data-core-launch>
-      <LaunchForm pending={flow.pending} retrying={flow.retrying} onEstimate={flow.estimate} />
+      <LaunchForm
+        pending={flow.pending}
+        retrying={flow.retrying}
+        onEstimate={flow.estimate}
+        initial={initial}
+      />
+      <ReviewLinkForm
+        pending={flow.pending}
+        retrying={flow.reviewRetrying}
+        refusal={flow.reviewRefusal}
+        onOpen={(fields) => void flow.reviewLink(fields)}
+      />
       {flow.failure && <FailureNote failure={flow.failure} />}
       {reply && (
         <>

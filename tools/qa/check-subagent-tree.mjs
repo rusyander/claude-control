@@ -13,8 +13,7 @@
  *    возвращает фокус на узел.
  * 4. Панель справа — шаги субагента из его транскрипта (вызовы и результаты),
  *    только чтение.
- * 5. «Остановить» у идущего субагента уходит запросом с его id (сам путь до
- *    CLI доказывает `check-subagent-stop.mjs` на настоящем CLI).
+ * 5. «Остановить» нет ни у одного узла: stdin CLI держит ядро, не панель.
  * 6. Карточка группы в хабе называет, сколько агентов идёт и сколько
  *    закончено; переход из неё открывает чат группы с панелью нужного агента.
  * 7. axe (WCAG 2.1 AA) по дереву, панели хода и полосе агентов карточки —
@@ -23,8 +22,8 @@
  *
  * Данные: разговоры засеяны синтетикой (`subagent-tree-fixture.mjs`) в дом
  * стенда, прогресс и ход субагента отдаёт настоящий сервер стенда. Подменено
- * только то, чего у стенда нет: живой процесс разговора (`processAlive`,
- * `canStopAgents`) и хаб родителя (`/api/chats`, `/api/chat/*\/tree`).
+ * только то, чего у стенда нет: живой процесс разговора (`processAlive`) и хаб
+ * родителя (`/api/chats`, `/api/chat/*\/tree`).
  *
  * Запуск: `node tools/qa/check-subagent-tree.mjs`; `SHOTS=<папка>` и
  * `PHASE=before|after` — снимки обеих тем.
@@ -41,9 +40,6 @@ import { GROUP_SESSION, PARENT, PROJECT_DIR, openChat, stubHub } from './subagen
 const suffix = process.env.PHASE ? `_${process.env.PHASE.toUpperCase()}` : '';
 const START = Date.now() - 12 * 60_000;
 
-/** Решения «Остановить», ушедшие с экрана. */
-const stops = [];
-
 async function stubLive(page, stand) {
   // Живого процесса у стенда нет — его признак подменяется в настоящем ответе
   // сервера, всё остальное (дерево, счётчики, модели) — как посчитал сервер.
@@ -53,17 +49,11 @@ async function stubLive(page, stand) {
       const body = await response.json();
       await route.fulfill({
         response,
-        json: { ...body, processAlive: true, canStopAgents: true },
+        json: { ...body, processAlive: true },
       });
     } catch {
       /* страница закрыта */
     }
-  });
-  await page.route('**/api/chat/*/agents/*/stop', async (route) => {
-    const parts = new URL(route.request().url()).pathname.split('/');
-    stops.push({ chatId: parts[3], agentId: parts[5], method: route.request().method() });
-    // Как ответил настоящий CLI 2.1.310 на `stop_task` (check-subagent-stop.mjs).
-    await route.fulfill({ json: { outcome: 'requested' } });
   });
   void stand;
 }
@@ -244,35 +234,9 @@ await runOnStand(
           check(`${theme}: Escape закрыл панель и вернул фокус на узел`, false);
         }
 
-        // «Остановить» — только у идущего, и уходит с его id.
-        const stop = node(AGENT_IDS.review).locator('[data-agent-stop]');
-        const stopCount = await stop.count();
-        const doneStops = await node(AGENT_IDS.explore).locator('[data-agent-stop]').count();
-        check(
-          `${theme}: «Остановить» есть только у идущего субагента`,
-          stopCount === 1 && doneStops === 0,
-        );
-        if (stopCount === 1) {
-          const before = stops.length;
-          await stop.click();
-          await page.waitForTimeout(400);
-          const sent = stops.slice(before);
-          check(
-            `${theme}: «Остановить» — POST с id агента`,
-            sent.length === 1 &&
-              sent[0].agentId === AGENT_IDS.review &&
-              sent[0].chatId === TREE_SESSION &&
-              sent[0].method === 'POST',
-            JSON.stringify(sent),
-          );
-          // «Запрошена», а не «остановлен»: подтверждение CLI ≠ остановка (замер 2.1.310).
-          const said = (await node(AGENT_IDS.review).textContent()) ?? '';
-          check(
-            `${theme}: после «Остановить» — «остановка запрошена»`,
-            /запрошен/.test(said),
-            said,
-          );
-        }
+        // «Остановить» нет ни у идущего, ни у закончившего: панели нечем его послать.
+        const stops = await page.locator('[data-agent-stop]').count();
+        check(`${theme}: «Остановить» нет ни у одного узла`, stops === 0, String(stops));
 
         // Карточка группы: счётчики и переход к агенту.
         await openChat(stand, page, PARENT);

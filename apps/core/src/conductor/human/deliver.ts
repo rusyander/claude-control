@@ -1,3 +1,4 @@
+import { HUMAN_ORIGIN_MARK } from '@agentdeck/contracts/core/session-stream';
 import { STEP_MACHINE } from '@agentdeck/contracts/core/states';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { Outgoing } from '../run/run.types.ts';
@@ -14,7 +15,8 @@ import type { HumanLedger } from './human.types.ts';
  * текста файла (подделать её изнутри файла нельзя — инструменты сообщение не пишут).
  */
 
-export const HUMAN_MARK = '[agentdeck · human-origin]';
+/** Метка — из контрактов: показ чата панели снимает ту же строку (`humanTextOf`). */
+export const HUMAN_MARK = HUMAN_ORIGIN_MARK;
 
 function marked(head: string, body: string): string {
   return `${HUMAN_MARK} ${head}\n${body}`;

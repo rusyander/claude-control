@@ -221,50 +221,6 @@
         "height": 900
       }
     },
-    "first/11-scenario-card": {
-      "light-ru": {
-        "file": "11-scenario-card.png",
-        "width": 440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "11-scenario-card.en.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "11-scenario-card.dark.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "11-scenario-card.dark.en.png",
-        "width": 440,
-        "height": 900
-      }
-    },
-    "first/12-scenario-created": {
-      "light-ru": {
-        "file": "12-scenario-created.png",
-        "width": 1400,
-        "height": 900
-      },
-      "light-en": {
-        "file": "12-scenario-created.en.png",
-        "width": 1400,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "12-scenario-created.dark.png",
-        "width": 1400,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "12-scenario-created.dark.en.png",
-        "width": 1400,
-        "height": 900
-      }
-    },
     "guards/01-contour-card": {
       "light-ru": {
         "file": "01-contour-card.png",
@@ -397,28 +353,6 @@
         "height": 900
       }
     },
-    "guards/07-other-cli": {
-      "light-ru": {
-        "file": "07-other-cli.png",
-        "width": 440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "07-other-cli.en.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "07-other-cli.dark.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "07-other-cli.dark.en.png",
-        "width": 440,
-        "height": 900
-      }
-    },
     "guards/08-dlp-broken": {
       "light-ru": {
         "file": "08-dlp-broken.png",
@@ -437,72 +371,6 @@
       },
       "dark-en": {
         "file": "08-dlp-broken.dark.en.png",
-        "width": 440,
-        "height": 900
-      }
-    },
-    "guards/09-cli-not-found": {
-      "light-ru": {
-        "file": "09-cli-not-found.png",
-        "width": 440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "09-cli-not-found.en.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "09-cli-not-found.dark.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "09-cli-not-found.dark.en.png",
-        "width": 440,
-        "height": 900
-      }
-    },
-    "guards/10-endpoint-unsupported": {
-      "light-ru": {
-        "file": "10-endpoint-unsupported.png",
-        "width": 440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "10-endpoint-unsupported.en.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "10-endpoint-unsupported.dark.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "10-endpoint-unsupported.dark.en.png",
-        "width": 440,
-        "height": 900
-      }
-    },
-    "guards/11-contour-unreachable": {
-      "light-ru": {
-        "file": "11-contour-unreachable.png",
-        "width": 440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "11-contour-unreachable.en.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "11-contour-unreachable.dark.png",
-        "width": 440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "11-contour-unreachable.dark.en.png",
         "width": 440,
         "height": 900
       }

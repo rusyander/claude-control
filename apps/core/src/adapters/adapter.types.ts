@@ -9,6 +9,8 @@ import type {
   SkillMode,
   UserLayerInventory,
 } from '@agentdeck/contracts/core/user-layer';
+import type { SendImage } from '@agentdeck/contracts/core/ask';
+import type { LocalLayerCarry, SettingSource } from '@agentdeck/contracts/core/session-carry';
 import type { Identity } from '../session-host/protocol.ts';
 import type {
   CoreSessionVars,
@@ -67,6 +69,11 @@ export interface DenySet {
   commands: string[][];
   /** Инструменты MCP по полному имени (`mcp__<server>__<tool>`). */
   mcpTools: string[];
+  /**
+   * Серверы MCP человека, которые правило `forge-mcp-read-only` держит только на чтении (P82):
+   * их инструменты до сеанса не перечислены — имя судят хук ядра и сервер права в момент вызова.
+   */
+  forgeMcpServers?: string[];
   /** Встроенные инструменты CLI классом в словаре ядра; имя у каждого CLI своё. */
   tools: CoreToolClass[];
 }
@@ -84,14 +91,33 @@ export interface PlatformDenyFacts {
   tokenFiles: readonly string[];
   /** Инструменты записи форджа по полному имени MCP (маски `mcp__<server>__*` допустимы). */
   forgeMcpTools?: readonly string[];
+  /** Серверы MCP человека шага, говорящие с форжем (`adapters/forge/mcp-tools.ts`): только чтение. */
+  forgeMcpServers?: readonly string[];
 }
 
 /** Сервер MCP на stdio, как его запускает CLI. */
-export interface McpServerEntry {
+export interface McpStdioEntry {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  /** Каталог запуска сервера (сервер человека, где его конфиг CLI называет `cwd`). */
+  cwd?: string;
+  url?: never;
 }
+
+/**
+ * Удалённый сервер MCP (s10 p8): `http` — streamable HTTP, `sse` — старый SSE. Заголовки уже с
+ * подставленными значениями (секреты — в книге ключей, в журнал — только имена).
+ */
+export interface McpRemoteEntry {
+  url: string;
+  transport: 'http' | 'sse';
+  headers?: Record<string, string>;
+  command?: never;
+}
+
+/** Сервер шага; различение и значения секретов — `mcp-carry.ts` (модуль типов значений не несёт, F-96). */
+export type McpServerEntry = McpStdioEntry | McpRemoteEntry;
 
 /** Слой человека в сеансе (06 §User layer, P87). */
 export type LayerMode = 'on' | 'observe' | 'off';
@@ -105,6 +131,38 @@ export interface RepoTrust {
   sourceRepo: string;
   /** Отметка панели: человек доверил этот репозиторий в панели (ядро берёт её из своего конфига). */
   panelMark: boolean;
+}
+
+/** Что читатель MCP человека знает о сеансе: пин окружения задачи, каталог сеанса, доверие. */
+export interface McpSourceInput {
+  /** Закреплённое окружение задачи: дом человека и переменные дома CLI (`CODEX_HOME`, …). */
+  pin: Record<string, string>;
+  /** Каталог сеанса (копия): отсюда CLI искал бы файлы проекта. */
+  cwd: string;
+  /** Доверие к исходному репозиторию (F-86); нет или не доверен — файлы проекта не читаются. */
+  trust?: RepoTrust;
+}
+
+/** Сервер MCP человека, как его собрал бы сам CLI из своих файлов. */
+export interface HumanMcpServer {
+  id: string;
+  /** Чей файл дал последнюю запись сервера: пользователя или проекта. */
+  scope: 'user' | 'project';
+  /** Файл последней записи по порядку CLI. */
+  file: string;
+  /** Запуск сервера; нет — сервер не переносится, причина в `skipped`. */
+  entry?: McpServerEntry;
+  skipped?: string;
+}
+
+/** Серверы MCP человека из конфига CLI (P73, s10 p7): предложения строгого списка шага. */
+export interface McpSourceRead {
+  /** Включённые серверы, по имени; выключенные (`enabled: false`) CLI не запустил бы — их нет. */
+  servers: HumanMcpServer[];
+  /** Файл есть, но не разобран — назван, не «пусто». */
+  unread: { file: string; reason: string }[];
+  /** Почему файлы проекта не читались (нет доверия); читались — нет поля. */
+  projectSkipped?: string;
 }
 
 /**
@@ -140,8 +198,27 @@ export interface LayerRun {
   losses?: string[];
 }
 
-/** Какие встроенные инструменты получает шаг (P73): ревью — только чтение. */
-export type ToolSet = 'all' | 'read-only';
+/**
+ * Какие встроенные инструменты получает шаг (P73): ревью — только чтение. `none` — ни одного
+ * (вопрос «ask», этап 10 F2): только серверы MCP, которые дала дорога. Переходник, не умеющий
+ * снять встроенные инструменты целиком, `none` не получает — дорога отказывает до запуска.
+ */
+export type ToolSet = 'all' | 'read-only' | 'none';
+
+/**
+ * Сужения и плагины сеанса от вызывающего (`task.created.session`, G6, контракт `session-carry`):
+ * `settingSources` — CLI грузит не больше этих источников настроек; `plugins` — каталоги плагинов
+ * на один сеанс (набор панели); `builtinTools` — встроенные инструменты не шире списка.
+ */
+export interface SessionLayerCarry {
+  settingSources?: readonly SettingSource[];
+  plugins?: readonly string[];
+  builtinTools?: readonly string[];
+  /** Промпт контура вместо системного промпта CLI (s10 G13 p7); бриф ядра — после него. */
+  systemPrompt?: string;
+  /** Локальный слой проекта вместо источника `project` (s10 G14 p6, `LocalLayerCarry`). */
+  localLayer?: LocalLayerCarry;
+}
 
 export interface SessionSpec {
   sessionId: string;
@@ -152,8 +229,13 @@ export interface SessionSpec {
   effort?: string;
   /** Первый бриф — системным промптом (P88). */
   brief: string;
-  /** Разговор CLI, который продолжаем; дельта возобновления — отдельным сообщением ядра. */
-  resume?: { conversationId: string };
+  /**
+   * Разговор CLI, который продолжаем; дельта возобновления — отдельным сообщением ядра. `from` —
+   * каталог прежней сессии ядра, чей разговор продолжается (решение `continuation`): переходник со
+   * своим домом у каждого сеанса берёт транскрипт оттуда. Нет `from` — разговор начат не ядром
+   * (оценка `resume`), транскрипт — в хранилище человека, уже подтверждённый `ownsTranscript`.
+   */
+  resume?: { conversationId: string; from?: string };
   endpoint?: { channel: AdapterChannelSummary; endpoint: BoundEndpoint };
   limits?: LocalLimits;
   /** Запреты ШАГА; запреты платформы (`platform`) каркас добавляет сам, снять их шаг не может. */
@@ -178,7 +260,23 @@ export interface SessionSpec {
    * `skills` — навыки человека (06:115): шаг сценария называет режим всегда (дорога берёт его из
    * `userLayer` шага), умолчания в переходнике нет — иначе «не спросили» и «включены» совпали бы.
    */
-  layer: { hooks: LayerMode; skills: SkillMode };
+  layer: {
+    hooks: LayerMode;
+    skills: SkillMode;
+    /**
+     * `user` — CLI грузит только источник человека (этап 10, F6, песочница): ни слоя проекта,
+     * ни инструкций предков рабочей папки — песочница под домом человека иначе подхватила бы его
+     * настоящие `CLAUDE.md`. Доверие к папке тогда не читается: слоя проекта нет вовсе. Только
+     * переходник с `userSourcesOnly`; прочим дорога отказывает. Нет поля — источники по режиму.
+     */
+    sources?: 'user';
+    /**
+     * Сужения и плагины вызывающего (`task.created.session`, G6). Каждое поле — только у
+     * переходника с тем же полем в `sessionCarry`; прочим дорога отказывает до запуска, а не
+     * запускает без них. Нет поля — сеанс как решил шаг.
+     */
+    carry?: SessionLayerCarry;
+  };
   /**
    * Исходный репозиторий копии и отметка панели (F-86). Нет поля — источник неизвестен, копия
    * недоверенная: слой репозитория до сеанса не доходит, `on` идёт как `observe`.
@@ -189,6 +287,29 @@ export interface SessionSpec {
   core: CoreSessionVars;
   /** Запись хуков в режиме `observe`: куда писать вызовы и чем. */
   recorder?: { command: string; log: string };
+  /** Рычаги экономии шага (`config.economy`, s10 p8; чат их не получает); нет — решает CLI. */
+  economy?: SessionEconomy;
+}
+
+/**
+ * Рычаги экономии шага (s10 p8, порт рычагов групп панели): ноль/нет — «не трогать, решает CLI».
+ * Каждый CLI несёт их своим ключом (`economy-carry.ts`) или называет потерю.
+ */
+export interface SessionEconomy {
+  /** Окно автосжатия, токены. */
+  compactWindow?: number;
+  /** Потолок ответа оболочки в окне, знаки. */
+  bashOutputChars?: number;
+  /** Потолок одного чтения файла, токены. */
+  readOutputTokens?: number;
+  /** Срок кэша подсказки; нет — решает CLI. */
+  cacheTtl?: '5m' | '1h';
+  /** Не подключать сеанс к IDE человека. */
+  detachIde?: boolean;
+  /** Строка привычек в правилах платформы брифа (+ без напоминания «молчит» у Claude). */
+  workHabits?: boolean;
+  /** Окно модели шага, токены (доля сжатия у Goose/Qwen); нет — неизвестно. */
+  modelWindow?: number;
 }
 
 export interface SessionHandle {
@@ -359,6 +480,11 @@ export interface WindowObservation {
   refusal: boolean;
   /** Имя окна у источника (`five_hour`…) — для причины решения, судья его не читает. */
   window: string | null;
+  /**
+   * Каждое окно источника с долей (имя → доля 0..100 и сброс, мс): замер загрузки для доли
+   * лимита у чата панели (`limit-journal`). Судья его не читает; нет окон с долей — поля нет.
+   */
+  windows?: Record<string, { usedPct: number; resetAt: number | null }>;
 }
 
 /** Сырой вызов инструмента, как его видит CLI (для `mapPermission`). */
@@ -408,6 +534,18 @@ export interface AdapterLadder {
 export interface CliAdapter {
   id: string;
   /**
+   * `false` — заготовка (этап 10, `adapters/placeholder`): id в реестре, запуска нет. Маршрута
+   * входа CLI у неё нет, судья compat отказывает `adapter_not_built`. Нет поля — переходник есть.
+   */
+  built?: false;
+  /**
+   * `false` — переходник идёт только по маршруту с адресом модели (свой дом конфигурации сеанса):
+   * своего входа CLI он не читает (вход человека живёт в его доме), поэтому маршрута
+   * `cli-login:<id>` ядро не строит — иначе набор по умолчанию предлагал бы маршрут, который
+   * запуск всегда отказывает. Нет поля — вход CLI есть.
+   */
+  cliLogin?: false;
+  /**
    * Имена образа процесса CLI (`claude` → `claude.exe` на Windows): по ним псевдозадача узнаёт
    * предка-CLI проверки из сессии человека (04:41-42, A2-F02). CLI, поставленный через npm, живёт
    * под образом `node` — такой предок не узнаётся, проверка идёт вне очереди и названа.
@@ -429,7 +567,39 @@ export interface CliAdapter {
    * Транскрипт разговора на месте (P15): `false` — нет, `undefined` — неизвестно; нет метода —
    * переходник продолжения по транскрипту не знает.
    */
-  transcriptPresent?(pin: Record<string, string>, conversationId: string): boolean | undefined;
+  transcriptPresent?(
+    pin: Record<string, string>,
+    conversationId: string,
+    /** Каталог кончившейся сессии ядра: дом CLI своего у каждого сеанса — транскрипт там. */
+    sessionDir?: string,
+  ): boolean | undefined;
+  /**
+   * Разговор, начатый не ядром, принадлежит ЭТОМУ корню (этап 10, F2): транскрипт id лежит в
+   * собственном хранилище CLI и сам называет своей папкой `root`. `true` — доказано; `false` —
+   * нет транскрипта или он другого корня; `undefined` — не прочитать. Нет метода — формат
+   * хранилища для CLI не доказан, и чужой разговор ядро не продолжает (`resume_unproven`).
+   */
+  ownsTranscript?(
+    pin: Record<string, string>,
+    root: string,
+    conversationId: string,
+  ): boolean | undefined;
+  /**
+   * Переходник снимает ВСЕ встроенные инструменты CLI (`ToolSet` `none`, вопрос «ask», этап 10
+   * F2) — доказанным флагом CLI, а не запретом по классам. Нет — дорога отказывает `none`
+   * до запуска (`tools-none-unsupported`): вопрос без инструментов не идёт с инструментами.
+   */
+  toolsNone?: true;
+  /**
+   * Переходник умеет `layer.sources = 'user'` (этап 10, F6) — доказанным флагом CLI: только слой
+   * человека из дома конфигурации пина, без проекта и предков. Нет — дорога отказывает до запуска.
+   */
+  userSourcesOnly?: true;
+  /**
+   * Что переходник несёт из `layer.carry` (G6) доказанным флагом CLI. Поле без отметки здесь —
+   * отказ дороги `session-carry-unsupported` с его именем, а не тихая потеря.
+   */
+  sessionCarry?: { readonly [K in keyof SessionLayerCarry]?: true };
   /** Слой чтения CLI с закреплённым окружением задачи (`SessionSpec.env.pin`); без IO. */
   readLayer(pin: Record<string, string>): ReadLayer;
   /**
@@ -438,6 +608,11 @@ export interface CliAdapter {
    * хука и модели определения подагента. Нет метода — опись неизвестна (`null`), не «пусто».
    */
   inventory?(pin: Record<string, string>, cwd: string, repoLayer: boolean): UserLayerInventory;
+  /**
+   * Серверы MCP человека в конфиге самого CLI (P73, s10 p7) — предложения строгого списка шага,
+   * в порядке CLI пользователь/проект. Нет метода — CLI предложений не даёт (не «пусто»).
+   */
+  mcpSource?(input: McpSourceInput): McpSourceRead;
   caps: AdapterCaps;
   bindEndpoint(
     channel: AdapterChannelSummary,
@@ -458,6 +633,12 @@ export interface CliAdapter {
     message: string,
     cmdId: string,
     origin?: SendOrigin,
+    /**
+     * Картинки к отправке (вопрос «ask», этап 10 F2): только у переходника с `caps.images`;
+     * дорога отказывает картинкам до запуска, если возможности нет, и переходник без неё их не
+     * получает.
+     */
+    images?: readonly SendImage[],
   ): Promise<{ dup: boolean }>;
   stop(handle: SessionHandle, mode: StopMode): Promise<StopOutcome>;
   mapPermission(raw: RawToolCall): PermissionAsk;
@@ -466,4 +647,19 @@ export interface CliAdapter {
   /** Ответ на `permit.request` (форма ответа — та, что вернул кодек права ядра). */
   answerPermit?(handle: SessionHandle, requestId: string, reply: unknown): Promise<void>;
   usage(handle: SessionHandle): TurnUsage[];
+  /**
+   * Нормализатор потока для ВИДА сеанса (этап 10, `GET …/sessions/:sid/stream`): свежий на каждый
+   * повтор `stdout.log`, тот же разбор, что у живого насоса. `expect` — отправка ядра из
+   * `core-io.jsonl`, чтобы ход человека встал на своё место. Нет метода — вида у CLI нет.
+   * `dir` — каталог сеанса: переходнику JSON-RPC разбор нужен с входом запуска (`rpc-view.json`);
+   * вида нет по названной причине — исключение `NoSessionView` (маршрут: 501 `no-view`).
+   */
+  streamNormaliser?(dir: string): StreamNormaliser;
+}
+
+export interface StreamNormaliser {
+  expect(cmdId: string, uuid: string): void;
+  push(line: string): AdapterEvent[];
+  /** Текст хода человека из записанной строки stdin; нет — форма `stream-json` (`message.content`). */
+  turnText?(data: string): string;
 }

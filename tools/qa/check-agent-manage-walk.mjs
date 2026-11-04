@@ -41,6 +41,8 @@ await runOnStand(
     label: 'agent-manage-walk',
     web: false,
     fakeCli: { claude: FAKE_PANEL_AGENT_MANAGE_CLI_SOURCE },
+    // Ход агента панели идёт через ядро (s10): без `core` он отказывает «core is not running».
+    core: true,
     seed: ({ root, cfg }) => {
       const appData = join(cfg, 'agentdeck');
       mkdirSync(join(appData, 'backups'), { recursive: true });

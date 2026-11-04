@@ -16,18 +16,15 @@ const BLOCK = [
 ].join('\n');
 
 describe('лента чужого провайдера — блок эскалации не показывается', () => {
-  const renderForeign = (content: string, partial = ''): string =>
+  const renderForeign = (content: string): string =>
     renderToStaticMarkup(
       <ProviderChatMessages
         messages={
           content ? [{ id: 'm1', role: 'assistant', content, at: '2026-09-25T00:00:00Z' }] : []
         }
         providerName="Codex"
-        partial={partial}
-        isRunning={Boolean(partial)}
         isEmptyState={false}
         onCreate={() => {}}
-        isCreating={false}
       />,
     );
 
@@ -48,23 +45,12 @@ describe('лента чужого провайдера — блок эскала
           { id: 'u1', role: 'user', content: `Формат:\n\n${BLOCK}`, at: '2026-09-25T00:00:00Z' },
         ]}
         providerName="Codex"
-        partial=""
-        isRunning={false}
         isEmptyState={false}
         onCreate={() => {}}
-        isCreating={false}
       />,
     );
 
     expect(html).toContain('Миграция ломает прод');
     expect(html).toContain('agentdeck:escalate');
-  });
-
-  it('в недописанной реплике — с открывающей кавычки', () => {
-    const html = renderForeign('', 'Отчёт.\n\n```agentdeck:escalate\n{"severity":"crit');
-
-    expect(html).not.toContain('agentdeck:escalate');
-    expect(html).not.toContain('severity');
-    expect(html).toContain('Отчёт.');
   });
 });

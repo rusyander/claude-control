@@ -25,6 +25,7 @@ export const READ_BY_FORGE: readonly ActionKind[] = [
   'mr-create',
   'mr-update',
   'thread-reply',
+  'mr-comment',
 ];
 
 /** Чей факт читается — решение «было / не было»; остальные — повтор, затем человек. */

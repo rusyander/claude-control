@@ -11,7 +11,7 @@ import { applyPushClosure, type ClosureState } from '../../platform/git/push-clo
 import { hookScripts, hooksDirOf } from '../../publisher/closure/index.ts';
 import { FORGE_CLOCK_SKEW_MS } from '../forge-wiring/readers.ts';
 import { gatherForged } from '../guard-wiring/facts.ts';
-import { forgeForRemote } from '../panel-forge.ts';
+import { forgeOfPanel } from '../panel-forge.ts';
 import type { ConductorWiringDeps } from './conductor-wiring.types.ts';
 
 /**
@@ -39,9 +39,13 @@ export interface GuardHooksOptions {
 const CORE_KINDS: ReadonlySet<string> = new Set(CORE_STEP_KINDS);
 const OK: HookVerdict = { ok: true };
 
-function defaultForgeFor(url: string): ForgePort | null {
-  const remote = forgeForRemote(url);
-  return remote.project.kind === 'generic' ? null : remote.port;
+/** Форж из каталога панели, решённого загрузкой (`deps.panelAppData`); сам каталог не ищется. */
+function defaultForgeFor(panelAppData: string | null | undefined) {
+  const forgeOf = forgeOfPanel(panelAppData);
+  return (url: string): ForgePort | null => {
+    const remote = forgeOf(url);
+    return remote.project.kind === 'generic' ? null : remote.port;
+  };
 }
 
 const sameClosure = (a: ClosureState, b: LiveTask['state']['closures'][string]): boolean =>
@@ -57,7 +61,7 @@ export function guardHooks(
 ): ConductorHooks {
   const now = options.now ?? Date.now;
   const git = options.git ?? {};
-  const forgeFor = options.forgeFor ?? defaultForgeFor;
+  const forgeFor = options.forgeFor ?? defaultForgeFor(deps.panelAppData);
   const hooksRoot = join(deps.layout.root, 'hooks');
   /** Время последней базы единицы — начало окна событий форжа (после краха — с начала задачи). */
   const marks = new Map<string, number>();

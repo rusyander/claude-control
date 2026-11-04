@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Group } from '@agentdeck/contracts';
 import { projectKey } from '../../../lib/app-store/group-sources.ts';
-import { pickableGroups } from '../../chat/group-auto-pick/group-auto-pick.ts';
 import { effectiveChoice, pairsIn, readChoice, writeChoice } from './choice.ts';
 
 /**
@@ -65,8 +64,6 @@ describe('выбор стороны пары — по паре, не по про
     writeChoice(appData, groups, proj, 'global:ga');
     writeChoice(appData, groups, proj, 'global:gb');
     expect(effective()).toEqual({ pa: 'global:ga', pb: 'global:gb' });
-    const catalog = pickableGroups(groups, proj, readChoice(appData, proj)).map((e) => e.key);
-    expect(catalog).toEqual(['global:ga', 'global:gb']);
   });
 
   it('проектная сторона одной пары не трогает глобальную другой', () => {

@@ -245,12 +245,17 @@ describe('decideNext: estimating runs only up to the split point (G5/G6)', () =>
       ...FEATURE,
       steps: FEATURE.steps.map((d) => (d.kind === 'plan' ? { ...d, after: [] } : d)),
     };
+    // Нет точки деления (чат) — оценивать нечего: `null` равен пустому замыканию.
     for (const scenario of [...PRESETS, detached]) {
-      expect({ id: scenario.id, scope: estimateScope(scenario)?.steps.map((d) => d.id) }).toEqual({
+      expect({
+        id: scenario.id,
+        scope: estimateScope(scenario)?.steps.map((d) => d.id) ?? [],
+      }).toEqual({
         id: scenario.id,
         scope: closure(scenario),
       });
     }
+    expect(estimateScope(PRESETS.find((p) => p.id === 'chat')!)).toBeNull();
     expect(estimateScope(detached)!.steps.map((d) => d.id)).toEqual(['plan']);
     expect(estimateScope(FEATURE)!.steps.map((d) => d.id)).toEqual(['intake', 'plan']);
     const reviewOnly = PRESETS.find((p) => p.id === 'review-only')!;

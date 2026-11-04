@@ -91,9 +91,15 @@ export async function location(page, override = {}) {
  * иллюстрировать текст картинкой, которая ему противоречит.
  */
 export async function emptyConfig(page) {
-  await page.route('**/api/overview', (route) =>
-    route.fulfill({
+  // Ответ панели берётся настоящий и в нём обнуляются счётчики: подмена целиком отставала от
+  // контракта — без `provider` страница «Обзор» падала («Cannot read properties of undefined
+  // (reading 'name')»), и кадр 01-wrong-dir 03.11.2026 снялся экраном ошибки.
+  await page.route('**/api/overview', async (route) => {
+    const response = await route.fetch();
+    const real = response.ok() ? await response.json() : {};
+    await route.fulfill({
       json: {
+        ...real,
         rules: { total: 0, enabled: 0 },
         hooks: { total: 0, enabled: 0, broken: 0 },
         skills: { total: 0, enabled: 0 },
@@ -102,8 +108,8 @@ export async function emptyConfig(page) {
         permissions: { allow: 0, ask: 0, deny: 0 },
         groups: { total: 0 },
       },
-    }),
-  );
+    });
+  });
   await page.route('**/api/history', (route) => route.fulfill({ json: { items: [] } }));
   await page.route('**/api/backups', (route) => route.fulfill({ json: { items: [] } }));
 }

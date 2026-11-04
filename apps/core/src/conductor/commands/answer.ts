@@ -1,6 +1,8 @@
 import { nextState, STEP_MACHINE } from '@agentdeck/contracts/core/states';
 import { humanChannel } from '../human/channel.ts';
 import { readHumanLedger } from '../human/ledger.ts';
+import { answerKey } from '../next/answers.ts';
+import { settleReconcileAnswer } from '../reconcile.ts';
 import type { ApplyCommand } from './commands.types.ts';
 import { applied, reject } from './outcome.ts';
 
@@ -12,7 +14,7 @@ import { applied, reject } from './outcome.ts';
  * применяется ровно раз: второй ответ на тот же вопрос — отказ, а не перезапись.
  */
 
-export const applyAnswer: ApplyCommand = async (task, command) => {
+export const applyAnswer: ApplyCommand = async (task, command, env) => {
   const { askId, answer } = command.fields as { askId: string; answer: string };
   const ledger = readHumanLedger(task);
   const who = humanChannel(task, command.cmdId);
@@ -22,6 +24,17 @@ export const applyAnswer: ApplyCommand = async (task, command) => {
     return reject(task, command.cmdId, 'already-answered', `ask ${askId} is already answered`);
   }
   const open = ask.state === 'open';
+  // Вопрос сверки (точка 4) решает судьбу действия: ответ вне вариантов (на любом языке) вопрос
+  // закрыл бы, а действие осталось бы ждать человека навсегда — отказ, вопрос остаётся открытым.
+  const reconcileOf = open && ask.source === 'reconcile' ? ask.dedupe : null;
+  if (reconcileOf !== null && answerKey('reconcile', answer) === undefined) {
+    return reject(
+      task,
+      command.cmdId,
+      'unknown-option',
+      `answer is none of the reconcile options: ${ask.options.join(' | ')}`,
+    );
+  }
   // Истёкший: машина вопроса знает поздний ответ (`expired` → тот же); снятый — нет, там только
   // сам ответ (переход был бы аномалией свёртки).
   if (open || ask.state === 'expired') {
@@ -58,9 +71,16 @@ export const applyAnswer: ApplyCommand = async (task, command) => {
       resumed = true;
     }
   }
+  const reconcile =
+    reconcileOf === null
+      ? undefined
+      : settleReconcileAnswer(task, { actionId: reconcileOf, answer, cause: answered.seq });
+  if (reconcile === 'recheck' && reconcileOf !== null)
+    env.reconcile?.()?.recheck(task.taskId, reconcileOf);
   return applied(task, command.cmdId, {
     askId,
     late: String(!open),
     resumed: String(resumed),
+    ...(reconcile ? { reconcile } : {}),
   });
 };

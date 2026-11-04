@@ -23,9 +23,10 @@ export default defineConfig({
       exclude: ['src/**/*.test.ts', 'src/**/*.d.mts'],
       enabled: wholeSuite,
       reporter: ['text-summary', 'html'],
-      // Замер 30.10 своего набора: 68.9 / 55 / 74 / 70.8. Остальное заглушки гоняют тесты ядра
-      // (adapters/forge, forge-wiring) — их покрытие здесь не считается; порог только растёт.
-      thresholds: { statements: 68, branches: 54, functions: 73, lines: 70 },
+      // Замер 04.11 своего набора: 76.2 / 63.6 / 79.4 / 79 (ленты событий и действия). Остальное
+      // заглушки гоняют тесты ядра (adapters/forge, forge-wiring) — их покрытие здесь не считается;
+      // порог только растёт.
+      thresholds: { statements: 76, branches: 63, functions: 79, lines: 78 },
     },
   },
 });

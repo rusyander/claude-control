@@ -37,6 +37,8 @@ const OWN_DELIVERY: ReadonlySet<string> = new Set([
   'mr-create',
   'mr-update',
   'thread-reply',
+  // Итог ревью по ссылке: отписать в MR человек уже решил ответом на вопрос шага (этап 10, F8).
+  'mr-comment',
 ]);
 
 /** Пункты 1–4 блокируют всегда: `blocking:false` модели их не снимает (F-46). */

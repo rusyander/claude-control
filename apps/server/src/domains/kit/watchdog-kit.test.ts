@@ -10,14 +10,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { builtinKitDir } from './service.ts';
 
 /**
- * Скиллы наблюдения за группами (`watchdog`, `agentdeck-watchdog`) едут в наборе: на машине без личной копии
- * в ~/.claude наблюдатель запускается из набора. Здесь — то, что делает их переносимыми:
- *  - снимок текстов правил наблюдателя (rule-texts.json) совпадает с модулем панели, из которого он снят;
+ * Скилл наблюдения `watchdog` едет в наборе: на машине без личной копии в ~/.claude наблюдатель
+ * запускается из набора. Здесь — то, что делает их переносимыми:
  *  - в публичном репозитории под скиллами нет путей чужой машины, имён компаний и русских описаний;
  *  - пункт Stop `watch-keepalive` набора держит ход наблюдателя по своему реестру (<kit state>/watchers),
  *    отпускает на hold.json и «все группы закончены» и молчит, пока тот же ход держит личный двойник —
@@ -29,9 +28,8 @@ import { builtinKitDir } from './service.ts';
  */
 
 const KIT = process.env.AGENTDECK_KIT_UNDER_TEST || builtinKitDir();
-const REPO = fileURLToPath(new URL('../../../../../', import.meta.url));
 const DISPATCH = join(KIT, 'hooks', 'lib', 'run.mjs');
-const SKILLS = ['watchdog', 'agentdeck-watchdog'].map((s) => join(KIT, 'skills', s));
+const SKILLS = [join(KIT, 'skills', 'watchdog')];
 const dir = mkdtempSync(join(tmpdir(), 'kit-watchdog-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -39,38 +37,6 @@ const walk = (d: string): string[] =>
   readdirSync(d, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)],
   );
-
-describe('rule-texts.json — снимок текстов правил наблюдателя', () => {
-  const lib = join(KIT, 'skills', 'agentdeck-watchdog', 'scripts', 'lib', 'rule-texts.mjs');
-  const json = join(KIT, 'skills', 'agentdeck-watchdog', 'scripts', 'rule-texts.json');
-
-  it('совпадает с group-watch/en.ts панели id в id и текст в текст', async () => {
-    const { parseRuleTexts, RULE_TEXTS_SRC } = (await import(pathToFileURL(lib).href)) as {
-      parseRuleTexts: (src: string) => Record<string, string>;
-      RULE_TEXTS_SRC: string;
-    };
-    const fromRepo = parseRuleTexts(readFileSync(join(REPO, RULE_TEXTS_SRC), 'utf8'));
-    const snapshot = (JSON.parse(readFileSync(json, 'utf8')) as { texts: Record<string, string> })
-      .texts;
-    // Пустой разбор с обеих сторон тоже «равен» — правил в модуле панели больше тридцати.
-    expect(Object.keys(fromRepo).length).toBeGreaterThan(30);
-    expect(snapshot).toEqual(fromRepo);
-  });
-
-  it('`rule-texts.mjs --check` из набора против этого репозитория — код 0', () => {
-    const r = spawnSync(
-      process.execPath,
-      [
-        join(KIT, 'skills', 'agentdeck-watchdog', 'scripts', 'rule-texts.mjs'),
-        '--repo',
-        REPO,
-        '--check',
-      ],
-      { encoding: 'utf8', timeout: 15_000 },
-    );
-    expect(r.status, r.stdout + r.stderr).toBe(0);
-  });
-});
 
 describe('публичный репозиторий: под скиллами наблюдения нет следов чужой машины', () => {
   const files = SKILLS.flatMap(walk);
@@ -88,7 +54,7 @@ describe('публичный репозиторий: под скиллами н�
       return MACHINE.filter((re) => re.test(text)).map((re) => `${relative(KIT, f)}: ${re}`);
     });
     expect(hits).toEqual([]);
-    expect(files.length).toBeGreaterThan(25);
+    expect(files.length).toBeGreaterThanOrEqual(13);
   });
 
   it('описания SKILL.md — английские, пути в тексте — от корня набора', () => {
@@ -111,18 +77,22 @@ describe('twins.json: каждый файл скиллов наблюдения 
     const ledger = JSON.parse(readFileSync(join(KIT, '..', 'twins.json'), 'utf8')) as {
       pairs: Record<string, { same: boolean }>;
     };
-    const unlisted = SKILLS.flatMap((root) =>
+    const keys = SKILLS.flatMap((root) =>
       walk(root).map((f) => {
         const rel = relative(join(KIT, 'skills'), f).split('\\').join('/');
         return /\/SKILL\.md$/.test(rel) ? `skills:${rel}` : `watch-skills:${rel}`;
       }),
-    ).filter((key) => !ledger.pairs[key]);
-    expect(unlisted).toEqual([]);
-    // Скрипты переносятся байт в байт: пара записана как `same`.
+    );
+    expect(keys.filter((key) => !ledger.pairs[key])).toEqual([]);
+    // Скрипты переносятся байт в байт: пара записана как `same`. Пары скриптов — ровно файлы набора:
+    // убранный из набора файл с оставленной парой тоже красный.
     const scripts = Object.entries(ledger.pairs).filter(([k]) =>
       /^watch-skills:.+\/scripts\/.+$/.test(k),
     );
-    expect(scripts.length).toBeGreaterThan(20);
+    expect(scripts.length).toBeGreaterThanOrEqual(9);
+    expect(scripts.map(([k]) => k).sort()).toEqual(
+      keys.filter((k) => /^watch-skills:.+\/scripts\/.+$/.test(k)).sort(),
+    );
     expect(scripts.filter(([, p]) => !p.same).map(([k]) => k)).toEqual([]);
   });
 });
@@ -150,9 +120,7 @@ function hook(s: Stage, event: 'stop' | 'post-any', payload: object) {
       AGENTDECK_KIT_VARIANT: '',
       AGENTDECK_KIT_STATE: s.state,
       AGENTDECK_KIT_CLI: '',
-      AGENTDECK_GROUP_STAGE: '',
-      AGENTDECK_SPLIT_CHILD: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       CLAUDE_CONFIG_DIR: s.config,
     },
     timeout: 15_000,
@@ -311,7 +279,7 @@ describe('cmd-duration набора: блокирующий вызов набл�
       knownFor: (store: object, cwd: string, command: string) => { wait?: boolean } | null;
       verdict: (o: object) => string | null;
     };
-    const watch = `node ${KIT}/skills/agentdeck-watchdog/scripts/watch-groups.mjs --state s`;
+    const watch = `node ${KIT}/skills/watchdog/scripts/watch.mjs --state s`;
     const other = 'node tools/slow.mjs';
     expect(lib.isBlockingWatch(watch)).toBe(true);
     expect(lib.isBlockingWatch(other)).toBe(false);

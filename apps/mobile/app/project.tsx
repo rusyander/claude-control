@@ -169,7 +169,7 @@ export default function ProjectScreen() {
             {!all && chats.length > FIRST_CHATS ? (
               <Button title={t.projects.showAll(chats.length)} onPress={() => setAll(true)} />
             ) : null}
-            <ForeignChatsSection projectPath={path} />
+            <ForeignChatsSection />
           </>
         ) : null}
         {tab === 'git' ? <GitPanel projectPath={path} /> : null}

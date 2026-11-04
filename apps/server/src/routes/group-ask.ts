@@ -1,19 +1,21 @@
 import type { FastifyReply } from 'fastify';
 import type { ServerContext } from '../context.ts';
-import { runAssistant } from '../domains/assistant-runner/assistant-runner.ts';
+import { createCoreAskPort } from '../domains/core-ask/core-ask.ts';
+import type { CoreAskPort } from '../domains/core-ask/core-ask.types.ts';
+import { askMasked } from '../domains/core-ask/one-shot.ts';
 import type { EntityToggleDeps } from '../domains/entity-toggle.ts';
-import { resolveAssistantEndpoint } from '../domains/endpoints/endpoints.ts';
 import type { ZodType } from 'zod';
 import { badGroupRequest, GroupRequestError, refusalBody } from '../domains/groups/errors.ts';
 import { issuesOf } from '../lib/request-body.ts';
 import { cheapModelFor, GroupModelError, type GroupAsk } from '../domains/groups/model.ts';
 import { codeOf } from '../lib/server-text/server-text.ts';
+import { coreHomeOf } from '../lib/hop-recorder.mjs';
 import { getActiveProvider } from '../providers/registry.ts';
 
 /**
  * Общее для маршрутов групп по областям и «Пути»: зависимости доменов из
  * контекста (собираются на каждом запросе — каталог конфигурации меняется на
- * лету) и служебный вызов модели через общий раннер ассистента.
+ * лету) и служебный вызов модели вопросом ядра «ask» (`core-ask/one-shot.ts`).
  */
 
 export function groupDeps(ctx: ServerContext): EntityToggleDeps {
@@ -21,25 +23,22 @@ export function groupDeps(ctx: ServerContext): EntityToggleDeps {
 }
 
 /**
- * Вызов модели активного провайдера. `cheap` — младшая ступень (у Claude —
- * `haiku`); свой эндпоинт панели, если выбран, уважается так же, как у
- * ассистента: данные уходят туда, куда человек их направил.
+ * Вызов модели активного провайдера вопросом ядра. `cheap` — младшая ступень (у Claude —
+ * `haiku`) потолком модели вопроса; профиль «Ассистент панели» и контур судит ядро так же,
+ * как у ассистента: данные уходят туда, куда человек их направил.
  */
 export function groupAsk(
   ctx: ServerContext,
-  /** Переключатель Claude на локальную модель; без него `claude -p` ушёл бы в облако. */
-  claudeEnv?: () => Record<string, string>,
+  port: CoreAskPort = createCoreAskPort(() => coreHomeOf()),
 ): GroupAsk {
   return async (messages, tier) => {
     const provider = getActiveProvider(ctx.store);
     const models = ctx.models.current(provider.modelVendors ?? []).models;
     const model = tier === 'cheap' ? cheapModelFor(provider, models) : undefined;
-    const result = await runAssistant(provider, messages, {
-      appDataDir: ctx.location.paths.appData,
-      models,
-      endpoint: resolveAssistantEndpoint(ctx.store, ctx.location.paths.appData),
+    const result = await askMasked(port, ctx.store, ctx.location.paths.appData, {
+      title: 'groups',
+      messages,
       ...(model ? { model } : {}),
-      ...(claudeEnv ? { claudeEnv } : {}),
     });
     if (!result.ok) throw new GroupModelError(result.reason, result.error);
     return result.reply;

@@ -7,19 +7,11 @@ import { UserBubble } from '../../UserBubble/UserBubble';
 import { styles } from './ForeignFeed.styles';
 
 /**
- * Лента разговора с чужим CLI: реплики из файла панели и кусок ответа, который
- * ещё печатается. Карточек инструментов нет — чужой CLI их ни в какой транскрипт
- * не пишет, панель видит только текст.
+ * Лента старого разговора с чужим CLI — реплики из файла панели, только история (этап 10,
+ * F2c): ход идёт в чате ядра, растущего ответа здесь нет. Карточек инструментов нет —
+ * чужой CLI их ни в какой транскрипт не писал, панель видела только текст.
  */
-export function ForeignFeed({
-  messages,
-  partial,
-  running,
-}: {
-  messages: ProviderChatMessage[];
-  partial: string;
-  running: boolean;
-}) {
+export function ForeignFeed({ messages }: { messages: ProviderChatMessage[] }) {
   const t = useT().foreignChat;
   return (
     <View style={styles.root}>
@@ -46,13 +38,6 @@ export function ForeignFeed({
           <AgentText key={message.id} text={message.content} />
         );
       })}
-      {running ? (
-        partial ? (
-          <AgentText text={partial} streaming />
-        ) : (
-          <Text style={styles.meta}>{t.typing}</Text>
-        )
-      ) : null}
     </View>
   );
 }

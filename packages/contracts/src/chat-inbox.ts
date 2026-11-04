@@ -19,7 +19,7 @@ import {
  * узнать, кто из агентов стоит на его ответе. Панель показывает вопрос в ленте
  * самого разговора; здесь те же вопросы собраны вместе, и каждый подписан, чей
  * он. Ответ уходит теми же маршрутами, что у ленты: решение по правам —
- * `permission-decision`, ворота ветки — `branch-decision`, выбор вариантов —
+ * `permission-decision`, выбор вариантов —
  * следующим сообщением в разговор.
  */
 
@@ -68,6 +68,23 @@ export const inboxSourceSchema = object({
 export type InboxSource = Infer<typeof inboxSourceSchema>;
 
 /**
+ * Поля вопроса права задачи ядра (`CorePermitAsk` из `chat-handoff`, этап 10): телефон собирает
+ * из них грант и ответ ядру и шлёт их командами, подписанными своим ключом. Маршрут прогона
+ * (`permission-decision`) такую карточку отвергает: ответ ядру — human-strict (06 §Authority).
+ */
+export const inboxCorePermitSchema = object({
+  taskId: string(),
+  askId: string(),
+  /** Пункт человека: 3 — адрес сервиса, 5 — грант на правку. */
+  point: number(),
+  options: array(string()),
+  /** Ключ репозитория шага — проект гранта; `null` — ядро его ещё не назвало. */
+  project: string().nullable(),
+  /** Цель отказа от корня репозитория — маска гранта. */
+  globs: array(string()),
+});
+
+/**
  * Одно ожидание. `key` устойчив между опросами: по нему клиент держит уже
  * выбранный ответ, пока сервер отдаёт тот же вопрос, и снимает его, когда вопрос
  * исчез (ответили за компьютером, прогон остановлен).
@@ -87,15 +104,11 @@ export const inboxAskSchema = union([
     relay: boolean().optional(),
     /** Запрос на запуск агента — подробности запуска. */
     launch: inboxLaunchSchema.optional(),
-  }),
-  object({
-    /** Первая правка в основной копии: «писать здесь» или «не писать». */
-    kind: literal('branchGate'),
-    key: string(),
-    toolUseId: string(),
-    toolName: string(),
-    input: unknown(),
-    askedAt: string(),
+    /**
+     * Вопрос права задачи ядра (`toolName` = `core-permit`): ответ уходит не маршрутом прогона,
+     * а подписанными командами ядра (`/api/core/commands`), вопрос — `input.question`.
+     */
+    core: inboxCorePermitSchema.optional(),
   }),
   object({
     kind: literal('question'),

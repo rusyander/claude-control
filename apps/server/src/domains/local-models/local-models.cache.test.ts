@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -16,6 +16,7 @@ import {
   type ServerShape,
 } from './server.ts';
 import { parseGgufFacts } from './gguf.ts';
+import { fakeCoreHold } from './__fixtures__/fake-core-hold.ts';
 import { modelFilePath } from './hf.ts';
 
 /**
@@ -51,7 +52,6 @@ let root: string;
 let spawned: { args: string[] }[];
 let stub: StubServer | undefined;
 let killed: number;
-let starting: Promise<void>[];
 
 const ENV = (): NodeJS.ProcessEnv => ({
   AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm'),
@@ -73,24 +73,24 @@ function service(freeGiB = 40, now?: () => number) {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, args: string[]) => {
-      spawned.push({ args });
-      starting.push(
-        stubs
-          .startStubLlama({ port: PORT, slotDir: flag(args, '--slot-save-path') })
-          .then((started) => {
-            stub = started;
-          }),
-      );
-      return { pid: 4242, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: () => {
-      killed += 1;
-      const old = stub;
-      stub = undefined;
-      // Порт закрывается настоящим закрытием заглушки — `stopServer` ждёт именно этого.
-      starting.push(old ? old.close() : Promise.resolve());
-    },
+    // «Ядро» грузит модель: заглушка llama-server встаёт на постоянный порт, удержание
+    // возвращается, когда она слушает (как ядро — после загрузки).
+    hold: fakeCoreHold({
+      hold: async ({ flags }) => {
+        spawned.push({ args: flags });
+        stub = await stubs.startStubLlama({
+          port: PORT,
+          slotDir: flag(flags, '--slot-save-path'),
+        });
+        return 4242;
+      },
+      release: async () => {
+        killed += 1;
+        const old = stub;
+        stub = undefined;
+        await old?.close();
+      },
+    }),
   });
 }
 
@@ -111,7 +111,6 @@ const flag = (args: string[], name: string): string | undefined => args[args.ind
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'cc-local-cache-'));
   spawned = [];
-  starting = [];
   killed = 0;
   stub = undefined;
   const paths = localPaths(root, ENV());
@@ -121,7 +120,6 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await Promise.all(starting);
   await stub?.close();
   rmSync(root, { recursive: true, force: true });
 });
@@ -188,7 +186,6 @@ describe('--cache-reuse только там, где сервер умеет сд
     seedModel({ arch: 'qwen3' });
     // Другой файл — другой запуск: сервер перезапускается уже с флагом.
     rmSync(localPaths(root, ENV()).pidFile, { force: true });
-    await Promise.all(starting);
     await stub?.close();
     stub = undefined;
     await service().startServer({ tag: TAG });
@@ -279,121 +276,5 @@ describe('выгрузка по простою', () => {
     expect(server).toMatchObject({ running: true, sleeping: true, loaded: [] });
     // Показ не будит сервер: ни одного обращения, кроме /health и /props.
     expect(stub?.isSleeping()).toBe(true);
-  });
-});
-
-describe('сброс кеша слота при смене разговора', () => {
-  const erases = (): number =>
-    (stub?.calls ?? []).filter(
-      (call) =>
-        call.method === 'POST' && call.path === '/slots/0' && call.query === '?action=erase',
-    ).length;
-
-  async function ready(now?: () => number) {
-    seedModel({ nextn: 1 });
-    const local = service(40, now);
-    await local.startServer({ tag: TAG });
-    const upstream = local.upstream(TAG);
-    if (!upstream?.prepare) throw new Error('no prepare');
-    return { local, prepare: upstream.prepare };
-  }
-
-  it('первый разговор и каждая смена сбрасывают кеш; тот же разговор — нет', async () => {
-    const { prepare } = await ready();
-    await prepare('chat-A');
-    expect(erases()).toBe(1);
-    await prepare('chat-A');
-    await prepare('chat-A');
-    expect(erases()).toBe(1);
-    await prepare('chat-B');
-    expect(erases()).toBe(2);
-    // Возврат к первому — тоже смена: чужой префикс (B) не наследуется.
-    await prepare('chat-A');
-    expect(erases()).toBe(3);
-  });
-
-  it('длинный кеш уходящего чата ложится на диск, возврат к нему — из файла, без сброса', async () => {
-    const { local, prepare } = await ready();
-    const upstream = local.upstream(TAG);
-    const action = (name: string): number =>
-      (stub?.calls ?? []).filter((call) => call.query === `?action=${name}`).length;
-    await prepare('chat-A');
-    // Ход чата A: запрос в 30 тыс. токенов — столько окажется в кеше слота.
-    upstream?.watch(30_000).done();
-    await prepare('chat-B');
-    expect(action('save')).toBe(1);
-    expect(erases()).toBe(2);
-    const slotsDir = localPaths(root, ENV()).slotsDir;
-    expect(existsSync(join(slotsDir, 'chat-A.bin'))).toBe(true);
-    expect(existsSync(join(slotsDir, 'chat-A.json'))).toBe(true);
-    // Чат B короткий — не пишется; A поднимается из файла, слот не стирается.
-    await prepare('chat-A');
-    expect(action('save')).toBe(1);
-    expect(action('restore')).toBe(1);
-    expect(erases()).toBe(2);
-  });
-
-  it('перед сном по простою кеш пишется на диск — один раз и не раньше срока', async () => {
-    let now = 1_000_000;
-    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    try {
-      const { local, prepare } = await ready(() => now);
-      const saves = (): number =>
-        (stub?.calls ?? []).filter((call) => call.query === '?action=save').length;
-      await prepare('chat-A');
-      local.upstream(TAG)?.watch(30_000).done();
-      // Простой короче срока (сон через IDLE_SLEEP_SECONDS, запись — за 45 с до него): не пишем.
-      now += (IDLE_SLEEP_SECONDS - 60) * 1000;
-      await vi.advanceTimersByTimeAsync(15_000);
-      await new Promise((done) => setTimeout(done, 100));
-      expect(saves()).toBe(0);
-      now += 30_000;
-      await vi.advanceTimersByTimeAsync(15_000);
-      await vi.waitFor(() => expect(saves()).toBe(1));
-      await vi.advanceTimersByTimeAsync(30_000);
-      await new Promise((done) => setTimeout(done, 100));
-      expect(saves()).toBe(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('запрос без метки разговора кеша не трогает', async () => {
-    const { prepare } = await ready();
-    await prepare(undefined);
-    expect(erases()).toBe(0);
-  });
-
-  it('запрос без метки после хода чата: кеш чата — на диск, следующий ход чата поднимает его, а не считает слот своим', async () => {
-    const { local, prepare } = await ready();
-    const action = (name: string): number =>
-      (stub?.calls ?? []).filter((call) => call.query === `?action=${name}`).length;
-    await prepare('chat-A');
-    local.upstream(TAG)?.watch(30_000).done();
-    // Проба контура (без метки) перепишет слот своим промптом.
-    await prepare(undefined);
-    expect(action('save')).toBe(1);
-    expect(erases()).toBe(1);
-    await prepare('chat-A');
-    expect(action('restore')).toBe(1);
-    expect(erases()).toBe(1);
-  });
-
-  it('спящий сервер не будится сбросом: кеш у него и так пуст', async () => {
-    const { prepare } = await ready();
-    stub?.sleep();
-    await prepare('chat-A');
-    expect(erases()).toBe(0);
-    expect(stub?.isSleeping()).toBe(true);
-    // Разговор запомнен: после пробуждения тот же чат кеш не стирает (он уже пуст).
-    await prepare('chat-A');
-    expect(erases()).toBe(0);
-  });
-
-  it('сервер без каталога слотов (501) запрос не срывает', async () => {
-    const { prepare } = await ready();
-    await stub?.close();
-    stub = undefined;
-    await expect(prepare('chat-A')).resolves.toBeUndefined();
   });
 });

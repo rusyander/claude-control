@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '@entities/AppConfig';
-import { applyWindowBar, systemTheme } from './ThemeProvider.lib';
+import { applyLanguage, applyWindowBar, systemTheme } from './ThemeProvider.lib';
 import type { ThemeProviderProps } from './ThemeProvider.types';
 
 /**
@@ -49,8 +49,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [settings?.accent]);
 
   useEffect(() => {
-    if (i18n.language !== language) void i18n.changeLanguage(language);
-    document.documentElement.lang = language;
+    void applyLanguage(i18n, language, document.documentElement);
   }, [language, i18n]);
 
   return children;

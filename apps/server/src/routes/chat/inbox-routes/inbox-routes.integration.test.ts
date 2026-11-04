@@ -12,17 +12,16 @@ import {
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
-import {
-  translate,
-  type ChatEvent,
-  type RawEvent,
-} from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { ChatEvent, RawEvent } from '../../../domains/chat/chat-events.ts';
+import type { PermissionRequest } from '../../../domains/chat/ChatPermissions/ChatPermissions.ts';
+import { cliEvents } from '../../../domains/chat/__fixtures__/cli-line.ts';
 import { registerChatRunRoutes } from '../run-routes/run-routes.ts';
 import { registerChatInboxRoutes } from './inbox-routes.ts';
 
 /**
  * Сводка ожиданий поверх НАСТОЯЩИХ маршрутов: брокер прав, реестр прогонов и
- * чтение транскрипта — настоящие; заглушен только процесс CLI (он не
+ * чтение транскрипта — настоящие; карточку права заводит тот же вызов брокера, что у
+ * задачи ядра (`chat-wiring.ts` desk.request); заглушен только процесс CLI (он не
  * заканчивается сам, чтобы запрос прав было кому держать). Вопрос теста —
  * видит ли телефон висящий запрос и вопрос агента с подписью «чей», и снимает
  * ли их ответ, отправленный тем же маршрутом, что у ленты.
@@ -40,13 +39,16 @@ describe('GET /api/chat/inbox', () => {
   let finishNext = false;
   /** Поток CLI текущего прогона: строки `stream-json` идут тем же разбором, что у живого. */
   let cliLine: (raw: RawEvent) => void = () => undefined;
+  /** События текущего прогона — тот же вход, что у `CoreChatRun`. */
+  let emitRun: (event: ChatEvent) => void = () => undefined;
   const liveRun = (): RunLike => {
     const finish = finishNext;
     finishNext = false;
     return {
       start: (_options: unknown, onEvent: (event: ChatEvent) => void) => {
+        emitRun = onEvent;
         cliLine = (raw) => {
-          for (const event of translate(raw)) onEvent(event);
+          for (const event of cliEvents(raw)) onEvent(event);
         };
         return finish ? Promise.resolve() : new Promise(() => undefined);
       },
@@ -60,6 +62,25 @@ describe('GET /api/chat/inbox', () => {
     expect(response.statusCode).toBe(200);
     // Ответ обязан проходить схему контракта: телефон читает его по ней.
     return chatInboxSchema.parse(response.json());
+  };
+
+  /**
+   * Карточка права тем путём, что у задачи ядра (`core-run.ts` permit): событие в поток
+   * прогона, запрос брокеру (`chat-wiring.ts` desk.request), по ответу — `permissionResolved`.
+   */
+  const askCard = (request: PermissionRequest) => {
+    const emit = emitRun;
+    const { runId: _run, ...card } = request;
+    emit({ kind: 'permission', ...card });
+    return session.requestPermission(request).then((reply) => {
+      emit({
+        kind: 'permissionResolved',
+        toolUseId: request.toolUseId,
+        behavior: reply.behavior,
+        ...(reply.expired ? { expired: true as const } : {}),
+      });
+      return reply;
+    });
   };
 
   beforeEach(async () => {
@@ -114,15 +135,11 @@ describe('GET /api/chat/inbox', () => {
   });
 
   it('висящий запрос прав виден с подписью чата и снимается решением из ленты', async () => {
-    const pending = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: CHAT,
-        toolName: 'Bash',
-        input: { command: 'rm -rf build' },
-        toolUseId: 't1',
-      },
+    const pending = askCard({
+      runId: CHAT,
+      toolName: 'Bash',
+      input: { command: 'rm -rf build' },
+      toolUseId: 't1',
     });
     let seen: ChatInbox | undefined;
     for (let attempt = 0; attempt < 100 && !seen?.chats[0]?.asks.length; attempt += 1) {
@@ -154,7 +171,7 @@ describe('GET /api/chat/inbox', () => {
       payload: { toolUseId: 't1', behavior: 'allow' },
     });
     expect(decided.json()).toEqual({ ok: true });
-    expect((await pending).json()).toMatchObject({ behavior: 'allow' });
+    expect(await pending).toMatchObject({ behavior: 'allow' });
 
     const after = (await inbox()).chats.find((item) => item.id === SESSION);
     expect(after?.asks).toEqual([]);
@@ -162,15 +179,11 @@ describe('GET /api/chat/inbox', () => {
   });
 
   it('CLI оборвал запрос прав: карточка уходит, ответ на неё — 410 «истёк», повтор — одна карточка', async () => {
-    const held = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: CHAT,
-        toolName: 'Write',
-        input: { file_path: 'a.txt' },
-        toolUseId: 't-dead',
-      },
+    const held = askCard({
+      runId: CHAT,
+      toolName: 'Write',
+      input: { file_path: 'a.txt' },
+      toolUseId: 't-dead',
     });
     let seen: ChatInbox | undefined;
     for (let attempt = 0; attempt < 100 && !seen?.chats[0]?.asks.length; attempt += 1) {
@@ -197,7 +210,7 @@ describe('GET /api/chat/inbox', () => {
     } as unknown as RawEvent);
 
     // Держатель запроса отпущен отказом с пометкой — мост не висит зря.
-    expect((await held).json()).toMatchObject({ behavior: 'deny', expired: true });
+    expect(await held).toMatchObject({ behavior: 'deny', expired: true });
     expect((await inbox()).chats[0]?.asks).toEqual([]);
     // Поток вкладок: карточка снята как «истекла», а внутреннее событие реестра
     // до клиентов не доезжает.
@@ -225,23 +238,13 @@ describe('GET /api/chat/inbox', () => {
       code: 'permission_expired',
       messageCode: 'permission-expired',
     });
-    const lateGate = await app.inject({
-      method: 'POST',
-      url: `/api/chat/${CHAT}/branch-decision`,
-      payload: { toolUseId: 't-dead', choice: 'here' },
-    });
-    expect(lateGate.statusCode).toBe(410);
 
     // Агент спросил снова — в сводке ровно одна карточка, новая.
-    const retry = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: CHAT,
-        toolName: 'Write',
-        input: { file_path: 'a.txt' },
-        toolUseId: 't-retry',
-      },
+    const retry = askCard({
+      runId: CHAT,
+      toolName: 'Write',
+      input: { file_path: 'a.txt' },
+      toolUseId: 't-retry',
     });
     let again: ChatInbox | undefined;
     for (let attempt = 0; attempt < 100 && !again?.chats[0]?.asks.length; attempt += 1) {
@@ -255,15 +258,11 @@ describe('GET /api/chat/inbox', () => {
       payload: { toolUseId: 't-retry', behavior: 'allow' },
     });
     expect(answered.json()).toEqual({ ok: true });
-    expect((await retry).json()).toMatchObject({ behavior: 'allow' });
+    expect(await retry).toMatchObject({ behavior: 'allow' });
   });
 
   it('результат вызова после ответа человека ничего не ломает: живой ответ не становится «истёк»', async () => {
-    const held = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: { runId: CHAT, toolName: 'Write', input: {}, toolUseId: 't-ok' },
-    });
+    const held = askCard({ runId: CHAT, toolName: 'Write', input: {}, toolUseId: 't-ok' });
     for (let attempt = 0; attempt < 100 && !(await inbox()).chats[0]?.asks.length; attempt += 1) {
       await new Promise((done) => setTimeout(done, 10));
     }
@@ -273,7 +272,7 @@ describe('GET /api/chat/inbox', () => {
       payload: { toolUseId: 't-ok', behavior: 'allow' },
     });
     expect(decided.json()).toEqual({ ok: true });
-    expect((await held).json()).toMatchObject({ behavior: 'allow' });
+    expect(await held).toMatchObject({ behavior: 'allow' });
     // CLI исполнил вызов и вернул результат — запрос уже снят, «истёк» не появляется.
     cliLine({
       type: 'user',
@@ -347,7 +346,7 @@ describe('GET /api/chat/inbox', () => {
   });
 
   it('запрос прав умершего прогона не показывается: ответить на него некуда', async () => {
-    void session.requestPermission({
+    void askCard({
       runId: 'gone-run',
       toolName: 'Bash',
       input: { command: 'ls' },
@@ -383,15 +382,11 @@ describe('GET /api/chat/inbox', () => {
    * сводка телефона его не видела, ответ по ключу прогона уходил в «отложено».
    */
   it('запрос прав под вторым написанием ключа виден в сводке и снимается ответом', async () => {
-    const pending = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: SESSION,
-        toolName: 'Bash',
-        input: { command: 'npm publish' },
-        toolUseId: 't-alias',
-      },
+    const pending = session.requestPermission({
+      runId: SESSION,
+      toolName: 'Bash',
+      input: { command: 'npm publish' },
+      toolUseId: 't-alias',
     });
     let seen: ChatInbox | undefined;
     for (let attempt = 0; attempt < 100 && !seen?.chats[0]?.asks.length; attempt += 1) {
@@ -408,25 +403,21 @@ describe('GET /api/chat/inbox', () => {
       payload: { toolUseId: 't-alias', behavior: 'allow' },
     });
     expect(decided.json()).toEqual({ ok: true });
-    expect((await pending).json()).toMatchObject({ behavior: 'allow' });
+    expect(await pending).toMatchObject({ behavior: 'allow' });
     expect((await inbox()).chats.find((item) => item.id === SESSION)?.asks).toEqual([]);
   });
 
   it('остановка снимает запрос, пришедший под вторым написанием ключа', async () => {
-    const pending = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: SESSION,
-        toolName: 'Bash',
-        input: { command: 'npm publish --tag next' },
-        toolUseId: 't-stop',
-      },
+    const pending = askCard({
+      runId: SESSION,
+      toolName: 'Bash',
+      input: { command: 'npm publish --tag next' },
+      toolUseId: 't-stop',
     });
     for (let attempt = 0; attempt < 100 && !(await inbox()).chats[0]?.asks.length; attempt += 1) {
       await new Promise((done) => setTimeout(done, 10));
     }
     session.abort(CHAT);
-    expect((await pending).json()).toMatchObject({ behavior: 'deny' });
+    expect(await pending).toMatchObject({ behavior: 'deny' });
   });
 });

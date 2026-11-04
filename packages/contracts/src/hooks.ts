@@ -192,6 +192,8 @@ export const hookSchema = object({
   scriptExists: boolean().optional(),
   /** Описание из шапки скрипта — первые строки комментария. */
   description: string().optional(),
+  /** Код перевода описания: шапка скрипта, который пишет сама панель, несёт `@description-code`. */
+  descriptionCode: string().optional(),
   groupIds: array(string()),
   /**
    * Из какого файла прочитан хук. Локальные настройки Claude Code читает

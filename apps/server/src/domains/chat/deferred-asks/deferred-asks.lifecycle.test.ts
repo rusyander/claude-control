@@ -5,10 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   DEFERRED_ASKS_FILE,
   DeferredAsks,
-  allowResumePrompt,
-  denyResumePrompt,
   detailOf,
-  expiredResumePrompt,
   summaryOf,
   unresolvedPushRefusal,
 } from './deferred-asks.ts';
@@ -134,24 +131,6 @@ describe('deferred-asks › срок как исход записи (D-L12)', ()
     time.advance(2_000);
     store.sweep();
     expect(lapsed).toEqual([record.id]);
-  });
-
-  it('продолжения говорят снять черновик, когда ничего не ждёт', () => {
-    const record = {
-      id: 'D-7',
-      input: DROP,
-      toolName: 'Bash',
-      message: 'ок',
-      state: 'allowed' as const,
-    };
-    for (const text of [
-      allowResumePrompt(record),
-      denyResumePrompt(record),
-      expiredResumePrompt(record),
-    ]) {
-      expect(text).toContain('take the MR out of draft');
-    }
-    expect(expiredResumePrompt(record)).toContain('D-7');
   });
 });
 

@@ -70,12 +70,17 @@ export function emitPre(verdict, context = null) {
  * PreToolUse, non-blocking: inject text into context without touching the permission verdict.
  * Separate from emitPre because this is a DELIBERATE payload (a situational rule delivered at its
  * trigger), not a guard explaining itself — so it carries its own, larger ceiling.
+ * `updatedInput` replaces the tool input the call runs with (a module scoping a command it lets through).
  */
-export function emitPreContext(text, max = 2400) {
-  if (!text) return;
+export function emitPreContext(text, max = 2400, updatedInput = null) {
+  if (!text && !updatedInput) return;
   process.stdout.write(
     JSON.stringify({
-      hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: cap(text, max) },
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        ...(updatedInput ? { updatedInput } : {}),
+        ...(text ? { additionalContext: cap(text, max) } : {}),
+      },
     }),
   );
 }

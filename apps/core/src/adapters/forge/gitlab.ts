@@ -172,6 +172,24 @@ export function createGitlabPort(access: ForgeAccess): ForgePort {
       );
     },
 
+    async comment(iid, body) {
+      // Новое обсуждение MR без позиции — заметка верхнего уровня; ответ — первая заметка в нём.
+      return written(
+        await call('POST', `${project}/merge_requests/${iid}/discussions`, { body }),
+        `POST merge_requests/${iid}/discussions`,
+        (v) => (isRecord(v) && Array.isArray(v.notes) ? gitlabNote(v.notes[0]) : null),
+      );
+    },
+
+    async comments(iid) {
+      const url = `${project}/merge_requests/${iid}/discussions?per_page=100`;
+      return readList(
+        await call('GET', url),
+        `GET merge_requests/${iid}/discussions`,
+        (v) => gitlabThreads(v)?.flatMap((t) => t.notes) ?? null,
+      );
+    },
+
     async mergeability(iid) {
       return readById(
         await call('GET', `${project}/merge_requests/${iid}`),

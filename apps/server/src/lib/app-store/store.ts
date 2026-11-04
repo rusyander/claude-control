@@ -1,6 +1,4 @@
 import type { BuiltinGroupsRecord } from '@agentdeck/contracts/groups';
-import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
-import type { GroupWatchRecord } from '@agentdeck/contracts/group-watch';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -8,11 +6,7 @@ import type { FidelityMark } from '@agentdeck/contracts/portable-fidelity';
 import type { EnvSubscription } from '@agentdeck/contracts/portable-subscribe';
 import type { TransferRecord } from '@agentdeck/contracts/portable-transfer';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
-import type {
-  ChatEscalationEntry,
-  EscalationNotice,
-  StoredChatGroupSettings,
-} from '@agentdeck/contracts/chat-group-settings';
+import type { StoredChatGroupSettings } from '@agentdeck/contracts/chat-group-settings';
 import type {
   GroupPermissionLevel,
   SplitDefaults,
@@ -31,7 +25,6 @@ import type {
   PlatformAppliedRecord,
   PlatformHealthRecord,
   PlatformSmokeResult,
-  PlatformSpendRecord,
   Project,
   ProjectCodeLayout,
   ProjectCodeView,
@@ -52,12 +45,6 @@ import {
   setCodeView as writeCodeView,
 } from './code-view.ts';
 import {
-  projectCascadeEntries as readCascadeEntries,
-  setProjectCascade as writeProjectCascade,
-  projectReviewEntries as readReviewEntries,
-  setProjectReviewAfterWork as writeReviewAfterWork,
-} from './cascade.ts';
-import {
   isTestsAutoAccept as readTestsAutoAccept,
   setTestsAutoAccept as writeTestsAutoAccept,
 } from './tests-drafts.ts';
@@ -68,7 +55,6 @@ import {
   getRetiredChatLinks as readRetiredChatLinks,
   linkChatSession as moveChatLink,
   markChatFirstEdit as stampFirstEdit,
-  pinLinkEconomy,
   retireChatLink as stampChatLinkRetired,
   setChatLink as writeChatLink,
 } from './chat-links.ts';
@@ -87,16 +73,6 @@ import {
   setSplitPlan as writeSplitPlan,
   moveSplitPlan as relocateSplitPlan,
 } from './split-plans.ts';
-import {
-  allGroupWatchSignals as readAllGroupWatchSignals,
-  getGroupWatchSignals as readGroupWatchSignals,
-  setGroupWatchSignals as writeGroupWatchSignals,
-} from './group-watch-signals.ts';
-import {
-  allChatWatchSignals as readAllChatWatchSignals,
-  getChatWatchSignals as readChatWatchSignals,
-  setChatWatchSignals as writeChatWatchSignals,
-} from './chat-watch-signals.ts';
 import {
   getGroupWaitResume as readGroupWaitResume,
   setGroupWaitResume as writeGroupWaitResume,
@@ -145,11 +121,6 @@ import {
   savePortabilityTransfer as writePortabilityTransfer,
 } from './portability-transfer.ts';
 import {
-  forgetPlatformSpend as dropPlatformSpend,
-  getPlatformSpend as readPlatformSpend,
-  savePlatformSpend as writePlatformSpend,
-} from './platform-spend.ts';
-import {
   clearPlatformActivationNotice as dropPlatformActivationNotice,
   forgetPlatformSmoke as dropPlatformSmoke,
   getPlatformActivationNotice as readPlatformActivationNotice,
@@ -168,7 +139,6 @@ import {
   moveLegacyIntegrationTokens,
   readStateFile,
   stateFilePath,
-  stateOnDisk,
   withCurrentIntegrations,
   withCurrentPlatformDrivers,
 } from './state-file.ts';
@@ -190,13 +160,9 @@ import {
   setSplitDefaults as writeSplitDefaults,
 } from './split-settings/split-settings.ts';
 import {
-  addChatEscalation,
   aliasChatSession,
   canonicalChatKey,
   getChatGroupSettings as readChatGroupSettings,
-  listChatEscalations,
-  markChatEscalationsRead,
-  setChatGroupSettings as writeChatGroupSettings,
 } from './chat-group-settings/chat-group-settings.ts';
 import {
   forgetMcpHealth as dropMcpHealth,
@@ -256,7 +222,6 @@ const MACHINE_LOCAL_KEYS = [
   'chatGroupSettings',
   'chatKeyAliases',
   'chatForks',
-  'chatEscalations',
   'secretBackupVerifier',
   'permissionPlaces',
 ] as const satisfies readonly (keyof AppState)[];
@@ -303,7 +268,7 @@ export class AppStore {
 
   private persist(): void {
     if (this.isDetached) return;
-    writeJsonFile(this.stateFile, stateOnDisk(this.state));
+    writeJsonFile(this.stateFile, this.state);
     this.writeSettingsSnapshot();
   }
 
@@ -723,30 +688,6 @@ export class AppStore {
     if (dropCodeView(this.state, path)) this.persist();
   }
 
-  /**
-   * Где выключен подбор модели под задачу. Отдаём весь список, а не ответ по
-   * одному пути: рабочая папка прогона бывает подпапкой проекта и копией ветки,
-   * и сопоставление живёт в домене (`domains/model-cascade/model-cascade.ts`).
-   */
-  getProjectCascadeEntries(): Array<[string, boolean]> {
-    return readCascadeEntries(this.state);
-  }
-
-  setProjectCascade(path: string, enabled: boolean): void {
-    writeProjectCascade(this.state, path, enabled);
-    this.persist();
-  }
-
-  /** Где выключено «Ревью после работы»; сопоставление с рабочей папкой — в домене. */
-  getProjectReviewEntries(): Array<[string, boolean]> {
-    return readReviewEntries(this.state);
-  }
-
-  setProjectReviewAfterWork(path: string, enabled: boolean): void {
-    writeReviewAfterWork(this.state, path, enabled);
-    this.persist();
-  }
-
   /** Принимать ли черновики генерации тестов этого проекта без просмотра. */
   isTestsAutoAccept(path: string): boolean {
     return readTestsAutoAccept(this.state, path);
@@ -769,13 +710,6 @@ export class AppStore {
   setChatLink(chatId: string, link: ChatLink): void {
     writeChatLink(this.state, chatId, link);
     this.persist();
-  }
-
-  /** Рычаги экономии разговора — закреплённые на его первом старте (`pinLinkEconomy`). */
-  linkEconomy(keys: readonly string[], current: GroupEconomy): GroupEconomy {
-    const { economy, pinned } = pinLinkEconomy(this.state, keys, current);
-    if (pinned) this.persist();
-    return economy;
   }
 
   /**
@@ -819,7 +753,7 @@ export class AppStore {
     if (linked || moved || aliased || forked) this.persist();
   }
 
-  // --- Группа и автономность чата, заметки главному чату дерева ---
+  // --- Группа и автономность чата (только чтение прежних записей) ---
 
   /** Настоящий ключ разговора по любому его написанию. */
   canonicalChatKey(chatId: string): string {
@@ -828,29 +762,6 @@ export class AppStore {
 
   getChatGroupSettings(chatId: string): StoredChatGroupSettings | undefined {
     return readChatGroupSettings(this.state, chatId);
-  }
-
-  setChatGroupSettings(chatId: string, settings: StoredChatGroupSettings): StoredChatGroupSettings {
-    const next = writeChatGroupSettings(this.state, chatId, settings);
-    this.persist();
-    return next;
-  }
-
-  /** `false` — такая заметка уже записана, рассылать нечего. */
-  addChatEscalation(rootChatId: string, notice: EscalationNotice): boolean {
-    const added = addChatEscalation(this.state, rootChatId, notice);
-    if (added) this.persist();
-    return added;
-  }
-
-  getChatEscalations(): Record<string, ChatEscalationEntry[]> {
-    return listChatEscalations(this.state);
-  }
-
-  markChatEscalationsRead(rootChatId: string): boolean {
-    const changed = markChatEscalationsRead(this.state, rootChatId, new Date().toISOString());
-    if (changed) this.persist();
-    return changed;
   }
 
   /** Первая правка кода в разговоре ребёнка — момент в связь; чужие прогоны молча мимо. */
@@ -921,49 +832,6 @@ export class AppStore {
     return moved;
   }
 
-  // --- Сигналы сторожа групп: свой срез, пишет только сторож (F-42) ---
-
-  /** Блок сигналов группы как есть с диска — разбирает читатель (`groupSignalsOf`). */
-  getGroupWatchSignals(parentChatId: string, groupIndex: number): GroupWatchRecord | undefined {
-    return readGroupWatchSignals(this.state, parentChatId, groupIndex);
-  }
-
-  /** Все блоки: родитель → номер группы → блок. */
-  getAllGroupWatchSignals(): Record<string, Record<string, GroupWatchRecord>> {
-    return readAllGroupWatchSignals(this.state);
-  }
-
-  /**
-   * Записать блок группы в память, `undefined` — стереть. На диск — `saveGroupWatchSignals`:
-   * сторож пишет числа сигналов на каждом событии, а файл — только когда сменился состав или на тике.
-   */
-  putGroupWatchSignals(
-    parentChatId: string,
-    groupIndex: number,
-    record: GroupWatchRecord | undefined,
-  ): void {
-    writeGroupWatchSignals(this.state, parentChatId, groupIndex, record);
-  }
-
-  saveGroupWatchSignals(): void {
-    this.persist();
-  }
-
-  /** Блок сигналов одиночного чата как есть с диска (`groupSignalsOf` разбирает). */
-  getChatWatchSignals(chatId: string): GroupWatchRecord | undefined {
-    return readChatWatchSignals(this.state, chatId);
-  }
-
-  /** Все блоки одиночных чатов: ключ чата → блок. */
-  getAllChatWatchSignals(): Record<string, GroupWatchRecord> {
-    return readAllChatWatchSignals(this.state);
-  }
-
-  /** Записать блок чата в память, `undefined` — стереть; на диск — `saveGroupWatchSignals`. */
-  putChatWatchSignals(chatId: string, record: GroupWatchRecord | undefined): void {
-    writeChatWatchSignals(this.state, chatId, record);
-  }
-
   // --- Продолжения группы «по плану» подряд: свой срез, переживает перезапуск (F-87) ---
 
   getGroupWaitResume(conversation: string): GroupWaitResumeRecord | undefined {
@@ -1010,26 +878,7 @@ export class AppStore {
 
   /** Контур удалён — след пробы уходит вместе с ним. */
   forgetPlatformHealth(id: string): void {
-    const tail = this.state.platformThinkTail;
-    const hadTail = Boolean(tail && id in tail);
-    if (tail && hadTail) delete tail[id];
-    if (dropPlatformHealth(this.state, id) || hadTail) this.persist();
-  }
-
-  /** Модели контура, которые пишут размышления текстом до голого `</think>` (L9). */
-  getThinkTailModels(platformId: string): readonly string[] {
-    return this.state.platformThinkTail?.[platformId] ?? [];
-  }
-
-  /** Запомнить модель с голым `</think>`; повтор ничего не пишет. */
-  markThinkTail(platformId: string, model: string): void {
-    const known = this.state.platformThinkTail?.[platformId] ?? [];
-    if (!model || known.includes(model)) return;
-    this.state.platformThinkTail = {
-      ...this.state.platformThinkTail,
-      [platformId]: [...known, model],
-    };
-    this.persist();
+    if (dropPlatformHealth(this.state, id)) this.persist();
   }
 
   // --- Контуры: след применения (Т3) ---
@@ -1112,27 +961,8 @@ export class AppStore {
     this.persist();
   }
 
-  // --- Контуры: расход по дням (Т8) ---
-
-  /** Расход по контурам: id → дневные итоги (копия, не внутренний объект). */
-  getPlatformSpend(): Record<string, PlatformSpendRecord> {
-    return readPlatformSpend(this.state);
-  }
-
-  /**
-   * Заменить запись расхода целиком. Складывает её домен, здесь — только запись
-   * на диск, и зовут её ПАЧКОЙ: `persist` пишет весь `state.json` синхронно, а
-   * шлюз считает расход на каждом ответе модели.
-   */
-  savePlatformSpend(record: PlatformSpendRecord): void {
-    writePlatformSpend(this.state, record);
-    this.persist();
-  }
-
-  /** Контур удалён — расход уходит вместе с ним. */
-  forgetPlatformSpend(id: string): void {
-    if (dropPlatformSpend(this.state, id)) this.persist();
-  }
+  // Расход по дням (Т8) ведёт звено ядра (C3b, `contour-spend.json` дома ядра); поле
+  // `platformSpend` в state.json — застывший след, ядро забирает его один раз при первом запуске.
 
   // --- Контуры: активация (Т2) ---
 

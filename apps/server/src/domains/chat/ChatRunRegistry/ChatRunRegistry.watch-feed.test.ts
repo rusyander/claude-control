@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ChatRunRegistry, type RunLike } from './ChatRunRegistry.ts';
 import type { RunWatchFeed } from './ChatRunRegistry.types.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 import type { RunLedgerEntry } from '../run-ledger/run-ledger.ts';
 
 /**
@@ -138,7 +139,6 @@ describe('ChatRunRegistry → сторож групп', () => {
   it('выход сервера пишет в журнал лимита замеры идущего прогона, которые ждали пятиминутного шага', () => {
     let emit: ((event: ChatEvent) => void) | undefined;
     class Detachable extends FakeRun {
-      readonly live = { pipe: 'p', pid: 1, signature: 's' };
       override start(options: RunOptions, onEvent: (event: ChatEvent) => void): Promise<void> {
         emit = onEvent;
         return super.start(options, onEvent);

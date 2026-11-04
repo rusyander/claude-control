@@ -8,8 +8,8 @@
   margin-bottom: var(--spacing-3xs);
 }
 
-// Фишка «на паузе» — та же форма, что у звена конвейера в списке чатов: одно
-// слово в капсуле на утопленной поверхности, читается в обеих темах.
+// Счётчик — та же форма, что у звена конвейера в списке чатов: одно слово в
+// капсуле на утопленной поверхности, читается в обеих темах.
 .chip {
   flex: none;
   padding: 0 6px;
@@ -18,38 +18,8 @@
   white-space: nowrap;
 }
 
-// Ждут человека — вопрос или решение по ревью: это единственные фишки, после
-// которых работа не пойдёт сама, и они не должны сливаться с «ждёт фон».
+// «Ждёт вас» — единственный счётчик, после которого работа не пойдёт сама.
 .chipAsk {
   background: var(--color-warning-subtle);
   color: var(--color-fg);
-}
-
-// Сигнал сторожа «тревога» хоть у одной группы — фишка красная: группа молчит.
-.chipAlarm {
-  background: var(--color-danger-subtle);
-  color: var(--color-fg);
-}
-
-// Итог подогрева кэша по разделению: сберегли — зелёным, переплатили — жёлтым,
-// как фишка итога на карточке группы.
-.chipSaved {
-  background: var(--color-success-subtle);
-  color: var(--color-fg);
-}
-
-.chipLost {
-  background: var(--color-warning-subtle);
-  color: var(--color-fg);
-}
-
-// В тёмной теме `*-subtle` почти сливается с фоном: тон — от самого цвета.
-:global(:root[data-theme='dark']) .chipSaved {
-  background: color-mix(in srgb, var(--color-success) 18%, transparent);
-  color: var(--color-success);
-}
-
-:global(:root[data-theme='dark']) .chipLost {
-  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
-  color: var(--color-warning);
 }

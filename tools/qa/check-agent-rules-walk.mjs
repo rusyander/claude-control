@@ -2,85 +2,132 @@
  * Сквозной ход агента панели: «создай правила для X» → правила созданы и видны;
  * «для чего эти правила?» → объяснение из их текста. Кейс panel-agent-walks-001.
  *
- * Подменена только модель — фальшивый `claude` (`fake-cli-panel-agent.mjs`) на
- * PATH одноразовой панели. Путь целиком настоящий: `POST /api/agent/run` →
- * процесс CLI с `--mcp-config` панели → настоящий переходник `tools/mcp/panel.mjs`
- * → действия панели → карточки → решение человека (`/api/agent/pending/:id` с
- * Origin окна) → файл инструкций одноразового дома → страница «Правила» фронта.
+ * Ход идёт через ядро (этап 10): `POST /api/agent/run` → вопрос ядра «ask» → НАСТОЯЩИЙ
+ * `claude` сессией ядра, у которой из инструментов только мост панели (`tools/mcp/panel.mjs`)
+ * → действия панели → карточки → решение человека (`/api/agent/pending/:id` с Origin окна) →
+ * файл инструкций одноразового дома → страница «Правила» фронта. Подменена только модель:
+ * заглушка по программе ниже (`panel-agent-core-stand.mjs`).
  *
- * Свидетельства: файл инструкций на диске, страница «Правила» в браузере, файл
- * разговора. Отрицательная ветка: отклонённая карточка — правила нет ни на
- * диске, ни в ответе. Объяснение сверяется со строкой, которую человек дописал
- * в правило МЕЖДУ ходами: фальшивой модели она неоткуда знать, кроме как из
- * панели.
+ * Свидетельства: файл инструкций на диске, страница «Правила» в браузере, файл разговора,
+ * вызовы моста, дошедшие до модели. Отрицательная ветка: отклонённая карточка — правила нет ни
+ * на диске, ни в ответе. Объяснение сверяется со строкой, которую человек дописал в правило
+ * МЕЖДУ ходами: модели её неоткуда знать, кроме как из результата действия панели.
  *
- * Второй блок — действия групп и строк настроек (U5a), каждое одобрено и
- * отклонено, исход сверяется с диском: находка поиска наборов → группа проекта
- * (`state.json`), перенос переменной settings.json → settings.local.json, правка
- * права allow → ask на месте. Поиск наборов зовёт модель служебным `claude -p` —
- * его отвечает тот же фальшивый CLI.
+ * Второй блок — действия строк настроек (U5a), каждое отклонено и одобрено, исход сверяется с
+ * диском: перенос переменной settings.json → settings.local.json, правка права allow → ask на
+ * месте. Действий групп у агента больше нет (группы ведёт ядро) — их блок снят.
  *
- * Стенд одноразовый: свой дом, свой PATH; стенд человека не трогается.
+ * Стенд одноразовый: свой дом, свой PATH, своё ядро; стенд человека не трогается. Нет `claude`
+ * в PATH — «не проверено» (код 2).
  * Запуск: `node tools/qa/check-agent-rules-walk.mjs [--server-dir <копия apps/server>]`
  * (`--server-dir` — поднять копию сервера, например с внесённым мутантом).
  */
 import { chromium } from 'playwright';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { runOnStand, wait } from './throwaway-stand.mjs';
-import { FAKE_PANEL_AGENT_CLI_SOURCE } from './fake-cli-panel-agent.mjs';
+import { wait } from './throwaway-stand.mjs';
+import { runPanelAgentOnCore } from './panel-agent-core-stand.mjs';
 
 const TOPIC = 'сообщений коммитов';
 const REJECTED_TOPIC = 'имён веток';
 const HUMAN_LINE = 'Ссылка на задачу — в последней строке.';
-const PROJECT = 'walk-proj';
-const SET_NAME = `Walk set ${PROJECT}`;
 const ENV_KEY = 'WALK_MODE';
 const PERMISSION = 'Bash(npm test:*)';
 
 const serverAt = process.argv.indexOf('--server-dir');
 const SERVER_DIR = serverAt > 0 ? process.argv[serverAt + 1] : undefined;
 
-/** Проект с двумя скиллами (опись поиска наборов) и настройки с переменной и правом. */
-function seed({ root, cfg }) {
-  for (const id of ['walk-alpha', 'walk-beta']) {
-    const dir = join(root, PROJECT, '.claude', 'skills', id);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      join(dir, 'SKILL.md'),
-      `---\nname: ${id}\ndescription: ${id} step of the walk\n---\n\n## 1. Do ${id}\n`,
-    );
+const parse = (text) => {
+  const at = text.indexOf('{');
+  try {
+    return at >= 0 ? JSON.parse(text.slice(at)) : undefined;
+  } catch {
+    return undefined;
   }
+};
+
+/**
+ * Модель хода — выбор по ТЕКУЩЕЙ просьбе:
+ * - «создай правила для X» → два `save_rule` про X; ответ называет созданные;
+ * - «перенеси переменную KEY …» → `move_env` из settings.json;
+ * - «поменяй право «P» …» → `edit_permission_rule` allow → ask;
+ * - иначе («для чего эти правила?») → `list_rules`, потом каждое правило целиком, и ответ
+ *   пересказывает ИХ ТЕКСТ из панели — тел правил программа на этом ходу не знает.
+ */
+async function program({ current, tool }) {
+  const done = (result) => !result.isError && result.text.startsWith('Done.');
+  if (/перенеси/i.test(current)) {
+    const key = /\b([A-Z][A-Z0-9_]+)\b/.exec(current)?.[1] ?? 'X';
+    const result = await tool('move_env', { key, source: 'settings' });
+    return done(result)
+      ? `Переменная ${key} теперь в settings.local.json.`
+      : `Переменная ${key} осталась на месте: ${result.text.slice(0, 200)}`;
+  }
+  if (/право/i.test(current)) {
+    const pattern = /«(.+?)»/.exec(current)?.[1] ?? 'X';
+    const result = await tool('edit_permission_rule', {
+      id: `allow:${pattern}`,
+      decision: 'ask',
+      pattern,
+    });
+    return done(result)
+      ? `Право ${pattern} теперь спрашивает.`
+      : `Право ${pattern} не изменено: ${result.text.slice(0, 200)}`;
+  }
+  if (/созда/i.test(current)) {
+    const topic = (/для\s+(.+?)[.?!]*$/i.exec(current)?.[1] ?? 'X').trim();
+    const drafts = [
+      {
+        title: `${topic}: язык`,
+        body: `Сообщения про ${topic} пишутся по-русски, в повелительном наклонении.`,
+      },
+      { title: `${topic}: длина`, body: `Первая строка про ${topic} — не длиннее 72 символов.` },
+    ];
+    const made = [];
+    const refused = [];
+    for (const draft of drafts) {
+      const result = await tool('save_rule', draft);
+      (done(result) ? made : refused).push(draft.title);
+    }
+    return made.length > 0
+      ? `Создал правила: ${made.map((title) => `«${title}»`).join(', ')}.`
+      : `Правила не созданы: ${refused.map((title) => `«${title}»`).join(', ')} — вы отклонили.`;
+  }
+  const listed = parse((await tool('list_rules', {})).text);
+  const parts = [];
+  for (const rule of listed?.rules ?? []) {
+    const full = parse((await tool('list_rules', { id: rule.id })).text);
+    const body = typeof full?.body === 'string' ? full.body : (full?.body?.text ?? '');
+    parts.push(`«${rule.title}» — ${body.trim()}`);
+  }
+  return parts.length > 0 ? `Эти правила задают вот что:\n${parts.join('\n')}` : 'Правил нет.';
+}
+
+/** Настройки с переменной и правом — для второго блока. */
+function seed({ cfg }) {
   writeFileSync(
     join(cfg, 'settings.json'),
     `${JSON.stringify({ env: { [ENV_KEY]: 'walk' }, permissions: { allow: [PERMISSION] } }, null, 2)}\n`,
   );
 }
 
-await runOnStand(
+await runPanelAgentOnCore(
   {
     label: 'agent-rules-walk',
-    fakeCli: { claude: FAKE_PANEL_AGENT_CLI_SOURCE },
+    program,
     seed,
     ...(SERVER_DIR ? { serverDir: SERVER_DIR } : {}),
   },
-  async (stand, check) => {
+  async (stand, check, model) => {
     const origin = stand.webUrl;
     // Файл инструкций — тот, что разрешила сама панель (имя зависит от того, что лежит в доме).
     const location = (await stand.api('/location')).body;
     const instructions = location?.paths?.claudeMd ?? join(stand.cfg, 'CLAUDE.md');
     console.log(`Файл инструкций стенда: ${instructions}\n`);
     const claudeMd = () => stand.read(instructions) ?? '';
-    const cliCalls = () => {
-      const file = join(stand.bin, 'agent-cli.jsonl');
-      return existsSync(file)
-        ? readFileSync(file, 'utf8')
-            .split('\n')
-            .filter(Boolean)
-            .map((line) => JSON.parse(line))
-        : [];
-    };
+    /** Вызовы моста хода: последний запрос хода к модели несёт их все с результатами. */
+    const callsSince = (n) => model.turns.slice(n).at(-1)?.calls ?? [];
 
     /**
      * Один ход: запрос держится открытым (поток кадров), а карточки тем временем
@@ -97,7 +144,7 @@ await runOnStand(
         .then(async (res) => ({ status: res.status, text: await res.text() }))
         .finally(() => (settled = true));
       const seen = new Set();
-      for (let t = 0; t < 120_000 && !settled; t += 200) {
+      for (let t = 0; t < 180_000 && !settled; t += 200) {
         const pending = (await stand.api('/agent/pending')).body ?? [];
         for (const card of pending) {
           if (seen.has(card.id)) continue;
@@ -127,6 +174,12 @@ await runOnStand(
       first.response.text.slice(0, 400),
     );
     check(
+      'ход 1: ход шёл через ядро — кадр start, ответ без кадра ошибки',
+      first.response.text.includes('"kind":"start"') &&
+        !first.response.text.includes('"kind":"error"'),
+      first.response.text.slice(0, 1200),
+    );
+    check(
       'ход 1: две карточки save_rule, каждая — изменение',
       first.cards.length === 2 &&
         first.cards.every((card) => card.name === 'save_rule' && card.risk === 'change'),
@@ -150,6 +203,18 @@ await runOnStand(
       'ход 1: ответ агента называет созданные правила',
       reply1.includes(`«${TOPIC}: язык»`) && reply1.includes(`«${TOPIC}: длина»`),
       reply1,
+    );
+    const offered = model.turns.flatMap((item) => item.offered);
+    check(
+      'ход 1: модели предложены только мост панели и загрузчик инструментов',
+      offered.length > 0 &&
+        offered.every(
+          (name) =>
+            name.startsWith('mcp__panel-bridge__') ||
+            name === 'ToolSearch' ||
+            name === 'DeferredToolPlaceholder',
+        ),
+      JSON.stringify([...new Set(offered)]),
     );
 
     // Правила видны человеку — на странице «Правила» одноразового фронта.
@@ -207,7 +272,7 @@ await runOnStand(
 
     // ── Ход 2: «для чего эти правила?» ─────────────────────────────────────
     const history = first.conversation.messages.map(({ role, content }) => ({ role, content }));
-    const before = cliCalls().length;
+    const before = model.turns.length;
     const second = await turn(
       conversationId,
       [...history, { role: 'user', content: 'Для чего эти правила?' }],
@@ -219,7 +284,7 @@ await runOnStand(
       second.response.text.slice(0, 400),
     );
     check('ход 2: ни одной карточки — только чтение', second.cards.length === 0);
-    const reads = cliCalls().slice(before);
+    const reads = callsSince(before);
     check(
       'ход 2: агент читал правила действиями панели',
       reads.length >= 3 && reads.every((call) => call.name === 'list_rules' && !call.isError),
@@ -238,15 +303,13 @@ await runOnStand(
       reply2,
     );
 
-    // ── Действия групп и строк настроек: каждое — отказ, потом одобрение ─────
+    // ── Действия строк настроек: каждое — отказ, потом одобрение ───────────
     const json = (path) => {
       const text = stand.read(path);
       return text ? JSON.parse(text) : {};
     };
-    const statePath = join(stand.cfg, 'agentdeck', 'state.json');
     const settingsPath = join(stand.cfg, 'settings.json');
     const localPath = join(stand.cfg, 'settings.local.json');
-    const walkGroups = () => (json(statePath).groups ?? []).filter((g) => g.name === SET_NAME);
 
     /** Один ход с одним действием: одна карточка ожидаемого имени, решение, ответ агента. */
     async function actionTurn(label, ask, name, decision) {
@@ -266,53 +329,6 @@ await runOnStand(
       );
       return reply;
     }
-
-    const project = join(stand.root, PROJECT);
-    const added = await stand.api('/projects', {
-      method: 'POST',
-      headers: { origin },
-      body: { path: project, name: PROJECT },
-    });
-    check('проект для поиска наборов добавлен', added.status === 200, added.text.slice(0, 300));
-
-    const findAsk = `Найди наборы ресурсов в ${PROJECT}`;
-    const importRejected = await actionTurn(
-      'поиск наборов, отказ',
-      findAsk,
-      'import_discovered_group',
-      'reject',
-    );
-    check(
-      'поиск наборов, отказ: группы нет в state.json',
-      walkGroups().length === 0,
-      JSON.stringify(walkGroups()),
-    );
-    check(
-      'поиск наборов, отказ: агент говорит, что набор не импортирован',
-      importRejected.includes('не импортирован'),
-      importRejected,
-    );
-    const importApproved = await actionTurn(
-      'поиск наборов, одобрение',
-      findAsk,
-      'import_discovered_group',
-      'approve',
-    );
-    const [imported] = walkGroups();
-    const members = (imported?.members ?? []).map((m) => `${m.kind}:${m.id}`).sort();
-    check(
-      'поиск наборов, одобрение: в state.json группа проекта, выключенная, с обоими скиллами',
-      walkGroups().length === 1 &&
-        imported.isEnabled === false &&
-        imported.scope?.kind === 'project' &&
-        JSON.stringify(members) === JSON.stringify(['skill:walk-alpha', 'skill:walk-beta']),
-      JSON.stringify(imported),
-    );
-    check(
-      'поиск наборов, одобрение: ответ называет группу',
-      importApproved.includes(`«${SET_NAME}» стал группой проекта`),
-      importApproved,
-    );
 
     const moveAsk = `Перенеси переменную ${ENV_KEY} в личный файл`;
     const moveRejected = await actionTurn(

@@ -45,6 +45,18 @@ author instead of thirteen, and the batch is reviewable before it becomes public
 Direct route when drafts are not wanted: `create_merge_request_thread` per finding (resolvable thread,
 which is what a review comment should be), `create_merge_request_note` for the non-positional summary.
 
+**Cards are built from the report, never typed** (measured: 14 hand-written cards cost ≈9.9M of a ≈33M
+review, each a guard refusal or two). `node <kit>/tools/review-publish.mjs prepare --report <report>
+--out <dir> --repo <head checkout> --base-sha <b> [--start-sha <s>] --head-sha <h>` writes per finding
+`F-NN.md` (guard card shape, review-only fields dropped, scaffolding scrubbed) and `F-NN.pos.json` (§3,
+re-anchored to the first shown place of `(other sites: …)` when the site is outside the diff, the
+original named in `**Where:**`), folds «same as F-NN» into its target, and lists sites with no shown
+place for the summary note. Exit 4 = `FLAGS` — sentences it cannot rewrite safely (first person, rung
+labels, probe names); fix them with Edit in the card, rerun until exit 0. Then every thread in ONE
+message (body = the card, position = its `.pos.json`), `review-sync --write`, and
+`review-publish.mjs index --report <report> --out <dir>/index.md --manifest <dir>/manifest.json` → the
+summary note, linked to the threads (§6), same exit-4 rule.
+
 ## 3. Position object — inline anchoring
 
 ```json

@@ -5,6 +5,7 @@ import type { ConfigProvider } from '../../providers/types/types.ts';
 import { readJsonFile, readTextFile } from '../../lib/safe-io/safe-io.ts';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
 import { envItemId, envSkip } from './canon.ts';
+import { nested } from './intent-codes.ts';
 import { commandItem, pluginItem, skillItem, subagentItem } from './normalize-files.ts';
 import { normalizeHooks, scriptPathOf, type HookInput } from './normalize-hooks.ts';
 import { sourceFactory } from './normalize-types.ts';
@@ -86,7 +87,15 @@ export function readClaudePlugins(deps: ClaudePluginsDeps): ImportResult {
   if (!existsSync(registryPath)) {
     return {
       items: [],
-      skipped: [envSkip('plugin', 'empty', `${registryPath}: реестр плагинов не заведён`)],
+      skipped: [
+        envSkip(
+          'plugin',
+          'empty',
+          `${registryPath}: реестр плагинов не заведён`,
+          'portability-skip-plugin-registry-missing',
+          { path: registryPath },
+        ),
+      ],
     };
   }
 
@@ -103,6 +112,15 @@ export function readClaudePlugins(deps: ClaudePluginsDeps): ImportResult {
           'unsupported_format',
           `${registryPath}: реестр версии ${String(registry.version ?? 'без номера')}, ` +
             `Claude Code читает только версию ${REGISTRY_VERSION} — эти плагины не действуют`,
+          'portability-skip-plugin-registry-version',
+          {
+            path: registryPath,
+            version:
+              registry.version === undefined || registry.version === null
+                ? nested('plugin-registry-no-version')
+                : String(registry.version),
+            expected: REGISTRY_VERSION,
+          },
         ),
       ],
     };
@@ -116,14 +134,28 @@ export function readClaudePlugins(deps: ClaudePluginsDeps): ImportResult {
   for (const id of Object.keys(installed).sort()) {
     const install = pickInstall(installed[id] ?? []);
     if (!install) {
-      skipped.push(envSkip('plugin', 'not_readable', `${id}: в реестре нет пути установки`));
+      skipped.push(
+        envSkip(
+          'plugin',
+          'not_readable',
+          `${id}: в реестре нет пути установки`,
+          'portability-skip-plugin-no-install',
+          { id },
+        ),
+      );
       continue;
     }
     if (!isDirectory(install.path)) {
       // Каталог вычищен «подметанием» CLI, а запись реестра осталась: плагина
       // на диске нет, и переносить из него нечего.
       skipped.push(
-        envSkip('plugin', 'not_readable', `${id}: каталога ${install.path} нет на диске`),
+        envSkip(
+          'plugin',
+          'not_readable',
+          `${id}: каталога ${install.path} нет на диске`,
+          'portability-skip-plugin-dir-missing',
+          { id, path: install.path },
+        ),
       );
       continue;
     }
@@ -154,7 +186,13 @@ export function readClaudePlugins(deps: ClaudePluginsDeps): ImportResult {
     if (!enabled) {
       for (const kind of provides) {
         skipped.push(
-          envSkip(kind, 'disabled', `${id}: плагин выключен, его записи не действуют и не едут`),
+          envSkip(
+            kind,
+            'disabled',
+            `${id}: плагин выключен, его записи не действуют и не едут`,
+            'portability-skip-plugin-disabled',
+            { id },
+          ),
         );
       }
       continue;
@@ -257,7 +295,15 @@ function pluginSkills(params: ContentDeps): ImportResult {
   for (const name of listDir(dir)) {
     const skillFile = join(dir, name, 'SKILL.md');
     if (!existsSync(skillFile)) {
-      skipped.push(envSkip('skill', 'unsupported_format', `${name}: в каталоге нет SKILL.md`));
+      skipped.push(
+        envSkip(
+          'skill',
+          'unsupported_format',
+          `${name}: в каталоге нет SKILL.md`,
+          'portability-skip-no-skill-file',
+          { name },
+        ),
+      );
       continue;
     }
     const raw = readTextFile(skillFile);
@@ -328,7 +374,16 @@ function pluginSubagents(params: ContentDeps): ImportResult {
       pluginIdentity(subagentItem(params.source, parsed), params.id, parsed.name),
     ),
     skipped: scan.problems.map((problem) =>
-      envSkip('subagent', 'unsupported_format', `${problem.filePath}: ${problem.detail}`),
+      envSkip(
+        'subagent',
+        'unsupported_format',
+        `${problem.filePath}: ${problem.detail}`,
+        'portability-skip-subagent-problem',
+        {
+          path: problem.filePath,
+          problem: problem.detailCode ? nested(problem.detailCode) : problem.detail,
+        },
+      ),
     ),
   };
 }

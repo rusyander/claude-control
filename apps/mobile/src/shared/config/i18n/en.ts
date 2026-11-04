@@ -3,13 +3,12 @@ import type { Dictionary } from './ru';
 import { serverMessagesEn } from './server-messages/en.ts';
 import { panelTextsEn } from './panel-texts/texts.en.ts';
 import { homeEn } from './home/en.ts';
-import { watcherEn } from './watcher/en.ts';
 import { usageLimitsEn } from './usage-limits/en.ts';
 import { foreignChatEn } from './foreign-chat/en.ts';
 import { projectsEn } from './projects/en.ts';
 import { computersEn } from './computers/en.ts';
 import { signingEn } from './signing/en.ts';
-import { groupWatchEn } from './group-watch/en.ts';
+import { coreTaskEn } from './core-task/en.ts';
 
 /**
  * English mirrors `ru.ts` and is typed against it: a missing or renamed key
@@ -19,7 +18,6 @@ export const en: Dictionary = {
   serverMessages: serverMessagesEn,
   panelTexts: panelTextsEn,
   home: homeEn,
-  watcher: watcherEn,
   usageLimits: usageLimitsEn,
   foreignChat: foreignChatEn,
   tabs: {
@@ -74,15 +72,6 @@ export const en: Dictionary = {
     image: '[image]',
     autoPick: (label: string) => `Auto-pick: ${label}`,
     autoPickUnparsed: 'Auto-pick: the question was closed with the recommended option',
-    groupLine: (group: string, autonomous: boolean) =>
-      `Group: ${group} · ${autonomous ? 'autonomous' : 'ask me'}`,
-    groupAuto: 'auto',
-    escalation: {
-      title: (title: string) => `Critical from group "${title}"`,
-      fromBlock: 'Reported by the group itself',
-      fromAutoPick: 'Autonomy picked for you in a critical question',
-      dismiss: 'Mark as read',
-    },
     contextSummarized:
       'The contour compressed the history before this answer: the model saw a summary of the ' +
       'start of the conversation, not the full text. What went into the summary the panel cannot ' +
@@ -224,8 +213,6 @@ export const en: Dictionary = {
         'driver-none': 'This contour does not draw images: its driver declares no such capability',
         'no-model': 'The key catalog has no image-generation model',
         'endpoint-no-url': 'The endpoint profile has no image generation address',
-        'gateway-off': 'The panel gateway is off, and contour requests go through it',
-        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'This API kind has no separate images endpoint',
         'no-agent': 'No raster route and no chat to ask an agent in',
       },
@@ -234,8 +221,6 @@ export const en: Dictionary = {
         'driver-none': 'no raster: this contour does not draw images',
         'no-model': 'no raster: the key catalog has no image-generation model',
         'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
-        'gateway-off': 'no raster: the panel gateway is off',
-        'gateway-failed': 'no raster: the panel gateway did not come up',
         'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
         'no-agent': 'no raster: nobody to draw',
       },
@@ -269,7 +254,7 @@ export const en: Dictionary = {
   projects: projectsEn,
   computers: computersEn,
   signing: signingEn,
-  groupWatch: groupWatchEn,
+  coreTask: coreTaskEn,
 
   git: {
     title: 'Git',

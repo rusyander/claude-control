@@ -111,7 +111,7 @@ describe('settings snapshot at startup', () => {
   /**
    * Рычаги решений (решение владельца 24.10): снимок приходит из git, а записать
    * его мог кто угодно с доступом к репозиторию — и агент другой машины тоже.
-   * Авторежим, правила автоподтверждения, автопродолжение, сроки D-n, проверка
+   * Авторежим, автопродолжение, срок D-n, проверка
    * промптов, разрешения и развилки групп, пересылка на телефон и автоприём
    * тестов остаются здешними; нейтральное (число копий, «До MR», потолок групп)
    * приходит как раньше.
@@ -120,9 +120,7 @@ describe('settings snapshot at startup', () => {
     const leverProject = (): string => join(homedir(), 'work', 'levers');
     const LOCAL_LEVERS = {
       chatAutoMode: false,
-      autoApproveRules: {},
       handoffAutoDefault: false,
-      deferAfterMinutes: 30,
       deferredTtlDays: 3,
       promptGate: { enabled: true, action: 'block' as const },
     };
@@ -130,9 +128,7 @@ describe('settings snapshot at startup', () => {
       settings: {
         backupKeep: 3,
         chatAutoMode: true,
-        autoApproveRules: { packagePublish: true, externalDestroy: true },
         handoffAutoDefault: true,
-        deferAfterMinutes: 0,
         deferredTtlDays: 90,
         promptGate: { enabled: false, action: 'warn' },
       },
@@ -192,7 +188,6 @@ describe('settings snapshot at startup', () => {
       const ctx = new ServerContext();
       ctx.store.updateSettings({
         ...LOCAL_LEVERS,
-        autoApproveRules: { gitWrite: true },
         backupKeep: 5,
       });
       ctx.store.setOutsideRelay(false);

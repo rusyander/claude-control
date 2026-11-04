@@ -87,6 +87,8 @@ export interface HopDriver {
   responseCeilingSec?: number;
   /** Родная ручка Anthropic у платформы (путь внутри версии API). */
   anthropic?: { messages: string };
+  /** Ручка картинок контура (путь внутри версии API, манифест `imagesApi`); нет — 404. */
+  images?: { api: string };
   clientTools: PlatformClientTools;
   shimRequestFields?: Readonly<Record<string, unknown>>;
 }

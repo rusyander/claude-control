@@ -8,19 +8,19 @@ async function getLocalActivity(): Promise<LocalActivity> {
   return data;
 }
 
-/** Раз в полторы секунды: разбор промпта у видеокарты — тысячи токенов в секунду, полоса должна двигаться. */
+/** Раз в полторы секунды: отказ сервера моделей должен появиться под ходом сразу, не через ход. */
 const ACTIVITY_INTERVAL_MS = 1500;
 
 /**
- * Этап локального прогона для чата (L6). Опрос — только пока ход идёт: ответ дешёвый
- * (снимок присмотра шлюза, без запросов к серверу моделей), но и он не нужен простою.
- * `poll: false` — один запрос без опроса: между ходами чату нужен лишь замер слоя.
+ * Сервер и отказ локальной модели для чата (L6). Опрос — только пока ход идёт: ответ дешёвый
+ * (запись о сервере и снимок журнала запросов ядра, без запросов к серверу моделей), но и он
+ * не нужен простою.
  */
-export function useLocalActivity(enabled: boolean, poll = enabled) {
+export function useLocalActivity(enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.localActivity,
     queryFn: getLocalActivity,
     enabled,
-    refetchInterval: enabled && poll ? ACTIVITY_INTERVAL_MS : false,
+    refetchInterval: enabled ? ACTIVITY_INTERVAL_MS : false,
   });
 }

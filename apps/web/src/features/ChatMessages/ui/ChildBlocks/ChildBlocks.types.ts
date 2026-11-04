@@ -17,17 +17,6 @@ export interface ChildBlocksProps {
   onPauseTree?: () => void;
   onResumeTree?: () => void;
   treeBusy?: boolean;
-  /** Ответ на вопрос разбора группе без чата (Т1) — уходит родителю с номером. */
-  onAnswerHold?: (index: number, answer: string) => void;
-  holdBusy?: boolean;
-  /** «Отпустить» группу, ждущую предшественников (Т1) — туда же и тем же номером. */
-  onRelease?: (index: number) => void;
-  releaseBusy?: boolean;
-  onResumeInterrupted?: (index?: number) => void;
-  resumeInterruptedBusy?: boolean;
-  /** Пересчитать пересечения веток (Т6) — кнопка в сводке групп. */
-  onCheckOverlap?: () => void;
-  overlapBusy?: boolean;
   /** Запросы прав детей: на них ребёнок СТОИТ. */
   permissions?: ChildPermission[];
   onPermissionDecide?: (chatId: string, toolUseId: string, behavior: 'allow' | 'deny') => void;

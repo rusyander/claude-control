@@ -1,36 +1,33 @@
 /**
- * Потолок ответа инструмента группы Codex (пакет C плана экономии чужих CLI, решение O2)
- * на НАСТОЯЩЕМ codex.
+ * Потолок ответа инструмента Codex (пакет C плана экономии чужих CLI, решение O2) на НАСТОЯЩЕМ
+ * codex — по решению ядра.
  *
- * Путь: рычаги группы → канал панели (`economy-run/codex.ts`) → `withCodexKit`
- * (`kit/codex.ts`) → запуск тем же `spawnCliProcess` и с тем же сложением
- * окружения, что у `ProviderChatRun` (`{ ...kit.env, ...runEnv }`) → настоящий
- * `codex exec`. Модель — заглушка OpenAI responses: первым ответом зовёт оболочку
- * (`node big.js`, 40 000 знаков вывода), вторым — «done». Свидетели:
- *   - длина `function_call_output` во втором запросе к модели — ровно то, что
- *     Codex положил бы в окно;
- *   - argv, с которым ОС запустила процесс (`child.spawnargs`), а не то, что
- *     собрала панель;
- *   - окружение, которое видит команда, запущенная САМИМ codex (`big.js` пишет
- *     его в файл): переменные панели в него не доходят, метка-контроль доходит.
- *     Контрольный прогон без снятия (`withCodexKit` обойдён) показывает, что
- *     свидетель видит именно это имя, — иначе «нет переменной» ничего бы не значило.
+ * Путь: рычаги шага (`SessionSpec.economy`, умолчания `CORE_ECONOMY_DEFAULTS`) → `codexEconomy`
+ * ядра (`apps/core/src/adapters/economy-carry.ts`) → ключи верхнего уровня `config.toml` дома
+ * сеанса, ДО таблиц — тем же порядком, что у `planCodex` (рычаги, затем привязка адреса) →
+ * настоящий `codex exec` с этим домом (`CODEX_HOME`). Модель — заглушка OpenAI responses: первым
+ * ответом зовёт оболочку (`node big.js`, 40 000 знаков вывода), вторым — «done». Свидетель —
+ * длина `function_call_output` во втором запросе к модели: ровно то, что Codex положил в окно.
+ *
+ * Прежний канал панели (`economy-run/codex.ts` → `withCodexKit`, ключ в argv) ушёл в ядро вместе
+ * с чатом чужих CLI; ядро несёт ключ файлом дома сеанса, переменных окружения у Codex нет.
  *
  * Сценарии:
- *   рычаги по умолчанию (8000 знаков, 10 000 токенов) → ключа НЕТ: Codex и так
- *     строже (его предел 2500 токенов), ключ поднял бы предел;
- *   оболочка 4000, чтение 2000 → `-c tool_output_token_limit=2000`, вывод ужат
+ *   рычаги по умолчанию (8000 знаков, 10 000 токенов) → ключа НЕТ: Codex и так строже (его
+ *     предел 2500 токенов), ключ поднял бы предел;
+ *   оболочка 4000, чтение 2000 → `tool_output_token_limit = 2000` в `config.toml`, вывод ужат
  *     ниже умолчания Codex;
- *   ключ 500 напрямую → единица — токены (~4 знака): до модели доходит ≤ 2500 знаков.
+ *   ключ 500 в файле напрямую → единица — токены (~4 знака): до модели доходит ≤ 2500 знаков
+ *     (контроль, что Codex вообще читает ключ из дома сеанса).
  *
  * Дом Codex — временный `CODEX_HOME`; `~/.codex`, `~/.claude` не трогаются.
  * Подменена только модель (сетевая граница). Нет codex — «не проверено», код 2.
- * Зависший codex снимается деревом (`lib/kill-tree.mjs`): на Windows `child.kill()`
- * снял бы лишь обёртку, и codex остался бы сиротой.
+ * Зависший codex снимается деревом (`lib/kill-tree.mjs`): на Windows `child.kill()` снял бы лишь
+ * обёртку, и codex остался бы сиротой.
  *
  * Запуск: [STEER_CLI_DIR=<каталог с codex>] node tools/qa/check-codex-tool-output-limit.mjs
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
@@ -38,18 +35,12 @@ import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 const BIG = 40_000;
-/** Метка-контроль: доходит до команды codex, если окружение вообще доходит. */
-const MARK = 'AGENTDECK_PROBE_MARK';
-const server = (path) => new URL(`../../apps/server/src/${path}`, import.meta.url).href;
-const { economyRunEnv } = await import(server('domains/provider-chat/economy-run/economy-run.ts'));
-const { CODEX_COMPACT_LIMIT_ENV, CODEX_TOOL_OUTPUT_LIMIT_ENV, withCodexKit } = await import(
-  server('domains/kit/codex.ts')
+const at = (path) => new URL(`../../${path}`, import.meta.url).href;
+const { codexEconomy, CODEX_DEFAULT_TOOL_OUTPUT_TOKENS } = await import(
+  at('apps/core/src/adapters/economy-carry.ts')
 );
-const { spawnCliProcess } = await import(server('lib/cli-spawn/cli-spawn.ts'));
-const PANEL_VARS = [CODEX_TOOL_OUTPUT_LIMIT_ENV, CODEX_COMPACT_LIMIT_ENV];
-const { GROUP_ECONOMY_DEFAULTS } = await import(
-  new URL('../../packages/contracts/src/group-economy.ts', import.meta.url).href
-);
+const { CORE_ECONOMY_DEFAULTS } = await import(at('packages/contracts/src/core/config.ts'));
+const { spawnCliProcess } = await import(at('apps/server/src/lib/cli-spawn/cli-spawn.ts'));
 
 let bad = 0;
 const check = (text, ok, detail) => {
@@ -114,62 +105,39 @@ async function removeLater(dir) {
 }
 
 /**
- * Один прогон `codex exec` с argv панели: длина вывода инструмента, дошедшего до модели,
- * argv процесса и окружение команды codex. `strip: false` — контроль без снятия.
+ * Один прогон `codex exec` с домом сеанса: ключи экономии `toml` — верхним уровнем, затем
+ * таблица адреса заглушки (как `planCodex`: рычаги до первой таблицы). Итог — что легло в
+ * `config.toml` и длина вывода инструмента, дошедшего до модели.
  */
-async function run(env, options = {}) {
+async function run(toml) {
   const model = await startModel();
   const root = mkdtempSync(join(tmpdir(), 'cc-codex-tool-limit-'));
   const home = join(root, 'home');
   const work = join(root, 'work');
   mkdirSync(home, { recursive: true });
   mkdirSync(work, { recursive: true });
-  // Окружение прогона — как у службы чатов: канал рычагов + свои переменные запуска
-  // (дом Codex, ключ заглушки) + метка-контроль, всё через `withCodexKit`.
-  const platformEnv = { ...env, CODEX_HOME: home, STUB_KEY: 'x', [MARK]: 'seen' };
-  const kit = withCodexKit(
-    ['exec', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox', '-'],
-    platformEnv,
-    'exec',
-  );
-  // Свидетель окружения — команда, которую запускает САМ codex.
-  const witness = join(work, 'env.json');
-  writeFileSync(
-    join(work, 'big.js'),
-    [
-      `const names = ${JSON.stringify([...PANEL_VARS, MARK])};`,
-      `require('node:fs').writeFileSync(${JSON.stringify(witness)}, JSON.stringify(Object.fromEntries(names.map((n) => [n, process.env[n] ?? null]))));`,
-      `process.stdout.write('0123456789'.repeat(${BIG / 10}));`,
-      '',
-    ].join('\n'),
-  );
-  writeFileSync(
-    join(home, 'config.toml'),
-    [
-      'model_provider = "stub"',
-      'model = "stub-model"',
-      '[model_providers.stub]',
-      'name = "stub"',
-      `base_url = "http://127.0.0.1:${model.port}/v1"`,
-      'wire_api = "responses"',
-      'env_key = "STUB_KEY"',
-      '',
-    ].join('\n'),
-  );
-  // Сложение окружения — как в `ProviderChatRun` (`{ ...kit.env, ...runEnv, PWD }`).
-  // Контроль (`strip: false`) обходит снятие: окружение уходит как собрано.
-  const childEnv = { ...(options.strip === false ? platformEnv : (kit.env ?? {})), PWD: work };
-  const spawned = spawnCliProcess('codex', kit.args, { cwd: work, env: childEnv });
+  writeFileSync(join(work, 'big.js'), `process.stdout.write('0123456789'.repeat(${BIG / 10}));\n`);
+  const config = [
+    ...(toml ? [toml] : []),
+    'model_provider = "stub"',
+    'model = "stub-model"',
+    '[model_providers.stub]',
+    'name = "stub"',
+    `base_url = "http://127.0.0.1:${model.port}/v1"`,
+    'wire_api = "responses"',
+    'env_key = "STUB_KEY"',
+    '',
+  ].join('\n');
+  writeFileSync(join(home, 'config.toml'), config);
+  const args = ['exec', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox', '-'];
+  const spawned = spawnCliProcess('codex', args, {
+    cwd: work,
+    env: { CODEX_HOME: home, STUB_KEY: 'x', PWD: work },
+  });
   if (spawned.error) {
     await model.close();
     await removeLater(root);
-    return {
-      args: kit.args,
-      spawnargs: [],
-      code: 'spawn',
-      seen: undefined,
-      log: spawned.error.message,
-    };
+    return { config, code: 'spawn', log: spawned.error.message };
   }
   const { child } = spawned;
   child.stdin.end('run node big.js, then say done');
@@ -181,23 +149,9 @@ async function run(env, options = {}) {
     const timer = setTimeout(() => (killChildProcessTree(child), resolve('timeout')), 120_000);
     child.on('exit', (exit) => (clearTimeout(timer), resolve(exit)));
   });
-  let seen;
-  try {
-    seen = JSON.parse(readFileSync(witness, 'utf8'));
-  } catch {
-    seen = undefined;
-  }
   await model.close();
   await removeLater(root);
-  return {
-    args: kit.args,
-    // argv, с которым ОС запустила процесс (обёртка npm разворачивается в node + скрипт).
-    spawnargs: child.spawnargs ?? [],
-    code,
-    seen,
-    length: model.outputs[0]?.length,
-    log: log.slice(-400),
-  };
+  return { config, code, length: model.outputs[0]?.length, log: log.slice(-400) };
 }
 
 const cliDir = findCli('codex');
@@ -208,13 +162,19 @@ if (!cliDir) {
 // `spawnCliProcess` ищет codex по PATH процесса (окружение запуска — добавка к нему).
 process.env.PATH = `${cliDir}${delimiter}${process.env.PATH ?? ''}`;
 
-const keyOf = (args) => args.filter((arg) => arg.startsWith('tool_output_token_limit='));
-const channel = (economy) => economyRunEnv('codex', { env: {}, appData: tmpdir(), economy }) ?? {};
+const KEY = /^tool_output_token_limit = (\d+)$/m;
+/** Решение ядра для рычагов шага: ключи `config.toml` и потери с именем. */
+const decide = (economy) => codexEconomy({ economy });
 
-console.log('— рычаги по умолчанию');
-const base = await run(channel(GROUP_ECONOMY_DEFAULTS));
+console.log('— рычаги по умолчанию (умолчания ядра = умолчания групп панели)');
+const baseDecision = decide(CORE_ECONOMY_DEFAULTS);
+check(
+  `ядро ключа не ставит: Codex и так строже (${CODEX_DEFAULT_TOOL_OUTPUT_TOKENS} токенов)`,
+  !KEY.test(baseDecision.toml) && Object.keys(baseDecision.env).length === 0,
+  JSON.stringify(baseDecision),
+);
+const base = await run(baseDecision.toml);
 check('прогон завершился', base.code === 0, base.log);
-check('ключа нет: Codex и так строже', keyOf(base.args).length === 0, base.args.join(' '));
 check(
   `Codex сам ужал вывод ${BIG} знаков (до модели ${base.length})`,
   typeof base.length === 'number' && base.length < BIG / 2,
@@ -222,27 +182,18 @@ check(
 );
 
 console.log('— оболочка 4000 знаков, чтение 2000 токенов');
-const tight = await run(
-  channel({ ...GROUP_ECONOMY_DEFAULTS, bashOutputChars: 4_000, readOutputTokens: 2_000 }),
+const tightDecision = decide({ bashOutputChars: 4_000, readOutputTokens: 2_000 });
+check(
+  'ядро кладёт `tool_output_token_limit = 2000` ключом верхнего уровня, переменных нет',
+  tightDecision.toml.match(KEY)?.[1] === '2000' && Object.keys(tightDecision.env).length === 0,
+  JSON.stringify(tightDecision),
 );
+const tight = await run(tightDecision.toml);
 check('прогон завершился', tight.code === 0, tight.log);
 check(
-  'argv: `-c tool_output_token_limit=2000` ровно один раз',
-  JSON.stringify(keyOf(tight.args)) === JSON.stringify(['tool_output_token_limit=2000']) &&
-    tight.args[tight.args.indexOf('tool_output_token_limit=2000') - 1] === '-c',
-  tight.args.join(' '),
-);
-check(
-  'argv процесса (spawnargs) несёт тот же ключ',
-  tight.spawnargs.includes('tool_output_token_limit=2000'),
-  tight.spawnargs.join(' '),
-);
-check(
-  'служебные переменные панели до команды codex не доходят, метка доходит',
-  tight.seen !== undefined &&
-    PANEL_VARS.every((name) => tight.seen[name] === null) &&
-    tight.seen[MARK] === 'seen',
-  JSON.stringify(tight.seen),
+  'ключ в config.toml стоит до первой таблицы',
+  tight.config.search(KEY) >= 0 && tight.config.search(KEY) < tight.config.indexOf('['),
+  tight.config,
 );
 check(
   `вывод ужат ниже умолчания Codex (${tight.length} < ${base.length}) и не ниже ~2000 токенов`,
@@ -253,20 +204,16 @@ check(
   `${tight.length} / ${base.length}`,
 );
 
-console.log('— контроль: окружение без снятия (withCodexKit обойдён)');
-const raw = await run(
-  channel({ ...GROUP_ECONOMY_DEFAULTS, bashOutputChars: 4_000, readOutputTokens: 2_000 }),
-  { strip: false },
-);
-check('прогон завершился', raw.code === 0, raw.log);
+console.log('— один рычаг из двух: предел общий на все инструменты — потеря с именем');
+const halfDecision = decide({ bashOutputChars: 4_000 });
 check(
-  'свидетель видит переменную панели, когда её не сняли',
-  raw.seen?.[CODEX_TOOL_OUTPUT_LIMIT_ENV] === '2000' && raw.seen?.[MARK] === 'seen',
-  JSON.stringify(raw.seen),
+  'ключа нет, потеря названа',
+  !KEY.test(halfDecision.toml) && halfDecision.lost.some((line) => line.includes('tool output')),
+  JSON.stringify(halfDecision),
 );
 
-console.log('— ключ 500 напрямую (единица — токены)');
-const small = await run({ [CODEX_TOOL_OUTPUT_LIMIT_ENV]: '500' });
+console.log('— контроль: ключ 500 в файле напрямую (единица — токены)');
+const small = await run('tool_output_token_limit = 500');
 check('прогон завершился', small.code === 0, small.log);
 check(
   `500 токенов → до модели не больше ~2500 знаков (${small.length})`,

@@ -11,17 +11,15 @@
  * - `МОДЕЛЬ` — называет модель и глубину из своих флагов;
  * - `ВЛОЖЕНИЯ` — читает файлы, названные в ходе: размер PNG из заголовка и
  *   число страниц PDF — доказательство, что байты дошли до процесса;
- * - `УДАЛИ` — кладёт в рабочую папку tmp-delete-me.txt и просит права на
- *   `rm tmp-delete-me.txt`; удаляет, только если мост разрешил;
  * - `СЛОМАЙСЯ` — итог с ошибкой устаревшего CLI, как у настоящего;
  * - `ПРАВКА` — просит права на запись `note.txt` в рабочей папке; пишет, только
- *   если мост разрешил (ворота ветки в основной копии — `check-copy-offer-walk.mjs`).
+ *   если мост разрешил.
  *
  * Экспорт — строка: её исходник пишется в файл стенда.
  */
 export const FAKE_BASICS_CLI = String.raw`
 import { spawn } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -151,24 +149,6 @@ async function runTurn(content) {
     const text = 'Картинка PNG ' + (png ? pngSize(png) : 'не дошла') + ', в PDF страниц: ' + (pdf ? pdfPages(pdf) : 'не дошёл');
     log({ scenario: 'attach', prompt: content, files, png, pdf, text });
     assistant([{ type: 'text', text }]);
-    result();
-    return;
-  }
-  if (content.includes('УДАЛИ')) {
-    const target = join(cwd, 'tmp-delete-me.txt');
-    writeFileSync(target, 'delete me\n');
-    const toolUse = { type: 'tool_use', id: 'toolu_' + randomUUID().replace(/-/g, '').slice(0, 16), name: 'Bash',
-      input: { command: 'rm tmp-delete-me.txt', description: 'Удалить временный файл' } };
-    assistant([toolUse]);
-    const decision = await approve('Bash', toolUse.input, toolUse.id);
-    const allowed = decision.behavior === 'allow';
-    if (allowed) rmSync(target, { force: true });
-    log({ scenario: 'delete', prompt: content, decision: decision.behavior, target, exists: existsSync(target) });
-    const toolResult = { role: 'user', content: [{ type: 'tool_result', tool_use_id: toolUse.id,
-      content: allowed ? 'removed' : String(decision.message ?? 'denied'), is_error: !allowed }] };
-    out({ type: 'user', message: toolResult, session_id: session });
-    record('user', toolResult);
-    assistant([{ type: 'text', text: allowed ? 'Файл удалён.' : 'Мне отказали в удалении — файл на месте.' }]);
     result();
     return;
   }

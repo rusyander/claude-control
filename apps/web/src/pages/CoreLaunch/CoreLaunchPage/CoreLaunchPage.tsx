@@ -1,13 +1,14 @@
 import { useTranslation } from 'react-i18next';
 import { CoreHopsNotice } from '@entities/CoreTask';
-import { CoreLaunchScreen } from '@features/CoreLaunch';
+import { CoreLaunchScreen, McpPicksCard } from '@features/CoreLaunch';
 import { RoutesCard } from '@features/CoreRoutes';
 import { PageHeader } from '@shared/ui/page-header';
 import { Stack } from '@shared/ui/stack';
 
 /**
  * Запуск задачи ядра `/core/launch` (этап 9): оценка, проверка дорог, слой, гранты, деление и
- * запуск; ниже — маршруты моделей, которыми ядро может ходить.
+ * запуск; ниже — маршруты моделей, которыми ядро может ходить, и выбор серверов MCP человека
+ * для видов шага (настройка ядра `mcpPicks`).
  */
 export function CoreLaunchPage() {
   const { t } = useTranslation();
@@ -21,6 +22,7 @@ export function CoreLaunchPage() {
       <CoreHopsNotice />
       <CoreLaunchScreen />
       <RoutesCard />
+      <McpPicksCard />
     </Stack>
   );
 }

@@ -40,7 +40,12 @@ describe('expandInstructionText — регистр пути', () => {
 
     const result = expandInstructionText('@./CLAUDE.md', file);
 
-    expect(result.problems).toEqual([expect.stringContaining('цикл импортов')]);
+    expect(result.problems).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining('цикл импортов'),
+        code: 'portability-import-cycle',
+      }),
+    ]);
   });
 
   it('Windows: импорт себя в другом регистре — тоже цикл', () => {
@@ -48,7 +53,12 @@ describe('expandInstructionText — регистр пути', () => {
 
     const result = expandInstructionText('@./claude.md', file);
 
-    expect(result.problems).toEqual([expect.stringContaining('цикл импортов')]);
+    expect(result.problems).toEqual([
+      expect.objectContaining({
+        text: expect.stringContaining('цикл импортов'),
+        code: 'portability-import-cycle',
+      }),
+    ]);
     expect(result.text).not.toContain('тело файла');
   });
 

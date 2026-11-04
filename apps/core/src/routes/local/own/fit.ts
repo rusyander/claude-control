@@ -15,7 +15,8 @@ import type { Fact } from '../../../platform/os-kind.ts';
  */
 
 export interface FitInput {
-  model: { id: string; sizeBytes: number };
+  /** `needBytes` — нужное по раскладке вызывающего; тогда запас сверху не прибавляется. */
+  model: { id: string; sizeBytes: number; needBytes?: number };
   gpu: Fact<GpuMemory>;
   ram: { totalBytes: number; freeBytes: number };
   /** Запас сверх файла модели: KV-кеш контекста, буферы вычислений. */
@@ -69,8 +70,12 @@ const GIB = 1024 ** 3;
 const gib = (bytes: number): string => `${(bytes / GIB).toFixed(2)} GiB`;
 
 export function decideFit(input: FitInput): FitDecision {
-  const needBytes = input.model.sizeBytes + input.overheadBytes;
-  const need = `${input.model.id}: file ${gib(input.model.sizeBytes)} + overhead ${gib(input.overheadBytes)} = ${gib(needBytes)}`;
+  const stated = input.model.needBytes;
+  const needBytes = stated ?? input.model.sizeBytes + input.overheadBytes;
+  const need =
+    stated === undefined
+      ? `${input.model.id}: file ${gib(input.model.sizeBytes)} + overhead ${gib(input.overheadBytes)} = ${gib(needBytes)}`
+      : `${input.model.id}: file ${gib(input.model.sizeBytes)}, gpu need by the caller's layout ${gib(needBytes)}${stated === 0 ? ' (server places layers itself or runs on cpu)' : ''}`;
   const gpu = input.gpu;
   if (!('value' in gpu)) {
     const why = 'unknown' in gpu ? gpu.unknown : (gpu.detail ?? 'no gpu memory source');

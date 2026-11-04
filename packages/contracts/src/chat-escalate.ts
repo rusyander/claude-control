@@ -15,17 +15,17 @@
  * {"severity":"critical","text":"что случилось и почему это важно"}
  * ```
  *
- * Форма тела совпадает с `escalationSchema` (`chat-group-settings.ts`); тест
- * контрактов держит оба разбора согласными.
+ * Тело: `severity` только `critical`, `text` непустой и не длиннее
+ * `ESCALATE_TEXT_MAX`; тест сервера (`chat-escalate.test.ts`) держит эти границы.
  */
 
 import { blockLang, blockLangPattern } from './brand.ts';
 
-/** Язык блока — тот же, что `ESCALATE_BLOCK_LANG`. */
+/** Язык блока `agentdeck:escalate`. */
 export const ESCALATE_LANG = blockLang('escalate');
 
 /**
- * Потолок текста замечания — как у `escalationSchema`. Раньше 2k: длиннее
+ * Потолок текста замечания. Раньше 2k: длиннее
  * блок отвергался целиком, и критическое замечание оставалось сырым JSON в
  * ленте без карточки. Теперь потолок — защита от мусора.
  */

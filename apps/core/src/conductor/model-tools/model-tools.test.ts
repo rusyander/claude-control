@@ -274,6 +274,15 @@ describe('model tools', () => {
       modelTools: ['step_done', 'ask_human', 'blocker', 'core_state'],
     });
     expect(toolPlanFor('work')?.builtins).toBe('all');
+    // Этап 10: чат кончает человек командой `end-chat` — заявления модели «шаг сделан» у него нет.
+    expect(toolPlanFor('chat')).toEqual({
+      builtins: 'all',
+      modelTools: ['check', 'ask_human', 'blocker', 'core_state'],
+    });
+    const noDone = SESSION_STEP_KINDS.filter(
+      (k) => !toolPlanFor(k)?.modelTools.includes('step_done'),
+    );
+    expect(noDone).toEqual(['chat']);
     // Решение 28.10: разбор задачи, план и деление только читают — как ревью и отчёт.
     const readOnly = SESSION_STEP_KINDS.filter((k) => toolPlanFor(k)?.builtins === 'read-only');
     expect(readOnly).toEqual(['intake', 'plan', 'research', 'split', 'review', 'report']);

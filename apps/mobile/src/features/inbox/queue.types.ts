@@ -1,3 +1,5 @@
+import type { CorePermitAsk } from '@agentdeck/contracts/chat-handoff';
+
 /**
  * Карточка вопросов ОДНОГО чата: по одному вопросу за раз.
  *
@@ -15,9 +17,7 @@
  */
 
 export type AskAnswer =
-  | { kind: 'permission'; behavior: 'allow' | 'deny' }
-  | { kind: 'branchGate'; choice: 'here' | 'stop' }
-  | { kind: 'question'; labels: string[] };
+  { kind: 'permission'; behavior: 'allow' | 'deny' } | { kind: 'question'; labels: string[] };
 
 export interface CardState {
   /** Готовые ответы по `ask.key`. */
@@ -35,10 +35,13 @@ export type Submission =
       keys: string[];
     }
   | {
-      kind: 'branchGate';
-      runKey: string;
-      toolUseId: string;
-      choice: 'here' | 'stop';
+      /**
+       * Вопрос права задачи ядра: грант и ответ — подписанными командами ядра, а не маршрутом
+       * прогона (тот отвечает `core_permit_browser_only`). Ключ прогона не нужен.
+       */
+      kind: 'corePermit';
+      card: CorePermitAsk;
+      behavior: 'allow' | 'deny';
       keys: string[];
     }
   | { kind: 'message'; text: string; keys: string[] };

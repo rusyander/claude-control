@@ -6,3 +6,20 @@
  * где набор передаётся как `CoreToolClass[]` (`claudeDenyRules`, `qwenDenyRules`).
  */
 export const READ_ONLY_DENIED: readonly ('write' | 'edit' | 'shell')[] = ['write', 'edit', 'shell'];
+
+/**
+ * Набор `none` (вопрос «ask», этап 10 F2): к снятому у чтения — ещё и сеть. Чтение и поиск
+ * переходник снимает своими средствами (Claude — `--tools`, Qwen — `--exclude-tools`).
+ */
+export const NONE_DENIED: readonly ('write' | 'edit' | 'shell' | 'web')[] = [
+  ...READ_ONLY_DENIED,
+  'web',
+];
+
+/** Классы, снятые набором инструментов шага; `all` — ничего. */
+export function deniedClassesOf(
+  tools: 'all' | 'read-only' | 'none',
+): readonly ('write' | 'edit' | 'shell' | 'web')[] {
+  if (tools === 'none') return NONE_DENIED;
+  return tools === 'read-only' ? READ_ONLY_DENIED : [];
+}

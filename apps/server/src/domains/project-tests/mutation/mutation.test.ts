@@ -49,7 +49,8 @@ function gitIn(dir: string, args: string[]): string {
 describe('проверка набора поломкой', () => {
   let root: string | undefined;
   afterEach(() => {
-    if (root) rmSync(root, { recursive: true, force: true });
+    // Windows держит каталог копии, только что отпущенный её процессом (EBUSY), — повторы вместо красного.
+    if (root) rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     root = undefined;
   });
 

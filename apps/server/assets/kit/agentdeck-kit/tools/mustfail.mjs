@@ -7,22 +7,42 @@
 // A file whose revert leaves the suite green is a file the suite does not actually cover, whatever
 // `@covers` claims and whatever the coverage percentage says.
 //
-//   node <kit>/tools/mustfail.mjs --cmd "npm run test:ci" [--base origin/main] [--files a,b]
-//   node <kit>/tools/mustfail.mjs --cmd "..." --quick     # one run, all files reverted at once
-//   node <kit>/tools/mustfail.mjs --cmd "npx vitest related {file} --run"   # narrowed per file (own sibling test first)
-//   node <kit>/tools/mustfail.mjs --cmd "..." --mutants plan.json            # new tests, old code
+//   node <kit>/tools/mustfail.mjs --cmd "npm run test:ci" [--base origin/main]   # default: critical files, own tests only, 10 min/package
+//   node <kit>/tools/mustfail.mjs --cmd "pytest {tests}"            # any runner: {tests} = the test files picked per file
+//   node <kit>/tools/mustfail.mjs --cmd "..." --files a.ts,b.ts     # an explicit list instead of the critical files
+//   node <kit>/tools/mustfail.mjs --cmd "..." --all                 # every behaviour-bearing changed file (explicit ask only)
+//   node <kit>/tools/mustfail.mjs --cmd "..." --quick               # one run, all files reverted at once
+//   node <kit>/tools/mustfail.mjs --cmd "..." --mutants plan.json   # new tests, old code
 //   node <kit>/tools/mustfail.mjs --cmd "npx vitest run {spec}" --mutants plan.json   # each mutant: its own test file
 //     (plan field `spec` = the mutant's test file; unset → the one test file listed in --cmd that names `test`)
 //   node <kit>/tools/mustfail.mjs --cmd "..." --mutate src/x.ts --find "a >= b" --replace "a > b" [--test "name"]
 //
-// {file} (relative to --cwd) and {abs} in --cmd make every run about ONE file: its own baseline, its
-// own revert (for vitest/jest/pytest one baseline over all files replaces the per-file ones; a line
-// per file prints the pace). Many files and a slow suite → `--quick` first: one run answers whether
-// the change is covered at all, per-file runs only name WHICH file is not. Measured 18.09.2026: four files against a one-minute suite took 5m21s, because every
-// revert re-ran everything. Narrowed by the import graph the same verdicts cost seconds — and a tool
-// that takes five minutes is a tool that gets skipped, which is the only way this check ever fails.
-// Un-narrowed and more than two files: one combined revert runs first, because GREEN there already is
-// the verdict for the whole change and saves every per-file run after it.
+// Scope: the CRITICAL changed files by default, not every changed file — every file of a
+// critical kind, ranked hook · store · service/API · util · validation/form → other logic → page with logic →
+// component with logic, then changed lines + branches, then path. Left out and named: markup without logic,
+// type-only files, constants, barrels, styles, locales, test plumbing, configs, new and deleted files. Discovery
+// stays inside --cwd. No file-count cap: the limit is a TIME BUDGET per package (nearest package.json / go.mod /
+// pyproject.toml …), --budget minutes, default 10. The cost of each file is estimated BEFORE its run (picked test
+// files × the measured baseline); what does not fit is printed by name as «UNCHECKED (budget)» up front, and a
+// rerun resumes from the memo. --max N = an explicit cap per package (it caps --files too). --all = every
+// behaviour-bearing changed file, ranked the same way; --files = an explicit list, in its own order.
+//
+// Test selection: `vitest related {file}` per file walked hundreds of test files (a large frontend package:
+// ~15 min per file, a 33-file run crashed the worker at 453 test files), while the file's own
+// directory ran in 73–99 s with the same RED. So when --cmd runs vitest or jest (directly or via a package.json
+// script) or holds {tests}, each reverted file runs ONLY its own tests, cheapest exact source first:
+// (a) test files whose `@covers` names it or its directory, plus its sibling <name>.test.<ext>; else (b) the tests
+// in its own directory; else (c) the static import graph, cut to the --graph-cap (8) nearest by path distance —
+// the cut is printed. No test found → GREEN «not covered», no run. Baseline = ONE run of the union of the picked
+// tests per package, never the whole suite; each revert run stops at the first failure (--bail=1). Other commands
+// (go test, a node script) keep the legacy modes under the same budget; --no-select forces them.
+//
+// Legacy modes: {file} (relative to --cwd) and {abs} in --cmd make every run about ONE file: its own baseline,
+// its own revert (for vitest/jest/pytest one baseline over all files replaces the per-file ones). Measured
+// 18.09.2026: four files against a one-minute suite took 5m21s, because every revert re-ran everything — and a
+// tool that takes five minutes is a tool that gets skipped, which is the only way this check ever fails.
+// Un-narrowed and more than two files: one combined revert runs first, because GREEN there already is the verdict
+// for the whole change. `--quick`: one run with everything reverted answers whether the change is covered at all.
 //
 // Exit 0 = every behaviour-bearing changed file made the check go red. Exit 1 = at least one stayed
 // green (report names which). Exit 2 = could not run (dirty state, check already red, no targets).
@@ -84,11 +104,17 @@ if (has('help') || argv.includes('-h')) {
     head.push(line.replace(/^\/\/ ?/, ''));
   }
   console.log(
-    `${head.join('\n')}\n\nFlags: --cmd (required) --base <rev> --cwd <dir> --files a,b --max <n, default 6> --quick --mutants <plan.json> --mutate/--find/--replace [--test] --timeout <ms per run> --recover\n` +
-      `Vitest «related {file}» → graph mode (2 runs + tie-breaks, no --max cap): --trust-green (gate just green, skip baseline) ` +
-      `--budget <min, default 8> --no-graph (old per-file runs). A file with its own sibling test (<name>.test.<ext>) is judged by it first, ` +
-      `the graph walks only the rest (--no-sibling: graph only). A check that runs no test at all stops at once (exit 2). ` +
-      `Verdicts are memoised per tree; --fresh ignores the memo.\n\n` +
+    `${head.join('\n')}\n\nFlags: --cmd (required) --base <rev> --cwd <dir> --files a,b --all --max <n per package; default: no cap> ` +
+      `--graph-cap <n, default 8: directory / graph tests per file; 0 = @covers and sibling only> --quick --trust-green (gate just green, skip the baseline) ` +
+      `--budget <min per package, default 10> --timeout <ms per run> --fresh --recover --no-select --mutants <plan.json> --mutate/--find/--replace [--test]\n` +
+      `Selection (vitest/jest/node --test/{tests}) — never a hand-made fixed-suite wrapper: the picked tests of every file are ` +
+      `printed before any run, then the cost estimate and the budget cut. A baseline red before any revert whose runner NAMES ` +
+      `its failing tests (TAP, go -v, pytest, vitest/jest, node spec) is a known-red set: RED = a new failing test; unnamed red ` +
+      `→ NO-BASE. UNCHECKED never fails the run: rerun the SAME command until no row is left — proven files and the ` +
+      `baseline come from the memo (a RED holds for the tree under any command).\n` +
+      `Legacy (--no-select, or a runner that takes no test list): vitest «related {file}» → graph mode (2 runs + tie-breaks): ` +
+      `--no-graph (old per-file runs), --no-sibling (graph only; both imply --no-select). A check that runs no test at all ` +
+      `stops at once (exit 2). Verdicts are memoised per tree; --fresh ignores the memo.\n\n` +
       MUTANT_PLAN_HELP,
   );
   process.exit(0);
@@ -97,14 +123,20 @@ if (has('help') || argv.includes('-h')) {
 const CMD = flag('cmd');
 const BASE = flag('base');
 const CWD = flag('cwd', process.cwd());
-const MAX = Number(flag('max', '6'));
+// --max is opt-in (the budget is the limit, not a file count): unset = no cap.
+const MAX_SET = argv.includes('--max');
+const MAX = MAX_SET ? Number(flag('max', '6')) : Infinity;
+const ALL = has('all');
+// How many import-graph tests one file may pull in (step c of the selection); the nearest by path win.
+const GRAPH_CAP = Number(flag('graph-cap', '8'));
 const QUICK = has('quick');
 // Graph mode knobs: the gate just went green → no baseline run; a wall budget past which the per-file
 // tie-break runs stop and the rest are printed as not checked instead of blocking (owner 19.10.2026:
 // ~90 % of the verdicts in ~20 min beats 100 % in 5 h that nobody waits for).
 const TRUST_GREEN = has('trust-green');
-// 8, not 20: whole-diff runs cost split groups hours a day; bug-fix files only.
-const BUDGET_MS = Number(flag('budget', '8')) * 60_000;
+// 8, not 20: whole-diff runs cost split groups hours a day. 10 per PACKAGE since the budget replaced the
+// 6-file cap as the limit of the default scope.
+const BUDGET_MS = Number(flag('budget', '10')) * 60_000;
 
 // ---- crash journal (finding 54, live split run 24.09.2026) -------------------------------------------
 // A split group's CLI ended its turn under a background mustfail; the kill ran no handler and the tree
@@ -632,7 +664,7 @@ async function runMutants() {
   // Failing-test lines as runners print them: vitest/jest (FAIL, ×, ✕, ●), node:test (✖, not ok),
   // go (--- FAIL), pytest (FAILED), playwright (✘). Used to name WHICH test killed a mutant — the
   // 23.09.2026 lesson: the first failure in the file is not necessarily the targeted one.
-  const FAIL_LINE = /\bFAIL(?:ED)?\b|[×✕✖✘●]|\bnot ok\b/;
+  const FAIL_LINE = /\bFAIL(?:ED)?\b|[×✕✖✗✘●]|\bnot ok\b/;
   // Red from a missing symbol, a compile error or zero collected tests is not a verdict about behaviour.
   // Runtime TypeErrors stay out of this list on purpose: a mutant that returns null and makes the caller
   // throw "is not a function" WAS noticed by the test.
@@ -764,6 +796,7 @@ for (const marker of [
 /** The base to revert to: an explicit --base, else the merge-base with the default branch, else HEAD. */
 function resolveBase() {
   if (BASE) return BASE;
+
   for (const ref of ['origin/main', 'origin/master', 'main', 'master']) {
     if (git(['rev-parse', '--verify', '--quiet', ref]).status === 0) {
       // Three-dot semantics: what THIS branch changed, never what main moved on to. A two-dot range
@@ -784,7 +817,7 @@ const NOT_BEHAVIOUR =
   /(^|[\\/])(node_modules|dist|build|vendor|__generated__|sqlcdb)[\\/]|[._-](test|spec)\.|_test\.go$|(^|[\\/])(test_[^\\/]+|conftest)\.py$|\.d\.ts$|lock\.json$|\.snap$/i;
 
 // Relative to --cwd by way of git, never by comparing filesystem paths: `git rev-parse` answers with
-// the long path while the caller may hold the 8.3 short one (C:\Users\RUSYAN~1), and `relative()`
+// the long path while the caller may hold the 8.3 short one (C:\Users\LONGNA~1), and `relative()`
 // between the two walks up to the drive root — found by this tool's own fixture test.
 const PREFIX = (git(['rev-parse', '--show-prefix']).stdout || '').trim();
 
@@ -829,9 +862,13 @@ function targets() {
     const dropped = out.filter((f) => !SOURCE.test(f) || NOT_BEHAVIOUR.test(f));
     if (dropped.length)
       process.stdout.write(`mustfail: not behaviour, skipped: ${dropped.join(', ')}\n`);
-    return out.filter((f) => !dropped.includes(f));
+    const list = out.filter((f) => !dropped.includes(f));
+    if (MAX_SET && list.length > MAX) overflow = list.splice(MAX);
+    return list;
   }
   const seen = new Set();
+  const skipped = new Set();
+  const outside = new Set();
   for (const args of [
     ['diff', '--name-only', `${base}...HEAD`],
     ['diff', '--name-only'],
@@ -839,19 +876,399 @@ function targets() {
   ]) {
     for (const line of (git(args).stdout || '').split('\n')) {
       const f = line.trim();
-      if (f && SOURCE.test(f) && !NOT_BEHAVIOUR.test(f)) seen.add(f);
+      if (!f) continue;
+      if (!SOURCE.test(f) || NOT_BEHAVIOUR.test(f)) skipped.add(f);
+      // The check runs in --cwd: a changed file of another package judged against these tests reads «not covered».
+      else if (PREFIX && !f.startsWith(PREFIX)) outside.add(f);
+      else seen.add(f);
     }
   }
-  return [...seen];
+  const tail = `not behaviour (tests, locales, non-code): ${skipped.size}${outside.size ? ` · outside --cwd: ${outside.size}` : ''}`;
+  return criticalSample([...seen], tail);
+}
+
+// ---- critical sample -----------------------------------------------------------------------------------
+// Judging every changed file cost groups hours a day; the proof is worth most where behaviour lives. Classified
+// by path first, then by content (comments stripped): what a revert cannot meaningfully break is left out, the
+// rest is ranked kind → (changed lines + branch count) → path, and the first --max of each package are judged.
+let overflow = [];
+const SAMPLE_OUT = [
+  [/(^|\/)styles?\.[^/]+$|\.styles?\.[^/]+$|\.css\.[cm]?[jt]s$|(^|\/)app\/styles\//, 'styles'],
+  [/(^|\/)(locales?|i18n|translations?)\//, 'locales'],
+  [/(^|\/)types?\.[^/]+$|\.types?\.[^/]+$|(^|\/)types\/[^/]+$/, 'types only'],
+  [/(^|\/)(constants?|consts?)\.[^/]+$|\.constants?\.[^/]+$|(^|\/)constants\/[^/]+$/, 'constants'],
+  [
+    /(^|\/)(testing|test-utils|__mocks__|mocks?|fixtures?|__fixtures__|stories)\/|\.stories\.[^/]+$|\.mocks?\.[^/]+$/,
+    'test plumbing',
+  ],
+  [
+    /(^|\/)[^/]+\.config\.[cm]?[jt]s$|(^|\/)(main|setupTests|setup-tests)\.[cm]?[jt]sx?$|(^|\/)(conftest|settings|wsgi|asgi|manage)\.py$/,
+    'config / entry point',
+  ],
+];
+const VALIDATION = 'validation / form';
+const SAMPLE_TIERS = [
+  [/(^|\/)use[A-Z][\w-]*(\/|\.[^/]+$)/, 'hook'],
+  [
+    /(^|\/)(stores?|state|slices?|reducers?|machines?)(\/|\.[^/]+$)|[a-z](Store|Slice|Reducer|Machine)\.[^/]+$|\.(store|slice|reducer)\.[^/]+$/,
+    'store / reducer',
+  ],
+  [
+    /(^|\/)(services?|api|clients?|handlers?|repositor(?:y|ies)|controllers?)(\/|\.[^/]+$)|[a-z](Service|Api|Client|Handler|Repository|Controller)\.[^/]+$|\.(service|api|client|handler|controller)\.[^/]+$/,
+    'service / API',
+  ],
+  [
+    /(^|\/)(utils?|lib|libs|helpers?)(\/|\.[^/]+$)|[a-z](Utils?|Helpers?)\.[^/]+$|\.(utils?|helpers?)\.[^/]+$/,
+    'util',
+  ],
+  [
+    /(^|\/)(validat\w*|schemas?|forms?)(\/|\.[^/]+$)|[a-z](Schema|Validator|Validation)\.[^/]+$|\.(schema|validator|validation)\.[^/]+$|(^|\/)use\w*Form\b/,
+    VALIDATION,
+  ],
+];
+const PAGE = /(^|\/)(pages?|routes?|views?|screens?)\//i;
+const TESTS_ALLOW = /^\/\/\s*tests-allow:\s*\S/m; // a project waiver: «this file has no behaviour»
+const STMT_JS = /\b(?:if|switch|for|while)\s*\(|\bcatch\b|\bawait\b|\bthrow\b|\btry\s*\{/g;
+const STMT_WORDS =
+  /\b(?:if|elif|for|while|switch|select|case|except|rescue|unless|try|raise|panic)\b/g;
+const EXPR_BRANCH =
+  /&&|\|\||\?\?|[^?\s]\s*\?\s+[^.?:\s]|\.(?:filter|reduce|find|findIndex|some|every|sort|flatMap)\(/g;
+const HOOK_CALL = /\buse[A-Z]\w*\s*\(/g;
+const FUNC = /=>|\bfunction\b|\bdef\s+\w|\bfunc\s|\bclass\s+\w|\bfn\s+\w|\blambda\b/g;
+const RUNTIME_DECL =
+  /\b(?:const|let|var|function|class|enum)\s|\bexport\s+default\b|module\.exports|\bexports\./;
+const tally = (re, s) => (s.match(re) || []).length;
+const extOf = (p) => (/\.([^./]+)$/.exec(p)?.[1] ?? '').toLowerCase();
+
+function stripComments(src, ext) {
+  let s = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
+  if (/^(py|rb)$/.test(ext))
+    s = s.replace(/("""|''')[\s\S]*?\1/g, ' ').replace(/(^|\s)#.*$/gm, '$1');
+  return s;
+}
+/** A barrel by content, never by name. */
+function isBarrel(code, path) {
+  if (/(^|\/)__init__\.py$/.test(path))
+    return code
+      .split('\n')
+      .every((l) => !l.trim() || /^\s*(from\s+\S+\s+import|import\s|__all__)/.test(l));
+  const statements = code
+    .split(';')
+    .map((s) => s.trim().replace(/\s+/g, ' '))
+    .filter(Boolean);
+  return (
+    statements.length > 0 &&
+    statements.every((s) => /^export (type )?(\*|\{[^}]*\})( as \w+)? from ['"]/.test(s))
+  );
+}
+/** Root-relative directory of the nearest package manifest above `path`; '' = the repository root. */
+const MANIFESTS = [
+  'package.json',
+  'go.mod',
+  'pyproject.toml',
+  'setup.py',
+  'setup.cfg',
+  'Cargo.toml',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
+  'composer.json',
+  'Gemfile',
+];
+const pkgOfDir = new Map();
+function packageOf(path) {
+  const dirs = [];
+  let found = '';
+  for (let dir = posix.dirname(path); dir && dir !== '.'; dir = posix.dirname(dir)) {
+    if (pkgOfDir.has(dir)) {
+      found = pkgOfDir.get(dir);
+      break;
+    }
+    dirs.push(dir);
+    if (MANIFESTS.some((m) => existsSync(join(root, dir, m)))) {
+      found = dir;
+      break;
+    }
+  }
+  for (const d of dirs) pkgOfDir.set(d, found);
+  return found;
+}
+
+/** { out: why } = not sampled; else { tier, label, why, score }. */
+function classify(f, changed) {
+  if (!existsSync(join(root, f)))
+    return { out: 'deleted in the change — a revert only brings the file back' };
+  if (atBase(f) === null)
+    return { out: 'new file — nothing to revert (new code is proven by --mutants)' };
+  for (const [re, why] of SAMPLE_OUT) if (re.test(f)) return { out: why };
+  let src;
+  try {
+    src = readFileSync(join(root, f), 'utf8');
+  } catch {
+    return { out: 'unreadable' };
+  }
+  if (TESTS_ALLOW.test(src)) return { out: 'tests-allow waiver — no behaviour' };
+  const ext = extOf(f);
+  const code = stripComments(src, ext);
+  if (isBarrel(code, f)) return { out: 'barrel (re-exports only)' };
+  if (/^[cm]?tsx?$/.test(ext) && !RUNTIME_DECL.test(code) && /\b(?:interface|type)\s+\w/.test(code))
+    return { out: 'types only' };
+  const markup = /^(tsx|jsx|vue|svelte)$/.test(ext);
+  const hooks = tally(HOOK_CALL, code);
+  const stmt = tally(/^(py|go|rb)$/.test(ext) ? STMT_WORDS : STMT_JS, code);
+  const expr = tally(EXPR_BRANCH, code);
+  // Conditional rendering alone (`a && <X/>`, `a ? <X/> : null`) is markup; a hook or a statement is logic.
+  if (markup && !hooks && !stmt && expr <= 3) return { out: 'markup without logic' };
+  const kind = SAMPLE_TIERS.find(([re]) => re.test(f))?.[1];
+  if (!markup && !tally(FUNC, code) && kind !== VALIDATION)
+    return { out: 'data without functions (constants)' };
+  const logic = hooks + stmt + expr;
+  const pick = (tier, label) => ({
+    tier,
+    label,
+    why: `${changed} changed lines · logic ${logic}`,
+    score: changed + logic,
+  });
+  if (kind) return pick(1, kind);
+  if (!markup) return pick(2, 'logic');
+  return PAGE.test(f) ? pick(3, 'page with logic') : pick(4, 'component with logic');
+}
+
+function criticalSample(list, tail) {
+  if (!list.length) return list;
+  const changed = new Map();
+  for (const line of (git(['diff', '--numstat', '--no-renames', base]).stdout || '').split('\n')) {
+    const [a, d, p] = line.split('\t');
+    if (p) changed.set(p.trim(), (Number(a) || 0) + (Number(d) || 0));
+  }
+  const byPkg = new Map();
+  const left = new Map(); // why → files
+  const leave = (why, f) => left.set(why, [...(left.get(why) ?? []), f]);
+  for (const f of list) {
+    let c = classify(f, changed.get(f) ?? 0);
+    // --all judges every file; the classification only ranks it (a non-critical kind goes last, named).
+    if (c.out && ALL)
+      c = {
+        tier: 5,
+        label: `not a critical kind: ${c.out}`,
+        why: `${changed.get(f) ?? 0} changed lines`,
+        score: changed.get(f) ?? 0,
+      };
+    if (c.out) leave(c.out, f);
+    else {
+      const pkg = packageOf(f);
+      byPkg.set(pkg, [...(byPkg.get(pkg) ?? []), { f, ...c }]);
+    }
+  }
+  const chosen = [];
+  for (const pkg of [...byPkg.keys()].sort()) {
+    const ranked = byPkg
+      .get(pkg)
+      .sort((x, y) => x.tier - y.tier || y.score - x.score || (x.f < y.f ? -1 : x.f > y.f ? 1 : 0));
+    chosen.push(...ranked.slice(0, MAX));
+    for (const x of ranked.slice(MAX)) leave(`over --max ${MAX} per package`, x.f);
+  }
+  process.stdout.write(
+    ALL
+      ? `mustfail · every changed file with behaviour (--all): ${chosen.length}, most critical first\n`
+      : `mustfail · critical files: ${chosen.length} of ${list.length} changed with behaviour` +
+          `${MAX_SET ? ` (at most ${MAX} per package)` : ''} — the limit is not a file count but a budget of ${BUDGET_MS / 60_000} min per package ` +
+          `(all: --all, your own list: --files)\n`,
+  );
+  for (const x of chosen) process.stdout.write(`  + ${x.f} — ${x.label} · ${x.why}\n`);
+  for (const [why, fs] of left)
+    process.stdout.write(
+      `  − ${why}: ${fs.slice(0, 8).join(', ')}${fs.length > 8 ? ` … ${fs.length - 8} more` : ''}\n`,
+    );
+  process.stdout.write(`  · ${tail}\n`);
+  return chosen.map((x) => x.f);
 }
 
 const files = targets();
 if (!files.length) {
   console.error(
-    `mustfail: no behaviour-bearing changed source files against ${base} — nothing to prove`,
+    `mustfail: no behaviour-bearing changed source files against ${base} — nothing to prove` +
+      (flag('files') || ALL
+        ? ''
+        : ' (the sample above left none; --all judges every changed file, --files names them)'),
   );
   process.exit(2);
 }
+
+// ---- the runner that takes a list of test files --------------------------------------------------------
+// Selection needs a command that runs exactly the picked test files. {tests} in --cmd says where they go, for
+// any runner. Without it vitest and jest are recognised — named in --cmd, or as the body of the package.json
+// script --cmd runs — and rebuilt as `<runner> run <tests>`: the placeholders, positional filters, coverage,
+// watch and changed-only flags are dropped (coverage thresholds fail on any subset), the rest is kept. A chain
+// (`a && b`), an unknown runner or `vitest bench` → null: the legacy modes run --cmd as written.
+function shellSplit(s) {
+  const out = [];
+  let cur = '';
+  let quote = null;
+  let started = false;
+  for (const ch of s) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else cur += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      started = true;
+    } else if (/\s/.test(ch)) {
+      if (cur || started) out.push(cur);
+      cur = '';
+      started = false;
+    } else cur += ch;
+  }
+  if (cur || started) out.push(cur);
+  return out;
+}
+const shq = (t) => (t === '' || /[\s"'`$&|;<>()]/.test(t) ? `"${t.replace(/"/g, '\\"')}"` : t);
+// The runner's own binary only: `node vitest.cjs` (this tool's fixture fakes) is somebody's script, not vitest.
+const isRunner = (t) =>
+  /^(?:vitest|jest)(?:\.cmd)?$/i.test(posix.basename(t.replace(/\\/g, '/'))) ||
+  /(?:^|\/)node_modules\/(?:vitest\/vitest\.mjs|jest\/bin\/jest\.js)$/i.test(t.replace(/\\/g, '/'));
+const RUNNER_ARGS = {
+  vitest: {
+    value: new Set([
+      '-c',
+      '--config',
+      '-r',
+      '--root',
+      '--dir',
+      '--project',
+      '--environment',
+      '--pool',
+      '--reporter',
+      '--outputFile',
+      '-t',
+      '--testNamePattern',
+      '--mode',
+      '--maxWorkers',
+      '--minWorkers',
+      '--testTimeout',
+      '--hookTimeout',
+      '--retry',
+      '--bail',
+    ]),
+    drop: /^(?:--coverage(?:\..*)?|--watch|-w|--run|--changed|--shard|--ui|--open|--related)$/,
+  },
+  jest: {
+    value: new Set([
+      '-c',
+      '--config',
+      '--rootDir',
+      '-t',
+      '--testNamePattern',
+      '-w',
+      '--maxWorkers',
+      '--testTimeout',
+      '--reporters',
+      '--env',
+      '--testEnvironment',
+      '--selectProjects',
+    ]),
+    drop: /^(?:--coverage|--collectCoverage|--watch|--watchAll|--onlyChanged|-o|--lastCommit|--findRelatedTests|--runTestsByPath|--listTests|--changedSince|--testPathPatterns?|--shard)$/,
+  },
+};
+function testRunner() {
+  if (CMD.includes('{tests}'))
+    return { label: CMD, build: (list) => CMD.replaceAll('{tests}', list) };
+  let inv = CMD.trim();
+  let viaScript = false;
+  for (let hop = 0; hop < 3; hop++) {
+    const m =
+      /^(?:npm|pnpm|yarn|bun)\s+(?:run(?:-script)?\s+)?(?!(?:exec|x|dlx)\s)([\w:.@/-]+)(.*)$/s.exec(
+        inv,
+      );
+    if (!m) break;
+    let scripts = {};
+    try {
+      scripts = JSON.parse(readFileSync(join(CWD, 'package.json'), 'utf8')).scripts ?? {};
+    } catch {
+      /* no package.json: nothing to resolve */
+    }
+    const extra = m[2].replace(/^\s+--(?=\s|$)/, '');
+    if (typeof scripts[m[1]] === 'string') {
+      inv = `${scripts[m[1]]}${extra}`;
+      viaScript = true;
+    } else if (/^(vitest|jest)$/.test(m[1])) inv = `npx ${m[1]}${extra}`;
+    else return null;
+  }
+  if (/&&|\|\||;|\|/.test(inv)) return null;
+  const toks = shellSplit(inv);
+  // `node --test a.test.mjs b.test.mjs`: its files are a selection like any other; a fixed list per revert ran
+  // every suite for every file (356 s a revert, measured). Flags stay, paths are replaced.
+  if (
+    /^node(?:\.exe)?$/i.test(posix.basename((toks[0] ?? '').replace(/\\/g, '/'))) &&
+    toks.includes('--test')
+  ) {
+    const value = new Set([
+      '--test-reporter',
+      '--test-reporter-destination',
+      '--test-name-pattern',
+      '--test-skip-pattern',
+      '--test-concurrency',
+      '--test-timeout',
+      '--import',
+      '--require',
+      '-r',
+      '--loader',
+      '--env-file',
+      '--conditions',
+      '-C',
+    ]);
+    const keep = [];
+    for (let i = 1; i < toks.length; i++) {
+      const a = toks[i];
+      if (!a.startsWith('-') || /^--test-shard\b|^--watch\b/.test(a)) continue;
+      keep.push(a);
+      if (!a.includes('=') && value.has(a) && i + 1 < toks.length) keep.push(toks[++i]);
+    }
+    const cmd = [toks[0], ...keep].map(shq).join(' ');
+    // node has no include/exclude config and its TAP names tests, not files: «never mentioned» means nothing here.
+    return { label: `${cmd} <tests>`, build: (list) => `${cmd} ${list}`, runsEveryPath: true };
+  }
+  const at = toks.findIndex(isRunner);
+  if (at < 0) return null;
+  const kind = /jest/i.test(posix.basename(toks[at].replace(/\\/g, '/'))) ? 'jest' : 'vitest';
+  const head = toks.slice(0, at + 1);
+  // A script body's bare `vitest` is found through node_modules/.bin under `npm run`; outside it npx finds it.
+  if (viaScript && at === 0) head.unshift('npx');
+  const args = toks.slice(at + 1);
+  const { value, drop } = RUNNER_ARGS[kind];
+  const keep = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (kind === 'vitest' && i === 0 && a === 'bench') return null;
+    if (kind === 'vitest' && i === 0 && /^(?:run|related|watch|dev)$/.test(a)) continue;
+    if (!a.startsWith('-')) continue; // a filter, a test path, {file}: the selection replaces them all
+    const name = a.split('=')[0];
+    if (drop.test(name)) continue;
+    keep.push(a);
+    if (!a.includes('=') && value.has(name) && i + 1 < args.length) keep.push(args[++i]);
+  }
+  const cmd = [
+    ...head,
+    ...(kind === 'vitest' ? ['run'] : []),
+    ...keep,
+    ...(kind === 'jest' ? ['--runTestsByPath'] : []),
+  ]
+    .map(shq)
+    .join(' ');
+  // A revert run needs ONE failure for its verdict: the runner stops there instead of finishing every picked file.
+  // The baseline runs without it — it must name every test file that is already red.
+  const bail = keep.some((a) => /^--bail\b/.test(a))
+    ? ''
+    : kind === 'vitest'
+      ? ' --bail=1'
+      : ' --bail';
+  return {
+    label: `${cmd} <tests>`,
+    build: (list, stopAtFirst = false) => `${cmd}${stopAtFirst ? bail : ''} ${list}`,
+  };
+}
+const RUNNER = testRunner();
+const SELECT = Boolean(RUNNER) && !has('no-select') && !has('no-graph') && !has('no-sibling');
 
 // ---- verdict memo (verify-ledger design §3, row «mustfail»: S1 per-file verdict memo) ---------------
 // The ledger replays a check at an identical tree, but mustfail MUTATES the tree, so no run of it ever
@@ -877,18 +1294,30 @@ function treeKey() {
 }
 const MEMO = join(STATE, 'memo');
 const TREE = QUICK || has('fresh') ? null : treeKey();
+// Selection changes what a verdict is about (the picked tests, not the whole --cmd): its own key; legacy keys stay.
 const memoFile = (f) =>
-  join(MEMO, `${sha(Buffer.from(JSON.stringify([TREE, base, CMD, f])))}.json`);
+  join(
+    MEMO,
+    `${sha(Buffer.from(JSON.stringify(SELECT ? [TREE, base, CMD, f, 'select', GRAPH_CAP] : [TREE, base, CMD, f])))}.json`,
+  );
+// A RED is a fact about (tree, base, file) whatever command proved it — some test of this tree notices the
+// revert: proven and unchanged is never re-run (a changed --cmd string re-ran a proven file).
+// GREEN / NO-BASE stay keyed by the command: a different selection may catch what this one missed.
+const redFile = (f) =>
+  join(MEMO, `${sha(Buffer.from(JSON.stringify([TREE, base, f, 'red-any-cmd'])))}.json`);
 const MEMOABLE = new Set(['RED', 'RED·symbol', 'GREEN', 'NO-BASE']);
 function remember(f, verdict, note) {
   if (!TREE || !MEMOABLE.has(verdict)) return;
   try {
     mkdirSync(MEMO, { recursive: true });
-    writeFileSync(
-      memoFile(f),
-      // Local wall-clock time: the stamp is printed to a human, and UTC read as local was hours off.
-      JSON.stringify({ verdict, note, at: new Date().toLocaleString('sv-SE').slice(0, 16) }),
-    );
+    // Local wall-clock time: the stamp is printed to a human, and UTC read as local was hours off.
+    const rec = JSON.stringify({
+      verdict,
+      note,
+      at: new Date().toLocaleString('sv-SE').slice(0, 16),
+    });
+    writeFileSync(memoFile(f), rec);
+    if (verdict === 'RED') writeFileSync(redFile(f), rec);
   } catch {
     /* a memo that cannot be written only costs the next run time */
   }
@@ -896,12 +1325,15 @@ function remember(f, verdict, note) {
 const rows = [];
 if (TREE) {
   for (const f of [...files]) {
+    const hit = [memoFile(f), redFile(f)].find((p) => existsSync(p));
+    if (!hit) continue; // not judged at this tree yet
     try {
-      const m = JSON.parse(readFileSync(memoFile(f), 'utf8'));
-      rows.push([f, m.verdict, `${m.note} (verdict from ${m.at}, same tree)`]);
+      const m = JSON.parse(readFileSync(hit, 'utf8'));
+      const other = hit !== memoFile(f) ? ', another command' : '';
+      rows.push([f, m.verdict, `${m.note} (verdict from ${m.at}, same tree${other})`]);
       files.splice(files.indexOf(f), 1);
     } catch {
-      /* not judged at this tree yet */
+      /* an unreadable memo only costs a run */
     }
   }
   if (rows.length)
@@ -954,8 +1386,9 @@ function stopNoTests(out) {
   console.error(
     `\nmustfail: the check ran NO test at all and exited 0 — a green run without a test proves nothing, and every revert would read «NOT covered». ` +
       'With {file} that means it names the source file, not its test (a runner config with passWithNoTests turns «no test files» into exit 0). ' +
-      'Use --cmd "npx vitest related {file} --run" (jest: "npx jest --findRelatedTests {file}"): a file with its own sibling test (<name>.test.<ext>) ' +
-      `is judged by that test first, the import graph walks only the rest.\n${tail}`,
+      'Use --cmd "npx vitest run" or the package test script (vitest/jest: each file runs only its @covers / sibling / directory tests), ' +
+      '"<runner> {tests}" for any other runner; the legacy form "npx vitest related {file} --run" walks the import graph per file.\n' +
+      `${tail}`,
   );
   process.exit(2);
 }
@@ -996,7 +1429,43 @@ const run = (path = null, command = null) => {
   spent += Date.now() - started;
   return r;
 };
-if (TEMPLATED && QUICK) {
+// ---- known-red baseline ------------------------------------------------------------------------
+// A check red before any revert (an environment-bound test: no remote, no neighbour worktree) used to stop
+// the run or make the file NO-BASE, which pushed the caller into a hand-made skip wrapper that bypassed {tests}
+// selection (7 suites per revert, 356 s each, measured). When the runner names its failing tests, that set IS
+// the baseline: a revert is RED only when it fails a test outside it, or dies naming none.
+const FAIL_LINE = [
+  /^\s*not ok \d+ - (.+?)(?:\s+#\s.*)?$/, // TAP: node --test, tape
+  /^\s*--- FAIL: (\S+)/, // go test -v
+  /^FAILED (\S+)/, // pytest -rf
+  /^\s*FAIL\s+(\S+\s+>\s+.+?)\s*$/, // vitest / jest summary: FAIL file > suite > name
+  /^\s*[×✕✗]\s+(.+?)(?:\s+\d+\s?ms)?\s*$/, // vitest / jest per test
+  /^\s*✖\s+(.+?)(?:\s+\(\d+(?:\.\d+)?m?s\))?\s*$/, // node --test spec reporter (a TTY default)
+];
+/** Names of the failing tests a run printed; null when it printed none (crash, load error, unknown runner). */
+function failedTests(out) {
+  const ids = new Set();
+  for (const line of String(out ?? '').split('\n'))
+    for (const re of FAIL_LINE) {
+      const m = re.exec(line);
+      if (m) {
+        ids.add(m[1].trim());
+        break;
+      }
+    }
+  return ids.size ? ids : null;
+}
+const outOf = (r) => `${r.stdout ?? r.out ?? ''}\n${r.stderr ?? ''}`;
+/** Red against a known-red baseline: a failing test outside it, or a red run that names none. */
+function redVs(r, known) {
+  if (r.status === 0) return false;
+  if (!known) return true;
+  const ids = failedTests(outOf(r));
+  return !ids || [...ids].some((id) => !known.has(id));
+}
+const knownLine = (known) =>
+  `${known.size} test(s): ${[...known].slice(0, 3).join(' · ').slice(0, 160)}${known.size > 3 ? ' …' : ''}`;
+if (TEMPLATED && QUICK && !SELECT) {
   console.error(
     'mustfail: --quick reverts every file at once — it cannot be combined with a per-file {file} command',
   );
@@ -1006,16 +1475,25 @@ if (TEMPLATED && QUICK) {
 // ---- baseline: the check must be green before a mutation means anything -------------------------
 process.stdout.write(`mustfail · base ${base} · ${files.length} file(s) · ${CMD}\n`);
 // A templated command has no single baseline: each file is measured against its own narrowed run.
-const baseline = TEMPLATED || !files.length ? { status: 0 } : run();
+// Selection runs its own baseline: the union of the picked tests, never the whole --cmd.
+const baseline = SELECT || TEMPLATED || !files.length ? { status: 0 } : run();
 const baselineMs = spent;
+/** Tests already failing in the whole-check baseline; null = baseline green. */
+let KNOWN = null;
 if (baseline.status !== 0) {
-  const tail = (baseline.stdout || '').split('\n').slice(-12).join('\n');
-  console.error(
-    `\nmustfail: the check is ALREADY RED before any mutation — fix it first, a red check proves nothing.\n${tail}`,
+  KNOWN = failedTests(outOf(baseline));
+  if (!KNOWN) {
+    const tail = (baseline.stdout || '').split('\n').slice(-12).join('\n');
+    console.error(
+      `\nmustfail: the check is ALREADY RED before any mutation and names no failing test — fix it first, a red check proves nothing.\n${tail}`,
+    );
+    process.exit(2);
+  }
+  process.stdout.write(
+    `· the baseline is red before any revert — ${knownLine(KNOWN)}; a revert is RED only on a new failure\n`,
   );
-  process.exit(2);
 }
-if (!TEMPLATED && files.length && noTests(baseline)) stopNoTests(baseline.stdout);
+if (!SELECT && !TEMPLATED && files.length && noTests(baseline)) stopNoTests(baseline.stdout);
 
 // ---- mutation ------------------------------------------------------------------------------------
 /** @type {Map<string, {full: string, before: Buffer|null, backup: string}>} */
@@ -1046,13 +1524,17 @@ function putFileBack(path) {
     );
     return true;
   }
-  e.wrote = undefined;
+  // Cleared only after a verified write: a write that throws keeps the record, so restore() in the finally and the
+  // next start's settle() still know the file holds base bytes.
   if (e.before === null) {
     if (existsSync(e.full)) unlinkSync(e.full);
+    e.wrote = undefined;
     return true;
   }
   writeFileSync(e.full, e.before);
-  return readFileSync(e.full).equals(e.before);
+  const ok = readFileSync(e.full).equals(e.before);
+  if (ok) e.wrote = undefined;
+  return ok;
 }
 
 function restore() {
@@ -1099,7 +1581,11 @@ let exitCode = 0;
 
 // Vitest narrowed by `related {file}`: one graph run instead of a spawn per file (see graphMode).
 const GRAPH =
-  TEMPLATED && /\bvitest\b/.test(CMD) && /\brelated\s+\{file\}/.test(CMD) && !has('no-graph');
+  !SELECT &&
+  TEMPLATED &&
+  /\bvitest\b/.test(CMD) &&
+  /\brelated\s+\{file\}/.test(CMD) &&
+  !has('no-graph');
 
 /**
  * Graph mode (measured: 118–177 s per `vitest related {file}`, 22 files ≈ 45 min).
@@ -1176,7 +1662,7 @@ async function graphMode() {
   const direct = has('no-sibling')
     ? []
     : files.map((f) => [f, siblingTest(f)]).filter(([, t]) => t);
-  if (direct.length && direct.length <= MAX) {
+  if (direct.length && direct.length <= (MAX_SET ? MAX : 6)) {
     // Relative like {file}: an absolute path from git's long root misses a runner started under an 8.3 short cwd.
     const viaTests = (list) =>
       CMD.replace(
@@ -1324,9 +1810,626 @@ async function graphMode() {
     );
   }
 }
+
+// ---- test selection: each reverted file runs only the tests that cover it ----------------------------
+// Order, cheapest exact first: `@covers` claims (a project coverage contract) + the sibling test → the tests
+// of the file's own directory (those importing it first) → the static import graph, nearest by path. Never
+// the whole suite: a file without any test is GREEN «not covered» without a run.
+const SPEC = /(?:^|\/)(?:[^/]+[._-](?:test|spec)\.[cm]?[jt]sx?|test_[^/]+\.py|[^/]+_test\.py)$/i;
+const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+let repoSet = null;
+/** Every file of the tree (tracked + untracked, not ignored, not deleted), root-relative. */
+function repoFiles() {
+  if (repoSet) return repoSet;
+  const z = (args) => (git(args, { cwd: root }).stdout || '').split('\0').filter(Boolean);
+  const gone = new Set(z(['ls-files', '-z', '--deleted']));
+  repoSet = new Set(
+    z(['ls-files', '-z', '--cached', '--others', '--exclude-standard']).filter(
+      (f) => !gone.has(f) && !/(^|\/)node_modules\//.test(f),
+    ),
+  );
+  return repoSet;
+}
+const testsByPkg = new Map();
+function testsOf(pkg) {
+  if (!testsByPkg.has(pkg)) {
+    const pre = pkg ? `${pkg}/` : '';
+    testsByPkg.set(
+      pkg,
+      [...repoFiles()].filter((f) => f.startsWith(pre) && SPEC.test(f) && packageOf(f) === pkg),
+    );
+  }
+  return testsByPkg.get(pkg);
+}
+
+// Same reading as a project coverage checker (parseCovers / coversBase), not imported: a claim is a
+// path from <pkg>/src, or from the package root when it starts with src/, plugins/ or scripts/; a directory
+// claim covers the files directly in it, never the subtree.
+const COVERS_ROOTS = ['src', 'plugins', 'scripts'];
+const coversByPkg = new Map();
+function claimTargets(pkg, claim) {
+  const at = (...parts) => posix.normalize(parts.filter(Boolean).join('/'));
+  return [
+    ...new Set([
+      at(pkg, COVERS_ROOTS.includes(claim.split('/')[0]) ? '' : 'src', claim),
+      at(pkg, claim),
+      at(claim),
+    ]),
+  ];
+}
+function coversIndex(pkg) {
+  if (coversByPkg.has(pkg)) return coversByPkg.get(pkg);
+  const idx = new Map(); // claimed root-relative file or directory → test files
+  for (const t of testsOf(pkg)) {
+    let src;
+    try {
+      src = readFileSync(join(root, t), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const m of src.matchAll(/@covers\s+([^\s*]+)/g)) {
+      const claim = m[1]
+        .replace(/^[`'"]+|[`'",;.]+$/g, '')
+        .replace(/^\.\//, '')
+        .replace(/\/+$/, '');
+      if (!claim) continue;
+      for (const target of claimTargets(pkg, claim)) {
+        if (!idx.has(target)) idx.set(target, new Set());
+        idx.get(target).add(t);
+      }
+    }
+  }
+  coversByPkg.set(pkg, idx);
+  return idx;
+}
+function coveringTests(f) {
+  const idx = coversIndex(packageOf(f));
+  return [...new Set([...(idx.get(f) ?? []), ...(idx.get(posix.dirname(f)) ?? [])])].sort(cmpStr);
+}
+function pySibling(f) {
+  const m = /^(.*?)([^/]+)\.py$/.exec(f);
+  if (!m || SPEC.test(f)) return null;
+  const [, dir, name] = m;
+  const files = repoFiles();
+  for (const c of [
+    `${dir}test_${name}.py`,
+    `${dir}${name}_test.py`,
+    `${dir}tests/test_${name}.py`,
+    `${dir}../tests/test_${name}.py`,
+  ])
+    if (files.has(posix.normalize(c))) return posix.normalize(c);
+  return null;
+}
+const ownDirs = (f) => {
+  const d = posix.dirname(f);
+  return new Set([d, `${d}/__tests__`, `${d}/tests`, `${d}/test`]);
+};
+
+/** A JSON-with-comments file (tsconfig): comments stripped outside strings, trailing commas dropped. */
+function readJsonc(p) {
+  let s;
+  try {
+    s = readFileSync(p, 'utf8');
+  } catch {
+    return null;
+  }
+  let out = '';
+  for (let i = 0, q = false; i < s.length; i++) {
+    const c = s[i];
+    if (q) {
+      out += c;
+      if (c === '\\') out += s[++i] ?? '';
+      else if (c === '"') q = false;
+    } else if (c === '"') {
+      q = true;
+      out += c;
+    } else if (c === '/' && s[i + 1] === '/') {
+      while (i < s.length && s[i] !== '\n') i++;
+      out += '\n';
+    } else if (c === '/' && s[i + 1] === '*') {
+      const end = s.indexOf('*/', i + 2);
+      if (end < 0) break;
+      i = end + 1;
+    } else out += c;
+  }
+  try {
+    return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+  } catch {
+    return null;
+  }
+}
+/** Import aliases of a package: tsconfig `paths`, then vite/vitest `resolve.alias` written as resolve(__dirname, …). */
+function aliasesOf(pkg) {
+  const out = [];
+  const add = (key, target) => {
+    const k = key.replace(/\/?\*$/, '').replace(/\/$/, '');
+    if (k && !out.some((a) => a.key === k))
+      out.push({ key: k, target: posix.normalize(target.replace(/\/?\*$/, '')) });
+  };
+  const dir = pkg || '.';
+  for (const name of [
+    'tsconfig.json',
+    'tsconfig.app.json',
+    'tsconfig.base.json',
+    'jsconfig.json',
+  ]) {
+    const co = readJsonc(join(root, dir, name))?.compilerOptions;
+    if (!co?.paths) continue;
+    for (const [k, v] of Object.entries(co.paths))
+      if (Array.isArray(v) && typeof v[0] === 'string')
+        add(k, posix.join(dir, co.baseUrl ?? '.', v[0]));
+  }
+  for (const name of ['vite.config', 'vitest.config'].flatMap((n) =>
+    ['ts', 'mts', 'js', 'mjs'].map((e) => `${n}.${e}`),
+  )) {
+    let s;
+    try {
+      s = readFileSync(join(root, dir, name), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const m of s.matchAll(
+      /['"]([^'"\s]+)['"]\s*:\s*(?:path\.)?resolve\(\s*__dirname\s*,\s*['"]([^'"]+)['"]\s*\)/g,
+    ))
+      add(m[1], posix.join(dir, m[2]));
+    for (const m of s.matchAll(
+      /['"]([^'"\s]+)['"]\s*:\s*fileURLToPath\(\s*new URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)\s*\)/g,
+    ))
+      add(m[1], posix.join(dir, m[2]));
+  }
+  return out.sort((a, b) => b.key.length - a.key.length);
+}
+const RESOLVE_EXT = [
+  '.ts',
+  '.tsx',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+  '.mts',
+  '.cts',
+  '.vue',
+  '.svelte',
+];
+function resolveSpec(from, spec, aliases) {
+  let p = null;
+  if (/^\.\.?(\/|$)/.test(spec)) p = posix.join(posix.dirname(from), spec);
+  else {
+    const a = aliases.find((x) => spec === x.key || spec.startsWith(`${x.key}/`));
+    if (a) p = posix.join(a.target, spec.slice(a.key.length));
+  }
+  if (!p) return null; // a bare package: outside the tree
+  p = posix.normalize(p.replace(/\?.*$/, ''));
+  const files = repoFiles();
+  const cands = [p, ...RESOLVE_EXT.map((e) => p + e), ...RESOLVE_EXT.map((e) => `${p}/index${e}`)];
+  const js = /\.[cm]?jsx?$/.exec(p);
+  if (js) cands.push(...['.ts', '.tsx', '.mts', '.cts'].map((e) => p.slice(0, -js[0].length) + e)); // ESM `./x.js` → x.ts
+  return cands.find((c) => files.has(c)) ?? null;
+}
+// Static imports, re-exports, dynamic import() and require(); `import type` is erased before a run, vi.mock is not an edge.
+const IMPORT_RE =
+  /\b(?:import|export)\s+(type\s+)?(?:[\w$*{}\s,]*?\s*from\s*)?['"]([^'"\n]+)['"]|\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)|\brequire\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g;
+const revByPkg = new Map();
+/** file → the files that import it, inside one package. */
+function importers(pkg) {
+  if (revByPkg.has(pkg)) return revByPkg.get(pkg);
+  const rev = new Map();
+  const aliases = aliasesOf(pkg);
+  const pre = pkg ? `${pkg}/` : '';
+  for (const file of repoFiles()) {
+    if (
+      !file.startsWith(pre) ||
+      !/\.(?:[cm]?[jt]sx?|vue|svelte)$/i.test(file) ||
+      /\.d\.ts$|(^|\/)(dist|build|coverage)\//.test(file)
+    )
+      continue;
+    if (packageOf(file) !== pkg) continue;
+    let src;
+    try {
+      src = readFileSync(join(root, file), 'utf8');
+    } catch {
+      continue;
+    }
+    for (const m of src.matchAll(IMPORT_RE)) {
+      if (m[1]) continue;
+      const to = resolveSpec(file, m[2] ?? m[3] ?? m[4], aliases);
+      if (!to || to === file) continue;
+      if (!rev.has(to)) rev.set(to, new Set());
+      rev.get(to).add(file);
+    }
+  }
+  revByPkg.set(pkg, rev);
+  return rev;
+}
+const pathDistance = (a, b) => {
+  const x = posix.dirname(a).split('/');
+  const y = posix.dirname(b).split('/');
+  let i = 0;
+  while (i < x.length && i < y.length && x[i] === y[i]) i++;
+  return x.length - i + (y.length - i);
+};
+/** Test files that reach `f` through imports (never walking through another test), nearest by path first. */
+function graphTests(f) {
+  const rev = importers(packageOf(f));
+  const depth = new Map([[f, 0]]);
+  const found = [];
+  for (const queue = [f]; queue.length;) {
+    const cur = queue.shift();
+    for (const imp of rev.get(cur) ?? []) {
+      if (depth.has(imp)) continue;
+      depth.set(imp, depth.get(cur) + 1);
+      if (SPEC.test(imp)) found.push(imp);
+      else queue.push(imp);
+    }
+  }
+  return found.sort(
+    (a, b) =>
+      pathDistance(f, a) - pathDistance(f, b) || depth.get(a) - depth.get(b) || cmpStr(a, b),
+  );
+}
+/** { tests, how, capped } — the tests a revert of `f` is judged by. */
+function selectTests(f) {
+  const inCwd = (t) => !PREFIX || t.startsWith(PREFIX);
+  const covers = coveringTests(f).filter(inCwd);
+  const sib = [siblingTest(f), pySibling(f)].filter((t) => t && inCwd(t) && repoFiles().has(t));
+  const exact = [...new Set([...covers, ...sib])];
+  if (exact.length)
+    return {
+      tests: exact,
+      how: covers.length
+        ? `@covers ${covers.length}${sib.some((t) => !covers.includes(t)) ? ' + own test' : ''}`
+        : 'own test',
+    };
+  if (GRAPH_CAP <= 0)
+    return {
+      tests: [],
+      how: 'no @covers, no own test (--graph-cap 0: directory and graph not searched)',
+    };
+  // Own directory first, but only its tests that import the file: a neighbour test that never loads it cannot go
+  // red on its revert. The import graph next; a directory test the graph does not connect is the blind last resort
+  // (a dynamic import, a glob) and is labelled so.
+  const own = ownDirs(f);
+  const reach = graphTests(f).filter(inCwd);
+  const dir = testsOf(packageOf(f))
+    .filter((t) => own.has(posix.dirname(t)) && inCwd(t))
+    .sort(cmpStr);
+  const ownReach = dir.filter((t) => reach.includes(t));
+  if (ownReach.length) {
+    const take = ownReach.slice(0, GRAPH_CAP);
+    const cut = ownReach.length > take.length;
+    return {
+      tests: take,
+      how: `own directory tests: ${take.length}${cut ? ` of ${ownReach.length}` : ''}`,
+      capped: cut,
+    };
+  }
+  if (reach.length) {
+    const take = reach.slice(0, GRAPH_CAP);
+    const cut = reach.length > take.length;
+    return {
+      tests: take,
+      how: `import graph: ${take.length}${cut ? ` nearest by path of ${reach.length}` : ''}`,
+      capped: cut,
+    };
+  }
+  if (dir.length) {
+    const take = dir.slice(0, GRAPH_CAP);
+    return {
+      tests: take,
+      how: `own directory tests: ${take.length}${dir.length > take.length ? ` of ${dir.length}` : ''}, none visibly imports the file`,
+    };
+  }
+  return { tests: [], how: 'no tests' };
+}
+
+/**
+ * Cost of one run of picked tests: t ≈ fixed + perFile × (test files), least squares over every run measured in
+ * this package (the baseline is the first point). One distinct size only → half fixed, half per test file: the
+ * runner's start-up dominates small runs (measured: 13–30 s for one own-directory run, most of it start-up).
+ */
+function costModel() {
+  const pts = [];
+  return {
+    add(n, ms) {
+      if (n > 0 && ms > 0) pts.push([n, ms]);
+    },
+    est(n) {
+      if (!pts.length) return null;
+      const k = pts.length;
+      const mx = pts.reduce((s, [x]) => s + x, 0) / k;
+      const my = pts.reduce((s, [, y]) => s + y, 0) / k;
+      const sxx = pts.reduce((s, [x]) => s + (x - mx) ** 2, 0);
+      if (!sxx) return my / 2 + (my / 2) * (n / mx);
+      let per = Math.max(0, pts.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0) / sxx);
+      let fixed = my - per * mx;
+      if (fixed < 0) [fixed, per] = [0, my / mx];
+      return fixed + per * n;
+    },
+  };
+}
+
+async function selectMode() {
+  process.stdout.write(
+    `· test selection: @covers + own test → directory tests → import graph (up to ${GRAPH_CAP} nearest); ` +
+      `run: ${RUNNER.label}; budget ${BUDGET_MS / 60_000} min per package\n`,
+  );
+  const plan = [];
+  for (const f of files) {
+    if (!existsSync(join(root, f))) {
+      rows.push([f, 'SKIP', 'deleted in the change — a revert only brings the file back']);
+      continue;
+    }
+    if (atBase(f) === null) {
+      rows.push([f, 'SKIP', 'new file — reverting it breaks the build, not a coverage signal']);
+      continue;
+    }
+    const s = selectTests(f);
+    process.stdout.write(`  ${f} ← ${s.how}${s.tests.length ? `: ${shortList(s.tests)}` : ''}\n`);
+    if (s.tests.length) plan.push({ f, pkg: packageOf(f), ...s });
+    // The import graph is built for JS/TS only: elsewhere «no test found» is a gap of the search, not a verdict.
+    else if (/\.(?:[cm]?[jt]sx?|vue|svelte)$/i.test(f))
+      rows.push([
+        f,
+        'GREEN',
+        'no tests: no @covers, no own test, no test in the directory, empty import graph — NOT covered, nothing ran',
+      ]);
+    else
+      rows.push([
+        f,
+        'NO-BASE',
+        `no test found: no @covers, no own test, no test in the directory; no import graph is built for .${extOf(f)} — name the tests in --cmd`,
+      ]);
+  }
+  const pkgs = [...new Set(plan.map((p) => p.pkg))];
+  for (const pkg of pkgs)
+    await judgePackage(
+      pkg,
+      plan.filter((p) => p.pkg === pkg),
+      pkgs.length > 1,
+    );
+}
+
+const relCwd = (t) => posix.relative(PREFIX || '.', t);
+const shortList = (tests) =>
+  `${tests.slice(0, 4).map(relCwd).join(', ')}${tests.length > 4 ? ` … ${tests.length - 4} more` : ''}`;
+const secs = (ms) => (ms < 10_000 ? Math.round(ms / 100) / 10 : Math.round(ms / 1000));
+
+/** One package: union baseline → cost estimate → per-file reverts in rank order while the estimate fits the budget. */
+async function judgePackage(pkg, todo, named) {
+  const started = Date.now();
+  const left = () => BUDGET_MS - (Date.now() - started);
+  const listOf = (tests) => tests.map((t) => `"${relCwd(t)}"`).join(' ');
+  const env = unlockedLedgerEnv();
+  const model = costModel();
+  const budgetCut = (p, why) =>
+    rows.push([
+      p.f,
+      'UNCHECKED',
+      `unchecked — budget ${BUDGET_MS / 60_000} min per package: ${why}; re-run — proven files are not repeated`,
+    ]);
+  const union = [...new Set(todo.flatMap((p) => p.tests))].sort(cmpStr);
+  if (named)
+    process.stdout.write(
+      `· package ${pkg || '(root)'}: ${todo.length} file(s), ${union.length} test file(s)\n`,
+    );
+
+  /** Tests failing before any revert, named by the runner; null = green baseline or names unknown. */
+  let known = null;
+
+  // Baseline: ONE run of the union of the picked tests, never the whole suite. Memoised per (tree, base, runner):
+  // a budget-cut run is resumed, and a resume that re-ran a 342 s baseline spent the budget on it again and cut
+  // the same file forever. Any stored baseline whose tests cover this union answers it.
+  const baseMemo = TREE
+    ? join(MEMO, `${sha(Buffer.from(JSON.stringify([TREE, base, RUNNER.label, 'baseline'])))}.json`)
+    : null;
+  let stored = [];
+  try {
+    if (baseMemo) stored = JSON.parse(readFileSync(baseMemo, 'utf8'));
+  } catch {
+    /* none yet */
+  }
+  const reuse = stored.find((s) => union.every((t) => s.tests.includes(t)));
+  if (!TRUST_GREEN) {
+    const b = reuse
+      ? { ...reuse, timedOut: false }
+      : await execTree(RUNNER.build(listOf(union)), Math.max(left(), 60_000), env);
+    if (reuse)
+      process.stdout.write(
+        `· baseline from the memo: same tree, its tests cover these ${union.length} (${secs(reuse.ms)} s not spent)\n`,
+      );
+    else spent += b.ms;
+    if (b.timedOut)
+      return todo.forEach((p) =>
+        budgetCut(p, `the baseline over ${union.length} test files did not fit`),
+      );
+    if (!reuse && baseMemo) {
+      // Only what the verdicts read: failing-test lines and the lines naming a picked test file.
+      const keep = b.out
+        .split('\n')
+        .filter(
+          (l) => FAIL_LINE.some((re) => re.test(l)) || union.some((t) => l.includes(relCwd(t))),
+        )
+        .join('\n');
+      try {
+        mkdirSync(MEMO, { recursive: true });
+        writeFileSync(
+          baseMemo,
+          JSON.stringify(
+            [...stored, { tests: union, status: b.status, out: keep, ms: b.ms }].slice(-8),
+          ),
+        );
+      } catch {
+        /* a lost memo only costs the next run its baseline */
+      }
+    }
+    if (NO_TESTS.test(b.out)) {
+      console.error(
+        `\nmustfail: the runner ran none of the ${union.length} picked test file(s) — paths are passed relative to --cwd; check the runner's root/include.\n` +
+          `${b.out.split('\n').filter(Boolean).slice(-8).join('\n')}`,
+      );
+      process.exit(2);
+    }
+    model.add(union.length, b.ms);
+    // A picked test the runner never mentions was filtered out by its config (include/exclude): it proves nothing.
+    const mentioned = (t) =>
+      b.out.includes(relCwd(t)) || b.out.includes(relCwd(t).replace(/\//g, '\\'));
+    const silent =
+      !RUNNER.runsEveryPath && union.some(mentioned) ? union.filter((t) => !mentioned(t)) : [];
+    const lines = b.out.split('\n');
+    // Named failing tests → they are the baseline and every picked file stays in (the red one is often the very
+    // file that covers the change); unnamed → the old file-level exclusion.
+    known = b.status === 0 ? null : failedTests(b.out);
+    const failing =
+      b.status === 0 || known
+        ? []
+        : union.filter((t) =>
+            lines.some((l) => l.includes(relCwd(t)) && /\bFAIL\b|×|✕|❯|\bfailed\b/.test(l)),
+          );
+    if (known)
+      process.stdout.write(
+        `· the baseline is red before any revert — ${knownLine(known)}; RED only on a new failure\n`,
+      );
+    if (b.status !== 0 && !known && !failing.length) {
+      console.error(
+        `\nmustfail: the picked tests are ALREADY RED before any revert, and no failing test file could be named — fix it first.\n${lines.slice(-15).join('\n')}`,
+      );
+      process.exit(2);
+    }
+    process.stdout.write(
+      `· baseline: ${union.length} test file(s) — ${failing.length ? `red, failing before the revert: ${shortList(failing)} (excluded)` : 'green'}` +
+        `${silent.length ? ` · the runner did not run: ${shortList(silent)} (excluded)` : ''} (${secs(b.ms)} s)\n`,
+    );
+    for (const p of todo) {
+      const why = [
+        ...(p.tests.some((t) => failing.includes(t)) ? ['failing before the revert'] : []),
+        ...(p.tests.some((t) => silent.includes(t)) ? ['the runner does not run them'] : []),
+      ];
+      p.tests = p.tests.filter((t) => !failing.includes(t) && !silent.includes(t));
+      if (!p.tests.length)
+        rows.push([p.f, 'NO-BASE', `the picked tests (${p.how}) are unusable: ${why.join(', ')}`]);
+    }
+  }
+  const live = todo.filter((p) => p.tests.length);
+  if (!live.length) return;
+
+  // The forecast, before any revert: which files the budget is expected to hold, in rank order.
+  if (model.est(1) !== null) {
+    let room = left();
+    let total = 0;
+    const out = [];
+    for (const p of live) {
+      const e = model.est(p.tests.length);
+      if (e <= room) {
+        room -= e;
+        total += e;
+      } else out.push(p.f);
+    }
+    process.stdout.write(
+      `· estimate: ≈${secs(total)} s for ${live.length - out.length} file(s) (a run with 1 test file ≈${secs(model.est(1))} s), ` +
+        `package budget left ≈${secs(left())} s${out.length ? ` · will not fit by the estimate: ${out.join(', ')}` : ''}\n`,
+    );
+  }
+
+  if (QUICK) {
+    // One run with every file reverted: GREEN is already the verdict for the whole change.
+    for (const p of live) save(p.f);
+    for (const p of live) revert(p.f);
+    let r;
+    // Every file is put back before anything is thrown (a throw inside `finally` would also swallow
+    // the run's own error); the outer restore() still settles whatever stayed reverted.
+    const stuck = [];
+    try {
+      r = await execTree(
+        RUNNER.build(listOf([...new Set(live.flatMap((p) => p.tests))]), true),
+        Number(flag('timeout')) || Math.max(left(), 60_000),
+        env,
+      );
+    } finally {
+      for (const p of live) if (!putFileBack(p.f)) stuck.push(p.f);
+    }
+    if (stuck.length) throw new Error(`could not write ${stuck.join(', ')} back`);
+    spent += r.ms;
+    rows.push([
+      `all ${live.length} files at once`,
+      r.timedOut ? 'UNCHECKED' : redVs(r, known) ? 'RED' : 'GREEN',
+      'picked tests only',
+    ]);
+    return;
+  }
+
+  const t0 = Date.now();
+  for (const [i, p] of live.entries()) {
+    // Decided BEFORE the run with the model refined by every run so far — a run is never started to be killed.
+    // A resume reuses the baseline (memo above), so it spends the budget on reverts only and converges; a single
+    // revert dearer than the WHOLE budget never would — the cut names the --budget that fits it.
+    const e = model.est(p.tests.length);
+    const tag = `[${i + 1}/${live.length}] ${p.f}`;
+    if (e !== null && e > BUDGET_MS) {
+      budgetCut(
+        p,
+        `one revert ≈${secs(e)} s costs more than the whole budget — a rerun will not converge, needs --budget ${Math.ceil(e / 60_000) + 1}`,
+      );
+      process.stdout.write(`${tag} → UNCHECKED (revert dearer than the budget)\n`);
+      continue;
+    }
+    if (e === null ? left() < 30_000 : e > left()) {
+      budgetCut(
+        p,
+        e === null
+          ? 'under 30 s left'
+          : `estimate ≈${secs(e)} s, left ≈${secs(Math.max(left(), 0))} s`,
+      );
+      process.stdout.write(`${tag} → UNCHECKED (budget)\n`);
+      continue;
+    }
+    const s0 = Date.now();
+    save(p.f);
+    revert(p.f);
+    let r;
+    let back;
+    try {
+      // Bail stops at the FIRST failure — with a known-red baseline that may be a known one, hiding the new.
+      r = await execTree(
+        RUNNER.build(listOf(p.tests), !known),
+        Number(flag('timeout')) || Math.max(left(), 2 * (e ?? 0), 60_000),
+        env,
+      );
+    } finally {
+      back = putFileBack(p.f);
+    }
+    if (!back) throw new Error(`could not write ${p.f} back`);
+    spent += r.ms;
+    if (!r.timedOut) model.add(p.tests.length, r.ms);
+    const by = `${p.how}${p.capped ? ', the other graph tests were not run' : ''}`;
+    if (r.timedOut) rows.push([p.f, 'UNCHECKED', `run cut by time (${by})`]);
+    else if (redVs(r, known)) {
+      const kind = SYMBOL_RED.test(r.out) ? 'RED·symbol' : 'RED';
+      rows.push([
+        p.f,
+        kind,
+        kind === 'RED'
+          ? `the revert breaks its own tests (${by}) — covered`
+          : `the import of a vanished symbol failed, not a behaviour check (${by})`,
+      ]);
+    } else
+      rows.push([
+        p.f,
+        'GREEN',
+        `the revert does not break the picked tests${r.status !== 0 ? ' beyond those failing before it' : ''} (${by}) — NOT covered by them`,
+      ]);
+    const done = i + 1;
+    const eta = Math.round((((Date.now() - t0) / done) * (live.length - done)) / 1000);
+    process.stdout.write(
+      `${tag} → ${rows.at(-1)[1]} (${secs(Date.now() - s0)} s${live.length > done ? `, ≈${eta} s left` : ''})\n`,
+    );
+  }
+}
+
 try {
   if (!files.length) {
     /* every verdict came from the memo */
+  } else if (SELECT) {
+    await selectMode();
   } else if (GRAPH) {
     await graphMode();
   } else if (QUICK) {
@@ -1337,7 +2440,7 @@ try {
     const skipped = kinds.filter(([, k]) => k === 'new').map(([f]) => f);
     const r = run();
     restore();
-    const verdict = r.status !== 0 ? 'RED' : 'GREEN';
+    const verdict = redVs(r, KNOWN) ? 'RED' : 'GREEN';
     rows.push([
       `all ${files.length} files at once`,
       verdict,
@@ -1345,7 +2448,7 @@ try {
     ]);
     if (verdict === 'GREEN') exitCode = 1;
   } else {
-    const list = files.slice(0, MAX);
+    const list = files; // already cut: the sample per package, --files by an explicit --max (overflow)
     // The cheap question first: with everything reverted, does the check notice at all? GREEN is the
     // verdict for the whole change and the per-file runs would only repeat it, one suite-length each.
     let nothingCovered = false;
@@ -1354,7 +2457,7 @@ try {
       for (const f of list) revert(f);
       const all = run();
       for (const f of list) putFileBack(f);
-      if (all.status === 0) {
+      if (!redVs(all, KNOWN)) {
         nothingCovered = true;
         exitCode = 1;
         for (const f of list)
@@ -1377,6 +2480,17 @@ try {
     todo.forEach((path, i) => {
       const before = rows.length;
       const t0 = Date.now();
+      // The budget holds here too (no file cap): an un-narrowed revert costs one whole check run.
+      const per = i ? (Date.now() - startedAt) / i : TEMPLATED ? 0 : baselineMs;
+      if (Date.now() - startedAt + baselineMs + per > BUDGET_MS) {
+        rows.push([
+          path,
+          'UNCHECKED',
+          `unchecked — budget ${BUDGET_MS / 60_000} min: estimate ≈${Math.round(per / 1000)} s per file; re-run — proven files are not repeated`,
+        ]);
+        process.stdout.write(`[${i + 1}/${todo.length}] ${path} → UNCHECKED (budget)\n`);
+        return;
+      }
       judge(path);
       // A line per file: a long run watched from outside (a background task, a lane) shows its pace
       // instead of sitting silent until the table.
@@ -1389,6 +2503,7 @@ try {
     });
     function judge(path) {
       save(path);
+      let known = KNOWN;
       if (TEMPLATED && !unionGreen) {
         const own = run(path);
         // The first narrowed run without a test = a wrong --cmd: stop before spending a run per file on it.
@@ -1400,13 +2515,19 @@ try {
         }
         narrowRuns += 1;
         if (own.status !== 0) {
-          rows.push([
-            path,
-            'NO-BASE',
-            'the narrowed check is red before the revert: no related tests, or they already fail',
-          ]);
-          exitCode = 1;
-          return;
+          known = failedTests(outOf(own));
+          if (!known) {
+            rows.push([
+              path,
+              'NO-BASE',
+              'the narrowed check is red before the revert and names no failing test',
+            ]);
+            exitCode = 1;
+            return;
+          }
+          process.stdout.write(
+            `· ${path}: its own baseline is red — ${knownLine(known)}; RED only on a new failure\n`,
+          );
         }
       }
       const kind = revert(path);
@@ -1422,7 +2543,7 @@ try {
       // Put this file back before the next one, so each verdict is about one file alone. A file the
       // change DELETED has no local content: base content was written above, so removing it restores.
       putFileBack(path);
-      if (r.status !== 0) {
+      if (redVs(r, known)) {
         const out = (r.stdout || '') + (r.stderr || '');
         if (unionGreen && NO_TESTS.test(out)) {
           rows.push([path, 'NO-BASE', 'no related tests — a red run without a single test']);
@@ -1435,12 +2556,15 @@ try {
           ]);
         else rows.push([path, 'RED', 'the revert breaks the check — covered']);
       } else {
-        rows.push([path, 'GREEN', 'the revert does not break the check — NOT covered']);
+        rows.push([
+          path,
+          'GREEN',
+          r.status !== 0
+            ? 'the revert fails no test beyond those failing before it — NOT covered'
+            : 'the revert does not break the check — NOT covered',
+        ]);
         exitCode = 1;
       }
-    }
-    if (files.length > list.length) {
-      rows.push([`… ${files.length - list.length} more file(s)`, 'SKIP', `--max ${MAX} exceeded`]);
     }
     restored = false;
     restore();
@@ -1449,6 +2573,12 @@ try {
   if (!restore()) process.exit(2);
 }
 
+if (overflow.length)
+  rows.push([
+    `… ${overflow.length} more file(s)`,
+    'SKIP',
+    `--max ${MAX} exceeded: ${overflow.join(', ')}`,
+  ]);
 for (const [f, v, note] of rows) if (!note.includes('same tree')) remember(f, v, note);
 if (rows.some(([, v]) => v === 'GREEN' || v === 'NO-BASE')) exitCode = 1;
 
@@ -1466,10 +2596,10 @@ process.stdout.write(
   `\nMUSTFAIL: ${rows.filter(([, v]) => v.startsWith('RED')).length} red${symbolRed ? ` (${symbolRed} of them by symbol)` : ''} · ${green} green · ` +
     `${noBase ? `${noBase} without a base check · ` : ''}${rows.some(([, v]) => v === 'UNCHECKED') ? `${rows.filter(([, v]) => v === 'UNCHECKED').length} UNCHECKED (budget) · ` : ''}${rows.filter(([, v]) => v === 'SKIP').length} skipped · ${Math.round(spent / 1000)} s\n`,
 );
-if (!TEMPLATED && baselineMs > 30_000)
+if (!SELECT && !TEMPLATED && baselineMs > 30_000)
   process.stdout.write(
     `One check run takes ${Math.round(baselineMs / 1000)} s and repeats per file. Narrow it with the {file} placeholder:\n` +
-      '  --cmd "npx vitest related {file} --run" · "go test ./<file package>/..." · "pytest <test of this module>"\n',
+      '  --cmd "npm run test:ci" for vitest/jest (tests are picked by @covers) · "pytest {tests}" · "go test ./<file package>/..."\n',
   );
 if (symbolRed) {
   process.stdout.write(
@@ -1487,7 +2617,9 @@ if (green) {
 // nothing was proven — the other half of finding 94a's false green.
 if (exitCode === 0 && !rows.some(([, v]) => v.startsWith('RED'))) {
   console.error(
-    'mustfail: nothing proven — no target could be reverted (new files). Prove new code with --mutants.',
+    rows.some(([, v]) => v === 'UNCHECKED')
+      ? 'mustfail: nothing proven — the time budget cut every judged file. Re-run (proven files come from the memo) or raise --budget.'
+      : 'mustfail: nothing proven — no target could be reverted (new files). Prove new code with --mutants.',
   );
   process.exit(2);
 }

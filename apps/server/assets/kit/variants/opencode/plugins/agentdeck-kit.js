@@ -90,7 +90,7 @@ export const AgentdeckKit = async ({ directory }) => ({
   },
   'tool.execute.after': async (input, output) => {
     // An MCP tool's `output` is the server's own result `{content:[…]}` (no `output` string): OpenCode
-    // builds the model's text from `content` AFTER this hook (1.18.35), so that is what is sent and cut.
+    // builds the model's text from `content` AFTER this hook (1.18.35), so that is what the items see.
     const mcp = output && typeof output.output !== 'string' && Array.isArray(output.content);
     const res = await dispatch('post-any', {
       hook_event_name: 'PostToolUse',
@@ -103,9 +103,6 @@ export const AgentdeckKit = async ({ directory }) => ({
         ? { content: output.content, isError: output.isError === true }
         : output?.output,
     });
-    // `updatedMCPToolOutput` (mr-echo-trim): the same shape back, its MR echo cut (P-15).
-    const updated = res?.hookSpecificOutput?.updatedMCPToolOutput;
-    if (mcp && Array.isArray(updated?.content)) output.content = updated.content;
     const text = res?.hookSpecificOutput?.additionalContext;
     if (text && output && typeof output.output === 'string') output.output += `\n\n${text}`;
   },

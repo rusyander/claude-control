@@ -1,5 +1,5 @@
 import type { MessageUsage } from '@agentdeck/contracts';
-import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
+import type { CorePermitAsk, HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 
 /**
  * Модель прогона — та же, что в панели: события потока одни и те же, и
@@ -22,6 +22,8 @@ export interface PendingPermission {
   toolName: string;
   input: unknown;
   toolUseId: string;
+  /** Вопрос права задачи ядра: ответ — подписанными командами ядра, не маршрутом прогона. */
+  core?: CorePermitAsk;
 }
 
 /** Вложение: сервер ждёт имя и base64, размер ограничен телом запроса. */
@@ -60,6 +62,11 @@ export interface AgentRun {
   error?: string;
   errorCode?: string;
   errorRetriable?: boolean;
+  /**
+   * Ошибка — текст самой панели по коду (отказ ядра в ходе чата, s10 G7): экран показывает перевод
+   * кода. `message` — к какой строке `error` относится: другая ошибка поверх — перевода нет.
+   */
+  errorPanel?: { message: string; code: string; params?: Record<string, string> };
   /** Ключ прогона НА СЕРВЕРЕ — отличается от id, если чат начали в другом месте. */
   serverRunId?: string;
   askedQuestion: boolean;
@@ -160,8 +167,23 @@ export type ChatEvent =
       remainder?: boolean;
     }
   | { kind: 'done'; costUsd: number; durationMs: number; sessionId: string }
-  | { kind: 'error'; message: string; retriable?: boolean }
-  | { kind: 'permission'; toolName: string; input: unknown; toolUseId: string }
+  | {
+      kind: 'error';
+      message: string;
+      retriable?: boolean;
+      /** Код текста сервера (`cli-outdated`, отказ ядра в ходе чата…) и его подстановки. */
+      code?: string;
+      params?: Record<string, string>;
+      /** Текст — сама панель по коду: телефон показывает перевод кода, а не русскую строку. */
+      panel?: boolean;
+    }
+  | {
+      kind: 'permission';
+      toolName: string;
+      input: unknown;
+      toolUseId: string;
+      core?: CorePermitAsk;
+    }
   | { kind: 'permissionResolved'; toolUseId: string; behavior: 'allow' | 'deny' }
   /** Вопрос агента закрыла автономия чата — ответа человека он больше не ждёт. */
   | { kind: 'autoPick'; toolUseId: string; picks: { question: string; label: string }[] }

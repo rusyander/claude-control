@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useChatProgress } from '@entities/Chat';
 import { Typography } from '@shared/ui/typography';
-import { formatAgo } from '@shared/lib/format-ago';
 import { formatDuration } from '@shared/lib/format-duration';
 import { useNow } from '@shared/lib/use-now';
 import { groupProgress } from '../../lib/groupProgress';
@@ -18,24 +17,15 @@ import styles from './GroupProgress.module.scss';
  * Только строчные элементы: индикатор живёт внутри кнопки, открывающей чат.
  */
 export function GroupProgress({ chatId, group }: GroupProgressProps) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const permission = Boolean(group.awaitingPermission);
   const { data } = useChatProgress(chatId, group.isRunning || permission, HUB_POLL_MS);
   const view = groupProgress({ progress: data, group, permission });
   const now = useNow(true);
   const since = view.since ? Date.parse(view.since) : Number.NaN;
-  const sinceLabel = (): string | undefined => {
-    if (!Number.isFinite(since)) return undefined;
-    return view.state === 'finished'
-      ? formatAgo(since, now, t, i18n.language)
-      : formatDuration(now - since, t);
-  };
   const state = [
     t(`chat.cascade.hub.progress.state.${view.state}`),
-    // Закончившей — «36 мин назад», без секунд: тикающие секунды у того, что уже
-    // кончилось, только отвлекают (владелец 20.10). Идущей — длительность, как была.
-    sinceLabel(),
-    view.queueAhead ? t('chat.cascade.hub.progress.ahead', { count: view.queueAhead }) : undefined,
+    Number.isFinite(since) ? formatDuration(now - since, t) : undefined,
   ].filter(Boolean);
   const toolStart = view.tool?.startedAt ? Date.parse(view.tool.startedAt) : Number.NaN;
   const counted = view.percent !== undefined && view.done !== undefined && view.total;

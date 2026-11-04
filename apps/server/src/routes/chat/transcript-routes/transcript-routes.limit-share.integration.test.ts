@@ -10,11 +10,9 @@ import {
   ChatRunRegistry,
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import {
-  translate,
-  type ChatEvent,
-  type RunOptions,
-} from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../../../domains/chat/run-options/run-options.ts';
+import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
+import { cliEvents } from '../../../domains/chat/__fixtures__/cli-line.ts';
 import type { RawEvent } from '../../../domains/chat/chat-events.ts';
 import {
   appendLimitRun,
@@ -24,7 +22,7 @@ import { registerChatTranscriptRoutes } from './transcript-routes.ts';
 
 /**
  * Доля окна лимита у звена группы — весь путь сервера: строка `rate_limit_event`
- * разбирается тем же `translate`, что и поток CLI, реестр копит замеры и токены
+ * разбирается тем же итогом, что давал разбор потока CLI (`__fixtures__/cli-line.ts`), реестр копит замеры и токены
  * прогона, на завершении журнал ложится файлом в каталог данных, а список чатов
  * читает его и отдаёт `limitShare`. Подменён только процесс CLI.
  *
@@ -47,7 +45,7 @@ class FakeRun implements RunLike {
   }
 
   emitRaw(raw: RawEvent): void {
-    for (const event of translate(raw)) this.onEvent?.(event);
+    for (const event of cliEvents(raw)) this.onEvent?.(event);
   }
 
   emit(event: ChatEvent): void {

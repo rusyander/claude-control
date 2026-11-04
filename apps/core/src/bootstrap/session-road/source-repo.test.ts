@@ -61,4 +61,14 @@ describe('source repo of a step (F-86 trust)', () => {
     none.append({ kind: 'task.created', actor: 'core', data: { ...CREATED, repos: [] } });
     expect(sourceRepoOf(none, step(none, 'r1'))).toBeUndefined();
   });
+
+  it('G12 p7: a chat in a folder without git — the source is the folder itself', async () => {
+    const plain = (await openFresh()).task;
+    plain.append({
+      kind: 'task.created',
+      actor: 'core',
+      data: { ...CREATED, repos: [], placement: 'in-place', folder: '/work/notes' },
+    });
+    expect(sourceRepoOf(plain, step(plain, 'r1'))).toBe('/work/notes');
+  });
 });

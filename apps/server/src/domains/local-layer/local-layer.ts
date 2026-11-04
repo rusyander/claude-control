@@ -11,6 +11,7 @@ import {
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
+import type { LocalLayerCarry } from '@agentdeck/contracts/core/session-carry';
 import { gitSyncOutcome } from '../project-git/exec/exec.ts';
 import { buildLayer, MIN_SAVED_CHARS, PATH_RULES_SCRIPT, runArgsOf } from './build.ts';
 import { readTeamLayer, teamSourcePaths, type TeamPlace } from './team-layer.ts';
@@ -306,43 +307,48 @@ export function withoutProjectSource(args: readonly string[]): string[] | undefi
 }
 
 /**
- * Флаги слоя без `--mcp-config`: маршрут со `--strict-mcp-config` выбирает
- * серверы сам, и `.mcp.json` проекта он не взял бы и без слоя.
+ * Слой в поле сеанса ядра (`session.localLayer`, s10 G14 p6): плагин, инструкции и из командных
+ * настроек — хуки, права, переменные. Серверы `.mcp.json` сюда не идут: ядро предлагает их
+ * сеансу своим чтением. Прочие ключи настроек (модель, строка состояния…) ядро решает само.
  */
-export function withoutMcpConfig(args: readonly string[]): string[] {
-  const out: string[] = [];
-  for (let at = 0; at < args.length; at += 1) {
-    if (args[at] === '--mcp-config') at += 1;
-    else out.push(args[at] as string);
-  }
-  return out;
-}
-
-/**
- * Настройки флага: слой снизу, профиль группы сверху. Хуки по событию и списки
- * прав складываются — так CLI поступил бы с двумя источниками и сам.
- */
-export function mergeFlagSettings(
-  layer: Record<string, unknown>,
-  over: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = { ...layer, ...over };
-  const object = (value: unknown): Record<string, unknown> =>
+export function localLayerCarry(extras: Omit<LayerRunExtras, 'status'>): LocalLayerCarry {
+  const at = extras.args.indexOf('--plugin-dir');
+  const plugin = at >= 0 ? extras.args[at + 1] : undefined;
+  const settings = extras.settings;
+  const record = (value: unknown): Record<string, unknown> | undefined =>
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
-      : {};
-  const lists = (a: unknown, b: unknown): Record<string, unknown[]> => {
-    const out: Record<string, unknown[]> = {};
-    for (const [key, value] of [...Object.entries(object(a)), ...Object.entries(object(b))]) {
-      if (Array.isArray(value)) out[key] = [...(out[key] ?? []), ...value];
-      else out[key] = value as unknown[];
-    }
-    return out;
+      : undefined;
+  const rules = (value: unknown): string[] | undefined =>
+    Array.isArray(value) && value.length > 0
+      ? value.filter((rule): rule is string => typeof rule === 'string' && rule.length > 0)
+      : undefined;
+  const perms = record(settings.permissions);
+  const allow = rules(perms?.allow);
+  const ask = rules(perms?.ask);
+  const deny = rules(perms?.deny);
+  const hooks = record(settings.hooks);
+  const env = Object.entries(record(settings.env) ?? {}).filter(
+    (entry): entry is [string, string] => typeof entry[1] === 'string',
+  );
+  const instructions = extras.append.trim();
+  return {
+    ...(plugin ? { plugin } : {}),
+    ...(instructions ? { instructions } : {}),
+    ...(hooks && Object.keys(hooks).length > 0
+      ? { hooks: hooks as NonNullable<LocalLayerCarry['hooks']> }
+      : {}),
+    ...(allow || ask || deny
+      ? {
+          permissions: {
+            ...(allow ? { allow } : {}),
+            ...(ask ? { ask } : {}),
+            ...(deny ? { deny } : {}),
+          },
+        }
+      : {}),
+    ...(env.length > 0 ? { env: Object.fromEntries(env) } : {}),
   };
-  if (layer.hooks || over.hooks) merged.hooks = lists(layer.hooks, over.hooks);
-  if (layer.permissions || over.permissions)
-    merged.permissions = lists(layer.permissions, over.permissions);
-  return merged;
 }
 
 /** Что прогон получает от слоя; `undefined` — слой не подключается. */

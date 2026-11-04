@@ -17,6 +17,13 @@ const VENDOR_KEY = 'sk-ant-api03-Zx9Qw8Er7Ty6Ui5Op4As3Df2Gh1Jk0LzXcVbNm';
 const HEX_TOKEN = createHash('sha1').update('token').digest('hex');
 
 describe('journal secret mask wired by boot', () => {
+  it('a DLP mask label after "key:" is already masked — the session prompt keeps it verbatim', () => {
+    // The panel masks a pasted key as [КЛЮЧ_1]; the journal mask used to take the label for the
+    // value of the "key:" pair and hide it as ••••••, so the model never saw the label.
+    const prompt = 'Human (current request): Here is the key: [КЛЮЧ_1]';
+    expect(dlpSecretMask(prompt)).toEqual({ text: prompt, count: 0 });
+  });
+
   it('B1 hash- and commit-shaped identifiers reach the journal verbatim', async () => {
     const { task, dir, taskId } = await openFresh(undefined, deps({ mask: dlpSecretMask }));
     task.append({
@@ -48,6 +55,22 @@ describe('journal secret mask wired by boot', () => {
       idempotencyHint: string;
     };
     expect(started.idempotencyHint).toBe(GIT_SHA);
+  });
+
+  it('a repo path whose mkdtemp folder has a word with a digit (cc-t3-…) reaches the journal verbatim', async () => {
+    // The opaque-key detector took `cc-t3-codex-project-gl9Kjc` for a key: `t3` was not a «word»,
+    // so the words-with-tail exemption missed it, and the task lost its repo path on disk.
+    const path = 'C:\\Temp\\cc-t3-codex-project-gl9Kjc';
+    const { task, dir, taskId } = await openFresh(undefined, deps({ mask: dlpSecretMask }));
+    task.append({
+      kind: 'task.created',
+      actor: 'core',
+      data: { ...CREATED, repos: [{ repoKey: 'r1', path, baseRef: GIT_SHA }] },
+    });
+    task.close();
+    const created = readJournalLines(dir, taskId).lines.find((l) => l.kind === 'task.created')!;
+    expect((created.data as typeof CREATED).repos[0]!.path).toBe(path);
+    expect(created.masked).toBeUndefined();
   });
 
   it('B1 a real key is still masked: vendor prefix, and hex under a secret name', async () => {

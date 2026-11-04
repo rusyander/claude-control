@@ -1,26 +1,20 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { getProvider, listProviders } from '../../providers/registry.ts';
-import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
-import type { ProviderChatRunLike } from '../../domains/provider-chat/provider-chat.ts';
 import { createChat } from '../../domains/provider-chat/store/store.ts';
-import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import { sandboxPaths } from '../../domains/sandbox/SandboxConfig.ts';
 import { registerPluginRoutes } from '../plugin-routes/plugin-routes.ts';
 import { registerSandboxRoutes } from '../sandbox-routes/sandbox-routes.ts';
+import {
+  FAKE_TURN,
+  fakeCorePort,
+  type FakeCorePort,
+} from '../../domains/project-tests/agent/__fixtures__/fake-core-port.ts';
 import { registerProviderChatRoutes } from '../provider-chat-routes/provider-chat-routes.ts';
 
 /**
@@ -78,31 +72,14 @@ function fakeClis(bin: string, names: string[]): () => Call[] {
       : [];
 }
 
-/** Прогон чата, который тест только считает: сам CLI в этих тестах не нужен. */
-class CountedRun implements ProviderChatRunLike {
-  static created = 0;
-
-  constructor() {
-    CountedRun.created += 1;
-  }
-
-  start(): Promise<void> {
-    return new Promise<void>(() => {
-      // Ответа не будет — тесту важен лишь факт старта.
-    });
-  }
-
-  stop(): void {}
-}
-
 const FOREIGN = listProviders().filter((provider) => provider.id !== 'claude');
 
 describe('provider-guard: отказ до запуска CLI', () => {
   let root: string;
   let appData: string;
   let app: FastifyInstance | undefined;
-  let chats: ProviderChatService | undefined;
   let calls: () => Call[];
+  let core: FakeCorePort | undefined;
   const sandboxId = `qa-guard-${process.pid}`;
 
   beforeEach(() => {
@@ -116,12 +93,9 @@ describe('provider-guard: отказ до запуска CLI', () => {
     const bin = join(root, 'bin');
     calls = fakeClis(bin, ['claude', 'kimi', 'cursor-agent', 'gemini']);
     vi.stubEnv('PATH', `${bin}${delimiter}${process.env.PATH ?? ''}`);
-    CountedRun.created = 0;
   });
 
   afterEach(async () => {
-    chats?.stopAll();
-    chats = undefined;
     await app?.close();
     app = undefined;
     vi.unstubAllEnvs();
@@ -138,10 +112,11 @@ describe('provider-guard: отказ до запуска CLI', () => {
       backupDir: join(appData, 'backups'),
     } as unknown as ServerContext;
     app = Fastify();
-    chats = new ProviderChatService(() => new CountedRun());
     registerPluginRoutes(app, ctx);
-    registerSandboxRoutes(app, ctx);
-    registerProviderChatRoutes(app, ctx, chats, new HandoffChains());
+    // Разговор песочницы — задача ядра: порт ядра подставной, настоящее ядро машины тест не трогает.
+    core = fakeCorePort({ turn: FAKE_TURN });
+    registerSandboxRoutes(app, ctx, { corePort: () => core!.port });
+    registerProviderChatRoutes(app, ctx);
     await app.ready();
     return ctx;
   };
@@ -252,73 +227,43 @@ describe('provider-guard: отказ до запуска CLI', () => {
       expect((await inject('DELETE', `/api/sandbox/${sandboxId}`)).statusCode).toBe(200);
     });
 
-    it('Claude: прогон песочницы доходит до claude — подмена CLI видна журналу', async () => {
+    it('Claude: страж раздел пропускает, прогон песочницы — задача ядра, панель claude сама не запускает', async () => {
       await boot('claude');
       // Состав уже собран: проверяется запуск, а не сборка.
       mkdirSync(sandboxPaths(sandboxId).configDir, { recursive: true });
+      mkdirSync(sandboxPaths(sandboxId).workDir, { recursive: true });
       const answer = await inject('POST', '/api/sandbox/run', { id: sandboxId, prompt: 'вопрос' });
 
       expect(answer.statusCode).toBe(200);
-      expect(calls().map((call) => call.cli)).toContain('claude');
+      expect(answer.body).toContain('"kind":"done"');
+      expect(core!.calls[0]).toMatchObject({ kind: 'set-cli', fields: { adapter: 'claude' } });
+      expect(calls()).toEqual([]);
     });
   });
 
   describe('чат чужого CLI (`/api/provider-chat/*`)', () => {
-    const cursorChats = (): string[] => {
-      const dir = join(appData, 'provider-chats', 'cursor');
-      return existsSync(dir) ? readdirSync(dir) : [];
-    };
-
-    it('Cursor: заведение разговора — 409 provider-chat-unsupported, файла нет', async () => {
-      await boot('cursor');
-      const answer = await inject('POST', '/api/provider-chat/chats', {});
-
-      expect(answer.statusCode).toBe(409);
-      expect(answer.json()).toMatchObject({
-        messageCode: 'provider-chat-unsupported',
-        params: { provider: getProvider('cursor').name },
-      });
-      expect(cursorChats()).toEqual([]);
-      expect(calls()).toEqual([]);
-    });
-
-    it('Cursor: разговор, оставшийся на диске, — отправка, очередь и перезапуск отказывают без прогона', async () => {
-      await boot('cursor');
-      const chat = createChat(appData, 'cursor', { workdir: root });
-      expect(chat).toBeDefined();
-      const base = `/api/provider-chat/chats/${chat!.id}`;
-
-      const send = await inject('POST', `${base}/send`, { text: 'привет' });
-      const queued = await inject('POST', `${base}/send`, { text: 'ещё', queueIfBusy: true });
-      const restart = await inject('POST', `${base}/restart`);
-      const fromQueue = await inject('POST', `${base}/queue/q1/send`);
-
-      for (const answer of [send, queued, restart, fromQueue]) {
-        expect(answer.statusCode).toBe(409);
-        expect(answer.json()).toMatchObject({ messageCode: 'provider-chat-unsupported' });
-      }
-      expect(CountedRun.created).toBe(0);
-      expect(calls()).toEqual([]);
-    });
-
-    it.each(FOREIGN.map((provider) => [provider.id, provider.capabilities.chat]))(
-      '%s (chat %s): отказ ровно там, где чат не готов',
-      async (id, status) => {
+    // Ход чужого CLI идёт чатом ядра: прежние маршруты прогона отказывают по имени при любом CLI,
+    // и ни один процесс CLI панель не запускает.
+    it.each(['cursor', 'gemini'])(
+      '%s: заведение, отправка, очередь и перезапуск — 410 provider-chat-core без прогона',
+      async (id) => {
         await boot(id);
-        const answer = await inject('POST', '/api/provider-chat/chats', {});
-
-        expect(answer.statusCode).toBe(status === 'ready' ? 200 : 409);
+        const chat = createChat(appData, id, { workdir: root });
+        expect(chat).toBeDefined();
+        const base = `/api/provider-chat/chats/${chat!.id}`;
+        const answers = [
+          await inject('POST', '/api/provider-chat/chats', {}),
+          await inject('POST', `${base}/send`, { text: 'привет' }),
+          await inject('POST', `${base}/send`, { text: 'ещё', queueIfBusy: true }),
+          await inject('POST', `${base}/restart`),
+          await inject('POST', `${base}/queue/q1/send`),
+        ];
+        for (const answer of answers) {
+          expect(answer.statusCode).toBe(410);
+          expect(answer.json()).toMatchObject({ messageCode: 'provider-chat-core' });
+        }
+        expect(calls()).toEqual([]);
       },
     );
-
-    it('Gemini: отправка доходит до прогона — счётчик видит старт', async () => {
-      await boot('gemini');
-      const created = await inject('POST', '/api/provider-chat/chats', {});
-      const id = created.json<{ id: string }>().id;
-      const send = await inject('POST', `/api/provider-chat/chats/${id}/send`, { text: 'привет' });
-
-      expect(send.statusCode).toBe(200);
-      expect(CountedRun.created).toBe(1);
-    });
   });
 });

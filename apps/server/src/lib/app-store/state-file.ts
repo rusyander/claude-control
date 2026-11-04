@@ -1,12 +1,6 @@
 import { renameSync } from 'node:fs';
 import { join } from 'node:path';
-import { groupEconomyChanges, groupEconomyWithDefaults } from '@agentdeck/contracts/group-economy';
-import {
-  groupSignalsOf,
-  groupWatchChanges,
-  groupWatchWithDefaults,
-  type GroupWatchRecord,
-} from '@agentdeck/contracts/group-watch';
+import { RETIRED_NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
 import { migrateLegacyPlatforms } from '@agentdeck/contracts/platform-legacy';
 import {
   migrateLegacyIntegrations,
@@ -34,9 +28,11 @@ export function stateFilePath(appDataDir: string): string {
  * (песочницы, смена целевого каталога через claudeDirOverride).
  */
 export function mergeState(input: Partial<AppState>): AppState {
-  const loaded = withWatchSlice(
-    withGroupSignalSubscription(
-      withCurrentIntegrations(withCurrentPlatformDrivers(input).state).state,
+  const loaded = withoutLegacyGroupWatch(
+    withoutRetiredKeys(
+      withoutRetiredNotifyEvents(
+        withCurrentIntegrations(withCurrentPlatformDrivers(input).state).state,
+      ),
     ),
   );
   const base = structuredClone(DEFAULT_STATE);
@@ -53,8 +49,6 @@ export function mergeState(input: Partial<AppState>): AppState {
     providerChecks: { ...base.providerChecks, ...loaded.providerChecks },
     mcpHealth: { ...base.mcpHealth, ...loaded.mcpHealth },
     projectCodeViews: { ...base.projectCodeViews, ...loaded.projectCodeViews },
-    projectCascade: { ...base.projectCascade, ...loaded.projectCascade },
-    projectReviewAfterWork: { ...base.projectReviewAfterWork, ...loaded.projectReviewAfterWork },
     chatLinks: { ...base.chatLinks, ...loaded.chatLinks },
     treePause: { ...base.treePause, ...loaded.treePause },
     chatPins: { ...base.chatPins, ...loaded.chatPins },
@@ -79,98 +73,119 @@ export function mergeState(input: Partial<AppState>): AppState {
         ...base.settings.integrations,
         ...loaded.settings?.integrations,
       },
-      // На диске лежат только отличия от умолчаний (`stateOnDisk`) — недостающие
-      // рычаги берутся из умолчаний ТЕКУЩЕГО кода, а не пропадают.
-      groupEconomy: groupEconomyWithDefaults(loaded.settings?.groupEconomy),
-      groupWatch: groupWatchWithDefaults(loaded.settings?.groupWatch),
     },
   };
 }
 
-/** Отметка разовой переделки подписки Telegram на сигналы сторожа групп. */
-export const GROUP_SIGNAL_TELEGRAM_MIGRATION = 'group-signal-telegram';
+/**
+ * Ключи, которые прежние версии писали в `state.json`, а нынешняя не знает:
+ * заметки главным чатам деревьев (`chatEscalations`) ушли вместе с маршрутами
+ * чата групп (этап 10); проектное правило «Ревью после работы»
+ * (`projectReviewAfterWork`) — с тумблером в меню чата (этап 10, G14), ревью ведёт
+ * сценарий ядра; правило «Подбирать модель под задачу» (`projectCascade`) — с тем
+ * же меню (этап 10, G14): подбор по роду работы шёл только в предложение
+ * разделения, а разделение из чата снято; срезы сигналов сторожа групп и чатов
+ * (`groupWatchSignals`, `chatWatchSignals`) — с проводкой сторожа панели, у них не
+ * осталось писателя (этап 10, G14). Старый файл читается как прежде, ключ
+ * снимается при чтении, и первая запись его уже не повторяет.
+ */
+const RETIRED_STATE_KEYS = [
+  'chatEscalations',
+  'projectReviewAfterWork',
+  'projectCascade',
+  'groupWatchSignals',
+  'chatWatchSignals',
+] as const;
 
 /**
- * Сигналы сторожа групп в Telegram прежде включал свой выключатель
- * `groupWatch.telegram` (по умолчанию включён); теперь — событие `groupSignal`
- * в списке событий Telegram (F-37). Сохранённый список событий перекрывает
- * умолчания, а выключатель загрузка отбрасывает — без переноса тот, кто получал
- * сигналы, молча перестал бы их получать. Переносим согласие один раз: блок
- * сторожа на диске есть и выключатель не выключен — `groupSignal` в список
- * Telegram. Вебхук не трогаем: сигналов он прежде не получал, согласия не было.
- * Отметка ставится и когда переносить нечего: иначе снятая потом галочка
- * возвращалась бы на каждом старте — блок без выключателя выглядит так же.
+ * Поля настроек, которых нынешняя версия не знает: тумблер «Предлагать разделить
+ * задачи по чатам» (`taskSplitInitiative`) снят (этап 10, G14) — у карточки
+ * разделения нет кнопок; блоки «Экономия групп разделения» (`groupEconomy`) и
+ * «Сторож групп разделения» (`groupWatch`) сняты с карточками (этап 10, G15) —
+ * рычаги экономии шагов задачи живут в разделе `economy` настройки ядра, своего
+ * сторожа у панели нет. Правила автоподтверждения чата (`autoApproveRules`) и
+ * срок, через который карточка прав уходила в D-n (`deferAfterMinutes`), сняты
+ * (этап 10, G12): о правах шага судит ядро, карточка в D-n больше не уходит, и
+ * ни то ни другое никто не читал. Настройки сливаются с умолчаниями разворотом,
+ * и без снятия поле жило бы на диске и в ответе панели вечно.
  */
-function withGroupSignalSubscription(loaded: Partial<AppState>): Partial<AppState> {
-  const done = Array.isArray(loaded.doneMigrations) ? loaded.doneMigrations : [];
-  if (done.includes(GROUP_SIGNAL_TELEGRAM_MIGRATION)) return loaded;
-  const marked = { ...loaded, doneMigrations: [...done, GROUP_SIGNAL_TELEGRAM_MIGRATION] };
-  const settings = loaded.settings;
-  const watch: unknown = settings?.groupWatch;
-  if (!settings || typeof watch !== 'object' || watch === null) return marked;
-  if ((watch as { telegram?: unknown }).telegram === false) return marked;
-  const telegram = settings.integrations?.telegram;
-  if (!telegram || !Array.isArray(telegram.events)) return marked;
-  if (telegram.events.includes('groupSignal')) return marked;
+const RETIRED_SETTINGS_KEYS = [
+  'taskSplitInitiative',
+  'groupEconomy',
+  'groupWatch',
+  'autoApproveRules',
+  'deferAfterMinutes',
+] as const;
+
+function withoutRetiredKeys(input: Partial<AppState>): Partial<AppState> {
+  const settings = input.settings as Record<string, unknown> | undefined;
+  const staleSettings =
+    settings !== undefined && RETIRED_SETTINGS_KEYS.some((key) => Object.hasOwn(settings, key));
+  if (!staleSettings && !RETIRED_STATE_KEYS.some((key) => Object.hasOwn(input, key))) return input;
+  const copy: Record<string, unknown> = { ...input };
+  for (const key of RETIRED_STATE_KEYS) delete copy[key];
+  if (staleSettings) {
+    const cleaned: Record<string, unknown> = { ...settings };
+    for (const key of RETIRED_SETTINGS_KEYS) delete cleaned[key];
+    copy.settings = cleaned;
+  }
+  return copy as Partial<AppState>;
+}
+
+/**
+ * Снятые события подписки (сигнал сторожа групп, этап 10, G14) уходят из сохранённых
+ * списков Telegram и вебхука при чтении: строгая схема настроек отбивала бы каждое
+ * сохранение, пока в списке лежит имя, которого она не знает. Прежняя отметка переноса
+ * `group-signal-telegram` в `doneMigrations` остаётся как есть — её никто не читает.
+ */
+function withoutRetiredNotifyEvents(loaded: Partial<AppState>): Partial<AppState> {
+  const integrations = loaded.settings?.integrations;
+  if (!integrations) return loaded;
+  const clean = <T extends { events?: unknown }>(target: T | undefined): T | undefined => {
+    if (!target || !Array.isArray(target.events)) return target;
+    const events = target.events.filter((event) => !RETIRED_NOTIFY_EVENTS.includes(event));
+    return events.length === target.events.length ? target : { ...target, events };
+  };
+  const telegram = clean(integrations.telegram);
+  const webhook = clean(integrations.webhook);
+  if (telegram === integrations.telegram && webhook === integrations.webhook) return loaded;
   return {
-    ...marked,
+    ...loaded,
     settings: {
-      ...settings,
+      ...loaded.settings!,
       integrations: {
-        ...settings.integrations,
-        telegram: { ...telegram, events: [...telegram.events, 'groupSignal'] },
+        ...integrations,
+        ...(telegram ? { telegram } : {}),
+        ...(webhook ? { webhook } : {}),
       },
     },
   };
 }
 
 /**
- * Сигналы сторожа из записей разделения (прежнее место, поле `watch` группы) —
- * в свой срез `groupWatchSignals` (F-42). Срез уже знает группу — его и держим:
- * он пишется только сторожем. Повторная загрузка ничего не находит.
+ * Прежнее место сигналов сторожа — поле `watch` группы в записи разделения.
+ * Сигналы сняты (этап 10, G14): поле снимается при чтении, остальная запись
+ * группы на месте, и первая запись его уже не повторяет.
  */
-function withWatchSlice(loaded: Partial<AppState>): Partial<AppState> {
+function withoutLegacyGroupWatch(loaded: Partial<AppState>): Partial<AppState> {
   const plans = loaded.splitPlans;
   if (!plans || typeof plans !== 'object') return loaded;
+  const hasWatch = (group: unknown): boolean =>
+    typeof group === 'object' && group !== null && Object.hasOwn(group, 'watch');
   const legacy = Object.entries(plans).filter(
-    ([, record]) =>
-      Array.isArray(record?.groups) && record.groups.some((group) => group?.watch !== undefined),
+    ([, record]) => Array.isArray(record?.groups) && record.groups.some(hasWatch),
   );
   if (legacy.length === 0) return loaded;
-  const slice: Record<string, Record<string, GroupWatchRecord>> = {};
-  for (const [parent, groups] of Object.entries(loaded.groupWatchSignals ?? {})) {
-    slice[parent] = { ...groups };
-  }
   const splitPlans = { ...plans };
   for (const [parent, record] of legacy) {
-    const own = { ...slice[parent] };
     const groups = record.groups.map((group) => {
-      if (group?.watch === undefined) return group;
-      const { watch, ...rest } = group;
-      const signals = groupSignalsOf(watch);
-      if (signals.length > 0 && !own[String(group.index)]) own[String(group.index)] = { signals };
+      if (!hasWatch(group)) return group;
+      const { watch: _watch, ...rest } = group as typeof group & { watch?: unknown };
       return rest;
     });
-    if (Object.keys(own).length > 0) slice[parent] = own;
     splitPlans[parent] = { ...record, groups };
   }
-  return { ...loaded, splitPlans, groupWatchSignals: slice };
-}
-
-/**
- * Состояние в том виде, в каком оно пишется в файл: рычаги экономии групп —
- * только отличные от умолчаний, иначе первое же сохранение заморозило бы все
- * умолчания блока и их смена в коде до пользователя не дошла бы.
- */
-export function stateOnDisk(state: AppState): unknown {
-  return {
-    ...state,
-    settings: {
-      ...state.settings,
-      groupEconomy: groupEconomyChanges(state.settings.groupEconomy),
-      groupWatch: groupWatchChanges(state.settings.groupWatch),
-    },
-  };
+  return { ...loaded, splitPlans };
 }
 
 /**

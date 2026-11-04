@@ -67,8 +67,8 @@ export function driverProblem(
  * Манифест пресета и карточки поверх драйвера базы — то, что из него спрашивает конвейер звена,
  * тем же правилом, что `applyManifest` драйвера панели: префикс вендора пересобирает разбор кадров
  * (только у базы, которая их читает), путь инструментов, родная ручка Anthropic (пусто — снята),
- * потолки ответа (0 — сняты). Усилие, поле размышлений и ручка картинок звену не нужны: их правил
- * у драйвера звена нет.
+ * потолки ответа (0 — сняты), ручка картинок (пусто — снята). Усилие и поле размышлений звену не
+ * нужны: их правила приходят готовыми (`requestRules`).
  */
 export function withManifest(driver: HopDriver, patch: PlatformManifestOverrides): HopDriver {
   let next: HopDriver = { ...driver };
@@ -80,6 +80,10 @@ export function withManifest(driver: HopDriver, patch: PlatformManifestOverrides
   if (patch.anthropicMessages !== undefined) {
     if (patch.anthropicMessages) next.anthropic = { messages: patch.anthropicMessages };
     else delete next.anthropic;
+  }
+  if (patch.imagesApi !== undefined) {
+    if (patch.imagesApi) next.images = { api: patch.imagesApi };
+    else delete next.images;
   }
   if (patch.nonStreamTimeoutSec !== undefined) {
     if (patch.nonStreamTimeoutSec > 0) next.nonStreamTimeoutSec = patch.nonStreamTimeoutSec;

@@ -41,6 +41,18 @@ const filled = () => ({
 });
 
 describe('core launch draft', () => {
+  it('the panel language reaches the estimate body (the core writes the launch question in it)', () => {
+    const lang = (language?: string) => {
+      const got = fieldsOf(filled(), language);
+      if (!got.ok) throw new Error('draft refused');
+      expect(estimateFieldsSchema.safeParse(got.fields).success).toBe(true);
+      return got.fields.lang;
+    };
+    expect(lang('ru')).toBe('ru');
+    expect(lang('en-US')).toBe('en');
+    expect(lang(undefined)).toBeUndefined();
+  });
+
   it('CI wait is off by default and reaches the estimate body as false', () => {
     expect(emptyDraft().ciWait).toBe(false);
     const got = fieldsOf(filled());
@@ -118,6 +130,8 @@ describe('core launch draft', () => {
     });
     expect(opts.find((o) => o.value === 'preset:answer-reviewers')?.disabled).toBe(true);
     expect(opts.filter((o) => o.value.startsWith('preset:')).length).toBe(6);
+    expect(opts.some((o) => o.value === 'preset:chat')).toBe(false);
+    expect(opts.some((o) => o.value === 'preset:ask')).toBe(false);
     expect(opts.at(-1)).toEqual({
       value: 'library:flow@2',
       label: 'Мой поток · v2',

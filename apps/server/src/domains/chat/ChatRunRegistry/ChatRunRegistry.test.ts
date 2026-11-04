@@ -5,7 +5,8 @@ import {
   type BufferedEvent,
   type RunSubscriber,
 } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 import type { PlatformRunRoute } from '../../platform/routing/routing.ts';
 import type { LoweredRunRecord } from '@agentdeck/contracts/model-cascade';
 
@@ -371,42 +372,30 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     expect(registry.describe('c9')?.options.workspaceNote).toBe('');
   });
 
-  it('строка о тестах знает, группа ли прогон: группе — своя редакция (1.4)', () => {
-    registry.setChildResolver((keys) => keys.includes('g1'));
-    registry.setWorkspaceNote((_cwd, run) => (run.group ? 'QA group' : 'QA chat'));
-    registry.start('g1', { ...OPTIONS }, {});
-    registry.start('c1', { ...OPTIONS }, {});
-    expect(registry.describe('g1')?.options.workspaceNote).toBe('QA group');
-    expect(registry.describe('g1')?.options.child).toBe(true);
-    expect(registry.describe('c1')?.options.workspaceNote).toBe('QA chat');
-    expect(registry.describe('c1')?.options.child).toBe(false);
-  });
-
   /**
-   * X1: строка группы идёт без путей, проект блока «Тесты» — окружением прогона.
-   * Только ребёнку разделения: чат человека зовёт tests-cli с `--project` сам, а
-   * осечка решателя старт не срывает.
+   * Ответ из Telegram продолжает разговор параметрами его последнего хода: идущий
+   * ход — по живой записи, законченный — по памяти, которая переживает выход
+   * прогона из реестра. Чужой ключ ничего не находит.
    */
-  it('проект строки о тестах — в окружении группы, чату его нет, осечка — без окружения', () => {
-    const asked: string[] = [];
-    registry.setChildResolver((keys) => keys.includes('g1') || keys.includes('g2'));
-    registry.setWorkspaceEnv((cwd) => {
-      asked.push(cwd);
-      return { AGENTDECK_TESTS_PROJECT: `${cwd}/project` };
+  it('последний ход разговора: идущий и законченный находятся по ключу и по сессии', async () => {
+    registry.start('s1', { ...OPTIONS, model: 'opus', effort: 'high' }, {});
+    expect(registry.latestRunOf(['s1'])).toBeUndefined();
+    fake.emit(SESSION);
+    expect(registry.latestRunOf(['s1'])).toMatchObject({
+      chatId: 's1',
+      sessionId: 'sess-1',
+      options: { model: 'opus', effort: 'high' },
     });
-    registry.start('g1', { ...OPTIONS }, {});
-    registry.start('c1', { ...OPTIONS }, {});
-    expect(registry.describe('g1')?.options.platformEnv).toEqual({
-      AGENTDECK_TESTS_PROJECT: '/tmp/x/project',
+    fake.finish();
+    await flush();
+    // Законченный ход идущим уже не числится — ответ даёт память законченных.
+    expect(registry.isRunning('s1')).toBe(false);
+    expect(registry.latestRunOf(['sess-1'])).toMatchObject({
+      chatId: 's1',
+      sessionId: 'sess-1',
+      options: { model: 'opus', effort: 'high' },
     });
-    expect(registry.describe('c1')?.options.platformEnv).toEqual({});
-    expect(asked).toEqual(['/tmp/x']);
-
-    registry.setWorkspaceEnv(() => {
-      throw new Error('битый automation.json');
-    });
-    registry.start('g2', { ...OPTIONS }, {});
-    expect(registry.describe('g2')?.options.platformEnv).toEqual({});
+    expect(registry.latestRunOf(['other'])).toBeUndefined();
   });
 
   /**
@@ -471,10 +460,10 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     fake.finish();
     await flush();
 
-    // Повтор хода родителя разделения: параметры прошлой попытки несут и сводку
-    // детей, и блок перемены под ней — ни то, ни другое не копится.
+    // Повтор хода прежнего родителя разделения: параметры прошлой попытки несут и
+    // сводку детей, и блок перемены под ней. Сводку больше никто не ставит (конвейер
+    // разделения снят, этап 10) — прежняя снимается, перемена не копится.
     note = 'QA workspace: two';
-    registry.setChildrenBriefResolver(() => '<agentdeck-children>дети</agentdeck-children>');
     fake = new FakeRun();
     const retried =
       '<agentdeck-children>дети</agentdeck-children>\n\n' +
@@ -482,10 +471,8 @@ describe('ChatRunRegistry — происхождение прогона и ма�
     registry.start('s2', { ...OPTIONS, prompt: retried, sessionId: 'sess-1' }, {});
     const prompt = registry.describe('s2')?.options.prompt ?? '';
     expect(prompt.match(/<agentdeck-workspace>/g)).toHaveLength(1);
-    expect(prompt.match(/<agentdeck-children>/g)).toHaveLength(1);
-    expect(prompt).toMatch(
-      /^<agentdeck-children>дети<\/agentdeck-children>\n\n<agentdeck-workspace>/,
-    );
+    expect(prompt).not.toContain('<agentdeck-children>');
+    expect(prompt).toMatch(/^<agentdeck-workspace>/);
     expect(prompt).toContain('QA workspace: two</agentdeck-workspace>\n\nещё');
   });
 
@@ -562,12 +549,12 @@ describe('ChatRunRegistry — происхождение прогона и ма�
      * целиком — лёгкий чат шёл с правками, группа без очереди и хуков.
      */
     it('у прогона со своим --strict-mcp-config или выбором MCP от профиля снято только MCP', () => {
-      const withQueue = {
+      const withEnv = {
         ...profile,
-        env: { ...profile.env, AGENTDECK_HEAVY_QUEUE_DIR: 'q' },
+        env: { ...profile.env, PROFILE_TOOL_HOME: 'q' },
         settings: { permissions: { deny: ['Edit'] } },
       };
-      registry.setGroupProfileResolver(() => withQueue);
+      registry.setGroupProfileResolver(() => withEnv);
       registry.setPlatformRouting(() => ({
         env: {},
         layers: { args: ['--strict-mcp-config'], systemPrompt: true, dropped: [] },
@@ -580,8 +567,8 @@ describe('ChatRunRegistry — происхождение прогона и ма�
       registry.start('g3', OPTIONS, {});
       for (const id of ['g2', 'g3']) {
         const options = registry.describe(id)?.options;
-        expect(options?.platformSettings).toEqual(withQueue.settings);
-        expect(options?.platformEnv).toEqual({ AGENTDECK_HEAVY_QUEUE_DIR: 'q' });
+        expect(options?.platformSettings).toEqual(withEnv.settings);
+        expect(options?.platformEnv).toEqual({ PROFILE_TOOL_HOME: 'q' });
         expect(options?.profileNote).toBe('');
       }
       expect(registry.describe('g2')?.options.platformArgs).toEqual(['--strict-mcp-config']);
@@ -592,19 +579,25 @@ describe('ChatRunRegistry — происхождение прогона и ма�
   });
 
   /**
-   * Локальный слой проекта ложится на каждый старт: источник `project` снят,
-   * флаги слоя, его инструкции и командные настройки — под профилем группы.
-   * Песочница со своим каталогом и маршрут без `project` слоя не получают.
+   * Локальный слой проекта решается на каждом старте: источник `project` снят, а плагин,
+   * инструкции, хуки, права и переменные слоя едут полем ядра `localLayer` (s10 G14 p6) —
+   * флаги, дописка и настройки панели слоя не несут. Песочница со своим каталогом и маршрут
+   * без `project` слоя не получают; слой, выключенный между ходами, снимается с продолжения.
    */
   describe('локальный слой проекта', () => {
     const layer = {
       args: ['--plugin-dir', 'P', '--mcp-config', 'M'],
       append: 'Contents of /p/CLAUDE.md (project instructions, checked into the codebase):\n\nTEAM',
-      settings: { model: 'team', hooks: { Stop: ['team'] } },
+      settings: {
+        model: 'team',
+        hooks: { Stop: [{ hooks: [{ type: 'command', command: 'team' }] }] },
+        permissions: { deny: ['Bash(rm:*)'] },
+        env: { TEAM_ENV: '1' },
+      },
       status: {} as never,
     };
 
-    it('обычный прогон получает слой, профиль группы — поверх командных настроек', () => {
+    it('обычный прогон получает слой полем ядра, профиль группы остаётся своим полем', () => {
       const asked: string[] = [];
       registry.setLocalLayerResolver((cwd) => {
         asked.push(cwd);
@@ -614,33 +607,53 @@ describe('ChatRunRegistry — происхождение прогона и ма�
         args: [],
         env: {},
         note: '',
-        settings: { model: 'group', hooks: { Stop: ['group'] } },
+        settings: { model: 'group' },
       }));
       registry.start('l1', OPTIONS, {});
       const options = registry.describe('l1')?.options;
       expect(asked).toEqual([OPTIONS.cwd]);
-      expect(options?.platformArgs).toEqual(['--setting-sources', 'user,local', ...layer.args]);
-      expect(options?.platformAppend).toBe(layer.append);
-      expect(options?.platformSettings).toEqual({
-        model: 'group',
-        hooks: { Stop: ['team', 'group'] },
+      expect(options?.platformArgs).toEqual(['--setting-sources', 'user,local']);
+      expect(options?.platformAppend).toBe('');
+      expect(options?.platformSettings).toEqual({ model: 'group' });
+      expect(options?.localLayer).toEqual({
+        plugin: 'P',
+        instructions: layer.append,
+        hooks: layer.settings.hooks,
+        permissions: { deny: ['Bash(rm:*)'] },
+        env: { TEAM_ENV: '1' },
       });
     });
 
-    it('строгий MCP маршрута снимает только MCP слоя', () => {
+    it('строгий MCP маршрута остаётся, слой флагов не добавляет', () => {
       registry.setLocalLayerResolver(() => layer);
       registry.setPlatformRouting(() => ({
         env: {},
         layers: { args: ['--strict-mcp-config'], systemPrompt: true, dropped: [] },
       }));
       registry.start('l2', OPTIONS, {});
-      expect(registry.describe('l2')?.options.platformArgs).toEqual([
+      const options = registry.describe('l2')?.options;
+      expect(options?.platformArgs).toEqual([
         '--strict-mcp-config',
         '--setting-sources',
         'user,local',
-        '--plugin-dir',
-        'P',
       ]);
+      expect(options?.localLayer?.plugin).toBe('P');
+    });
+
+    it('слой выключен между ходами — продолжение поля не несёт', async () => {
+      let on = true;
+      registry.setLocalLayerResolver(() => (on ? layer : undefined));
+      registry.start('l6', OPTIONS, {});
+      // Прежние параметры хода (с полем слоя) уходят в продолжение как есть.
+      const previous = registry.describe('l6')?.options;
+      expect(previous?.localLayer).toBeDefined();
+      fake.finish();
+      await flush();
+      on = false;
+      registry.start('l6', { ...(previous ?? OPTIONS) }, {});
+      const options = registry.describe('l6')?.options;
+      expect(options?.localLayer).toBeUndefined();
+      expect(options?.platformArgs).toEqual([]);
     });
 
     it('песочница и маршрут без project слоя не получают', () => {

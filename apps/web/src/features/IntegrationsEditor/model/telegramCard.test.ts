@@ -21,7 +21,7 @@ import {
 const settings = (over: Partial<TelegramSettings> = {}): TelegramSettings => ({
   enabled: true,
   chatId: '777',
-  events: ['runError', 'testFailed', 'budget', 'groupSignal'],
+  events: ['runError', 'testFailed', 'budget'],
   ...over,
 });
 const answers = (over: Partial<TelegramAnswersView['settings']> = {}) => ({
@@ -44,7 +44,7 @@ const status = (over: Partial<IntegrationStatus> = {}): IntegrationStatus => ({
 
 describe('группы «Когда звать» и события', () => {
   it('группа отмечена, только если отмечены все её события', () => {
-    expect(groupsOf(['permission', 'question', 'runError', 'testFailed', 'groupSignal'])).toEqual({
+    expect(groupsOf(['permission', 'question', 'runError', 'testFailed'])).toEqual({
       waits: true,
       broken: true,
       budget: false,
@@ -64,7 +64,7 @@ describe('группы «Когда звать» и события', () => {
       budget: false,
     };
     expect([...notifyBody(draft, true).events].sort()).toEqual(
-      ['groupSignal', 'permission', 'question', 'runError', 'testFailed'].sort(),
+      ['permission', 'question', 'runError', 'testFailed'].sort(),
     );
   });
 });

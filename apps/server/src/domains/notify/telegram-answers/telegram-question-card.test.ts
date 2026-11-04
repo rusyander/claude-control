@@ -121,9 +121,7 @@ describe('вопрос-карточка законченного хода — в
           clientOf: (chatId) => tail(chatId)?.client,
           now,
         }),
-        foreign: [],
         defaultCli: 'Claude Code',
-        cliName: (id) => id,
       });
     const items = await collect();
     expect(items).toHaveLength(1);

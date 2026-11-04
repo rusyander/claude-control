@@ -13,6 +13,13 @@ import { openSection } from './rules-stubs.mjs';
 
 export async function shootLayers(browser, web, scenario) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  // Знакомство с маскотом уже было: его приветствие показывается один раз на 11 с и ложилось
+  // поверх 03-project-local, когда сценарий снимался один (GUIDE_ONLY=layers, 03.11.2026).
+  await page.addInitScript(() => {
+    const key = 'agentdeck.mascot';
+    const saved = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+    window.localStorage.setItem(key, JSON.stringify({ ...saved, greeted: true }));
+  });
 
   try {
     // ── 01. Реестр проектов ──────────────────────────────────────────────────

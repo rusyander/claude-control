@@ -14,8 +14,7 @@ Auto-applies to any fix with a visible result, no reminder needed.
 landed in that tree):
 
 - Dev servers, builds and shot scripts run from YOUR working copy only — never the user's main
-  checkout or another worktree: not your branch's base, not yours to write. A panel split group
-  gets refused by `own-copy-guard`.
+  checkout or another worktree: not your branch's base, not yours to write.
 - BEFORE = your copy before the first edit. First edit already landed with no BEFORE → shoot it from
   the base commit in an isolated tree inside your copy:
   `mkdir -p .agent/tmp/base && git archive $(git merge-base HEAD origin/<target>) | tar -x -C .agent/tmp/base`

@@ -1,18 +1,24 @@
 /**
  * Реестр протоколов провода. Сервер перебирает реестр, а не имена: протокол —
  * модуль с одной формой (`matches`, `inspect`, `head`/`body`/`failFrames` для
- * потока, `json`, `errorBody`, `windowHeaders`, необязательный `utility`).
+ * потока, `json`, `errorBody`, необязательные `windowHeaders` и `utility`). `inspect`
+ * получает тело и путь: у Google модель и поток — в пути.
  *
- * Шов под Google (`google-genai`, фаза 10): ещё один модуль той же формы в этот
- * список — `:streamGenerateContent?alt=sse` / `:generateContent`; сервер, сценарии,
- * след и набор проверок его подхватят, а клиент-разборщик в тестах пакета будет
- * обязателен (тест покрытия возможностей покраснеет без него).
+ * Новый протокол — ещё один модуль той же формы в этот список; сервер, сценарии, след и
+ * набор проверок его подхватят, а клиент-разборщик в тестах пакета обязателен (тест покрытия
+ * возможностей краснеет без него). Нет `windowHeaders` — шаг с `window` отказ сценария.
  */
 import { anthropicMessages } from './anthropic-messages.mjs';
+import { googleGenai } from './google-genai.mjs';
 import { openaiChat } from './openai-chat.mjs';
 import { openaiResponses } from './openai-responses.mjs';
 
-export const DIALECTS = Object.freeze([anthropicMessages, openaiChat, openaiResponses]);
+export const DIALECTS = Object.freeze([
+  anthropicMessages,
+  openaiChat,
+  openaiResponses,
+  googleGenai,
+]);
 
 export const DIALECT_IDS = Object.freeze(DIALECTS.map((dialect) => dialect.id));
 

@@ -11,6 +11,7 @@ import { AskBody } from '../AskBody/AskBody';
 import { localChatKey } from '../chatKey';
 import { ageMinutes } from '../../../entities/inbox/ageMinutes';
 import { sentKeys } from '../../../entities/inbox/sentKeys';
+import { decideCorePermit } from '../../../entities/core-task';
 import type { AskAnswer, CardState } from '../queue.types';
 import { answerAsk } from '../answerAsk';
 import { editAsk } from '../editAsk';
@@ -107,6 +108,8 @@ export function AskCard({
           autoApprove: run.autoApprove,
         });
       },
+      // Вопрос права задачи ядра: грант и ответ — командами ядра с подписью ключа телефона.
+      sendCore: (card, behavior) => decideCorePermit(t, card, behavior),
     })
       .then((outcome) => {
         markSent(outcome.sentKeys.flatMap((key) => sentKeys(chat, { key })));

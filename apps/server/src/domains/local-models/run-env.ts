@@ -47,9 +47,9 @@ export const LOCAL_RUN_ENV_VARS: readonly string[] =
   claudeRunFacts.limitsChannel?.via === 'env' ? claudeRunFacts.limitsChannel.vars : [];
 
 /**
- * Только для прогонов через шлюз панели (L7). Claude Code с чужим адресом API поиск
+ * Только для прогонов через шлюз контуров (L7). Claude Code с чужим адресом API поиск
  * инструментов выключает: облако само разворачивает `tool_reference`, а чужой сервер
- * не умеет. Шлюз умеет (`gateway/local-window/deferred-tools.ts`), и описания MCP
+ * не умеет. Шлюз ядра умеет (`apps/core/src/hop-host/gateway/local-window/deferred-tools.ts`), и описания MCP
  * (~36 тыс. токенов на полном наборе владельца) перестают ехать в каждом запросе.
  * Переключатель терминала ведёт CLI на llama-server мимо шлюза — ему это не ставится.
  * С `--tools` без `ToolSearch` (облегчённый набор) CLI сам грузит всё сразу (замер 15.10).
@@ -60,9 +60,9 @@ export const LOCAL_GATEWAY_RUN_ENV = { ENABLE_TOOL_SEARCH: 'true' } as const;
 export const LOCAL_REQUEST_FLOOR_MS = 300_000;
 /** Предел самого Claude Code: больше 30 минут он срок не принимает. */
 export const CLAUDE_TIMEOUT_CAP_MS = 1_800_000;
-/** Скорость разбора промпта, пока замера нет (как у шлюза, `local-window.ts`). */
+/** Скорость разбора промпта, пока замера нет. */
 const FALLBACK_PROMPT_TPS = 150;
-/** Запас на разброс скорости: тот же коэффициент, что у шлюза. */
+/** Запас на разброс скорости. */
 const BUDGET_SLACK = 1.5;
 /** Какая доля окна на ответ одного инструмента. */
 const LOCAL_TOOL_OUTPUT_SHARE = 8;

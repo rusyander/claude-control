@@ -1,17 +1,6 @@
 import { z } from 'zod';
-import type {
-  Group,
-  McpServer,
-  McpServerDraft,
-  PermissionRule,
-  Project,
-} from '@agentdeck/contracts';
+import type { McpServer, McpServerDraft, PermissionRule, Project } from '@agentdeck/contracts';
 import type { PanelActionPreview } from '@agentdeck/contracts/panel-agent';
-import {
-  groupKeyOf,
-  pairsOf,
-  type ProjectGroupChoiceView,
-} from '@agentdeck/contracts/group-sources';
 import { unifiedDiff } from '../../../domains/config-preview/unified-diff.ts';
 import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import {
@@ -43,14 +32,14 @@ import {
   permissionsPage,
   type McpInput,
 } from '../actions-config/actions-config.ts';
-import { pageFor, projectOf, projectPage, projectRef, samePath } from '../project-target.ts';
+import { pageFor, projectOf, projectPage, projectRef } from '../project-target.ts';
 import { dataField, textField } from '../texts/texts.ts';
 
 /**
  * Действия над конфигурацией ОДНОГО проекта (U4a): его файл инструкций,
- * `.mcp.json`, права `.claude/settings*.json` и выбор стороны пары групп.
- * Исполняются проектными маршрутами окна (`/api/projects/:id/...`,
- * `/api/projects/group-choice`) — те же проверки, резервная копия и гейт
+ * `.mcp.json`, права `.claude/settings*.json`.
+ * Исполняются проектными маршрутами окна (`/api/projects/:id/...`) — те же
+ * проверки, резервная копия и гейт
  * провайдера. Проектные файлы лежат в репозитории проекта, поэтому карточка —
  * дифф того, что уйдёт в файл, а секреты модель не видит и не присылает теми же
  * правилами, что и у пользовательского уровня (`actions-config.ts`).
@@ -524,113 +513,11 @@ const removeProjectPermission = definePanelAction({
   page: (input) => pageFor(input),
 });
 
-// --- Выбор стороны пары групп ---
-
-const groupKeyInput = z
-  .string()
-  .regex(/^(global|project):.+$/, 'global:<group id> or project:<group id>');
-
-const choiceUrl = (project: Project, group?: string) =>
-  `/api/projects/group-choice?path=${encode(project.path)}${group ? `&group=${encode(group)}` : ''}`;
-
-const readProjectGroupChoice = definePanelAction({
-  name: 'read_project_group_choice',
-  section: 'projects',
-  risk: 'read',
-  description:
-    'Which side of each group pair is active in one project: a project group or its global copy. ' +
-    'choices maps project group id → active key (global:<id> | project:<id>); empty = project groups everywhere.',
-  input: z.object({
-    project: projectRef,
-    group: z.string().trim().min(1).optional().describe('Group id or key of one pair; omit = all'),
-  }),
-  route: async (input, inject) => ({
-    method: 'GET',
-    url: choiceUrl(await projectOf(inject, input), input.group),
-  }),
-  summary: 'journal-project-group-choice',
-});
-
-/**
- * Пара проекта, стороной которой назван ключ, или отказ до карточки: маршрут
- * ответил бы 404/409 уже после клика человека.
- */
-async function pairOf(inject: InjectRoute, project: Project, key: string) {
-  const groups = await readRoute<Group[]>(inject, '/api/groups');
-  const pair = pairsOf(groups, (path) => samePath(path, project.path)).find(
-    (item) => groupKeyOf(item.project) === key || (item.global && groupKeyOf(item.global) === key),
-  );
-  if (!pair) {
-    throw new Error(
-      `«${key}» is not a side of any group pair in project «${project.name}». ` +
-        'Call read_project_group_choice and list_groups.',
-    );
-  }
-  const side = groupKeyOf(pair.project) === key ? pair.project : (pair.global ?? pair.project);
-  return { pair, name: `${side.name} (${key})` };
-}
-
-const setProjectGroupChoice = definePanelAction({
-  name: 'set_project_group_choice',
-  section: 'projects',
-  risk: 'change',
-  title: 'journal-project-group-choice-set',
-  description:
-    'Choose which side of a group pair is active in one project: groupKey "global:<id>" or "project:<id>" ' +
-    '(ids from read_project_group_choice / list_groups); null returns every pair to its project group. Needs confirmation.',
-  input: z.object({ project: projectRef, groupKey: groupKeyInput.nullable() }),
-  route: async (input, inject) => ({
-    method: 'PUT',
-    url: '/api/projects/group-choice',
-    body: { path: (await projectOf(inject, input)).path, groupKey: input.groupKey },
-  }),
-  fingerprint: async (input, inject) => {
-    const project = await projectOf(inject, input);
-    return fingerprintOf(await readRoute<ProjectGroupChoiceView>(inject, choiceUrl(project)));
-  },
-  preview: async (input, inject) => {
-    const project = await projectOf(inject, input);
-    const before = await readRoute<ProjectGroupChoiceView>(inject, choiceUrl(project));
-    const label = `group-choice: ${project.path}`;
-    const fields = [dataField('label-project', `${project.name} — ${project.path}`)];
-    if (input.groupKey === null) {
-      if (Object.keys(before.choices).length === 0) {
-        throw new Error('Nothing would change: every pair already uses its project group.');
-      }
-      return stateCard(
-        label,
-        before.choices,
-        {},
-        card('summary-project-group-choice-reset', { project: project.name }),
-        fields,
-      );
-    }
-    const current = await readRoute<ProjectGroupChoiceView>(
-      inject,
-      choiceUrl(project, input.groupKey),
-    );
-    const { pair, name } = await pairOf(inject, project, input.groupKey);
-    const active = current.groupKey ?? groupKeyOf(pair.project);
-    if (active === input.groupKey) {
-      throw new Error('Nothing would change: that group is already the active one.');
-    }
-    return stateCard(
-      label,
-      { active },
-      { active: input.groupKey },
-      card('summary-project-group-choice', { group: name, project: project.name }),
-      [...fields, dataField('label-group', name)],
-    );
-  },
-  page: (input) => pageFor(input),
-});
-
 /** Действия конфигурации проекта в порядке показа: чтения, затем правки. */
 export const PROJECT_CONFIG_ACTIONS: readonly AnyPanelAction[] = [
   readProjectClaudeMd,
   listProjectMcp,
   listProjectPermissions,
-  readProjectGroupChoice,
   saveProjectClaudeMd,
   saveProjectMcpServer,
   deleteProjectMcpServer,
@@ -638,5 +525,4 @@ export const PROJECT_CONFIG_ACTIONS: readonly AnyPanelAction[] = [
   addProjectPermission,
   editProjectPermission,
   removeProjectPermission,
-  setProjectGroupChoice,
 ];

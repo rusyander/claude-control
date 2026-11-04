@@ -52,17 +52,6 @@ export function PanelAgentGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('firstHistory')} text={g('firstHistoryText')}>
             <HelpShot topic="panelAgent" scenario="first" frame="10-history" side="panel" />
           </GuideStep>
-          <GuideStep title={g('firstScenario')} text={g('firstScenarioText')}>
-            <HelpShot topic="panelAgent" scenario="first" frame="11-scenario-card" side="panel" />
-          </GuideStep>
-          <GuideStep title={g('firstScenarioCreated')} text={g('firstScenarioCreatedText')}>
-            <HelpShot
-              topic="panelAgent"
-              scenario="first"
-              frame="12-scenario-created"
-              side="panel"
-            />
-          </GuideStep>
         </GuideSteps>
       </HelpSection>
 
@@ -86,30 +75,8 @@ export function PanelAgentGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('guardsMcpSecret')} text={g('guardsMcpSecretText')}>
             <HelpShot topic="panelAgent" scenario="guards" frame="06-mcp-secret" side="panel" />
           </GuideStep>
-          <GuideStep title={g('guardsOtherCli')} text={g('guardsOtherCliText')}>
-            <HelpShot topic="panelAgent" scenario="guards" frame="07-other-cli" side="panel" />
-          </GuideStep>
           <GuideStep title={g('guardsDlp')} text={g('guardsDlpText')}>
             <HelpShot topic="panelAgent" scenario="guards" frame="08-dlp-broken" side="panel" />
-          </GuideStep>
-          <GuideStep title={g('guardsCli')} text={g('guardsCliText')}>
-            <HelpShot topic="panelAgent" scenario="guards" frame="09-cli-not-found" side="panel" />
-          </GuideStep>
-          <GuideStep title={g('guardsEndpoint')} text={g('guardsEndpointText')}>
-            <HelpShot
-              topic="panelAgent"
-              scenario="guards"
-              frame="10-endpoint-unsupported"
-              side="panel"
-            />
-          </GuideStep>
-          <GuideStep title={g('guardsContourDown')} text={g('guardsContourDownText')}>
-            <HelpShot
-              topic="panelAgent"
-              scenario="guards"
-              frame="11-contour-unreachable"
-              side="panel"
-            />
           </GuideStep>
           <GuideStep title={g('guardsBusy')} text={g('guardsBusyText')}>
             <HelpShot topic="panelAgent" scenario="guards" frame="12-busy" side="panel" />

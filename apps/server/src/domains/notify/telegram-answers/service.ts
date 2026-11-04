@@ -36,6 +36,7 @@ import {
   TOAST,
 } from './compose.ts';
 import type { AnswersStore } from './store.ts';
+import { coreAskRefusalText } from '../core-notice.ts';
 import { CLEAR_REPLY_TTL_MS, clearChat, clearReplyText, flushDeletes } from './cleanup.ts';
 import {
   AlbumBuffer,
@@ -171,6 +172,7 @@ export class TelegramAnswersService {
   constructor(deps: AnswersServiceDeps) {
     this.deps = deps;
     this.now = deps.now ?? Date.now;
+    deps.store.useClock(() => this.now());
     this.albums = new AlbumBuffer(deps.albumWaitMs ?? 1_500);
   }
 
@@ -437,8 +439,8 @@ export class TelegramAnswersService {
     item.outcome =
       why.kind === 'inPanel'
         ? OUTCOME.inPanel(now)
-        : why.kind === 'deferred'
-          ? OUTCOME.deferred(why.id, now)
+        : why.kind === 'coreOnly'
+          ? OUTCOME.coreOnly(now)
           : OUTCOME.stale(now);
   }
 
@@ -584,12 +586,6 @@ export class TelegramAnswersService {
         return this.finish(token, message, item, toast, clientId, {
           kind: 'decision',
           behavior: action.act,
-        });
-      case 'here':
-      case 'stop':
-        return this.finish(token, message, item, toast, clientId, {
-          kind: 'branch',
-          choice: action.act,
         });
       case 'pick':
       case 'toggle':
@@ -743,6 +739,16 @@ export class TelegramAnswersService {
       await toast(item.outcome?.startsWith('💻') ? TOAST.answered : TOAST.stale);
       return;
     }
+    if (outcome.coreOnly) {
+      // Вопрос ядра ждёт ответа, но не отсюда: кнопки снимаются (повтор дал бы тот же отказ),
+      // строка итога называет, где ответить, — без «Не получилось» и без «Уже не актуально».
+      this.answerFiles.delete(item.key);
+      item.state = 'done';
+      item.outcome = OUTCOME.coreOnly(now);
+      await this.render(token, message);
+      await toast(TOAST.coreOnly);
+      return;
+    }
     this.deps.log(`telegram-answers: answer refused: ${outcome.detail}`);
     await toast(TOAST.failed);
   }
@@ -797,6 +803,13 @@ export class TelegramAnswersService {
     const to = messages.map((one) => one.reply_to_message?.message_id).find(Boolean);
     if (!to) {
       await this.say(token, ownerId, HELP_TEXT);
+      return;
+    }
+    // Вопрос ядра задач: ответ `answer` — суд `human-strict`, Telegram его не доказывает (ни числа
+    // страницы панели, ни подписи ключом телефона). Не пересылаем — отказ и где ответить.
+    const coreAsk = this.deps.sentLog?.find(ownerId, to, this.now())?.coreAsk;
+    if (coreAsk) {
+      await this.say(token, ownerId, coreAskRefusalText(coreAsk.deepLink));
       return;
     }
     const clientId = `tg-r${messages[0]!.message_id}`;
@@ -1012,8 +1025,6 @@ function outcomeLine(answer: Answer, at: number): string {
   if (answer.kind === 'decision') {
     return answer.behavior === 'allow' ? OUTCOME.allowed(at) : OUTCOME.denied(at);
   }
-  if (answer.kind === 'branch')
-    return answer.choice === 'here' ? OUTCOME.here(at) : OUTCOME.stop(at);
   const text =
     answer.questions.length <= 1
       ? (answer.picks[0] ?? []).join(', ')

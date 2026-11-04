@@ -56,9 +56,6 @@ export const platformEn: Record<PlatformMessageCode, string> = {
   'oauth-session-missing': 'The authorization session was not found or expired',
   'assistant-timeout': 'The assistant did not answer in the allotted time',
   'assistant-request-invalid': 'The assistant request was not accepted: {{detail}}',
-  'assistant-empty-reply': 'The model returned an empty answer.',
-  'assistant-reply-truncated':
-    "The model's answer was cut off at the length limit — nothing was applied. Split the task into parts.",
   'manifest-invalid-object': 'Request rejected: overrides must be an object of fields ({{field}}).',
   'manifest-invalid-client-tools':
     'Request rejected: tools must be «native» or «shim» ({{field}}).',
@@ -81,30 +78,17 @@ export const platformEn: Record<PlatformMessageCode, string> = {
     'Request rejected: «{{subject}}» — the panel sets this header itself ({{field}}).',
   'assistant-route-refused': 'The helper did not start: {{reason}}',
   'assistant-provider-unsupported':
-    '{{provider}} has neither a non-interactive mode nor an API — the helper has nothing to answer with. Switch the active CLI or pick a «Panel assistant» profile',
-  'assistant-provider-unavailable':
-    '{{provider}} is not on the panel process PATH and there is no API key — the helper has nothing to answer with. Install the CLI or save a key',
-  'assistant-contour-cli-missing':
-    '{{provider}} goes through the contour, but the CLI is not on the panel process PATH — the helper did not start, so as not to reach the vendor cloud past the contour',
-  'assistant-contour-gateway-down':
-    'The panel assistant goes through the contour «{{title}}», but the panel gateway is not running — the request was not sent, so as not to reach the vendor cloud. Press «Start gateway» on the contour card',
-  'assistant-contour-no-token':
-    'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
-  'watcher-cli-missing':
-    '{{provider}} is not on the panel process PATH — there is nothing to run the analysis with. Install the CLI. Analysis did not start',
-  'watcher-provider-unsupported':
-    'The active CLI is {{provider}}: it has no run without edits, which the watcher analyses problems with, and the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
-  'watcher-endpoint-unsupported':
-    'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
-  'watcher-off': 'The watcher is off: turn it on to check a bug.',
+    '{{provider}} has no core judge that would refuse a built-in tool on every call — a service question without tools cannot be trusted to it. Switch the active CLI to another one, for example Claude or Qwen Code',
+  'assistant-extra-tool':
+    'The model called a built-in tool ({{tool}}), but a service question has no tools — the turn was stopped, there is no answer.',
   'provider-chat-unsupported':
     '{{provider}} has no non-interactive mode — the panel chat cannot work with it. The conversation was not created: switch the active CLI',
+  'provider-chat-core':
+    'A foreign CLI chat runs on the core: an old panel conversation is read-only — turns, stop, restart, queue and permission answers are no longer taken here. Continue in the core chat: section «Chat», button «New»',
   'analytics-provider-unsupported':
     'Analytics reads the logs of Claude Code, Codex and Qwen Code only, and the active CLI is {{provider}}. Claude data is not shown under it',
   'analytics-live-foreign':
     'The panel recognises running processes of Claude Code only, and the active CLI is {{provider}}. The list stays empty rather than pass claude processes off as its own',
-  'groups-foreign-not-delivered':
-    'Panel groups live in the Claude Code settings, and {{provider}} does not read them — the group does not reach its runs',
   'plugins-provider-unsupported':
     'The Claude Code plugins section works through claude only, and the active CLI is {{provider}}. The command did not run',
   'sandbox-provider-unsupported':

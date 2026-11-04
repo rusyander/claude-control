@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import { createServer, type Server } from 'node:http';
@@ -21,7 +22,11 @@ import { createEventHub } from '../../lib/event-hub/event-hub.ts';
 import { allowedOrigins } from '../../lib/origin-guard/origin-guard.ts';
 import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.ts';
 import { agentJournalPath } from '../../domains/panel-agent/journal/journal.ts';
-import { panelBridgeScript } from '../../domains/panel-agent/runner/runner.ts';
+import {
+  BRIDGE_TOKEN_HEADER,
+  createBridgeTokenLedger,
+  type BridgeTokenLedger,
+} from '../../lib/bridge-tokens/bridge-tokens.ts';
 import { registerProjectRoutes } from '../project-routes/project-routes.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
 import { textWindow } from './action-kit/action-kit.ts';
@@ -33,6 +38,9 @@ import { textWindow } from './action-kit/action-kit.ts';
  * кликает человек. Доказательство — реестр проектов, а не текст инструмента.
  */
 const ORIGIN = 'http://localhost:8888';
+/** Скрипт моста — тот, который ядро кладёт в сессию «ask» (`panel-bridge`). */
+const panelBridgeScript = (): string =>
+  fileURLToPath(new URL('../../../../../tools/mcp/panel.mjs', import.meta.url));
 
 type ToolText = { content: Array<{ type: string; text: string }>; isError?: boolean };
 
@@ -45,6 +53,7 @@ describe('tools/mcp/panel.mjs', () => {
   let app: FastifyInstance;
   let base: string;
   let client: Client;
+  let bridges: BridgeTokenLedger;
   const seenHeaders: Array<string | string[] | undefined> = [];
 
   const connect = async (url: string, extra: Record<string, string> = {}): Promise<Client> => {
@@ -78,10 +87,12 @@ describe('tools/mcp/panel.mjs', () => {
       backupDir: join(appData, 'backups'),
       location: { paths: { appData } },
     } as unknown as ServerContext;
+    bridges = createBridgeTokenLedger();
     const access = {
       allowedOrigins: allowedOrigins(8888),
       requiresToken: () => false,
       expectedToken: () => '',
+      bridges,
     };
     app = Fastify();
     app.addHook('onRequest', async (request) => {
@@ -92,7 +103,7 @@ describe('tools/mcp/panel.mjs', () => {
     registerAccessGate(app, access);
     registerEmptyBodyGuard(app);
     registerProjectRoutes(app, ctx);
-    registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
+    registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access, bridges });
     await app.listen({ port: 0, host: '127.0.0.1' });
     base = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
     client = await connect(base);
@@ -318,8 +329,25 @@ describe('tools/mcp/panel.mjs', () => {
     }
   });
 
+  it('токен моста из окружения ядра: живой — действие проходит, снятый — модель слышит отказ', async () => {
+    const token = bridges.mint('conv-bridge');
+    const bridge = await connect(base, { AGENTDECK_BRIDGE_TOKEN: token });
+    try {
+      const live = (await bridge.callTool({ name: 'list_sections', arguments: {} })) as ToolText;
+      expect(live.isError).toBeFalsy();
+      // Итог действия записан на токен хода — его прочтёт следующий ход разговора.
+      expect(bridges.revoke(token)).toEqual([expect.stringMatching(/^list_sections: /)]);
+      const dead = (await bridge.callTool({ name: 'list_sections', arguments: {} })) as ToolText;
+      expect(dead.isError).toBe(true);
+      expect(dead.content[0]?.text).toContain('401');
+    } finally {
+      await bridge.close();
+    }
+  });
+
   it('константы переходника совпадают с контрактом', () => {
     const source = readFileSync(panelBridgeScript(), 'utf8');
+    expect(source).toContain(`const BRIDGE_TOKEN_HEADER = '${BRIDGE_TOKEN_HEADER}';`);
     expect(source).toContain(`const PANEL_AGENT_HEADER = '${PANEL_AGENT_HEADER}';`);
     expect(source).toContain(`name: '${PANEL_AGENT_BRIDGE_ID}'`);
     const confirm = /const PANEL_ACTION_CONFIRM_TIMEOUT_MS = (\d+) \* 60_000;/.exec(source);

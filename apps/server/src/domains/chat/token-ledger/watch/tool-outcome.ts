@@ -1,5 +1,4 @@
 import { DEFERRED_MARKER, PANEL_REFUSAL_MARKER } from '@agentdeck/contracts/deferred-asks';
-import { MAIN_SYNC_DENIED, MAIN_SYNC_UNKNOWN } from '../../main-sync/main-sync.ts';
 
 /**
  * Чем кончился вызов инструмента — для R15 (вызов упёрся в свой срок), R18
@@ -54,18 +53,10 @@ const PERMISSION_DENIAL = /Permission for this action was denied/;
 const NOT_A_WALL = /autonomous-pick|no verdict/i;
 const GUARD_LABEL_MAX = 40;
 /**
- * Отказы брокера панели приходят ошибкой без рода CLI, если вызов отбит до
- * исполнения ответом на запрос прав: текст — единственный след (C14). Догон
- * целевой ветки — общее начало `MAIN_SYNC_DENIED` и `MAIN_SYNC_UNKNOWN`; правка в
- * основной копии — начало `outsideCopyDenial` (`ChatBranchGate.ts`: модуль тянет
- * диск и git, сюда идёт только текст, сверку держит тест).
+ * Отказы панели приходят ошибкой без рода CLI: текст — единственный след (C14).
+ * Отказы стража догона и ворот ветки ушли вместе с мостом прав (этап 10, G14).
  */
-const MAIN_SYNC_PREFIX = commonPrefix(MAIN_SYNC_DENIED, MAIN_SYNC_UNKNOWN);
-export const OUTSIDE_COPY_PREFIX =
-  "The edit was not applied: the file lies in the project's main copy";
 const BROKER_DENIALS: ReadonlyArray<readonly [string, string]> = [
-  [MAIN_SYNC_PREFIX, 'main-sync'],
-  [OUTSIDE_COPY_PREFIX, 'outside-copy'],
   // Отложено человеку как D-n и отказ панели с известным ответом: отказ, а не
   // вопрос — реестр не поднимает по нему «ждёт вас» (`ChatRunRegistry.emit`).
   [DEFERRED_MARKER, 'deferred'],
@@ -86,12 +77,6 @@ const HEAD_SCAN = 400;
 const ERROR_HEAD_MAX = 120;
 // eslint-disable-next-line no-control-regex -- цвет терминала в ответе Playwright и тестов
 const ANSI = /\u001b\[[0-9;]*m/g;
-
-function commonPrefix(left: string, right: string): string {
-  let n = 0;
-  while (n < left.length && left[n] === right[n]) n += 1;
-  return left.slice(0, n);
-}
 
 /**
  * Голова ошибки: без обёрток CLI (`<tool_use_error>`, «Error:»), строки кода выхода и

@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:43.396Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+      "shotAt": "2026-11-03T16:50:38.881Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
       "en": {
         "file": "01-list.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:36.686Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:52:46.958Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "255da666b1150ba3",
+          "text": "3eedca0c8b87c7be"
+        }
       },
       "dark": {
         "file": "01-list.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:14.130Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:54:37.866Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "0bc6d256a71aaf24",
+          "text": "06e449a7becc9354"
+        }
       },
       "darkEn": {
         "file": "01-list.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:25.643Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:56:30.808Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "df11ede83f112b1d",
+          "text": "3eedca0c8b87c7be"
+        }
+      },
+      "seal": {
+        "png": "37542b3eeb70472f",
+        "text": "06e449a7becc9354"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:44.673Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Ничего не найдено По запросу «миграции» совпадений ни в заголовках, ни в тексте правил нет.",
+      "shotAt": "2026-11-03T16:50:40.609Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Ничего не найдено По запросу «миграции» совпадений ни в заголовках, ни в тексте правил нет.",
       "en": {
         "file": "02-search.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:37.970Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Nothing found No rule title or body matches “миграции”."
+        "shotAt": "2026-11-03T16:52:48.677Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Nothing found No rule title or body matches “миграции”.",
+        "seal": {
+          "png": "f7aef2fdb507f369",
+          "text": "3b03b4aed18d47f0"
+        }
       },
       "dark": {
         "file": "02-search.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:15.408Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Ничего не найдено По запросу «миграции» совпадений ни в заголовках, ни в тексте правил нет."
+        "shotAt": "2026-11-03T16:54:39.593Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 4 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Ничего не найдено По запросу «миграции» совпадений ни в заголовках, ни в тексте правил нет.",
+        "seal": {
+          "png": "c0c9eb58b4373c4b",
+          "text": "3eabbecac8561ae9"
+        }
       },
       "darkEn": {
         "file": "02-search.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:26.902Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Nothing found No rule title or body matches “миграции”."
+        "shotAt": "2026-11-03T16:56:32.570Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 4 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Nothing found No rule title or body matches “миграции”.",
+        "seal": {
+          "png": "a22639561daf5870",
+          "text": "3b03b4aed18d47f0"
+        }
+      },
+      "seal": {
+        "png": "2250fed7fe783591",
+        "text": "3eabbecac8561ae9"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:48.278Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Обновлено",
+      "shotAt": "2026-11-03T16:50:44.244Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Обновлено",
       "en": {
         "file": "03-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:41.585Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Updated"
+        "shotAt": "2026-11-03T16:52:52.318Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Updated",
+        "seal": {
+          "png": "c112619a7d9dd9f8",
+          "text": "1a5160d4f2e56dce"
+        }
       },
       "dark": {
         "file": "03-off.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:19.086Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Обновлено"
+        "shotAt": "2026-11-03T16:54:43.238Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Обновлено",
+        "seal": {
+          "png": "c4996102236b3370",
+          "text": "811ea1ab07fadeca"
+        }
       },
       "darkEn": {
         "file": "03-off.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:30.540Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Updated"
+        "shotAt": "2026-11-03T16:56:36.202Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть. Бэкенд только на чтение Читать код сервера можно всегда. Править — только после явного разрешения на эту задачу; разрешение не переносится на следующую. Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Рассуждение о том, что код верный, проверкой не считается. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек. Updated",
+        "seal": {
+          "png": "76d81d41f6432106",
+          "text": "1a5160d4f2e56dce"
+        }
+      },
+      "seal": {
+        "png": "2419a574a937e008",
+        "text": "811ea1ab07fadeca"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:53.994Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-KDlYmu\\CLAUDE.md Символов: 545 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "shotAt": "2026-11-03T16:50:50.680Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-yQE3Ij\\CLAUDE.md Символов: 545 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
       "en": {
         "file": "04-file-disabled.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:47.622Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-hn3v19\\CLAUDE.md Characters: 545 Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:52:58.760Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-qyKf7z\\CLAUDE.md Characters: 545 Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "4b51b73e9a8eb9eb",
+          "text": "fdf2325ae312c05e"
+        }
       },
       "dark": {
         "file": "04-file-disabled.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:25.781Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-u1f2Nx\\CLAUDE.md Символов: 545 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code"
+        "shotAt": "2026-11-03T16:54:49.669Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-69idSY\\CLAUDE.md Символов: 545 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+        "seal": {
+          "png": "8aadc68e37c2d88c",
+          "text": "aab544589031b9ec"
+        }
       },
       "darkEn": {
         "file": "04-file-disabled.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:36.579Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-N1Zq8v\\CLAUDE.md Characters: 545 Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:56:42.624Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-48Pk35\\CLAUDE.md Characters: 545 Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "a7dfdd6e6f702297",
+          "text": "63e7bf57da2145c3"
+        }
+      },
+      "seal": {
+        "png": "cbf7cd21c5de4e05",
+        "text": "c28afff297d4a4a0"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:57.023Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 0 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+      "shotAt": "2026-11-03T16:50:54.466Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 0 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
       "en": {
         "file": "05-zero.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:50.848Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 0 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:53:02.612Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 0 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "67aa0a840050744b",
+          "text": "3b666c42080b2b69"
+        }
       },
       "dark": {
         "file": "05-zero.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:29.048Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 0 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:54:53.456Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 0 Выключены 1 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "e6368d10935c3ec8",
+          "text": "9dbddd95e2eb9732"
+        }
       },
       "darkEn": {
         "file": "05-zero.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:39.813Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 0 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:56:46.485Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 0 Off 1 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "fdd25f84455cc21b",
+          "text": "3b666c42080b2b69"
+        }
+      },
+      "seal": {
+        "png": "eab66953adae82ba",
+        "text": "9dbddd95e2eb9732"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:30:49.573Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Правила, которые остались в CLAUDE.md, но агент их не видит. Включите переключателем — текст не потерян. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+      "shotAt": "2026-11-03T16:50:45.566Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Правила, которые остались в CLAUDE.md, но агент их не видит. Включите переключателем — текст не потерян. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
       "en": {
         "file": "06-tab-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:42.904Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Rules that stay in CLAUDE.md but the agent does not see. Turn one on with its switch — the text is not lost. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:52:53.630Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Rules that stay in CLAUDE.md but the agent does not see. Turn one on with its switch — the text is not lost. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "c6e1e86e9bbc17d5",
+          "text": "be0fe2817e187b9e"
+        }
       },
       "dark": {
         "file": "06-tab-off.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:20.572Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Правила, которые остались в CLAUDE.md, но агент их не видит. Включите переключателем — текст не потерян. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:54:44.544Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 4 Включены 3 Выключены 1 Правила, которые остались в CLAUDE.md, но агент их не видит. Включите переключателем — текст не потерян. Коммиты только по просьбе Выключено Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "494645f057126dc1",
+          "text": "cbcbe6caad52ebe9"
+        }
       },
       "darkEn": {
         "file": "06-tab-off.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:31.856Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Rules that stay in CLAUDE.md but the agent does not see. Turn one on with its switch — the text is not lost. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек."
+        "shotAt": "2026-11-03T16:56:37.518Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 4 On 3 Off 1 Rules that stay in CLAUDE.md but the agent does not see. Turn one on with its switch — the text is not lost. Коммиты только по просьбе Disabled Никаких commit, push и веток по своей инициативе. Правки остаются в рабочей копии, а что из них попадёт в историю — решает человек.",
+        "seal": {
+          "png": "10a98ee655ea6ee3",
+          "text": "be0fe2817e187b9e"
+        }
+      },
+      "seal": {
+        "png": "6ddcf5edccc2ba8a",
+        "text": "cbcbe6caad52ebe9"
       }
     }
   ]

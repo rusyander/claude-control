@@ -1,6 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { isOAuthCallback, isRequestAllowed } from '../origin-guard/origin-guard.ts';
 import { acceptsQueryToken, isValidApiToken, presentedToken } from '../api-token/api-token.ts';
+import {
+  BRIDGE_TOKEN_HEADER,
+  isAgentActionsPath,
+  type BridgeTokenLedger,
+} from '../bridge-tokens/bridge-tokens.ts';
 
 export interface AccessGateDeps {
   /** Источники своего интерфейса — `allowedOrigins(WEB_PORT)`. */
@@ -12,6 +17,11 @@ export interface AccessGateDeps {
   requiresToken: () => boolean;
   /** Ожидаемый токен; спрашивается только когда он действительно нужен. */
   expectedToken: () => string;
+  /**
+   * Книга токенов моста сессии (`bridge-tokens.ts`): одна на панель — её же читают маршруты
+   * агента (владелец разговора, итоги действий). Нет книги — заголовок моста не принимается нигде.
+   */
+  bridges?: BridgeTokenLedger;
 }
 
 /**
@@ -47,6 +57,23 @@ export function registerAccessGate(app: FastifyInstance, deps: AccessGateDeps): 
 
     if (!isRequestAllowed(guarded, deps.allowedOrigins)) {
       reply.code(403).send({ error: 'Запрос с постороннего сайта отклонён' });
+      return;
+    }
+
+    // Мост сессии ядра приходит своим токеном вместо токена панели: годен только на действиях
+    // агента и только живой. Мёртвый или не там — отказ, даже при выключенном удалённом доступе:
+    // процесс модели, переживший свой ход, не должен дотягиваться до панели ничем.
+    const bridge = request.headers[BRIDGE_TOKEN_HEADER];
+    if (bridge !== undefined) {
+      const live =
+        typeof bridge === 'string' &&
+        isAgentActionsPath(request.url) &&
+        deps.bridges?.ownerOf(bridge) !== undefined;
+      if (!live) {
+        reply.code(401).send({ error: 'Токен моста сессии не действует' });
+        return;
+      }
+      done();
       return;
     }
 

@@ -38,6 +38,8 @@ await runOnStand(
   {
     label: 'agent-tests-block-walk',
     fakeCli: { claude: FAKE_PANEL_AGENT_TESTS_BLOCK_CLI_SOURCE },
+    // Ход агента панели идёт через ядро (s10): без `core` он отказывает «core is not running».
+    core: true,
     seed: ({ home }) => {
       const tests = join(home, PROJECT, '.agent', 'tests');
       mkdirSync(tests, { recursive: true });

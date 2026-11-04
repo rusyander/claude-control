@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -10,7 +10,7 @@ import {
   createLoopbackStreamFetch,
   readCaCert,
 } from './ca-fetch.ts';
-import { failureKind } from '../gateway/upstream/upstream.ts';
+import { failureKind } from '../upstream/upstream.ts';
 
 /**
  * Транспорт с корневым сертификатом компании — против НАСТОЯЩЕГО сервера.
@@ -147,12 +147,33 @@ describe('readCaCert: нечитаемый файл — ошибка НАСТР�
 });
 
 describe('createCaFetch: своя реализация нужна только там, где без неё нельзя', () => {
-  it('без сертификата отдаётся встроенный fetch — второй транспорт не заводится', () => {
+  it('без сертификата обычный адрес идёт встроенным fetch — второй транспорт не заводится', async () => {
     // Окружение — явно пустое: прокси в окружении прогона (`HTTPS_PROXY` сессии
     // или корпоративной машины) законно требует своей реализации, и тест
     // проверял бы уже не «без сертификата», а чужую сеть.
-    expect(createCaFetch('', {})).toBe(globalThis.fetch);
-    expect(createCaFetch('   ', {})).toBe(globalThis.fetch);
+    const builtin = vi.spyOn(globalThis, 'fetch');
+    try {
+      for (const fetchImpl of [createCaFetch('', {}), createCaFetch('   ', {})]) {
+        expect((await fetchImpl(`${base}/v1/models`)).status).toBe(200);
+      }
+      expect(builtin).toHaveBeenCalledTimes(2);
+    } finally {
+      builtin.mockRestore();
+    }
+  });
+
+  it('имя под .localhost доходит до петли и без сертификата, и с ним (RFC 6761)', async () => {
+    // Резолвер Windows не знает `api.localhost` локального стенда: проба видела «адрес
+    // недоступен» там, где браузер открывал страницу.
+    const port = new URL(base).port;
+    for (const fetchImpl of [
+      createCaFetch('', {}),
+      createCaStreamFetch('', {}),
+      createCaFetch(pem, {}),
+    ]) {
+      const response = await fetchImpl(`http://stand-check.localhost:${port}/v1/models`);
+      expect(await response.json()).toEqual({ data: [{ id: 'gpt-4o' }] });
+    }
   });
 
   it('прокси в окружении — свой транспорт, даже без сертификата', () => {

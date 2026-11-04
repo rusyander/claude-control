@@ -8,7 +8,7 @@
  * - «что поменял агент в чате «ID»» → `read_project_changes`; ответ перечисляет файлы;
  * - «что в .claude папки «P»» → `read_project_local_config`; ответ называет скиллы,
  *   правила и команды хуков так, как их вернула панель (ключ модели не виден);
- * - «выключи/включи подбор модели в проекте «P»» → `set_model_cascade`.
+ * - «заведи папку e2e в проекте «P»» → `create_e2e_folder` (путь проекта — из list_projects).
  */
 import { FAKE_PANEL_AGENT_CLI_SOURCE } from './fake-cli-panel-agent.mjs';
 
@@ -44,11 +44,19 @@ const SCENARIO = String.raw`const current = (/Human \(current request\): ([\s\S]
         '; правила: ' + body.rules.map((rule) => rule.path).join(', ') +
         '; хуки: ' + body.hooks.map((hook) => hook.event + ' ' + hook.command).join(' | ');
   } else {
-    const enabled = !/выключи/i.test(current);
-    const made = await tool('set_model_cascade', { project: await projectRef(), enabled });
+    const listed = (await tool('list_projects', {})).text;
+    let projects;
+    try {
+      projects = JSON.parse(listed.slice(listed.search(/[[{]/)));
+    } catch {
+      projects = undefined;
+    }
+    const list = Array.isArray(projects) ? projects : (projects?.projects ?? []);
+    const projectPath = list.find((item) => item.name === quoted)?.path ?? quoted;
+    const made = await tool('create_e2e_folder', { projectPath });
     reply = made.isError || !made.text.startsWith('Done.')
-      ? 'Подбор модели не изменён: ' + first(made.text)
-      : 'Подбор модели ' + (enabled ? 'включён' : 'выключен') + '.';
+      ? 'Папка e2e не заведена: ' + first(made.text)
+      : 'Папка e2e заведена.';
   }
 `;
 

@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import type { ModelPricing, PricingEntry } from '../app-settings.ts';
+import type {
+  PlatformExhaustedScope,
+  PlatformGatewayEvent,
+  PlatformSpendRecord,
+  PlatformSummarizedReport,
+  PlatformUsageRecord,
+} from '../platform.ts';
 import { dlpRuleSchema, type DlpRule } from '../dlp.ts';
 import { platformManifestSchema, type PlatformManifestOverrides } from '../platform-presets.ts';
 import type { Fact } from './facts.ts';
@@ -99,6 +106,27 @@ export interface HopRegisterSpec {
    * ручка Anthropic, путь инструментов, префикс вендора) терялось. Нет — драйвер базы как есть.
    */
   manifest?: PlatformManifestOverrides | null;
+  /**
+   * Управляемые правила контура (Т7: инструменты контура, режим цикла, пресет, размышления) уже
+   * разложенными в поля провода: ядро сводит выбор человека и манифест драйвера, звено только
+   * кладёт поля ПОСЛЕ перевода диалекта и ДО маски. Нет — тело уходит без правил.
+   */
+  requestRules?: HopRequestRules | null;
+}
+
+/** Значение поля правила на проводе: строка, флаг или список имён. */
+export type HopRuleValue = string | boolean | string[];
+
+/**
+ * Правила тела верха. `set` — поля по пути (`a.b` — вложенное, объекты по дороге копируются);
+ * `streamless` — значения, с которыми верх не принимает поток (у платформы компании режим
+ * `single_turn`): тогда поток снимается, ответ приходит цельным телом. `forceStream` — перевод
+ * верха в поток (настройка панели `platformGateway.forceStream`, по умолчанию да).
+ */
+export interface HopRequestRules {
+  set: { path: string; value: HopRuleValue }[];
+  streamless: { path: string; values: string[] }[];
+  forceStream: boolean;
 }
 
 /** Заголовок ключа верха: имя (token RFC 9110) и слово перед ключом. */
@@ -108,13 +136,44 @@ export interface HopUpstreamAuth {
 }
 
 /**
- * Пары перевода шлюза звена (мост `hop-host/gateway/bridge.ts`: Anthropic → OpenAI chat) —
- * ОДИН список для судьи `compat` ядра и для регистрации у хоста: заявить больше, чем мост
- * умеет, значило бы открыть канал, которого нет; хост отказывает регистрации вне списка.
+ * Пары перевода шлюза звена — ОДИН список для судьи `compat` ядра и для регистрации у хоста:
+ * заявить больше, чем мост умеет, значило бы открыть канал, которого нет; хост отказывает
+ * регистрации вне списка. Мосты: `hop-host/gateway/bridge.ts` (Anthropic → OpenAI chat) и перевод
+ * на краю `hop-host/gateway/edge.ts` (Responses, Gemini → OpenAI chat, этап 10). DLP судит
+ * переведённое тело верха (`compat` `dlpDialect`, план Q7), поэтому `HOP_DLP_PARSES` прежний.
  */
 export const HOP_TRANSLATIONS: readonly { from: Dialect; to: Dialect }[] = [
   { from: 'anthropic-messages', to: 'openai-chat' },
+  { from: 'openai-responses', to: 'openai-chat' },
+  { from: 'google-genai', to: 'openai-chat' },
 ];
+
+/**
+ * Порт шлюза человека на хосте звеньев (этап 10): адрес, который активация пишет в конфиги CLI
+ * человека. Единственное исключение из отказа 5170–5180 — только для продукта; тесты берут
+ * свободный порт.
+ */
+export const HOP_USER_GATEWAY_PORT = 5179;
+
+/**
+ * Порт шлюза человека у ядра явно (стенды QA, тесты): число — этот порт; `0`, не число или вне
+ * 1–65535 — шлюза нет. Не задан — ядро на доме человека слушает порт из настроек панели (5179 по
+ * умолчанию, шлюза у панели больше нет), ядро на отдельном доме — нет (`userGatewayPlanOf` ядра).
+ */
+export const HOP_USER_GATEWAY_PORT_ENV = 'AGENTDECK_USER_GATEWAY_PORT';
+
+/**
+ * Порт шлюза человека по окружению — одно правило для ядра (где слушать) и проверок: число —
+ * задан; `null` — выключен явно (`0`, не порт); `undefined` — не задан, решает ядро.
+ */
+export function userGatewayPortOf(
+  env: Record<string, string | undefined>,
+): number | null | undefined {
+  const raw = env[HOP_USER_GATEWAY_PORT_ENV];
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const port = Number(raw);
+  return Number.isInteger(port) && port > 0 && port < 65_536 ? port : null;
+}
 
 /** Диалекты, тело которых разбирает DLP-звено (`@agentdeck/dlp` api-shapes); Google — нет. */
 export const HOP_DLP_PARSES: readonly Dialect[] = ['anthropic-messages', 'openai-chat'];
@@ -178,6 +237,69 @@ export interface HopStatus {
   substitutions?: HopPortSubstitution[];
   /** Каталог данных панели, с которым запущен хост (ключи `panel-store`, правила маски). */
   panelAppData?: string | null;
+  /** Шлюз человека (этап 10); нет — не открыт. */
+  userGateway?: HopUserGatewayState | null;
+  /** Прокси защиты данных человека (C3c); нет — не открыт. */
+  dlpProxy?: HopDlpProxyState | null;
+}
+
+/**
+ * Прокси защиты данных человека на хосте звеньев (C3c, перенос `DlpProxy` панели): человек сам
+ * пишет в свой CLI адрес `http://127.0.0.1:<port>`, прокси маскирует тело по правилам панели,
+ * пересылает на `upstream` с ключом самого CLI (ключа у прокси нет) и разворачивает метки в
+ * ответе. Журнал срабатываний — `dlp-journal.jsonl` в каталоге данных панели.
+ */
+export interface HopDlpProxyConfig {
+  port: number;
+  /** Абсолютный адрес наверх, уже разрешённый ядром (`@agentdeck/dlp/proxy-config`). */
+  upstream: string;
+  /** Тело незнакомой формы: пропустить (с записью в журнал) или отклонить. */
+  passUnknown: boolean;
+  journal: boolean;
+}
+
+/** `waiting` — порт занят, звено пробует снова; `listening` — держит. Счётчики — с настройки. */
+export interface HopDlpProxyState {
+  port: number;
+  state: 'waiting' | 'listening';
+  since: number;
+  upstream: string;
+  lastError?: string | null;
+  requests: number;
+  masked: number;
+  blocked: number;
+}
+
+/**
+ * Маршрут контура для шлюза человека: адрес CLI `/<platformId>/v1/...` (тот же, что у прежнего
+ * шлюза панели). `spec` — регистрация, как у метки сеанса; `from` звено ставит по ручке запроса,
+ * `tag`/`sessionId` — свои (`user:<platformId>`).
+ */
+export interface HopUserRoute {
+  platformId: string;
+  title: string;
+  enabled: boolean;
+  /**
+   * Разделы, открытые на контуре (`Platform.consumers`, у записи до Т3 — подстановка по целям):
+   * адрес с отметкой `/_s/<раздел>` проходит, только если раздел здесь. Адрес без отметки проходит
+   * всегда — свои проверки панели и старые файлы CLI.
+   */
+  consumers: string[];
+  /** Имена CLI по id — для текста отказа закрытого раздела `foreign:<id>`. */
+  cliNames?: Record<string, string>;
+  spec: HopRegisterSpec;
+}
+
+/**
+ * Шлюз человека: `waiting` — порт занят (прежний шлюз панели ещё держит его), звено пробует
+ * снова каждые `retryMs` и берёт порт, как только его отпустят; `listening` — держит.
+ */
+export interface HopUserGatewayState {
+  port: number;
+  state: 'waiting' | 'listening';
+  since: number;
+  routes: string[];
+  lastError?: string | null;
 }
 
 /**
@@ -218,7 +340,70 @@ export type HopControlRequest =
   | { op: 'status' }
   | { op: 'clear-exhausted'; routeId: RouteId }
   | { op: 'spend-of'; tag: HopTag }
-  | ({ op: 'probe' } & HopProbeRequest);
+  | ({ op: 'probe' } & HopProbeRequest)
+  /** Открыть/перенастроить шлюз человека (`port: null` — закрыть); `routes` ЗАМЕНЯЮТ набор. */
+  | { op: 'user-gateway'; port: number | null; routes: HopUserRoute[] }
+  /** Открыть/перенастроить прокси защиты данных человека (`config: null` — закрыть). */
+  | { op: 'dlp-proxy'; config: HopDlpProxyConfig | null }
+  /** Учёт контуров (C3b): след и счётчики от запуска звена + сводка сжатий. */
+  | { op: 'contours' }
+  | { op: 'contour-spend' }
+  /**
+   * Запись в учёт звена снаружи. Шлюз панели, который её слал, снят (этап 10); рабочего писателя
+   * нет — запись засевает учёт для проверок чтения (`boot.contours.integration`, `check-core-contours`).
+   */
+  | {
+      op: 'contour-record';
+      platformId: string;
+      event?: PlatformGatewayEvent;
+      usage?: HopContourUsage;
+      exhausted?: { at: string; scope?: PlatformExhaustedScope; level?: string };
+      summarized?: { at: string; path: string; messageId?: string; runTag?: string };
+    }
+  /** Факты прогона чужого CLI для его ответа в чате (C3b): сжатие по метке, вызовы с `since`. */
+  | { op: 'contour-run'; runTag: string; since: number }
+  /** Id сообщений, перед которыми контур сжал историю, — ленте Claude (C3b). */
+  | { op: 'contour-summarized' };
+
+/** Расход одного ответа контура — форма `SpendDelta` учёта контуров. */
+export interface HopContourUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  cacheWrite1hTokens?: number;
+  unreported?: true;
+}
+
+/** Учёт контуров звена: то, из чего ядро собирает данные карточки шлюза панели. */
+export interface HopContours {
+  /** С какого момента звено считает (запуск хоста, мс). */
+  since: number;
+  requests: number;
+  failures: number;
+  usage: PlatformUsageRecord[];
+  /** Новые сверху, не больше 50. */
+  events: PlatformGatewayEvent[];
+  summarized: PlatformSummarizedReport;
+  /** Перейдённые пороги бюджета по возрастанию `seq`, не больше 50. */
+  notices: HopBudgetNotice[];
+}
+
+/**
+ * Порог бюджета контура, перейдённый учётом звена (`budgetCrossing`): один раз на переход —
+ * отметка о сказанном едет на диск вместе с расходом. `seq` растёт и через перезапуск звена:
+ * курсор читателя (каналы панели Telegram/вебхук) не повторяет сказанное.
+ */
+export interface HopBudgetNotice {
+  seq: number;
+  at: string;
+  platformId: string;
+  platformTitle: string;
+  level: 'near' | 'over';
+  share: number;
+}
 
 export type HopControlReply =
   | { op: 'register'; ok: true; reply: HopRegisterReply }
@@ -227,6 +412,13 @@ export type HopControlReply =
   | { op: 'clear-exhausted'; ok: true; cleared: boolean }
   | { op: 'spend-of'; ok: true; spend: HopSpend | null }
   | { op: 'probe'; ok: true; reply: HopProbeReply }
+  | { op: 'user-gateway'; ok: true; state: HopUserGatewayState | null }
+  | { op: 'dlp-proxy'; ok: true; state: HopDlpProxyState | null }
+  | { op: 'contours'; ok: true; contours: HopContours }
+  | { op: 'contour-spend'; ok: true; records: Record<string, PlatformSpendRecord> }
+  | { op: 'contour-record'; ok: true }
+  | ({ op: 'contour-run'; ok: true } & CoreContourRunReply)
+  | ({ op: 'contour-summarized'; ok: true } & CoreContourSummarizedReply)
   | { op: HopControlRequest['op']; ok: false; code: string; detail: string };
 
 /**
@@ -330,6 +522,8 @@ const upstreamSchema = z.url({ protocol: /^https?$/, error: 'upstream is not an 
 /** Имя заголовка HTTP (token RFC 9110): ни пробелов, ни переводов строки — ключ не уедет вбок. */
 const headerName = z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/, 'header name');
 const headerValue = z.string().regex(/^[^\r\n]*$/);
+/** Путь поля на проводе: имена через точку (`chat_template_kwargs.enable_thinking`). */
+const wirePath = z.string().regex(/^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)*$/);
 
 export const hopRegisterSpecSchema = z.strictObject({
   tag: nonEmpty,
@@ -356,10 +550,178 @@ export const hopRegisterSpecSchema = z.strictObject({
   upstreamQuery: z.record(nonEmpty, z.string()).default({}),
   upstreamRooted: z.boolean().default(false),
   manifest: platformManifestSchema.strict().nullable().default(null),
+  requestRules: z
+    .strictObject({
+      set: z.array(
+        z.strictObject({
+          path: wirePath,
+          value: z.union([z.string(), z.boolean(), z.array(z.string())]),
+        }),
+      ),
+      streamless: z.array(z.strictObject({ path: wirePath, values: z.array(z.string()) })),
+      forceStream: z.boolean(),
+    })
+    .nullable()
+    .default(null),
 });
 
 /** Регистрация, как её держит хост: значения по умолчанию проставлены разбором. */
 export type HopRegistration = z.output<typeof hopRegisterSpecSchema>;
+
+/**
+ * След запроса контура (`PlatformGatewayEvent` панели). Схема держит обязательное ядро формы;
+ * прочие поля едут как есть — их пишет и читает один и тот же тип контракта.
+ */
+const contourEventSchema = z.looseObject({
+  at: z.string().min(1),
+  platformId: nonEmpty,
+  path: z.string(),
+  dialect: z.string(),
+  status: z.number().int(),
+});
+
+/** Расход одного ответа контура (`SpendDelta` учёта контуров). */
+const contourUsageSchema = z.strictObject({
+  model: z.string(),
+  promptTokens: z.number().int().nonnegative(),
+  completionTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative(),
+  cacheReadTokens: z.number().int().nonnegative().optional(),
+  cacheWriteTokens: z.number().int().nonnegative().optional(),
+  cacheWrite1hTokens: z.number().int().nonnegative().optional(),
+  unreported: z.literal(true).optional(),
+});
+
+/**
+ * `GET /v1/contours` ядра (C3b): учёт контуров звена — единственный источник карточки шлюза,
+ * расхода и полосы бюджета панели. `live` — след и счётчики от запуска звена, `records` — дни
+ * расхода по контурам (бюджет панель сверяет общей функцией `spendInfo`).
+ */
+export interface CoreContoursReply {
+  live: HopContours;
+  records: Record<string, PlatformSpendRecord>;
+  /**
+   * Шлюз человека на хосте (`HopStatus.userGateway`): по нему панель решает, куда вести прогоны
+   * CLI через контур (порт `listening`), и отвечает «шлюз не поднят». Нет — не открыт.
+   */
+  userGateway?: HopUserGatewayState | null;
+}
+
+/**
+ * `POST /v1/contours/apply` ядра (этап 10, s10 G7): панель записала контур — ядро настраивает шлюз
+ * человека сейчас, а не на такте (5 с). Ответ приходит, когда хост звеньев уже принял маршруты:
+ * снятый раздел закрыт к моменту ответа панели человеку. `applied: false` — шлюза у этого ядра нет
+ * (ядро на отдельном доме без порта шлюза); `userGateway` — состояние, как его назвал хост.
+ */
+export interface CoreContoursApplyReply {
+  applied: boolean;
+  userGateway: HopUserGatewayState | null;
+}
+
+/**
+ * `GET /v1/dlp-proxy` · `POST /v1/dlp-proxy/apply` (C3c): прокси защиты данных человека, как его
+ * держит хост звеньев по настройкам панели. `enabled` — тумблер раздела; `proxy` — слушатель
+ * (`null` — не открыт); `problem` — почему не открыт при включённом тумблере: код — тот же, что
+ * у отказа панели (`dlp-no-rules`, `dlp-upstream-missing`, …), `detail` — слова.
+ */
+export interface CoreDlpProxyReply {
+  enabled: boolean;
+  /** Порт из настроек — адрес, который человек вписывает в CLI, даже пока слушателя нет. */
+  port: number;
+  proxy: HopDlpProxyState | null;
+  problem: { code: string; detail: string } | null;
+}
+
+/** `GET /v1/contours/notices?after=<seq>` — извещения о бюджете; звена нет — пусто. */
+export interface CoreContourNoticesReply {
+  notices: HopBudgetNotice[];
+}
+
+/**
+ * `GET /v1/contours/run?tag=<метка>&since=<мс>` — факты прогона чужого CLI для его ответа в чате:
+ * сжимал ли контур историю в прогоне с этой меткой; сколько вызовов инструментов агента видел
+ * учёт с `since` (`toolCalls` нет — запросов за это время не было: молчать честнее нуля).
+ */
+export interface CoreContourRunReply {
+  summarized: boolean;
+  toolCalls?: number;
+}
+
+/** `GET /v1/contours/summarized` — id сообщений, перед которыми контур сжал историю. */
+export interface CoreContourSummarizedReply {
+  messageIds: string[];
+}
+
+/**
+ * Метка звена для запросов САМОЙ панели в контур (картинки, презентации, запасной путь
+ * помощника) — `panel:<id контура>`. Регистрирует её ядро (`POST /v1/contours/:id/link`), не
+ * панель: факты маршрута — те же, что у шлюза человека для этого контура:
+ *   - маршрут `gateway:<id>` — расход, бюджет, отметка «исчерпан» и след ложатся на карточку
+ *     ЭТОГО контура (`/v1/contours`), как у запросов CLI;
+ *   - ключ — из хранилища панели (`platform:<id>`), читает и подставляет хост; панель получает
+ *     только заглушку `adk-hop-…`;
+ *   - DLP — политика контура (`dataMask`/обязательная маска), правила хоста;
+ *   - драйвер, заголовки, query, корень API, управляемые правила запроса — из карточки;
+ *   - диалект клиента И верха — OpenAI chat (перевода нет, прослойки инструментов нет);
+ *     ручки: `/v1/chat/completions`, `/v1/images/generations`, `GET /v1/models`.
+ * Заглушка одна на метку: повторная регистрация гасит прежнюю, поэтому ядро держит выданную,
+ * пока факты контура и хост те же; панель держит ответ и просит `fresh` после 401 хоста.
+ * Свои эндпоинты панели (профили api-key, не контуры) этой меткой не покрыты.
+ */
+export const panelHopTag = (platformId: string): HopTag => `panel:${platformId}`;
+
+/**
+ * Метка звена для прямых вызовов API самой панели по ключу (Q5): свой эндпоинт человека
+ * (`api-key:endpoint:<id>`) и ключ вендора (`api-key:<cli>`) — `panel:<routeId>`. Регистрирует
+ * ядро (`POST /v1/links`): верх — адрес профиля, ключ — из хранилища панели (подставляет хост),
+ * DLP — общий выключатель маски панели, диалект клиента И верха — вид API профиля (перевода нет).
+ * С меткой контура не пересекается: id маршрута ключа начинается с `api-key:`.
+ */
+export const panelRouteHopTag = (routeId: string): HopTag => `panel:${routeId}`;
+
+/** Маршруты, которые звено панели принимает в `POST /v1/links`: ключ API, не контур. */
+export const PANEL_LINK_ROUTE = /^api-key:[\w.:-]{1,200}$/;
+
+/** Тело `POST /v1/links`: id маршрута ключа и «заново» после 401 хоста. */
+export interface CoreRouteLinkBody {
+  routeId: string;
+  fresh?: boolean;
+}
+
+/**
+ * `POST /v1/contours/:id/link` (тело `{fresh?: true}`) — адрес звена и заглушка ключа метки
+ * `panelHopTag(id)`. Токен ядра или Bearer панели; сеанс модели — 403 `forged-authority`.
+ * 404 `unknown-platform` — контура нет или он выключен; 409 `link-refused` (+ `hopCode`) — хост
+ * не принял регистрацию; 503 `hop-unavailable` — хост не ответил.
+ */
+export interface CoreContourLinkReply {
+  /** `http://127.0.0.1:<порт шлюза звена>`; ручка — `/v1/chat/completions` или `/v1/images/generations`. */
+  baseUrl: string;
+  /** Заглушка ключа метки — `Authorization: Bearer <key>`. */
+  key: string;
+}
+
+/** Тело `POST /v1/contours/record` — запись в учёт звена снаружи (op `contour-record` без `op`). */
+export type CoreContourRecordBody = Omit<
+  Extract<HopControlRequest, { op: 'contour-record' }>,
+  'op'
+>;
+
+/** Перейдённый порог бюджета контура (`HopBudgetNotice`). */
+export const budgetNoticeSchema = z.strictObject({
+  seq: z.number().int().positive(),
+  at: z.string().min(1),
+  platformId: nonEmpty,
+  platformTitle: z.string(),
+  level: z.enum(['near', 'over']),
+  share: z.number(),
+});
+
+/** Запись постоянного учёта контура (`PlatformSpendRecord`): дни и отметка «исчерпан». */
+const contourSpendRecordSchema = z.looseObject({
+  platformId: nonEmpty,
+  days: z.array(z.looseObject({ day: z.string() })),
+});
 
 export const hopControlRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({
@@ -382,6 +744,66 @@ export const hopControlRequestSchema = z.discriminatedUnion('op', [
     ]),
     headers: z.record(headerName, headerValue).default({}),
   }),
+  z.strictObject({
+    op: z.literal('user-gateway'),
+    port: z.number().int().min(1).max(65_535).nullable(),
+    routes: z.array(
+      z.strictObject({
+        platformId: nonEmpty,
+        title: z.string(),
+        enabled: z.boolean(),
+        consumers: z.array(z.string()).default([]),
+        cliNames: z.record(z.string(), z.string()).optional(),
+        spec: hopRegisterSpecSchema,
+      }),
+    ),
+  }),
+  z.strictObject({
+    op: z.literal('dlp-proxy'),
+    config: z
+      .strictObject({
+        port: z.number().int().min(1).max(65_535),
+        upstream: z.string().regex(/^https?:\/\//),
+        passUnknown: z.boolean(),
+        journal: z.boolean(),
+      })
+      .nullable(),
+  }),
+  /** Учёт контуров (C3b): след, расход от запуска, счётчики и сводка сжатий — для карточки шлюза. */
+  z.strictObject({ op: z.literal('contours') }),
+  /** Постоянный учёт контуров по дням (вся запись, включая отметку «исчерпан»). */
+  z.strictObject({ op: z.literal('contour-spend') }),
+  /**
+   * Запись запроса, прошедшего через шлюз ПАНЕЛИ (пока он не снят, этап 10 (v)): след, расход,
+   * отказ по бюджету, сжатие истории. Учёт один — на звене; панель свой больше не ведёт.
+   */
+  z.strictObject({
+    op: z.literal('contour-record'),
+    platformId: nonEmpty,
+    event: contourEventSchema.optional(),
+    usage: contourUsageSchema.optional(),
+    exhausted: z
+      .strictObject({
+        at: z.string().min(1),
+        scope: z.enum(['key', 'limit']).optional(),
+        level: z.string().optional(),
+      })
+      .optional(),
+    summarized: z
+      .strictObject({
+        at: z.string().min(1),
+        path: z.string(),
+        messageId: z.string().optional(),
+        runTag: z.string().optional(),
+      })
+      .optional(),
+  }),
+  z.strictObject({
+    op: z.literal('contour-run'),
+    runTag: nonEmpty,
+    since: z.number().int().nonnegative(),
+  }),
+  z.strictObject({ op: z.literal('contour-summarized') }),
 ]);
 
 export type HopControlMessage = z.output<typeof hopControlRequestSchema>;
@@ -394,7 +816,33 @@ const HOP_OPS = [
   'clear-exhausted',
   'spend-of',
   'probe',
+  'user-gateway',
+  'dlp-proxy',
+  'contours',
+  'contour-spend',
+  'contour-record',
+  'contour-run',
+  'contour-summarized',
 ] as const;
+
+const userGatewayStateSchema = z.looseObject({
+  port: z.number().int(),
+  state: z.enum(['waiting', 'listening']),
+  since: z.number(),
+  routes: z.array(z.string()),
+  lastError: z.string().nullable().optional(),
+});
+
+const dlpProxyStateSchema = z.looseObject({
+  port: z.number().int(),
+  state: z.enum(['waiting', 'listening']),
+  since: z.number(),
+  upstream: z.string(),
+  lastError: z.string().nullable().optional(),
+  requests: z.number().int().nonnegative(),
+  masked: z.number().int().nonnegative(),
+  blocked: z.number().int().nonnegative(),
+});
 
 const spendSchema = z.looseObject({
   tag: nonEmpty,
@@ -423,6 +871,8 @@ const statusSchema = z.looseObject({
     )
     .optional(),
   panelAppData: z.string().nullable().optional(),
+  userGateway: userGatewayStateSchema.nullable().optional(),
+  dlpProxy: dlpProxyStateSchema.nullable().optional(),
 });
 
 /** Ответ хоста, как его проверяет клиент: чужая или битая форма — не ответ. */
@@ -444,6 +894,46 @@ export const hopControlReplySchema = z.union([
       body: z.string(),
       contentType: z.string().optional(),
     }),
+  }),
+  z.looseObject({
+    op: z.literal('user-gateway'),
+    ok: z.literal(true),
+    state: userGatewayStateSchema.nullable(),
+  }),
+  z.looseObject({
+    op: z.literal('dlp-proxy'),
+    ok: z.literal(true),
+    state: dlpProxyStateSchema.nullable(),
+  }),
+  z.looseObject({
+    op: z.literal('contours'),
+    ok: z.literal(true),
+    contours: z.looseObject({
+      since: z.number(),
+      requests: z.number().int().nonnegative(),
+      failures: z.number().int().nonnegative(),
+      usage: z.array(z.looseObject({ platformId: z.string() })),
+      events: z.array(contourEventSchema),
+      summarized: z.looseObject({ total: z.number(), recent: z.array(z.looseObject({})) }),
+      notices: z.array(budgetNoticeSchema),
+    }),
+  }),
+  z.looseObject({
+    op: z.literal('contour-spend'),
+    ok: z.literal(true),
+    records: z.record(z.string(), contourSpendRecordSchema),
+  }),
+  z.looseObject({ op: z.literal('contour-record'), ok: z.literal(true) }),
+  z.looseObject({
+    op: z.literal('contour-run'),
+    ok: z.literal(true),
+    summarized: z.boolean(),
+    toolCalls: z.number().int().nonnegative().optional(),
+  }),
+  z.looseObject({
+    op: z.literal('contour-summarized'),
+    ok: z.literal(true),
+    messageIds: z.array(z.string()),
   }),
   z.looseObject({
     op: z.enum(HOP_OPS),

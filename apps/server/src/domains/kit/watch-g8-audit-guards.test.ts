@@ -199,7 +199,7 @@ describe('read-discipline: повтор чтения внутри цепочки
       env: {
         ...process.env,
         AGENTDECK_KIT_VARIANT: '',
-        AGENTDECK_HEAVY_QUEUE_DIR: '',
+        AGENTDECK_STEP_KIND: '',
         AGENTDECK_KIT_STATE: join(root, 'state'),
       },
       timeout: 15_000,

@@ -1,5 +1,4 @@
 import type { ChatSummary } from '@agentdeck/contracts';
-import type { GroupSignal } from '@agentdeck/contracts/group-watch';
 import type { RunStatus } from '@shared/lib/agent-runs';
 
 /** Режим поиска в списке: по названию/проекту/превью или по телу переписки. */
@@ -85,10 +84,6 @@ export interface ChatRowProps {
   status?: RunStatus;
   /** Уровень вложенности в дереве: отступ и ветвь рисуются по нему. */
   depth?: number;
-  /** Непрочитанные критичные заметки детей разделения — только у главного чата. */
-  unreadEscalations?: number;
-  /** Активные сигналы сторожа одиночного чата; пусто — метки нет. */
-  watchSignals?: GroupSignal[];
   /**
    * Закрепить/открепить — только у корня: ребёнок едет за родителем. Нет
    * обработчика — нет и кнопки.

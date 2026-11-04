@@ -41,23 +41,6 @@ export async function stubHub(page, cwd, start) {
       json: {
         root: PARENT,
         running: 1,
-        split: {
-          parentChatId: PARENT,
-          order: [0],
-          groups: [
-            {
-              index: 0,
-              title: 'Отчёты',
-              branch: 'feature/reports',
-              after: [],
-              chatId: GROUP_SESSION,
-              path: cwd,
-              seated: true,
-              deliver: true,
-              status: 'started',
-            },
-          ],
-        },
         nodes: [
           {
             chatId: GROUP_SESSION,

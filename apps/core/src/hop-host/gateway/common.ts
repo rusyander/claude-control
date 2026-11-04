@@ -3,6 +3,9 @@ import type { DlpApiKind } from '@agentdeck/dlp/api-shapes';
 import type { AliasVault } from '@agentdeck/dlp/mask';
 import { maskRequestBody } from '@agentdeck/dlp/request-filter';
 import { maskingOn, rulesOf, upstreamAuth, upstreamUrl, type HopContext } from '../context.ts';
+import type { SpendDelta } from '@agentdeck/pricing/contour-spend';
+import type { ContourRefusal } from '../contour-book/contour-book.ts';
+import { contourEvent, contourIdOf, type ContourEventFacts } from '../contour-book/record.ts';
 import type { HopTraceEntry, TagEntry } from '../host.types.ts';
 import { clientGone, refuse, type Refusal } from '../http.ts';
 import { callUpstream, retryAfterSeconds, UpstreamError, type UpstreamReply } from '../upstream.ts';
@@ -27,18 +30,62 @@ export interface GatewayRequest {
   driver: HopDriver;
 }
 
+/**
+ * Строка следа звена и — у маршрута контура — след запроса в учёт контуров (карточка шлюза
+ * панели читает его через ядро). Одна точка: след и карточка не расходятся.
+ */
 export function traceOf(
   g: GatewayRequest,
   fields: Partial<HopTraceEntry> & { status: number },
+  facts?: Partial<ContourEventFacts>,
 ): void {
+  const at = g.ctx.now();
   g.ctx.trace.write({
-    at: g.ctx.now(),
+    at,
     tag: g.entry.spec.tag,
     routeId: g.entry.spec.routeId,
     hop: 'gateway',
     path: g.path,
+    ...(g.entry.section ? { section: g.entry.section } : {}),
     ...fields,
   });
+  const platformId = contourIdOf(g.entry.spec.routeId);
+  if (platformId === undefined) return;
+  g.ctx.contours.event(
+    contourEvent({
+      at,
+      platformId,
+      path: g.path,
+      dialect: g.entry.spec.from,
+      ...(g.entry.runTag ? { runTag: g.entry.runTag } : {}),
+      ...(g.entry.section ? { section: g.entry.section } : {}),
+      trace: fields,
+      ...(facts ? { facts } : {}),
+    }),
+  );
+}
+
+/**
+ * Расход ответа контура в учёт контуров (дни + живой счётчик). Маршрут не контура — мимо: его
+ * расход ведёт книга меток (`SpendBook`).
+ */
+export function countContour(g: GatewayRequest, delta: SpendDelta): void {
+  const platformId = contourIdOf(g.entry.spec.routeId);
+  if (platformId !== undefined) g.ctx.contours.usage(platformId, delta, new Date(g.ctx.now()));
+}
+
+/** Что кончилось по отказу 402 — первая совпавшая строка манифеста драйвера; нет — пусто. */
+function budgetRefusalOf(
+  body: unknown,
+  rows: HopDriver['budgetRefusals'] = [],
+): ContourRefusal | undefined {
+  const error = (body as { error?: { message?: unknown } } | undefined)?.error;
+  if (typeof error?.message !== 'string') return undefined;
+  for (const row of rows) {
+    const match = row.message.exec(error.message);
+    if (match) return { scope: row.scope, ...(match[1] ? { level: match[1] } : {}) };
+  }
+  return undefined;
 }
 
 export function deny(g: GatewayRequest, refusal: Refusal, lost: string[] = []): void {
@@ -100,12 +147,13 @@ export interface SentUpstream {
 
 /**
  * Поход наверх с ключом маршрута. Отказ (ключ не прочитан, связи нет, тишина) уходит клиенту
- * здесь же; `undefined` — ответа нет, работа запроса кончена.
+ * здесь же; `undefined` — ответа нет, работа запроса кончена. Тело `null` — чтение (`GET`,
+ * список моделей): ответ ждётся JSON, а не потоком.
  */
 export async function sendUpstream(
   g: GatewayRequest,
   upstreamPath: string,
-  body: string,
+  body: string | null,
   extraHeaders: Record<string, string>,
   lost: string[],
 ): Promise<SentUpstream | undefined> {
@@ -120,14 +168,15 @@ export async function sendUpstream(
   try {
     const reply = await callUpstream({
       url: upstreamUrl(g.entry, upstreamPath),
-      method: 'POST',
+      method: body === null ? 'GET' : 'POST',
       headers: {
         ...extraHeaders,
         ...auth.headers,
-        'content-type': 'application/json',
-        accept: 'text/event-stream',
+        ...(body === null
+          ? { accept: 'application/json' }
+          : { 'content-type': 'application/json', accept: 'text/event-stream' }),
       },
-      body,
+      ...(body === null ? {} : { body }),
       signal: abort.signal,
       headersTimeoutMs: g.ctx.stallMs,
       retryPauseMs: g.ctx.retryPauseMs,
@@ -175,7 +224,16 @@ export async function refuseUpstreamStatus(
   retried: boolean,
 ): Promise<void> {
   const body = safeJson(await upstream.text());
-  if (upstream.status === 402) g.ctx.spend.markExhausted(g.entry.spec.routeId, g.ctx.now());
+  if (upstream.status === 402) {
+    g.ctx.spend.markExhausted(g.entry.spec.routeId, g.ctx.now());
+    const platformId = contourIdOf(g.entry.spec.routeId);
+    if (platformId !== undefined)
+      g.ctx.contours.exhausted(
+        platformId,
+        new Date(g.ctx.now()),
+        budgetRefusalOf(body, g.driver.budgetRefusals),
+      );
+  }
   const bridged = bridgeUpstreamStatus(upstream.status, body, {
     model,
     retryAfterSeconds: retryAfterSeconds(upstream),
@@ -189,12 +247,17 @@ export async function refuseUpstreamStatus(
     { status, code: bridged.code, message: bridged.message },
     g.ctx.language,
   );
-  traceOf(g, {
-    status,
-    code: upstream.status === 402 ? 'billing_error' : bridged.code,
-    error: bridged.message,
-    ...(bridged.violations.length ? { violations: bridged.violations } : {}),
-    ...(lost.length ? { lost } : {}),
-    ...(retried ? { retried: true } : {}),
-  });
+  traceOf(
+    g,
+    {
+      status,
+      code: upstream.status === 402 ? 'billing_error' : bridged.code,
+      error: bridged.message,
+      ...(bridged.violations.length ? { violations: bridged.violations } : {}),
+      ...(lost.length ? { lost } : {}),
+      ...(retried ? { retried: true } : {}),
+    },
+    // Запрос не приняли ИМЕННО проверки содержимого (451), а не ключ, бюджет или частота.
+    upstream.status === 451 ? { blocked: true } : undefined,
+  );
 }

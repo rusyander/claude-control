@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathStep } from '@agentdeck/contracts/group-path';
 import { buildPath, skillSteps, withinIndex } from './path.ts';
-import { InvalidPathStepsError, normalizePathSteps } from '../path-edit.ts';
 
 const SKILL = ['## 1. Take the ticket', 'x', '## 2. Fix', 'y', '## 3. Deliver', 'z'].join('\n');
 
@@ -87,15 +86,6 @@ describe('buildPath — scenario', () => {
       [{ id: 'td', body: SKILL }],
     );
     expect(keys(view)).toEqual(['+a', '+b']);
-  });
-});
-
-describe('normalizePathSteps — within', () => {
-  it('a step inside a skill must belong to work', () => {
-    const bad = step('x', { anchor: 'review', within: { skillId: 'td', index: 0, after: 'A' } });
-    expect(() => normalizePathSteps({ steps: [bad] })).toThrow(InvalidPathStepsError);
-    const good = step('x', { within: { skillId: 'td', index: 0, after: 'A' } });
-    expect(normalizePathSteps({ steps: [good] })[0]?.within).toEqual(good.within);
   });
 });
 

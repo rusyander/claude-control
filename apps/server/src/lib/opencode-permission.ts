@@ -4,6 +4,7 @@ import {
   type OpencodePermissionLevel,
   type OpencodePermissionTool,
 } from '@agentdeck/contracts/vocabulary';
+import { isOpencodeLevel, supportsPatternMap } from '@agentdeck/contracts/permissions';
 import { UnrecognizedFormatError } from './codex-toml/codex-toml.ts';
 
 /**
@@ -63,13 +64,6 @@ export {
   type OpencodePermissionTool,
 };
 
-/**
- * Инструменты, у которых КАРТА ШАБЛОНОВ (шаблон → уровень) работает и панель
- * умеет её править: `bash` — команды (задокументировано), `read` — пути файлов
- * (снято живой пробой).
- */
-export const OPENCODE_PATTERN_TOOLS = ['bash', 'read'] as const;
-
 /** Строка карты шаблонов: шаблон команды → уровень. */
 export interface OpencodePatternRule {
   pattern: string;
@@ -107,20 +101,8 @@ export interface OpencodePermissionState {
 /** Максимальная длина показываемого значения сохранённой записи. */
 const PRESERVED_VALUE_LIMIT = 200;
 
-function isLevel(value: unknown): value is OpencodePermissionLevel {
-  return (
-    typeof value === 'string' &&
-    OPENCODE_PERMISSION_LEVELS.includes(value as OpencodePermissionLevel)
-  );
-}
-
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/** Умеет ли панель править карту шаблонов у этого инструмента. */
-export function supportsPatternMap(tool: string): boolean {
-  return (OPENCODE_PATTERN_TOOLS as readonly string[]).includes(tool);
 }
 
 /** Компактное значение для показа сохранённой записи (обрезается по длине). */
@@ -151,7 +133,7 @@ export function readOpencodePermission(raw: unknown): OpencodePermissionState {
   for (const [key, value] of Object.entries(raw)) {
     const managed = (OPENCODE_PERMISSION_TOOLS as readonly string[]).includes(key);
 
-    if (managed && isLevel(value)) {
+    if (managed && isOpencodeLevel(value)) {
       tools.push({ tool: key as OpencodePermissionTool, mode: 'level', level: value });
       continue;
     }
@@ -160,7 +142,7 @@ export function readOpencodePermission(raw: unknown): OpencodePermissionState {
     // где КАЖДОЕ значение — уровень. Иначе запись сохраняется только для чтения.
     if (managed && supportsPatternMap(key) && isPlainObject(value)) {
       const entries = Object.entries(value);
-      if (entries.length > 0 && entries.every(([, level]) => isLevel(level))) {
+      if (entries.length > 0 && entries.every(([, level]) => isOpencodeLevel(level))) {
         tools.push({
           tool: key as OpencodePermissionTool,
           mode: 'patterns',

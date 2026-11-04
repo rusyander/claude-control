@@ -1,5 +1,5 @@
 import type { Fact } from '@agentdeck/contracts/core/facts';
-import { pinnedBaseOf, unitCopyOf } from '../conductor/copy/index.ts';
+import { reviewBaseOf, unitCopyOf } from '../conductor/copy/index.ts';
 import type { SessionBinding } from '../conductor/model-tools/model-tools.types.ts';
 import type { UnitDiffDeps } from '../conductor/model-tools/unit-diff.ts';
 import type { LiveTask } from '../journal/resume.ts';
@@ -18,7 +18,8 @@ export function unitDiffFacts(
 ): Fact<UnitDiffDeps> {
   const copy = unitCopyOf(task, b.unitId);
   if (!copy) return { unknown: `unit ${b.unitId} has no copy` };
-  const base = pinnedBaseOf(task, b.unitId);
+  // Ревью MR по ссылке (этап 10, F8): дифф от общего предка с целевой веткой — изменения MR.
+  const base = reviewBaseOf(task, b.unitId);
   if (!base) return { unknown: `unit ${b.unitId} has no pinned base` };
   return {
     value: {

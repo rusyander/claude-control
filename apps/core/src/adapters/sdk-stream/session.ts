@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { attachSession, InputRefused, type HostConnection } from '../../session-host/client.ts';
 import { sessionFile, type ExitRecord } from '../../session-host/protocol.ts';
 import { readArtifact, readLines } from '../launcher/session-io.ts';
+import type { SendImage } from '@agentdeck/contracts/core/ask';
 import type { AdapterErrorCode, AdapterEvent, TurnUsage } from '../adapter.types.ts';
 import { SdkNormaliser, type SdkRule } from './normalise.ts';
 import { appendIoRecord, readIoRecord } from './io-record.ts';
@@ -73,14 +74,25 @@ const reasonText = (error: unknown): string =>
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Сообщение пользователя формата SDK — одинаково у обоих CLI на `--input-format stream-json`. */
-export function sdkUserLine(text: string, uuid: string): string {
+/**
+ * Сообщение пользователя формата SDK — одинаково у обоих CLI на `--input-format stream-json`.
+ * Картинки — блоками `image` (base64) после текста: текст первым блоком читают разборы отправки.
+ */
+export function sdkUserLine(text: string, uuid: string, images: readonly SendImage[] = []): string {
+  const blocks = images.map((image) => ({
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: image.mediaType,
+      data: readFileSync(image.path).toString('base64'),
+    },
+  }));
   return `${JSON.stringify({
     type: 'user',
     uuid,
     session_id: '',
     parent_tool_use_id: null,
-    message: { role: 'user', content: [{ type: 'text', text }] },
+    message: { role: 'user', content: [{ type: 'text', text }, ...blocks] },
   })}\n`;
 }
 
@@ -186,7 +198,7 @@ export class SdkSession {
   }
 
   /** Идемпотентна по cmdId: повтор отдаёт исход первой отправки с `dup: true`. */
-  send(cmdId: string, text: string): Promise<{ dup: boolean }> {
+  send(cmdId: string, text: string, images: readonly SendImage[] = []): Promise<{ dup: boolean }> {
     const known = this.sends.get(cmdId);
     if (known) return known.then(() => ({ dup: true }));
     if (this.finished) return Promise.reject(new Error('session ended'));
@@ -195,7 +207,7 @@ export class SdkSession {
     if (this.stopping) return Promise.reject(new Error('session stopping'));
     const uuid = UUID.test(cmdId) ? cmdId : randomUUID();
     const promise = new Promise<{ dup: boolean }>((done, fail) => {
-      this.queue.push({ cmdId, uuid, data: sdkUserLine(text, uuid), done, fail });
+      this.queue.push({ cmdId, uuid, data: sdkUserLine(text, uuid, images), done, fail });
     });
     this.sends.set(cmdId, promise);
     this.schedule(0);

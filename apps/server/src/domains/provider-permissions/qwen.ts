@@ -1,14 +1,10 @@
 import type { QwenApprovalMode, QwenPermissionDraft } from '@agentdeck/contracts';
+import { parseToolList } from '@agentdeck/contracts/permissions';
 import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
 import { DEFAULT_QWEN_APPROVAL, QWEN_APPROVAL_MODES } from './constants.ts';
-import {
-  objectSection,
-  parseToolList,
-  readStringList,
-  stripManagedSectionKeys,
-} from './normalize.ts';
+import { objectSection, readStringList, stripManagedSectionKeys } from './normalize.ts';
 import { backupNameOf } from './target.ts';
 import type { ProviderPermissionsTarget, QwenPermissionsValues } from './types.ts';
 

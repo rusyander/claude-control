@@ -11,7 +11,8 @@ import type { LiveTask } from '../../journal/resume.ts';
 export function sourceRepoOf(task: LiveTask, stepId: string): string | undefined {
   const repos = task.state.created?.repos ?? [];
   if (repos.length === 1) return repos[0]!.path;
-  if (repos.length === 0) return undefined;
+  // Чат в папке без git (G12 p7): исходник — сама папка (доверие CLI и список чтения — по ней).
+  if (repos.length === 0) return task.state.created?.folder;
   const unitId = task.state.steps[stepId]?.unitId;
   if (!unitId) return undefined;
   const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];

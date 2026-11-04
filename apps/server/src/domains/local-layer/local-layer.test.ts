@@ -18,8 +18,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   localLayerRun,
   localLayerStatus,
-  mergeFlagSettings,
-  withoutMcpConfig,
   withoutProjectSource,
   writeLayerMode,
 } from './local-layer.ts';
@@ -30,8 +28,10 @@ import type { TeamPlace } from './team-layer.ts';
 
 /**
  * Локальный слой: всё командное доезжает (дословно или свежим сжатием), замена
- * хуков действует только против той командной версии, которую улучшает. Что
- * собранные флаги делают с НАСТОЯЩИМ CLI — доказывает `tools/qa/check-local-layer.mjs`.
+ * хуков действует только против той командной версии, которую улучшает. До прогона слой
+ * доезжает полем сеанса ядра `session.localLayer` (s10 G14 p6): путь «режим → реестр →
+ * перенос» — local-layer.carry.test.ts, живая проба на настоящем claude —
+ * apps/core/src/adapters/claude/claude.local-layer.live.integration.test.ts.
  */
 
 let base: string;
@@ -420,23 +420,7 @@ describe('флаги прогона', () => {
     expect(withoutProjectSource(['--setting-sources', 'project'])).toBeUndefined();
   });
 
-  it('strict-MCP: слой не добавляет .mcp.json', () => {
-    expect(withoutMcpConfig(['--plugin-dir', 'p', '--mcp-config', 'm'])).toEqual([
-      '--plugin-dir',
-      'p',
-    ]);
-  });
-
-  it('настройки: хуки и права складываются, профиль сверху', () => {
-    const merged = mergeFlagSettings(
-      { model: 'a', hooks: { Stop: [1] }, permissions: { deny: ['x'] } },
-      { model: 'b', hooks: { Stop: [2], Pre: [3] }, permissions: { deny: ['y'] } },
-    );
-    expect(merged).toEqual({
-      model: 'b',
-      hooks: { Stop: [1, 2], Pre: [3] },
-      permissions: { deny: ['x', 'y'] },
-    });
+  it('настройки: локальная правка снимает командное значение того же ключа', () => {
     expect(
       yieldToLocal({ env: { A: '1', B: '2' }, list: [1] }, { env: { A: 'x' }, list: [2] }),
     ).toEqual({

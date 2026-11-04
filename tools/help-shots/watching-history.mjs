@@ -18,17 +18,23 @@ export async function shootTrace(browser, web, scenario) {
   try {
     await settings(page);
     await location(page);
+    // Запись «сегодня» — след самой съёмки (панель пишет настройки при подъёме): фикстура
+    // датирована сентябрём, и в кадре, описанном подписью, ей не место. Убирается из ОТВЕТА
+    // ленты, а не из разметки: строка, вырезанная из DOM под React, роняла страницу на
+    // следующей перерисовке («Failed to execute 'insertBefore' on 'Node'») — кадр 04-after
+    // и в коммите, и 03.11.2026 снимался экраном «Раздел не смог отрисоваться».
+    await page.route('**/api/history', async (route) => {
+      const response = await route.fetch();
+      if (!response.ok()) return route.fulfill({ response });
+      const body = await response.json();
+      const items = (body.items ?? []).filter(
+        (item) => !(item.file === 'settings.json' && new Date(item.at).getMonth() !== 8),
+      );
+      return route.fulfill({ response, json: { ...body, items } });
+    });
 
     // ── 01. Лента: файл, время, против чего дифф и ±строк ────────────────────
     await open(page, web, '/history?tab=config', 2000);
-    // Запись «сегодня» — след самой съёмки (панель пишет настройки при подъёме): фикстура
-    // датирована сентябрём, и в кадре, описанном подписью, ей не место.
-    await page.evaluate(() => {
-      for (const row of document.querySelectorAll('button[aria-expanded]')) {
-        const text = row.textContent ?? '';
-        if (text.includes('settings.json') && !/сент|Sep/.test(text)) row.parentElement?.remove();
-      }
-    });
     await frame(scenario, page, '01-feed');
 
     // ── 02. Раскрытая запись: построчный дифф ────────────────────────────────

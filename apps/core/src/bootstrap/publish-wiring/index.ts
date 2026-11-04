@@ -5,10 +5,11 @@ import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { GitOptions } from '../../platform/git/git.types.ts';
 import { createPublishQueue, type PublishQueue } from '../../publisher/queue/queue.ts';
 import { readyJudge } from '../../publisher/ready/ready.ts';
-import { forgeForRemote } from '../panel-forge.ts';
+import { forgeOfPanel } from '../panel-forge.ts';
 import { publishAttempt, type ForgeAccess } from './attempt.ts';
 import { cleanRemote } from './clean-remote.ts';
 import { composeForGate, scenarioPublishes } from './compose.ts';
+import { probeDelivery } from './delivery-probe.ts';
 import { outboxPort } from './outbox-port.ts';
 import { threadsSection } from './threads-brief.ts';
 
@@ -31,6 +32,8 @@ export interface PublishWiringDeps {
   coreHome: string;
   scenariosDir: string;
   note: (event: string, data: Record<string, unknown>) => void;
+  /** Каталог панели, решённый загрузкой; нет или `null` — форж по умолчанию без панели. */
+  panelAppData?: string | null;
 }
 
 export interface PublishWiring {
@@ -44,10 +47,13 @@ export interface PublishWiring {
  * Форж из настроек панели. Доступ к ПУШУ панель пока не отдаёт (её ключ закрыт в порту API) —
  * git берёт свой помощник; запрос контракта к зоне F.
  */
-function defaultForgeFor(url: string): ForgeAccess | null {
-  const remote = forgeForRemote(url);
-  if (remote.project.kind === 'generic') return null;
-  return { port: remote.port, credential: null };
+function defaultForgeFor(panelAppData: string | null | undefined) {
+  const forgeOf = forgeOfPanel(panelAppData);
+  return (url: string): ForgeAccess | null => {
+    const remote = forgeOf(url);
+    if (remote.project.kind === 'generic') return null;
+    return { port: remote.port, credential: null };
+  };
 }
 
 export function createPublishWiring(
@@ -60,7 +66,7 @@ export function createPublishWiring(
     coreHome: deps.coreHome,
     git,
     now: options.now ?? Date.now,
-    forgeFor: options.forgeFor ?? defaultForgeFor,
+    forgeFor: options.forgeFor ?? defaultForgeFor(deps.panelAppData),
     judge: readyJudge(),
     outbox: outboxPort,
   };
@@ -69,6 +75,7 @@ export function createPublishWiring(
     commands: {
       promote: (unitId) => queue.promote(unitId),
       cleanRemote: (task, input) => cleanRemote(task, input, git),
+      delivery: (copy) => probeDelivery(attemptDeps, deps.registry, copy),
     },
     hooks: {
       async preStep(s) {

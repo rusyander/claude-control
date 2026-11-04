@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Group, ProjectRunnerView } from '@agentdeck/contracts';
+import type { ProjectRunnerView } from '@agentdeck/contracts';
 import type { PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { agentJournalPath } from '../../domains/panel-agent/journal/journal.ts';
 import {
@@ -66,20 +66,6 @@ async function permissionId(stand: ProjectStand, pattern: string): Promise<strin
   if (!rule) throw new Error(`no permission ${pattern}: ${JSON.stringify(listed)}`);
   return rule.id;
 }
-
-const group = (id: string, name: string, patch: Partial<Group>): Group => ({
-  id,
-  name,
-  description: '',
-  color: 'accent',
-  icon: 'folder',
-  members: [],
-  env: {},
-  projectPaths: [],
-  isEnabled: true,
-  order: 0,
-  ...patch,
-});
 
 /** Копия проекта руками человека — там, где её ищет панель. */
 function humanCopy(stand: ProjectStand, branch: string): string {
@@ -195,25 +181,6 @@ const ROWS: Row[] = [
       return { project: stand.projectId, id: await permissionId(stand, 'Read') };
     },
     edit: (stand) => writePermissions(stand, { deny: ['Read'] }),
-  },
-  {
-    name: 'set_project_group_choice',
-    module: 'config',
-    setup: (stand) => {
-      const scope = { kind: 'project' as const, path: stand.projectDir, provider: 'claude' };
-      stand.store.saveGroup(group('pa', 'Проектная', { scope }));
-      stand.store.saveGroup(
-        group('ga', 'Глобальная копия', {
-          origin: { scope, groupId: 'pa', hash: 'h', copiedAt: '2026-09-28T00:00:00.000Z' },
-        }),
-      );
-      return { project: stand.projectId, groupKey: 'global:ga' };
-    },
-    edit: (stand) =>
-      inject(stand, 'PUT', '/api/projects/group-choice', {
-        path: stand.projectDir,
-        groupKey: 'project:pa',
-      }),
   },
   // --- Git и копии ---
   {
@@ -408,9 +375,9 @@ describe('panel-agent actions: project stale cards (every change/danger action)'
     await stand.close();
   });
 
-  it('таблица покрывает все 23 действия-правки проекта', () => {
-    expect(ROWS.map((row) => row.name).sort()).toHaveLength(23);
-    expect(new Set(ROWS.map((row) => row.name)).size).toBe(23);
+  it('таблица покрывает все 22 действия-правки проекта', () => {
+    expect(ROWS.map((row) => row.name).sort()).toHaveLength(22);
+    expect(new Set(ROWS.map((row) => row.name)).size).toBe(22);
     expect(new Set(ROWS.map((row) => row.module))).toEqual(new Set(['config', 'git', 'runner']));
   });
 

@@ -26,14 +26,6 @@ export function ChildBlocks({
   onPauseTree,
   onResumeTree,
   treeBusy,
-  onAnswerHold,
-  holdBusy,
-  onRelease,
-  releaseBusy,
-  onResumeInterrupted,
-  resumeInterruptedBusy,
-  onCheckOverlap,
-  overlapBusy,
   permissions,
   onPermissionDecide,
   questions,
@@ -116,14 +108,6 @@ export function ChildBlocks({
           onPauseAll={onPauseTree}
           onResumeAll={onResumeTree}
           treeBusy={treeBusy}
-          onAnswerHold={onAnswerHold}
-          holdBusy={holdBusy}
-          onRelease={onRelease}
-          releaseBusy={releaseBusy}
-          onResumeInterrupted={onResumeInterrupted}
-          resumeInterruptedBusy={resumeInterruptedBusy}
-          onCheckOverlap={onCheckOverlap}
-          overlapBusy={overlapBusy}
           {...(onAnswer && inCards.size > 0 ? { questions: inCards, onAnswer } : {})}
           {...(onPermissionDecide && permitsInCards.size > 0
             ? { permissions: permitsInCards, onPermissionDecide }

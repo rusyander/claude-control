@@ -24,7 +24,6 @@ export function ProviderChatSidebar({
   activeChatId,
   onSelect,
   onCreate,
-  isCreating,
   projects,
   isProjectsLoading,
   providerId,
@@ -66,7 +65,6 @@ export function ProviderChatSidebar({
             onCreate();
             setSection('chats');
           }}
-          isLoading={isCreating}
           leftIcon={<Icon name="plus" size={16} />}
         >
           {t('providerChat.new')}
@@ -81,7 +79,6 @@ export function ProviderChatSidebar({
             providerId={providerId}
             providerName={providerName}
             onStart={startInProject}
-            isStarting={isCreating}
           />
         )}
 

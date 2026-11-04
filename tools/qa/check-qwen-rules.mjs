@@ -7,21 +7,19 @@
  *      нет; `alwaysApply` формату чужой — 400, файл не появился;
  *   2. панель создаёт постоянное правило (без шаблонов) и условное
  *      (`paths: src/**\/*.tsx`); на диске — `.md`, у условного список `paths`;
- *   3. вопрос в разговоре Qwen: постоянное правило в первом же запросе к модели,
- *      условного там нет;
- *   4. модель просит прочитать `src/App.tsx`. В чате панели (`qwen serve`)
- *      условное правило НЕ приходит: qwen 0.25 подключает такие правила только
- *      в планировщике инструментов терминального режима, а serve исполняет
- *      инструменты через ACP мимо него. Это ограничение CLI, и проверка держит
- *      его как сторожа: покраснело — qwen починил, справку пора править;
- *   5. тот же файл правила — настоящему `qwen -p` в терминальном режиме:
- *      после чтения `src/App.tsx` условное правило приходит модели, чтение
- *      `README.md` (вне шаблона) его не подключает — формат панели CLI читает;
- *   6. панель удаляет постоянное правило — в новом разговоре его у модели нет
+ *   3. настоящий `qwen -p` в каталоге проекта с тем же домом: постоянное правило
+ *      в первом же запросе к модели, условного там нет;
+ *   4–5. модель просит прочитать `src/App.tsx` — после чтения условное правило
+ *      приходит модели; чтение `README.md` (вне шаблона) его не подключает —
+ *      формат панели CLI читает;
+ *   6. панель удаляет постоянное правило — в новом запуске его у модели нет
  *      (контроль: без этого шага проверка не умела бы краснеть).
  *
+ * Разговор через чат панели (`qwen serve` её исполнителем) снят на этапе 10 (F2c): чат Qwen
+ * идёт задачей ядра. Перенос правил человека в сеанс ядра — дело ядра и здесь не проверяется.
+ *
  * Свидетель — тело запроса, дошедшего до заглушки модели. Подменена только
- * модель (сетевая граница); панель, служба чата и CLI — настоящие. CLI — из
+ * модель (сетевая граница); панель и CLI — настоящие. CLI — из
  * `STEER_CLI_DIR` (каталоги через разделитель PATH), иначе из PATH; нет его —
  * «не проверено», код 2. Дом CLI и панели — временные каталоги.
  *
@@ -39,7 +37,7 @@ import {
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
+import { NotChecked, reporter, startStand } from './throwaway-stand.mjs';
 import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
@@ -183,29 +181,11 @@ try {
     writeFileSync(join(dir, 'README.md'), `${README_TEXT}\n`);
     return dir;
   };
-  const ask = async (dir, text) => {
-    const chat = await stand.api('/provider-chat/chats', {
-      method: 'POST',
-      body: { workdir: dir },
-    });
-    if (chat.status !== 200) throw new Error(`разговор не создан: ${chat.text}`);
-    const id = chat.body.id;
-    const from = model.bodies.length;
-    const sent = await stand.api(`/provider-chat/chats/${id}/send`, {
-      method: 'POST',
-      body: { text },
-    });
-    check('вопрос принят', sent.status === 200, sent.text);
-    for (let i = 0; i < 480; i += 1) {
-      const status = (await stand.api(`/provider-chat/chats/${id}/status`)).body;
-      if (status?.isRunning === false && model.bodies.length > from) break;
-      await wait(250);
-    }
-    await wait(500);
-    return model.bodies.slice(from);
-  };
-
-  /** Терминальный режим: `qwen -p` в каталоге проекта, тот же дом и модель. */
+  /**
+   * Терминальный режим: `qwen -p` в каталоге проекта, тот же дом и модель. Чат панели (`qwen
+   * serve` её исполнителем) снят на этапе 10 (F2c): вопрос один — читает ли CLI файл правила в
+   * форме панели, и отвечает на него сам CLI из того же дома.
+   */
   const askTerminal = async (dir, text) => {
     const from = model.bodies.length;
     const cli = join(cliDir, IS_WIN ? 'qwen.cmd' : 'qwen');
@@ -225,22 +205,12 @@ try {
     return model.bodies.slice(from);
   };
 
-  console.log('\n3–4. Чат панели (qwen serve): постоянное сразу, условное — ограничение CLI');
-  const dir = project('work');
-  const turns = await ask(dir, `READ ${join(dir, 'src', 'App.tsx')}`);
+  console.log('\n3–4. qwen -p: постоянное правило сразу, условное — после чтения по шаблону');
   const sawFile = (bodies, text) => bodies.slice(1).some((body) => body.includes(text));
-  check('файл прочитан, его текст дошёл до модели', sawFile(turns, APP_TEXT), String(turns.length));
-  check('постоянное правило в первом запросе', turns[0]?.includes(ALWAYS_MARK) === true);
-  check('условного в первом запросе нет', turns[0]?.includes(COND_MARK) === false);
-  check(
-    'serve: условное после чтения не пришло (ограничение qwen 0.25; красное — qwen починил, править справку)',
-    sawFile(turns, APP_TEXT) && !sawFile(turns, COND_MARK),
-  );
-
-  console.log('\n5. Терминальный qwen -p читает тот же файл правила');
   const term = project('term');
   const read = await askTerminal(term, `READ ${join(term, 'src', 'App.tsx')}`);
   check('файл прочитан, его текст дошёл до модели', sawFile(read, APP_TEXT), String(read.length));
+  check('постоянное правило в первом запросе', read[0]?.includes(ALWAYS_MARK) === true);
   check('условного в первом запросе нет', read[0]?.includes(COND_MARK) === false);
   check('после чтения src/App.tsx условное правило пришло модели', sawFile(read, COND_MARK));
   const other = project('other');
@@ -260,7 +230,7 @@ try {
     removed.status === 200 && !existsSync(join(rulesDir, 'always.md')),
     removed.text,
   );
-  const after = await ask(project('after'), 'Привет');
+  const after = await askTerminal(project('after'), 'Привет');
   check('запрос дошёл до модели', after.length > 0);
   check('удалённого правила у модели нет', !after.join('\n').includes(ALWAYS_MARK));
 } catch (error) {

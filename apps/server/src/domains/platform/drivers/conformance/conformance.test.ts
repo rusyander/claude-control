@@ -1,28 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import {
-  clientToolsTravel,
-  PLATFORM_PRESETS,
-  shimByClientTools,
-} from '@agentdeck/contracts/platform-presets';
+import { PLATFORM_PRESETS, shimByClientTools } from '@agentdeck/contracts/platform-presets';
 import type { PlatformDriver } from '../driver.ts';
 import { allDrivers } from '../index.ts';
 import { contourHeaders, contourUrl } from '../../transport/transport.ts';
-import {
-  anthropicRequestToOpenAi,
-  chooseToolRoute,
-  openAiRequestLoss,
-  type Dialect,
-} from '../../gateway/dialect/dialect.ts';
-import { StreamTranslator } from '../../gateway/frames/frames.ts';
-import { bridgeUpstreamStatus } from '../../gateway/status/status.ts';
-import {
-  ANTHROPIC_REQUEST_WITH_TOOLS,
-  DELTA_FRAME,
-  IMAGE_DELTA_FRAME,
-  MODELS_ANSWER,
-  SECRET_IN_BODY,
-  USAGE_FRAME,
-} from './fixtures.ts';
+import { bridgeUpstreamStatus } from '../../status/status.ts';
+import { MODELS_ANSWER, SECRET_IN_BODY } from './fixtures.ts';
 
 /**
  * НАБОР СООТВЕТСТВИЯ — одна таблица на все драйверы.
@@ -31,14 +13,10 @@ import {
  * контур приносит файл драйвера и обязан пройти ВСЁ, что ниже; провал любой
  * строки красит `pnpm test` (инвариант 9 партии).
  *
- * Половина строк гоняет манифест ЧЕРЕЗ РЕАЛЬНЫЙ МОСТ, а не сверяет его поля
- * между собой. Разница не косметическая: таблица, спрашивавшая манифест о
- * манифесте, зеленела и тогда, когда мост не делал ничего из объявленного, —
- * ровно тем и была прежняя редакция. Поэтому строки драйвера подставляются в те
- * самые функции, которые работают на живом запросе: перевод запроса
- * (`anthropicRequestToOpenAi`, `openAiRequestLoss`), разбор потока
- * (`StreamTranslator`) и перевод отказа (`bridgeUpstreamStatus`). Сети здесь
- * по-прежнему нет — драйвер по договору в неё не ходит.
+ * Строки, гонявшие манифест через мост шлюза (перевод запроса и разбор потока), ушли вместе со
+ * шлюзом в ядро (этап 10, C3d) — `apps/core/src/hop-host/gateway/drivers/conformance.test.ts`, по
+ * каждому пресету контракта. Здесь — манифест, адрес и ключ, модели, возможности и перевод отказа
+ * (`bridgeUpstreamStatus`). Сети по-прежнему нет — драйвер по договору в неё не ходит.
  */
 
 /**
@@ -70,11 +48,6 @@ const DECLARED: Record<string, { vendorFields: number; statusRows: number; viola
   together: { vendorFields: 0, statusRows: 0, violations: 0 },
 };
 
-/** Кадр потока в проводном виде. */
-function frame(payload: unknown): string {
-  return `data: ${JSON.stringify(payload)}\n\n`;
-}
-
 /**
  * Название проверки, каким его увидит человек, для объявленного драйвером поля.
  * `label: true` значит «поле несёт фразу», остальные — идентификатор, и
@@ -98,24 +71,6 @@ function declaredViolations(driver: PlatformDriver): Record<string, string>[] {
     text: SECRET_IN_BODY,
     input: SECRET_IN_BODY,
   }));
-}
-
-/** Прогнать кадры через настоящий разборщик от имени этого драйвера. */
-function runStream(
-  driver: PlatformDriver,
-  dialect: Dialect,
-  frames: string[],
-): { out: string; translator: StreamTranslator } {
-  const translator = new StreamTranslator({
-    dialect,
-    model: 'chat-one',
-    includeUsage: false,
-    driver,
-  });
-  let out = '';
-  for (const chunk of frames) out += translator.push(chunk);
-  out += translator.end();
-  return { out, translator };
 }
 
 describe.each(allDrivers)('набор соответствия: $id', (driver: PlatformDriver) => {
@@ -281,52 +236,6 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
     expect(driver.responseCeilingSec).toBeGreaterThan(0);
   });
 
-  it('инструменты клиента в диалекте OpenAI живут ровно так, как объявлено', () => {
-    // Не сверка двух полей манифеста, а прогон через ту самую функцию, которая
-    // считает потери живого запроса: `clientTools: 'shim'` без строки в
-    // манифесте даёт ПУСТОЙ след при выброшенных схемах — панель обещает агенту
-    // руки и молчит о том, что их нет.
-    const loss = openAiRequestLoss(
-      { tools: ANTHROPIC_REQUEST_WITH_TOOLS.tools },
-      driver.requestFields,
-    );
-    // Потеря — только у `shim`: `native-no-call` поле ВЕЗЁТ, и молчание модели
-    // не повод называть потерянным то, что доехало.
-    expect(loss.some((item) => item.field === 'tools')).toBe(
-      !clientToolsTravel(driver.clientTools),
-    );
-    for (const item of loss) expect(item.note.trim()).not.toBe('');
-  });
-
-  it('инструменты в диалекте Anthropic без прослойки: полем либо потерей с причиной', () => {
-    // Маршрут выбирается ТЕМ ЖЕ решением, что на живом запросе, и проверяется по
-    // телу, уходящему наверх. Прежняя строка здесь закрепляла потерю у всех
-    // драйверов «хоть трижды passthrough» — и зеленела, пока совместимый шлюз
-    // оставался без рук (аудит DRV-01).
-    const route = chooseToolRoute({ toolShim: false, platformTools: false }, driver, () => '');
-    const { body, lost } = anthropicRequestToOpenAi(
-      ANTHROPIC_REQUEST_WITH_TOOLS,
-      driver.requestFields,
-      route,
-    );
-    if (clientToolsTravel(driver.clientTools)) {
-      expect(body.tools).toEqual([
-        {
-          type: 'function',
-          function: { name: 'calc', description: 'счёт', parameters: { type: 'object' } },
-        },
-      ]);
-      expect(body.tool_choice).toBe('auto');
-      expect(lost).toEqual([]);
-      return;
-    }
-    expect(body.tools).toBeUndefined();
-    expect(body.tool_choice).toBeUndefined();
-    const tools = lost.find((item) => item.field === 'tools');
-    expect(tools?.note.trim()).not.toBe('');
-    expect(lost.some((item) => item.field === 'tool_choice')).toBe(true);
-  });
-
   it('умолчание прослойки нового контура совпадает с тем, как платформа принимает инструменты', () => {
     // Пресет читает мастер фронта, манифест — конвейер. Разойдясь, они включали бы
     // прослойку шлюзу, принимающему `tools` полем, или выключали её платформе компании, у
@@ -336,75 +245,6 @@ describe.each(allDrivers)('набор соответствия: $id', (driver: P
     // Руки без прослойки есть только у `native`: и «поля нет» (`shim`), и «поле
     // есть, а вызовов нет» (`native-no-call`) означают одно — умолчание «включена».
     expect(preset.defaults.toolShim).toBe(shimByClientTools(driver.clientTools));
-  });
-
-  it('прослойка не шлёт выбор инструмента без `tools`, кроме объявленного драйвером', () => {
-    const route = chooseToolRoute({ toolShim: true, platformTools: false }, driver, () => 'п');
-    const { body } = anthropicRequestToOpenAi(
-      ANTHROPIC_REQUEST_WITH_TOOLS,
-      driver.requestFields,
-      route,
-    );
-    expect(body.tools).toBeUndefined();
-    expect(body.tool_choice).toBe(driver.shimRequestFields?.tool_choice);
-  });
-
-  it('обычный поток драйвер вендорным не считает', () => {
-    expect(driver.readFrame(JSON.parse(DELTA_FRAME))).toBeUndefined();
-    expect(driver.readFrame(JSON.parse(USAGE_FRAME))).toBeUndefined();
-  });
-
-  it('объявленное вендорное поле узнаётся и названо своим именем', () => {
-    for (const field of driver.vendorFields) {
-      const parsed = driver.readFrame({ [field]: 'что-нибудь' });
-      // Иначе цельный ответ разложился бы в кадр, который разборщик потока
-      // считает незнакомым: поле объявлено в одном месте и не узнано в другом.
-      expect(parsed, `поле ${field} объявлено, но не узнано`).toBeDefined();
-      // Именем кадр вычищается, если рядом с вердиктом приехал кусок ответа.
-      // Разойдясь с объявленным, оно оставило бы вендорный ключ в теле клиента.
-      expect(parsed?.field).toBe(field);
-    }
-  });
-
-  it('вендорный кадр не доезжает до клиента ни в одном диалекте', () => {
-    for (const dialect of ['openai-compat', 'anthropic'] as const) {
-      for (const field of driver.vendorFields) {
-        const { out } = runStream(driver, dialect, [
-          frame({ [field]: { note: SECRET_IN_BODY } }),
-          frame(JSON.parse(DELTA_FRAME)),
-          'data: [DONE]\n\n',
-        ]);
-        expect(out, `${field} уехал клиенту в диалекте ${dialect}`).not.toContain(field);
-        expect(out).not.toContain(SECRET_IN_BODY);
-      }
-    }
-  });
-
-  it('вендорное поле рядом с обычным чанком не уезжает вместе с ним', () => {
-    for (const field of driver.vendorFields) {
-      // Худший случай формы: вердикт приехал В ОДНОМ кадре с содержимым. Читать
-      // такой кадр как обычный чанк значит отдать клиенту служебное тело.
-      const mixed = {
-        ...JSON.parse(DELTA_FRAME),
-        [field]: { note: SECRET_IN_BODY },
-      };
-      const { out } = runStream(driver, 'openai-compat', [frame(mixed), 'data: [DONE]\n\n']);
-      expect(out, `${field} уехал клиенту рядом с содержимым`).not.toContain(field);
-      expect(out).not.toContain(SECRET_IN_BODY);
-    }
-  });
-
-  it('часть ответа, не перенесённая в чужой диалект, названа, а не обнулена', () => {
-    const { out, translator } = runStream(driver, 'anthropic', [
-      frame(JSON.parse(IMAGE_DELTA_FRAME)),
-      'data: [DONE]\n\n',
-    ]);
-    // Текст доезжает целиком...
-    expect(out).toContain('вот схема');
-    // ...а картинка, которой в диалекте Anthropic не будет, названа человеку.
-    // Молча обнулённая, она и есть ответ, в котором человек видит пустоту и не
-    // знает, что она была.
-    expect(translator.facts.droppedParts).toContain('content[].image_url');
   });
 
   it('своя строка отказа отвечает клиенту ровно тем, что объявила', () => {

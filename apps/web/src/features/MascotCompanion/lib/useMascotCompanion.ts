@@ -13,7 +13,6 @@ import { resolveMood, statusLine } from '../model/mood';
 import { shouldTip } from '../model/shouldTip';
 import { EMPTY_MEMORY, pickReaction } from '../model/reactions';
 import type { ReactionKind, ReactionMemory } from '../model/reactions.types';
-import { useGroupEvents } from './useGroupEvents';
 import type { ChatTarget } from '../model/chatTargets.types';
 import type { RunSnapshot } from '../model/runEvents.types';
 import { useActivity } from './useActivity';
@@ -42,11 +41,8 @@ const REACTION_MOOD: Record<ReactionKind, MascotMood> = {
   linkLost: 'lost',
   linkBack: 'happy',
   runFailed: 'error',
-  groupFailed: 'error',
-  groupStopped: 'thinking',
   limitHit: 'waiting',
   longDone: 'happy',
-  groupDelivered: 'happy',
 };
 
 /** Повод реакции: род, кого назвать и куда вести кнопкой. */
@@ -252,19 +248,6 @@ export function useMascotCompanion(isPanelOpen: boolean) {
     if (link === 'down') react([{ kind: 'linkLost' }]);
     else if (link === 'up' && before === 'down') react([{ kind: 'linkBack' }]);
   }, [link, prefs.enabled, prefs.reactions, react, dismissSpeech]);
-
-  // Группы разделения: упала, остановлена, доставлена. Кнопка ведёт в хаб —
-  // разговор-корень дерева.
-  useGroupEvents((events) => {
-    if (!prefs.enabled || !prefs.reactions) return;
-    react(
-      events.map((event) => ({
-        kind: event.kind,
-        name: event.title,
-        target: runTarget({ id: event.root }, chatList),
-      })),
-    );
-  });
 
   // Разговор, ждущий вне прогонов панели (терминал, соседнее окно, вопрос
   // дерева), — тот же повод «ждёт ответа». Как у звонка: первый снимок только

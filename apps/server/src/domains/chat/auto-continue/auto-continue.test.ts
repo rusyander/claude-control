@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ChatRunRegistry, type RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import {
   AutoContinue,

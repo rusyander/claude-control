@@ -9,9 +9,6 @@ export const panelActionsChatRu = {
   list_waiting: 'Что в чатах ждёт вас',
   list_chat_projects: 'Папки, в которых есть чаты',
   send_chat_message: 'Написать в чат',
-  request_split: 'Попросить чат предложить разделение',
-  split_decline: 'Работать здесь, без разделения',
-  set_chat_group: 'Группа и автономность чата',
   stop_chat_run: 'Остановить агента в чате',
   split_control: 'Пульт разделения задач',
 };

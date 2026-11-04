@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 668,
       "height": 608,
-      "shotAt": "2026-10-05T18:50:12.668Z",
-      "text": "Добро пожаловать в AgentDeck Шаг 1 из 4 · Панель для управления конфигурацией Claude Code в одном месте. Просмотр и правка правил, хуков, скиллов, MCP-серверов и разрешений. Всё читается и пишется в локальные файлы Claude Code — ничего не уходит с вашей машины. Перед правками делается резервная копия, поэтому любое изменение легко откатить. Пропустить Далее",
+      "shotAt": "2026-11-03T15:39:37.752Z",
+      "text": "Добро пожаловать в AgentDeck Шаг 1 из 4 · Панель для управления конфигурацией CLI-агентов (Claude Code, Qwen Code, Codex и других) в одном месте. Просмотр и правка правил, хуков, скиллов, MCP-серверов и разрешений. Всё читается и пишется в локальные файлы вашего CLI — ничего не уходит с вашей машины. Перед правками делается резервная копия, поэтому любое изменение легко откатить. Пропустить Далее",
       "en": {
         "file": "01-wizard-intro.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:50:44.253Z",
-        "text": "Welcome to AgentDeck Step 1 of 4 · A panel for your Claude Code configuration, all in one place. View and edit rules, hooks, skills, MCP servers and permissions. Everything reads and writes your local Claude Code files — nothing leaves your machine. Backups are made before edits, so any change is easy to roll back. Skip Next"
+        "shotAt": "2026-11-03T15:54:13.469Z",
+        "text": "Welcome to AgentDeck Step 1 of 4 · A panel for your CLI agents’ configuration (Claude Code, Qwen Code, Codex and others), all in one place. View and edit rules, hooks, skills, MCP servers and permissions. Everything reads and writes your CLI’s local files — nothing leaves your machine. Backups are made before edits, so any change is easy to roll back. Skip Next",
+        "seal": {
+          "png": "238f0acecbcc3624",
+          "text": "5fbc84f1667b4b3a"
+        }
       },
       "dark": {
         "file": "01-wizard-intro.dark.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:15.150Z",
-        "text": "Добро пожаловать в AgentDeck Шаг 1 из 4 · Панель для управления конфигурацией Claude Code в одном месте. Просмотр и правка правил, хуков, скиллов, MCP-серверов и разрешений. Всё читается и пишется в локальные файлы Claude Code — ничего не уходит с вашей машины. Перед правками делается резервная копия, поэтому любое изменение легко откатить. Пропустить Далее"
+        "shotAt": "2026-11-03T16:03:53.674Z",
+        "text": "Добро пожаловать в AgentDeck Шаг 1 из 4 · Панель для управления конфигурацией CLI-агентов (Claude Code, Qwen Code, Codex и других) в одном месте. Просмотр и правка правил, хуков, скиллов, MCP-серверов и разрешений. Всё читается и пишется в локальные файлы вашего CLI — ничего не уходит с вашей машины. Перед правками делается резервная копия, поэтому любое изменение легко откатить. Пропустить Далее",
+        "seal": {
+          "png": "2e221cd922a810a4",
+          "text": "ce4e1b258c75665c"
+        }
       },
       "darkEn": {
         "file": "01-wizard-intro.dark.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:44.897Z",
-        "text": "Welcome to AgentDeck Step 1 of 4 · A panel for your Claude Code configuration, all in one place. View and edit rules, hooks, skills, MCP servers and permissions. Everything reads and writes your local Claude Code files — nothing leaves your machine. Backups are made before edits, so any change is easy to roll back. Skip Next"
+        "shotAt": "2026-11-03T16:09:27.349Z",
+        "text": "Welcome to AgentDeck Step 1 of 4 · A panel for your CLI agents’ configuration (Claude Code, Qwen Code, Codex and others), all in one place. View and edit rules, hooks, skills, MCP servers and permissions. Everything reads and writes your CLI’s local files — nothing leaves your machine. Backups are made before edits, so any change is easy to roll back. Skip Next",
+        "seal": {
+          "png": "64db9d5f8a92c593",
+          "text": "5fbc84f1667b4b3a"
+        }
+      },
+      "seal": {
+        "png": "369ac8977f9981b0",
+        "text": "ce4e1b258c75665c"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 668,
       "height": 608,
-      "shotAt": "2026-10-05T18:50:14.589Z",
+      "shotAt": "2026-11-03T15:39:43.082Z",
       "text": "Каталог конфигурации Шаг 2 из 4 · Укажите панели каталог .claude. Обычно определяется автоматически. Если путь неверный или каталог не найден — выберите папку вручную. из переменной окружения C:\\work\\claude-demo-providers\\.claude Путь к каталогу .claude Применить Выбрать папку Назад Пропустить Далее",
       "en": {
         "file": "02-wizard-location.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:50:46.166Z",
-        "text": "Configuration folder Step 2 of 4 · Point the panel at your .claude directory. Usually detected automatically. If it is wrong or missing, choose the folder manually. from environment variable C:\\work\\claude-demo-providers\\.claude Path to the .claude folder Apply Choose folder Back Skip Next"
+        "shotAt": "2026-11-03T15:54:18.816Z",
+        "text": "Configuration folder Step 2 of 4 · Point the panel at your .claude directory. Usually detected automatically. If it is wrong or missing, choose the folder manually. from environment variable C:\\work\\claude-demo-providers\\.claude Path to the .claude folder Apply Choose folder Back Skip Next",
+        "seal": {
+          "png": "604921b681caa63f",
+          "text": "0343ddb65ddcf61e"
+        }
       },
       "dark": {
         "file": "02-wizard-location.dark.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:17.066Z",
-        "text": "Каталог конфигурации Шаг 2 из 4 · Укажите панели каталог .claude. Обычно определяется автоматически. Если путь неверный или каталог не найден — выберите папку вручную. из переменной окружения C:\\work\\claude-demo-providers\\.claude Путь к каталогу .claude Применить Выбрать папку Назад Пропустить Далее"
+        "shotAt": "2026-11-03T16:03:59.027Z",
+        "text": "Каталог конфигурации Шаг 2 из 4 · Укажите панели каталог .claude. Обычно определяется автоматически. Если путь неверный или каталог не найден — выберите папку вручную. из переменной окружения C:\\work\\claude-demo-providers\\.claude Путь к каталогу .claude Применить Выбрать папку Назад Пропустить Далее",
+        "seal": {
+          "png": "d9e8ba7fc17bf322",
+          "text": "5b8e8ef3a52d3ae2"
+        }
       },
       "darkEn": {
         "file": "02-wizard-location.dark.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:46.814Z",
-        "text": "Configuration folder Step 2 of 4 · Point the panel at your .claude directory. Usually detected automatically. If it is wrong or missing, choose the folder manually. from environment variable C:\\work\\claude-demo-providers\\.claude Path to the .claude folder Apply Choose folder Back Skip Next"
+        "shotAt": "2026-11-03T16:09:32.711Z",
+        "text": "Configuration folder Step 2 of 4 · Point the panel at your .claude directory. Usually detected automatically. If it is wrong or missing, choose the folder manually. from environment variable C:\\work\\claude-demo-providers\\.claude Path to the .claude folder Apply Choose folder Back Skip Next",
+        "seal": {
+          "png": "44248e0f81a24c32",
+          "text": "0343ddb65ddcf61e"
+        }
+      },
+      "seal": {
+        "png": "c19a493af44328d2",
+        "text": "5b8e8ef3a52d3ae2"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 668,
       "height": 608,
-      "shotAt": "2026-10-05T18:50:17.189Z",
-      "text": "Найденные CLI Шаг 3 из 4 · Каким инструментом будет управлять панель. Панель посмотрела, какие CLI установлены в системе. Это подсказка — выбрать можно любого провайдера, а шаг целиком можно пропустить. Claude Code установлен рекомендуется Активен По умолчанию панель работает с Claude Code. Провайдера всегда можно сменить в настройках. Назад Пропустить Далее",
+      "shotAt": "2026-11-03T15:39:45.685Z",
+      "text": "Найденные CLI Шаг 3 из 4 · Каким инструментом будет управлять панель. Панель посмотрела, какие CLI установлены в системе. Это подсказка — выбрать можно любого провайдера, а шаг целиком можно пропустить. Claude Code установлен рекомендуется Активен Codex (OpenAI) установлен Выбрать Qwen Code установлен Выбрать Continue установлен Выбрать Goose установлен Выбрать OpenCode установлен Выбрать Aider установлен Выбрать По умолчанию панель работает с Claude Code. Провайдера всегда можно сменить в настройках. Назад Пропустить Далее",
       "en": {
         "file": "03-wizard-providers.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:50:48.748Z",
-        "text": "Detected CLIs Step 3 of 4 · Which tool the panel will manage. The panel checked which CLIs are installed on this system. This is a hint — you can pick any provider, or skip this step entirely. Claude Code installed recommended Active By default the panel works with Claude Code. You can always switch providers in Settings. Back Skip Next"
+        "shotAt": "2026-11-03T15:54:24.851Z",
+        "text": "Detected CLIs Step 3 of 4 · Which tool the panel will manage. The panel checked which CLIs are installed on this system. This is a hint — you can pick any provider, or skip this step entirely. Claude Code installed recommended Active Codex (OpenAI) installed Choose Qwen Code installed Choose Continue installed Choose Goose installed Choose OpenCode installed Choose Aider installed Choose By default the panel works with Claude Code. You can always switch providers in Settings. Back Skip Next",
+        "seal": {
+          "png": "1c27f6a7dd92f3d0",
+          "text": "0bb20dbeb0eccd6a"
+        }
       },
       "dark": {
         "file": "03-wizard-providers.dark.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:19.664Z",
-        "text": "Найденные CLI Шаг 3 из 4 · Каким инструментом будет управлять панель. Панель посмотрела, какие CLI установлены в системе. Это подсказка — выбрать можно любого провайдера, а шаг целиком можно пропустить. Claude Code установлен рекомендуется Активен По умолчанию панель работает с Claude Code. Провайдера всегда можно сменить в настройках. Назад Пропустить Далее"
+        "shotAt": "2026-11-03T16:04:01.647Z",
+        "text": "Найденные CLI Шаг 3 из 4 · Каким инструментом будет управлять панель. Панель посмотрела, какие CLI установлены в системе. Это подсказка — выбрать можно любого провайдера, а шаг целиком можно пропустить. Claude Code установлен рекомендуется Активен Codex (OpenAI) установлен Выбрать Qwen Code установлен Выбрать Continue установлен Выбрать Goose установлен Выбрать OpenCode установлен Выбрать Aider установлен Выбрать По умолчанию панель работает с Claude Code. Провайдера всегда можно сменить в настройках. Назад Пропустить Далее",
+        "seal": {
+          "png": "1ec7ab8c6af4324c",
+          "text": "c5792eef439444e7"
+        }
       },
       "darkEn": {
         "file": "03-wizard-providers.dark.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:49.421Z",
-        "text": "Detected CLIs Step 3 of 4 · Which tool the panel will manage. The panel checked which CLIs are installed on this system. This is a hint — you can pick any provider, or skip this step entirely. Claude Code installed recommended Active By default the panel works with Claude Code. You can always switch providers in Settings. Back Skip Next"
+        "shotAt": "2026-11-03T16:09:38.746Z",
+        "text": "Detected CLIs Step 3 of 4 · Which tool the panel will manage. The panel checked which CLIs are installed on this system. This is a hint — you can pick any provider, or skip this step entirely. Claude Code installed recommended Active Codex (OpenAI) installed Choose Qwen Code installed Choose Continue installed Choose Goose installed Choose OpenCode installed Choose Aider installed Choose By default the panel works with Claude Code. You can always switch providers in Settings. Back Skip Next",
+        "seal": {
+          "png": "d2f9a85fc9a3d5fb",
+          "text": "0bb20dbeb0eccd6a"
+        }
+      },
+      "seal": {
+        "png": "ff63fc2662875bc3",
+        "text": "c5792eef439444e7"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 668,
       "height": 608,
-      "shotAt": "2026-10-05T18:50:20.110Z",
+      "shotAt": "2026-11-03T15:39:48.284Z",
       "text": "Доступ Claude Code Шаг 4 из 4 · Нужен только песочнице — чат и разделы работают без него. Панель проверила, откуда Claude Code берёт доступ к аккаунту. Зелёный бейдж — всё найдено, делать ничего не нужно. Если доступа нет, войдите командой claude в терминале или задайте его вручную. Шаг можно пропустить. не найден Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную Назад Готово",
       "en": {
         "file": "04-wizard-access.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:50:51.316Z",
-        "text": "Claude Code access Step 4 of 4 · Needed only by the sandbox — chat and the sections work without it. The panel checked where Claude Code takes its account access from. A green badge means it was found and nothing needs doing. If there is none, log in with the claude command in a terminal or set it by hand. This step can be skipped. not found The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually Back Done"
+        "shotAt": "2026-11-03T15:54:27.448Z",
+        "text": "Claude Code access Step 4 of 4 · Needed only by the sandbox — chat and the sections work without it. The panel checked where Claude Code takes its account access from. A green badge means it was found and nothing needs doing. If there is none, log in with the claude command in a terminal or set it by hand. This step can be skipped. not found The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually Back Done",
+        "seal": {
+          "png": "ccff6a9d0fe5ca82",
+          "text": "835cfa0e0fb73f5d"
+        }
       },
       "dark": {
         "file": "04-wizard-access.dark.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:22.265Z",
-        "text": "Доступ Claude Code Шаг 4 из 4 · Нужен только песочнице — чат и разделы работают без него. Панель проверила, откуда Claude Code берёт доступ к аккаунту. Зелёный бейдж — всё найдено, делать ничего не нужно. Если доступа нет, войдите командой claude в терминале или задайте его вручную. Шаг можно пропустить. не найден Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную Назад Готово"
+        "shotAt": "2026-11-03T16:04:04.257Z",
+        "text": "Доступ Claude Code Шаг 4 из 4 · Нужен только песочнице — чат и разделы работают без него. Панель проверила, откуда Claude Code берёт доступ к аккаунту. Зелёный бейдж — всё найдено, делать ничего не нужно. Если доступа нет, войдите командой claude в терминале или задайте его вручную. Шаг можно пропустить. не найден Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную Назад Готово",
+        "seal": {
+          "png": "543dcdec46bcbb20",
+          "text": "8ec0a2dc59a48675"
+        }
       },
       "darkEn": {
         "file": "04-wizard-access.dark.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-10-05T18:51:52.015Z",
-        "text": "Claude Code access Step 4 of 4 · Needed only by the sandbox — chat and the sections work without it. The panel checked where Claude Code takes its account access from. A green badge means it was found and nothing needs doing. If there is none, log in with the claude command in a terminal or set it by hand. This step can be skipped. not found The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually Back Done"
+        "shotAt": "2026-11-03T16:09:41.341Z",
+        "text": "Claude Code access Step 4 of 4 · Needed only by the sandbox — chat and the sections work without it. The panel checked where Claude Code takes its account access from. A green badge means it was found and nothing needs doing. If there is none, log in with the claude command in a terminal or set it by hand. This step can be skipped. not found The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually Back Done",
+        "seal": {
+          "png": "a9c9dca4b6f234ad",
+          "text": "835cfa0e0fb73f5d"
+        }
+      },
+      "seal": {
+        "png": "bfee3a512fda4fe5",
+        "text": "8ec0a2dc59a48675"
       }
     },
     {
@@ -146,31 +210,47 @@
         "masked": 0,
         "width": 1400,
         "height": 1000,
-        "shotAt": "2026-10-05T18:50:56.534Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Help Settings Application, accessibility and configuration path General Access Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Theme, accent, language, accessibility and the editor project files open in. Theme Light Dark Match system Accent Applied on top of the current theme; presets come from the design-system palette. Default Blue Green Purple Amber Language Русский English Accessibility Large text Scales the whole font ramp up Reduce motion Disables animations and transitions High contrast Strengthens borders and text colour Code editor Used by the \"Open in editor\" button. Editors installed on your system are shown. Auto VS Code VS Code Insiders · not found Cursor · not found Windsurf · not found Zed · not found Sublime Text · not found WebStorm · not found IntelliJ IDEA · not found PyCharm · not found PhpStorm · not found GoLand · not found Rider · not found Neovim · not found Custom command The editor CLI command if it is not in the list (e.g. mate). Save Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Off"
+        "shotAt": "2026-11-03T15:54:33.290Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Settings Application, accessibility and configuration path General Access Phone Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Theme, accent, language, accessibility, the panel as an app and the editor project files open in. Theme Light Dark Match system Accent Applied on top of the current theme; presets come from the design-system palette. Default Blue Green Purple Amber Language Русский English Accessibility Large text Scales the whole font ramp up Reduce motion Disables animations and transitions High contrast Strengthens borders and text colour Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay. Reactions to events The server connection lost or back, a turn or a group failed, a group stopped or delivered, the subscription limit hit, a long turn finished. One short line, at most once a minute per event; in the chat — above the input field. Off — Decky reports a failed turn with the old single line and stays silent about the rest. Panel as an app This browser does not offer installation. Open http://127.0.0.1:8888 in Chrome or Edge and choose «Install AgentDeck» in the menu — or the panel is already installed and open in a tab. Open the window when Windows starts: pnpm keepalive:app in the panel folder (undo with pnpm keepalive:app:off). The window appears once per boot, when the stand already answers. Code editor Used by the \"Open in editor\" button. Editors installed on your system are shown. Auto VS Code VS Code Insiders · not found Cursor · not found Windsurf · not found Zed · not found Sublime Text · not found WebStorm · not found IntelliJ IDEA · not found PyCharm · not found PhpStorm · not found GoLand · not found Rider · not found Neovim · not found Custom command The editor CLI command if it is not in the list (e.g. mate). Save",
+        "seal": {
+          "png": "24b0b3d39c157d7d",
+          "text": "9b43772e698fd27a"
+        }
       },
       "dark": {
         "file": "05-tabs.dark.png",
         "masked": 0,
         "width": 1400,
         "height": 1000,
-        "shotAt": "2026-10-05T18:51:27.002Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Справка Настройки Приложение, доступность и путь к конфигурации Общие Доступ Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Тема, акцент, язык, доступность и редактор, в котором открываются файлы проекта. Тема Светлая Тёмная Как в системе Акцент Применяется поверх текущей темы; пресеты — из палитры дизайн-системы. По умолчанию Синий Зелёный Фиолетовый Янтарный Язык Русский English Доступность Крупный текст Увеличивает всю шкалу шрифтов Меньше движения Отключает анимации и переходы Высокий контраст Усиливает границы и цвет текста Редактор кода В нём открывается проект по кнопке «Открыть в редакторе». Показаны установленные в системе. Авто VS Code VS Code Insiders · не найден Cursor · не найден Windsurf · не найден Zed · не найден Sublime Text · не найден WebStorm · не найден IntelliJ IDEA · не найден PyCharm · не найден PhpStorm · не найден GoLand · не найден Rider · не найден Neovim · не найден Своя команда Команда CLI редактора, если его нет в списке (например, mate). Сохранить Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Выключен"
+        "shotAt": "2026-11-03T16:04:10.196Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Настройки Приложение, доступность и путь к конфигурации Общие Доступ Телефон Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Тема, акцент, язык, доступность, панель как приложение и редактор, в котором открываются файлы проекта. Тема Светлая Тёмная Как в системе Акцент Применяется поверх текущей темы; пресеты — из палитры дизайн-системы. По умолчанию Синий Зелёный Фиолетовый Янтарный Язык Русский English Доступность Крупный текст Увеличивает всю шкалу шрифтов Меньше движения Отключает анимации и переходы Высокий контраст Усиливает границы и цвет текста Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются. Реакции на события Связь с сервером пропала или вернулась, ход или группа упали, группа остановлена или доставлена, упёрлись в лимит подписки, закончился долгий ход. Одна короткая фраза, не чаще раза в минуту на событие; в чате — над полем ввода. Выключено — о сбое хода Дека говорит прежней фразой, об остальном молчит. Панель как приложение Этот браузер установку не предлагает. Откройте http://127.0.0.1:8888 в Chrome или Edge и выберите в меню «Установить AgentDeck» — или панель уже установлена и открыта вкладкой. Открывать окно при старте Windows: pnpm keepalive:app в каталоге панели (снять — pnpm keepalive:app:off). Окно появляется один раз за загрузку, когда стенд уже отвечает. Редактор кода В нём открывается проект по кнопке «Открыть в редакторе». Показаны установленные в системе. Авто VS Code VS Code Insiders · не найден Cursor · не найден Windsurf · не найден Zed · не найден Sublime Text · не найден WebStorm · не найден IntelliJ IDEA · не найден PyCharm · не найден PhpStorm · не найден GoLand · не найден Rider · не найден Neovim · не найден Своя команда Команда CLI редактора, если его нет в списке (например, mate). Сохранить",
+        "seal": {
+          "png": "9a766268b78a4ec1",
+          "text": "2abdbe1f3d878595"
+        }
       },
       "darkEn": {
         "file": "05-tabs.dark.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1000,
-        "shotAt": "2026-10-05T18:51:56.703Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Help Settings Application, accessibility and configuration path General Access Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Theme, accent, language, accessibility and the editor project files open in. Theme Light Dark Match system Accent Applied on top of the current theme; presets come from the design-system palette. Default Blue Green Purple Amber Language Русский English Accessibility Large text Scales the whole font ramp up Reduce motion Disables animations and transitions High contrast Strengthens borders and text colour Code editor Used by the \"Open in editor\" button. Editors installed on your system are shown. Auto VS Code VS Code Insiders · not found Cursor · not found Windsurf · not found Zed · not found Sublime Text · not found WebStorm · not found IntelliJ IDEA · not found PyCharm · not found PhpStorm · not found GoLand · not found Rider · not found Neovim · not found Custom command The editor CLI command if it is not in the list (e.g. mate). Save Background watcher While on, the panel collects all of its own problems: on the server — 5xx and 4xx responses caused by its own interface, log errors and warnings, slow responses, CLI runs that failed or exited with an error; on the page — errors, console warnings, failed requests, wrongly shaped replies, stuck loading. A cheap model checks each one against the panel's source code and adds remarks about defects it notices nearby. The model only reads code and changes nothing. Each cause is one report section numbered WR-n: kind (failure or remark), severity, check status, place in the code, root cause, steps, how to fix, evidence with secrets removed and the number of repeats; an index sits on top. The report is written so another agent can pick it up. Analyses stay under an hourly cap; no problems — no spend. Turned off, the watcher collects nothing. Off"
+        "shotAt": "2026-11-03T16:09:47.085Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Settings Application, accessibility and configuration path General Access Phone Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Theme, accent, language, accessibility, the panel as an app and the editor project files open in. Theme Light Dark Match system Accent Applied on top of the current theme; presets come from the design-system palette. Default Blue Green Purple Amber Language Русский English Accessibility Large text Scales the whole font ramp up Reduce motion Disables animations and transitions High contrast Strengthens borders and text colour Mascot Show Decky At the bottom of the sidebar: an agent summary, remarks about finished turns and questions, cameos in the chat. Remarks and tips Every now and then Decky suggests panel features and comments on long turns in the chat. Messages about questions and finished turns stay. Reactions to events The server connection lost or back, a turn or a group failed, a group stopped or delivered, the subscription limit hit, a long turn finished. One short line, at most once a minute per event; in the chat — above the input field. Off — Decky reports a failed turn with the old single line and stays silent about the rest. Panel as an app This browser does not offer installation. Open http://127.0.0.1:8888 in Chrome or Edge and choose «Install AgentDeck» in the menu — or the panel is already installed and open in a tab. Open the window when Windows starts: pnpm keepalive:app in the panel folder (undo with pnpm keepalive:app:off). The window appears once per boot, when the stand already answers. Code editor Used by the \"Open in editor\" button. Editors installed on your system are shown. Auto VS Code VS Code Insiders · not found Cursor · not found Windsurf · not found Zed · not found Sublime Text · not found WebStorm · not found IntelliJ IDEA · not found PyCharm · not found PhpStorm · not found GoLand · not found Rider · not found Neovim · not found Custom command The editor CLI command if it is not in the list (e.g. mate). Save",
+        "seal": {
+          "png": "99e81552dd4666e7",
+          "text": "9b43772e698fd27a"
+        }
       },
       "file": "05-tabs.png",
       "masked": 0,
       "width": 1400,
       "height": 1000,
-      "shotAt": "2026-10-05T18:50:25.387Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Справка Настройки Приложение, доступность и путь к конфигурации Общие Доступ Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Тема, акцент, язык, доступность и редактор, в котором открываются файлы проекта. Тема Светлая Тёмная Как в системе Акцент Применяется поверх текущей темы; пресеты — из палитры дизайн-системы. По умолчанию Синий Зелёный Фиолетовый Янтарный Язык Русский English Доступность Крупный текст Увеличивает всю шкалу шрифтов Меньше движения Отключает анимации и переходы Высокий контраст Усиливает границы и цвет текста Редактор кода В нём открывается проект по кнопке «Открыть в редакторе». Показаны установленные в системе. Авто VS Code VS Code Insiders · не найден Cursor · не найден Windsurf · не найден Zed · не найден Sublime Text · не найден WebStorm · не найден IntelliJ IDEA · не найден PyCharm · не найден PhpStorm · не найден GoLand · не найден Rider · не найден Neovim · не найден Своя команда Команда CLI редактора, если его нет в списке (например, mate). Сохранить Фоновый наблюдатель Пока включён, панель собирает все свои проблемы: сервера — ответы 5xx и 4xx из-за ошибки своего же интерфейса, ошибки и предупреждения журнала, медленные ответы, упавшие и завершившиеся с ошибкой запуски CLI; страницы — ошибки, предупреждения консоли, неудавшиеся запросы, ответы не того вида, зависшие загрузки. Дешёвая модель сверяет каждую с исходным кодом панели и добавляет замечания о дефектах, замеченных рядом. Модель только читает код, ничего не правит. Каждая причина — один раздел отчёта с номером WR-n: тип (сбой или замечание), важность, статус сверки, место в коде, причина, шаги, как исправить, улики без секретов и число повторов; сверху — оглавление. Отчёт написан так, чтобы его мог подхватить другой агент. Разборов — не больше потолка в час; нет проблем — нет и трат. Выключенный наблюдатель не собирает ничего. Выключен"
+      "shotAt": "2026-11-03T15:39:54.128Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Настройки Приложение, доступность и путь к конфигурации Общие Доступ Телефон Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Тема, акцент, язык, доступность, панель как приложение и редактор, в котором открываются файлы проекта. Тема Светлая Тёмная Как в системе Акцент Применяется поверх текущей темы; пресеты — из палитры дизайн-системы. По умолчанию Синий Зелёный Фиолетовый Янтарный Язык Русский English Доступность Крупный текст Увеличивает всю шкалу шрифтов Меньше движения Отключает анимации и переходы Высокий контраст Усиливает границы и цвет текста Маскот Показывать Деку Внизу боковой панели: сводка по агентам, реплики о готовых ходах и вопросах, появления в чате. Реплики и советы Время от времени Дека сам подсказывает возможности панели и комментирует долгие ходы в чате. Сообщения о вопросах и готовых ходах остаются. Реакции на события Связь с сервером пропала или вернулась, ход или группа упали, группа остановлена или доставлена, упёрлись в лимит подписки, закончился долгий ход. Одна короткая фраза, не чаще раза в минуту на событие; в чате — над полем ввода. Выключено — о сбое хода Дека говорит прежней фразой, об остальном молчит. Панель как приложение Этот браузер установку не предлагает. Откройте http://127.0.0.1:8888 в Chrome или Edge и выберите в меню «Установить AgentDeck» — или панель уже установлена и открыта вкладкой. Открывать окно при старте Windows: pnpm keepalive:app в каталоге панели (снять — pnpm keepalive:app:off). Окно появляется один раз за загрузку, когда стенд уже отвечает. Редактор кода В нём открывается проект по кнопке «Открыть в редакторе». Показаны установленные в системе. Авто VS Code VS Code Insiders · не найден Cursor · не найден Windsurf · не найден Zed · не найден Sublime Text · не найден WebStorm · не найден IntelliJ IDEA · не найден PyCharm · не найден PhpStorm · не найден GoLand · не найден Rider · не найден Neovim · не найден Своя команда Команда CLI редактора, если его нет в списке (например, mate). Сохранить",
+      "seal": {
+        "png": "a35f7d4d79cba964",
+        "text": "2abdbe1f3d878595"
+      }
     },
     {
       "id": "06-access-dir",
@@ -180,31 +260,47 @@
         "masked": 1,
         "width": 1116,
         "height": 176,
-        "shotAt": "2026-10-05T18:51:00.528Z",
-        "text": ".claude directory from environment variable Detected automatically. Fill this in if the directory is non-standard or detection failed. Apply"
+        "shotAt": "2026-11-03T15:54:38.077Z",
+        "text": ".claude directory from environment variable Detected automatically. Fill this in if the directory is non-standard or detection failed. Apply",
+        "seal": {
+          "png": "f02f8ab51ca5a338",
+          "text": "d203e2e2486e6934"
+        }
       },
       "dark": {
         "file": "06-access-dir.dark.png",
         "masked": 1,
         "width": 1116,
         "height": 194,
-        "shotAt": "2026-10-05T18:51:30.961Z",
-        "text": "Каталог .claude из переменной окружения Определяется автоматически. Заполните, если каталог нестандартный или автоопределение не сработало. Применить"
+        "shotAt": "2026-11-03T16:04:15.057Z",
+        "text": "Каталог .claude из переменной окружения Определяется автоматически. Заполните, если каталог нестандартный или автоопределение не сработало. Применить",
+        "seal": {
+          "png": "6f9f71636a8ad7f0",
+          "text": "734e8add8ced1278"
+        }
       },
       "darkEn": {
         "file": "06-access-dir.dark.en.png",
         "masked": 1,
         "width": 1116,
         "height": 176,
-        "shotAt": "2026-10-05T18:52:00.710Z",
-        "text": ".claude directory from environment variable Detected automatically. Fill this in if the directory is non-standard or detection failed. Apply"
+        "shotAt": "2026-11-03T16:09:51.788Z",
+        "text": ".claude directory from environment variable Detected automatically. Fill this in if the directory is non-standard or detection failed. Apply",
+        "seal": {
+          "png": "ffda727b1eb5c127",
+          "text": "d203e2e2486e6934"
+        }
       },
       "file": "06-access-dir.png",
       "masked": 1,
       "width": 1116,
       "height": 194,
-      "shotAt": "2026-10-05T18:50:29.551Z",
-      "text": "Каталог .claude из переменной окружения Определяется автоматически. Заполните, если каталог нестандартный или автоопределение не сработало. Применить"
+      "shotAt": "2026-11-03T15:39:59.277Z",
+      "text": "Каталог .claude из переменной окружения Определяется автоматически. Заполните, если каталог нестандартный или автоопределение не сработало. Применить",
+      "seal": {
+        "png": "a37f8b13a86cedd0",
+        "text": "734e8add8ced1278"
+      }
     },
     {
       "id": "07-access-credentials",
@@ -214,31 +310,47 @@
         "masked": 0,
         "width": 1116,
         "height": 261,
-        "shotAt": "2026-10-05T18:51:01.413Z",
-        "text": "Claude Code access not found Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here. The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually"
+        "shotAt": "2026-11-03T15:54:39.013Z",
+        "text": "Claude Code access not found Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here. The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually",
+        "seal": {
+          "png": "7377322b9ac8481b",
+          "text": "82dedafaeaed357f"
+        }
       },
       "dark": {
         "file": "07-access-credentials.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 261,
-        "shotAt": "2026-10-05T18:51:31.879Z",
-        "text": "Доступ Claude Code не найден Нужен только песочнице: она запускает Claude с отдельным каталогом настроек, и обычный вход туда не попадает. Чат, плагины и MCP работают с вашим настоящим каталогом и в этом не нуждаются. Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную"
+        "shotAt": "2026-11-03T16:04:15.989Z",
+        "text": "Доступ Claude Code не найден Нужен только песочнице: она запускает Claude с отдельным каталогом настроек, и обычный вход туда не попадает. Чат, плагины и MCP работают с вашим настоящим каталогом и в этом не нуждаются. Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную",
+        "seal": {
+          "png": "b7c088c3ecf8a703",
+          "text": "80102fd957fe915b"
+        }
       },
       "darkEn": {
         "file": "07-access-credentials.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 261,
-        "shotAt": "2026-10-05T18:52:01.629Z",
-        "text": "Claude Code access not found Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here. The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually"
+        "shotAt": "2026-11-03T16:09:52.707Z",
+        "text": "Claude Code access not found Only sandboxes need this: they run Claude against a separate settings directory, which your normal login does not reach. Chat, plugins and MCP use your real directory and need nothing here. The file C:\\work\\claude-demo-providers\\.claude\\.credentials.json was not found. Sign in with the `claude` command in a terminal or set access manually in the panel settings. Set manually",
+        "seal": {
+          "png": "4bc3cb3ec03cc624",
+          "text": "82dedafaeaed357f"
+        }
       },
       "file": "07-access-credentials.png",
       "masked": 0,
       "width": 1116,
       "height": 261,
-      "shotAt": "2026-10-05T18:50:30.465Z",
-      "text": "Доступ Claude Code не найден Нужен только песочнице: она запускает Claude с отдельным каталогом настроек, и обычный вход туда не попадает. Чат, плагины и MCP работают с вашим настоящим каталогом и в этом не нуждаются. Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную"
+      "shotAt": "2026-11-03T15:40:00.242Z",
+      "text": "Доступ Claude Code не найден Нужен только песочнице: она запускает Claude с отдельным каталогом настроек, и обычный вход туда не попадает. Чат, плагины и MCP работают с вашим настоящим каталогом и в этом не нуждаются. Файл C:\\work\\claude-demo-providers\\.claude\\.credentials.json не найден. Войдите командой `claude` в терминале или задайте доступ вручную в настройках панели. Задать вручную",
+      "seal": {
+        "png": "a9af0c0fa4586465",
+        "text": "80102fd957fe915b"
+      }
     },
     {
       "id": "08-remote",
@@ -248,31 +360,47 @@
         "masked": 1,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-10-05T18:51:02.937Z",
-        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T15:54:40.584Z",
+        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "cd85a84e213e0de1",
+          "text": "5ef713bb1db21bf5"
+        }
       },
       "dark": {
         "file": "08-remote.dark.png",
         "masked": 1,
         "width": 1116,
         "height": 480,
-        "shotAt": "2026-10-05T18:51:33.384Z",
-        "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода."
+        "shotAt": "2026-11-03T16:04:17.544Z",
+        "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
+        "seal": {
+          "png": "46fc7c4d5232223d",
+          "text": "d09e3af52beb1511"
+        }
       },
       "darkEn": {
         "file": "08-remote.dark.en.png",
         "masked": 1,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-10-05T18:52:03.151Z",
-        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T16:09:54.249Z",
+        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "2bf4a79e19024f46",
+          "text": "5ef713bb1db21bf5"
+        }
       },
       "file": "08-remote.png",
       "masked": 1,
       "width": 1116,
       "height": 480,
-      "shotAt": "2026-10-05T18:50:31.989Z",
-      "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода."
+      "shotAt": "2026-11-03T15:40:01.934Z",
+      "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
+      "seal": {
+        "png": "c056ab4c710678d9",
+        "text": "d09e3af52beb1511"
+      }
     }
   ]
 }

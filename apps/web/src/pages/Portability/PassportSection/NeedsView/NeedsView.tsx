@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { EnvNeeds } from '@agentdeck/contracts/portable-env';
 import { needsSummary } from '@entities/Portability';
 import { Badge } from '@shared/ui/badge';
@@ -6,7 +7,8 @@ import styles from './NeedsView.module.scss';
 
 /** Что записи нужно от рантайма: факты — бейджами, причина — фразой. */
 export function NeedsView({ needs }: { needs: EnvNeeds }) {
-  const summary = needsSummary(needs);
+  const { t } = useTranslation();
+  const summary = needsSummary(needs, t);
   if (summary.why === null) {
     return (
       <>

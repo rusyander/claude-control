@@ -166,10 +166,13 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
       open.set(sessionId, entry);
       return { ok: true, sessionId, resumed: resumed !== undefined };
     },
-    async send(sessionId, text, cmdId, origin = 'platform') {
+    async send(sessionId, text, cmdId, origin = 'platform', images) {
       const o = open.get(sessionId);
       if (!o) return;
-      const sent = await o.adapter.send(o.handle, text, cmdId, origin);
+      const sent =
+        images && images.length > 0
+          ? await o.adapter.send(o.handle, text, cmdId, origin, images)
+          : await o.adapter.send(o.handle, text, cmdId, origin);
       deps.note('session.sent', { sessionId, cmdId, origin, dup: sent.dup });
     },
     end,

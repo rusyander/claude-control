@@ -18,6 +18,11 @@ import { defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
 import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 import { createRuntime, type Runtime } from './runtime.ts';
+import {
+  listeningGateway,
+  memoryContours,
+  type MemoryContours,
+} from '../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { GUARD_TWINS } from '../../domains/kit/service.ts';
 
 /**
@@ -26,8 +31,13 @@ import { GUARD_TWINS } from '../../domains/kit/service.ts';
  * `KitService` зеленеют и тогда, когда `runRoute` в `runtime.ts` набор не зовёт
  * или реестр теряет `route.kit`; здесь путь настоящий — маршрут отправки,
  * реестр прогонов, `runRoute` сборки, `KitService` на диске. Подменён только
- * процесс CLI (фабрика прогонов реестра): его опции и есть предмет.
+ * процесс CLI (фабрика прогонов реестра): его опции и есть предмет. Шлюз контуров держит ядро
+ * (этап 10, C3d): учёт контуров ядра подставлен (`memoryContours`), шлюз человека «слушает» на
+ * `GATEWAY_PORT` — трафика нет, прогон поддельный; слушатель проверяют тесты ядра
+ * (`apps/core/src/hop-host/user-gateway*.integration.test.ts`).
  */
+
+const GATEWAY_PORT = 5_179;
 
 interface Started {
   args: string[];
@@ -45,6 +55,7 @@ describe('набор панели доезжает до прогона обла�
   let app: FastifyInstance;
   let started: Started[];
   let store: AppStore;
+  let contours: MemoryContours;
 
   beforeEach(async () => {
     root = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-rt-kit-')));
@@ -76,7 +87,8 @@ describe('набор панели доезжает до прогона обла�
     // Каталог локальных моделей — свой: выбор MCP и состояние сервиса пишутся в
     // state.json, и без этого тест писал бы в настоящий каталог панели.
     process.env.AGENTDECK_LOCAL_MODELS_DIR = join(root, 'local-models');
-    runtime = createRuntime(ctx, 'http://127.0.0.1:1');
+    contours = memoryContours();
+    runtime = createRuntime(ctx, 'http://127.0.0.1:1', { contours });
 
     started = [];
     const fake = (): RunLike => ({
@@ -155,9 +167,9 @@ describe('набор панели доезжает до прогона обла�
     expect((await send('наш-2'))?.args).toEqual(['--plugin-dir', kitDir('guards')]);
   });
 
-  /** Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`); шлюз — живой. */
+  /** Контур заведён так же, как его заводит «Скачать и подключить» (`connect.ts`); шлюз ядра слушает. */
   /** `lean` — облегчённый набор, который человек включает на карточке контура (по умолчанию полный, L6). */
-  async function connectLocal(lean = false): Promise<void> {
+  function connectLocal(lean = false): void {
     const appData = join(root, 'agentdeck');
     const settings = platformSchema.parse(
       localPlatformSettings({
@@ -171,25 +183,27 @@ describe('набор панели доезжает до прогона обла�
     writePlatform(store, settings);
     writeToken(appData, LOCAL_PLATFORM_ID, LOCAL_PLATFORM_TOKEN);
     store.updateSettings({ activePlatformId: LOCAL_PLATFORM_ID });
-    await runtime.platformGateway.start({ store, appDataDir: appData, port: 0 });
+    contours.setUserGateway(listeningGateway(GATEWAY_PORT));
   }
 
   it('контур локальной модели — локальный вариант правил и вызовы инструментов по одному', async () => {
-    await connectLocal();
+    connectLocal();
     try {
       runtime.kit.setMode('claude', 'hybrid');
       const run = await send('локальный');
       expect(run?.args).toContain('--plugin-dir');
-      expect(run?.env.ANTHROPIC_BASE_URL).toContain(`/${LOCAL_PLATFORM_ID}/`);
+      expect(run?.env.ANTHROPIC_BASE_URL).toContain(
+        `127.0.0.1:${GATEWAY_PORT}/${LOCAL_PLATFORM_ID}/`,
+      );
       expect(run?.env.AGENTDECK_KIT_VARIANT).toBe('local');
       expect(run?.env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY).toBe('1');
     } finally {
-      await runtime.platformGateway.stop();
+      contours.setUserGateway(null);
     }
   });
 
   it('локальный контур при «глобальных»: окно и ограничения в окружении, дисциплина — допиской, набор не подключён', async () => {
-    await connectLocal();
+    connectLocal();
     try {
       runtime.kit.setMode('claude', 'global');
       const run = await send('локальный-глобальный');
@@ -207,7 +221,7 @@ describe('набор панели доезжает до прогона обла�
       expect(run?.env.CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY).toBe('1');
       expect(run?.append).toContain('Local model discipline');
     } finally {
-      await runtime.platformGateway.stop();
+      contours.setUserGateway(null);
     }
   });
 
@@ -219,13 +233,13 @@ describe('набор панели доезжает до прогона обла�
     );
     runtime.localModels.mcpPick(project, ['gitlab']);
     runtime.kit.setMode('claude', 'global');
-    await connectLocal();
+    connectLocal();
     try {
       const run = await send('локальный-полный');
       expect(run?.args).not.toContain('--strict-mcp-config');
       expect(run?.mcp).toBeUndefined();
     } finally {
-      await runtime.platformGateway.stop();
+      contours.setUserGateway(null);
     }
   });
 
@@ -239,7 +253,7 @@ describe('набор панели доезжает до прогона обла�
     runtime.kit.setMode('claude', 'global');
     // Облачный прогон того же проекта MCP получает обычным путём — своего файла нет.
     expect((await send('облачный-mcp'))?.mcp).toBeUndefined();
-    await connectLocal(true);
+    connectLocal(true);
     try {
       const run = await send('локальный-mcp');
       expect(run?.args).toContain('--strict-mcp-config');
@@ -248,7 +262,7 @@ describe('набор панели доезжает до прогона обла�
         config: { mcpServers: { gitlab: { command: 'gitlab-mcp' } } },
       });
     } finally {
-      await runtime.platformGateway.stop();
+      contours.setUserGateway(null);
     }
   });
 
@@ -261,14 +275,14 @@ describe('набор панели доезжает до прогона обла�
   });
 
   it('режим с набором: дисциплину несёт хук плагина, допиской она не дублируется', async () => {
-    await connectLocal();
+    connectLocal();
     try {
       runtime.kit.setMode('claude', 'hybrid');
       const run = await send('локальный-гибрид');
       expect(run?.append).toBe('');
       expect(run?.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeDefined();
     } finally {
-      await runtime.platformGateway.stop();
+      contours.setUserGateway(null);
     }
   });
 });

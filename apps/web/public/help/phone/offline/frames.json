@@ -10,15 +10,23 @@
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:17:20.685Z",
-        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 The panel did not answer — showing the last data received 1 running Questions: 1 waiting for an answer 1 needs you 1 project New chat New chat All conversations All conversations , New chat — no project, change  New chat — no project change shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 10 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 2 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings"
+        "shotAt": "2026-11-04T08:06:58.419Z",
+        "text": "Projects & chats Projects & chats Questions: 1 waiting for an answer Questions 1 The panel did not answer — showing the last data received 1 running Questions: 1 waiting for an answer 1 needs you 1 project New chat New chat All conversations All conversations , New chat — in shop-app, change  New chat — in shop-app change Core tasks Core tasks shop-app waiting: 1 · working: 1 Add sign-in by QR code to the mobile layout, needs you Add sign-in by QR code to the mobile layout 13 min needs you 1 question Waiting for your answer. Run the checkout e2e tests, working Run the checkout e2e tests 5 min working Fix the failing cart total test, quiet Fix the failing cart total test 3 h Fixed: the total now rounds after the discount. All 42 tests pass. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings  Settings",
+        "seal": {
+          "png": "2a7ab5c34b8e55d8",
+          "text": "461a4be59d3073cc"
+        }
       },
       "file": "01-home-silent.png",
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:18:04.869Z",
-      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Панель не ответила — показано последнее, что пришло 1 работает Вопросы: ждут ответа 1 1 ждёт вас 1 проект Новый чат Новый чат Все разговоры Все разговоры , Новый чат — без проекта, сменить  Новый чат — без проекта сменить shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 11 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests 3 мин работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки"
+      "shotAt": "2026-11-04T08:07:42.195Z",
+      "text": "Проекты и чаты Проекты и чаты Вопросы: ждут ответа 1 Вопросы 1 Панель не ответила — показано последнее, что пришло 1 работает Вопросы: ждут ответа 1 1 ждёт вас 1 проект Новый чат Новый чат Все разговоры Все разговоры , Новый чат — в shop-app, сменить  Новый чат — в shop-app сменить Задачи ядра Задачи ядра shop-app ждут: 1 · работают: 1 Add sign-in by QR code to the mobile layout, ждёт вас Add sign-in by QR code to the mobile layout 14 мин ждёт вас 1 вопрос Waiting for your answer. Run the checkout e2e tests, работает Run the checkout e2e tests 6 мин работает Fix the failing cart total test, молчит Fix the failing cart total test 3 ч Fixed: the total now rounds after the discount. All 42 tests pass. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки  Настройки",
+      "seal": {
+        "png": "35f94c9a3ef777c4",
+        "text": "eb7966f7c7e84112"
+      }
     },
     {
       "id": "02-settings-silent",
@@ -28,15 +36,23 @@
         "masked": 1,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:17:37.440Z",
-        "text": "Link Link Alerts Alerts General General  desk not answering http://10.0.2.2:55898 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-11-04T08:07:14.809Z",
+        "text": "Link Link Alerts Alerts General General  desk not answering http://10.0.2.2:60324 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:60324, selected  desk Windows · 10.0.2.2:60324 selected Add a computer Add a computer Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings ",
+        "seal": {
+          "png": "d3570724e0d0e381",
+          "text": "219fd8f453daf25e"
+        }
       },
       "file": "02-settings-silent.png",
       "masked": 1,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:18:21.521Z",
-      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk не отвечает http://10.0.2.2:55898 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки "
+      "shotAt": "2026-11-04T08:07:58.464Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk не отвечает http://10.0.2.2:60324 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:60324, выбран  desk Windows · 10.0.2.2:60324 выбран Добавить компьютер Добавить компьютер Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "seal": {
+        "png": "ea6c37429f06259f",
+        "text": "08ad252ec87c87f5"
+      }
     }
   ]
 }

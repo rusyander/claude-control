@@ -9,7 +9,6 @@ export interface ProviderChatSidebarProps {
   activeChatId?: string;
   onSelect: (chatId: string) => void;
   onCreate: () => void;
-  isCreating: boolean;
   /** Проекты всех провайдеров — вкладка «Проекты». */
   projects: ProviderChatProject[];
   isProjectsLoading: boolean;

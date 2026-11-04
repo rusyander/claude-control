@@ -1,16 +1,13 @@
 import type { ChatProgress, ProgressActiveTool } from '@agentdeck/contracts';
-import type { SplitGroupStatusView } from '@agentdeck/contracts/chat-handoff';
 import type { GroupStep } from './groupStep';
 
-/** Состояние группы на индикаторе: работает / ждёт очередь / ждёт разрешения / стоит / закончила. */
-type GroupProgressState = 'working' | 'queued' | 'permission' | 'stalled' | 'finished';
+/** Состояние группы на индикаторе: работает / ждёт разрешения / стоит. */
+type GroupProgressState = 'working' | 'permission' | 'stalled';
 
 export interface GroupProgressInput {
   progress: ChatProgress | undefined;
   group: {
     isRunning: boolean;
-    status?: SplitGroupStatusView;
-    mrClosed?: 'merged' | 'closed';
     /** Заведение первого звена цепочки (ISO). */
     startedAt?: string;
     /** Последняя запись в цепочке (ISO). */
@@ -33,6 +30,4 @@ export interface GroupProgressView {
   step?: GroupStep;
   /** Что группа делает прямо сейчас — незакрытый вызов идущего прогона. */
   tool?: ProgressActiveTool;
-  /** Сколько чужих ожидающих в очереди тяжёлых шагов впереди. */
-  queueAhead?: number;
 }

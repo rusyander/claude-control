@@ -30,14 +30,18 @@
  *
  * Запуск: node tools/help-shots/portability-panel.mjs
  * Переменные: GUIDE_PANEL_PORT (5197), GUIDE_WEB_PORT (8907),
+ *             GUIDE_PORTABILITY_HOME (`../.cc-help-portability`) — дом целей,
  *             GUIDE_LANG=en — английские кадры рядом с русскими.
  */
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront, shotLanguage } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
+import { reapStandTree } from '../qa/throwaway-stand.mjs';
 import { makeHome, drop, HOME_DIR } from './config-fixture.mjs';
+import { clearHomeByContent, HomeHeldError } from './clear-home.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5197);
@@ -45,6 +49,7 @@ const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8907);
 const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
 const WEB = `http://127.0.0.1:${WEB_PORT}`;
 const TARGET = 'codex';
+const LANG = shotLanguage();
 
 /**
  * Подписи кнопок нужны на обоих языках: английский прогон идёт тем же кодом по
@@ -111,8 +116,27 @@ const canon = makeHome();
 // Дом целей лежит РЯДОМ с репозиторием, а не во временной папке системы:
 // системный путь на Windows содержит имя пользователя, а карточка расхождения
 // пишет путь файла прямо на экран — и имя уехало бы в кадр справки.
-const fakeHome = resolve(ROOT, '..', '.cc-help-portability');
-rmSync(fakeHome, { recursive: true, force: true });
+// Дом снимается по содержимому (`clear-home.mjs`): пустой каталог, который держит чужой процесс
+// (Windows не даёт снести открытый каталог, EBUSY), остаётся — в нём ничего нет, и путь в кадрах
+// не меняется. Гасить чужие процессы съёмка не вправе. Занят и не пуст — отказ с именем;
+// GUIDE_PORTABILITY_HOME — другой дом на такой случай.
+const fakeHome = resolve(
+  process.env.GUIDE_PORTABILITY_HOME ?? resolve(ROOT, '..', '.cc-help-portability'),
+);
+const clearFakeHome = () => {
+  try {
+    for (const kept of clearHomeByContent(fakeHome))
+      console.log(`дом целей: пустой каталог ${kept} держит другой процесс — оставлен`);
+  } catch (error) {
+    if (!(error instanceof HomeHeldError)) throw error;
+    throw new Error(
+      `дом целей ${fakeHome} держит другой процесс (${error.code}: ${error.path}); ` +
+        'задайте GUIDE_PORTABILITY_HOME=<свободный каталог рядом с репозиторием>',
+      { cause: error },
+    );
+  }
+};
+clearFakeHome();
 mkdirSync(fakeHome, { recursive: true });
 
 // Разговоры чужих CLI панель ведёт сама, в своём каталоге данных рядом с
@@ -149,21 +173,24 @@ function workdir(name, checkpoint) {
 }
 
 try {
-  const env = {
-    ...process.env,
-    // Канон подписки — дом Claude: его панель читает и пишет сама.
-    CLAUDE_CONFIG_DIR: canon,
-    // Дома ЦЕЛЕЙ: всё, куда перенос и пересборка умеют писать.
-    HOME: fakeHome,
-    USERPROFILE: fakeHome,
-    CODEX_HOME: join(fakeHome, '.codex'),
-    QWEN_HOME: join(fakeHome, '.qwen'),
-    KIMI_CODE_HOME: join(fakeHome, '.kimi-code'),
-    XDG_CONFIG_HOME: join(fakeHome, '.config'),
-    APPDATA: join(fakeHome, 'AppData', 'Roaming'),
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      // Канон подписки — дом Claude: его панель читает и пишет сама.
+      CLAUDE_CONFIG_DIR: canon,
+      // Дома ЦЕЛЕЙ: всё, куда перенос и пересборка умеют писать.
+      HOME: fakeHome,
+      USERPROFILE: fakeHome,
+      CODEX_HOME: join(fakeHome, '.codex'),
+      QWEN_HOME: join(fakeHome, '.qwen'),
+      KIMI_CODE_HOME: join(fakeHome, '.kimi-code'),
+      XDG_CONFIG_HOME: join(fakeHome, '.config'),
+      APPDATA: join(fakeHome, 'AppData', 'Roaming'),
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-portability' },
+  );
 
   started.push(
     spawn(
@@ -206,6 +233,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   const transfer = openScenario('portability', 'transfer');
   const subscribe = openScenario('portability', 'subscribe');
   const carry = openScenario('portability', 'carry');
@@ -303,6 +331,32 @@ try {
       expanded === 'true',
     );
     await transfer.shot(page, '01-passport', { side: 'panel' });
+
+    // Строки пропусков в кадр не попадают (виды свёрнуты), но человек их
+    // разворачивает — и под английским интерфейсом причина обязана быть
+    // английской: сервер везёт её кодом, русская строка — только запасная.
+    for (const head of await kindHeads.all()) {
+      if ((await head.getAttribute('aria-expanded')) === 'false') await head.click();
+    }
+    await pause(400);
+    const skipTexts = await page
+      .locator('[role="tabpanel"] [data-skip]')
+      .evaluateAll((nodes) => nodes.map((node) => node.innerText.replace(/\s+/g, ' ').trim()));
+    const russianSkips = skipTexts.filter((text) => /[А-Яа-яЁё]/.test(text));
+    check(
+      'пропуски паспорта названы на языке интерфейса',
+      LANG === 'en' ? 'ни одной русской строки пропуска' : 'строки пропусков на экране',
+      LANG === 'en'
+        ? `${skipTexts.length - russianSkips.length} из ${skipTexts.length}${russianSkips[0] ? `; первая русская: ${russianSkips[0]}` : ''}`
+        : `${skipTexts.length}`,
+      skipTexts.length > 0 && (LANG !== 'en' || russianSkips.length === 0),
+    );
+    if (process.env.GUIDE_DEBUG_DIR) {
+      await page.screenshot({
+        path: `${process.env.GUIDE_DEBUG_DIR}/passport-skips.${LANG}.png`,
+        fullPage: true,
+      });
+    }
 
     // Цель выбирается на вкладке, которая про цель, — полем по имени.
     await openTab(/^(Перенос|Transfer)/);
@@ -503,12 +557,24 @@ try {
       String(driftLeft),
       driftLeft === 0,
     );
+    // Файл бывает двух видов, и «пересобран из канона» у них разное. Файл
+    // инструкций чужой: панель ведёт в нём только свой блок, и правка человека
+    // ЗА блоком остаётся. Файл скилла (Codex читает родные `.agents/skills`)
+    // панель пишет целиком — исход «проекция» возвращает его ровно к тому, что
+    // панель записала до правки. Прежде проверка ждала блок в любом файле и
+    // покраснела, когда скиллы Codex перестали ехать текстом в AGENTS.md.
     const restored = readFileSync(edited, 'utf8');
+    const managedBlock = before.includes('agentdeck:portability:begin');
+    const rebuilt = managedBlock
+      ? restored.includes('agentdeck:portability:begin')
+      : restored.trimEnd() === before.trimEnd();
     check(
-      'раздел панели пересобран из канона',
-      'блок panel на месте',
-      restored.includes('agentdeck:portability:begin') ? 'на месте' : 'пропал',
-      restored.includes('agentdeck:portability:begin'),
+      'файл пересобран из канона',
+      managedBlock ? 'блок panel на месте' : 'файл равен записанному панелью',
+      rebuilt
+        ? 'да'
+        : `нет: ${edited} (записаны: ${written.join(', ')}; начало: ${JSON.stringify(restored.slice(0, 160))})`,
+      rebuilt,
     );
 
     // ── carry/01. Что предлагается перенести ─────────────────────────────────
@@ -723,8 +789,13 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
+  // Ядро съёмки живёт в своём доме (`panel-core.mjs`) и снято строкой выше; здесь — остатки по
+  // записям под домом целей, до сноса: живой хост держал каталог после прогона (проход 6, 03.11).
+  for (const id of reapStandTree(fakeHome).left)
+    console.log(`стенд съёмки: не снят процесс ядра (${id.role}) pid ${id.pid}: ${id.why}`);
   drop(HOME_DIR);
-  rmSync(fakeHome, { recursive: true, force: true });
+  clearFakeHome();
 }
 
 const failed = rows.filter((row) => !row.ok).length;

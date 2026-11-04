@@ -39,7 +39,7 @@ export const settingsEn: typeof settingsRu = {
       'Move the panel settings to another machine: export and import the state.json file',
     canGitSnapshot:
       'Carry the panel settings through git: the panel keeps their portable part in ' +
-      'agentdeck/settings-snapshot.json (groups, marks, projects, split-group rules — ' +
+      'agentdeck/settings-snapshot.json (groups, marks, projects, group rules — ' +
       'without chat links, the remote access address or secrets, the home directory ' +
       'written as a token) and applies a snapshot that came from another machine at start',
     canEnvTransfer:
@@ -101,19 +101,17 @@ export const settingsEn: typeof settingsRu = {
     tabModelsText:
       'Default model and effort, auto permission mode and the lean tool set in chats (no ' +
       'Artifact, Workflow or ScheduleWakeup — about 12k tokens at the start of every request), ' +
-      'how many minutes an unanswered permission card waits before it becomes a D-n question ' +
-      'under “Awaiting decision” (10 by default, 0 waits as long as needed), how many days a D-n ' +
-      'waits for an answer (7), the model catalog, a custom endpoint and MCP server checks.',
+      'how many days an old D-n question waits for an answer (7), the model catalog, a custom ' +
+      'endpoint and MCP server checks.',
     tabPrompts: 'Prompts',
     tabPromptsText:
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, ' +
       'the agent behind a contour, the image and presentation modes.',
     tabGroups: 'Groups',
     tabGroupsText:
-      'What a split group decides by itself, how many groups run at once, which project is ' +
-      'heavy, group economy (under each lever — where it works for each CLI, details in the ' +
-      '“Chat” help), the group-watch thresholds, the sieves a group passes ' +
-      'before an MR, and the verify ledger — how many repeat runs it would have saved.',
+      'Task step economy — the levers the task core gives every step (the core stores them; under ' +
+      'each lever — where it works for each CLI, details in the “Chat” help), and the sieves a ' +
+      'group passes before an MR.',
     tabGlobalLayer: 'Global layer',
     tabGlobalLayerText:
       'Mechanics living both in the panel and in the config directory hooks: which copy is ' +
@@ -709,19 +707,17 @@ export const settingsEn: typeof settingsRu = {
       react: 'Reactions to events — in the chat above the input',
       reactText:
         'Decky answers with one short line when the connection to the panel server is lost or ' +
-        'back, a turn or a split group fails, a group is stopped or delivered, a turn hits the ' +
-        'subscription limit or a turn longer than ten minutes ends. In the chat the line sits ' +
-        'above the input field and covers nothing; on other pages it is a bubble by the ' +
-        'sidebar. With a conversation, “Open the chat” leads into it, for a group — into the ' +
-        'hub. × removes the line early. “Lost” is said only if the connection is not back ' +
-        'within five seconds: a server restart is not announced. Decky learns about groups ' +
-        'while the panel reads their tree — the hub or a group chat is open.',
+        'back, a turn fails, a turn hits the subscription limit or a turn longer than ten ' +
+        'minutes ends. In the chat the line sits above the input field and covers nothing; on ' +
+        'other pages it is a bubble by the sidebar. With a conversation, “Open the chat” leads ' +
+        'into it. × removes the line early. “Lost” is said only if the connection is not back ' +
+        'within five seconds: a server restart is not announced.',
       settings: 'Settings → General → “Mascot”',
       settingsText:
         '“Show Decky” removes it everywhere: the sidebar, the chat and the error pages. ' +
         '“Remarks and tips” turns off only the tips and the comments on long turns — ' +
         'messages about questions, errors and finished turns stay. “Reactions to events” ' +
-        'turns off the lines about the connection, groups, the limit and long turns; a ' +
+        'turns off the lines about the connection, the limit and long turns; a ' +
         'failed turn then gets the old single line. All three settings live in this ' +
         'browser, not in the Claude Code files. “Hide Decky” in the summary does the same ' +
         'as the first toggle.',
@@ -791,7 +787,5 @@ export const settingsEn: typeof settingsRu = {
   diagrams: {
     'what-happens-before-a-write':
       'One edit’s path: copy → write → rotation, and what reaches neither the copy nor the archive',
-    'how-the-watcher-works':
-      'A problem’s path through the watcher: where it comes from, how it merges by cause, when the model analyses it and what is not a problem',
   },
 };

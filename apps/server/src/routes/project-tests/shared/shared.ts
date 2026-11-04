@@ -211,13 +211,21 @@ const orphansSettled = new Set<string>();
 
 /**
  * Реестр прогонов живёт в памяти процесса, поэтому запись агентского прогона
- * «идёт», оставшаяся от прошлой жизни панели, — сирота: её CLI умер вместе с
- * панелью. Закрываем такие раз на проект за жизнь процесса, не трогая живой.
+ * «идёт», оставшаяся от прошлой жизни панели, — сирота. Её CLI держит ядро и
+ * переживает панель: запись закрываем, а задачу ядра снимаем, чтобы агент с
+ * грантом правки не работал дальше без хозяина. Раз на проект за жизнь процесса,
+ * не трогая живой.
  */
 export function settleOrphansOnce(root: string, deps: TestsDeps): void {
   if (orphansSettled.has(root)) return;
   try {
-    settleOrphanRuns(root, readRuns(root), deps.runs.get(root)?.id);
+    const records = readRuns(root);
+    const settled = new Set(settleOrphanRuns(root, records, deps.runs.get(root)?.id));
+    for (const record of records) {
+      if (settled.has(record.id) && record.coreTaskId) {
+        deps.runs.cancelOrphanCoreTask(record.coreTaskId);
+      }
+    }
     // Отмечаем только удавшийся проход: разовый сбой чтения иначе оставлял
     // сироту «идёт» до следующего перезапуска панели.
     orphansSettled.add(root);

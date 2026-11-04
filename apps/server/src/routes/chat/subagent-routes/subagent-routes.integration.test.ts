@@ -4,21 +4,16 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ServerContext } from '../../../context.ts';
-import type { ControlReply } from '../../../domains/chat/live-session/control-requests.ts';
 import { resetAgentDigestCache } from '../../../domains/chat/subagent-tree/agent-digest.ts';
 import { registerSubagentRoutes } from './subagent-routes.ts';
 
 /**
- * Ход субагента и его остановка через настоящий маршрут Fastify. Транскрипт —
- * файлы на диске в раскладке CLI; реестр подменён только в том, что отвечает
- * живой процесс (сам путь до `stop_task` гоняет `tools/qa/check-subagent-stop.mjs`
- * на настоящем CLI).
+ * Ход субагента через настоящий маршрут Fastify. Транскрипт — файлы на диске в
+ * раскладке CLI.
  */
 describe('маршруты субагента', () => {
   let root: string;
   let app: FastifyInstance;
-  let answer: ControlReply | 'absent';
-  let asked: Array<[string, string]>;
 
   beforeEach(async () => {
     resetAgentDigestCache();
@@ -42,16 +37,9 @@ describe('маршруты субагента', () => {
       }),
     );
     writeFileSync(join(agents, 'agent-a1b2.jsonl'), `${steps.join('\n')}\n`);
-    answer = { outcome: 'ok' };
-    asked = [];
     const ctx = { location: { paths: { root } } } as unknown as ServerContext;
     app = Fastify();
-    registerSubagentRoutes(app, ctx, {
-      stopSubagent: (chatId, agentId) => {
-        asked.push([chatId, agentId]);
-        return Promise.resolve(answer);
-      },
-    });
+    registerSubagentRoutes(app, ctx, {});
     await app.ready();
   });
 
@@ -121,21 +109,8 @@ describe('маршруты субагента', () => {
     expect(missing.json()).toMatchObject({ messageCode: 'agent-not-found' });
   });
 
-  it('POST stop: ответ CLI переводится в итог панели', async () => {
-    const stop = () => app.inject({ method: 'POST', url: '/api/chat/sess/agents/a1b2/stop' });
-    expect((await stop()).json()).toEqual({ outcome: 'requested' });
-    expect(asked).toEqual([['sess', 'a1b2']]);
-    answer = { outcome: 'error', message: 'No such task' };
-    expect((await stop()).json()).toEqual({ outcome: 'refused', message: 'No such task' });
-    answer = { outcome: 'unconfirmed' };
-    expect((await stop()).json()).toEqual({ outcome: 'unconfirmed' });
-    answer = 'absent';
-    expect((await stop()).json()).toEqual({ outcome: 'absent' });
-  });
-
-  it('POST stop с id-путём — 400, до процесса не доходит', async () => {
-    const bad = await app.inject({ method: 'POST', url: '/api/chat/sess/agents/a%20b/stop' });
-    expect(bad.statusCode).toBe(400);
-    expect(asked).toEqual([]);
+  it('остановки субагента нет: POST stop — 404 (stdin у CLI держит ядро, не панель)', async () => {
+    const stop = await app.inject({ method: 'POST', url: '/api/chat/sess/agents/a1b2/stop' });
+    expect(stop.statusCode).toBe(404);
   });
 });

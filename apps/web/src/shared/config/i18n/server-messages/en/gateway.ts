@@ -30,12 +30,10 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'gateway-registry-not-ready': 'The contour is still starting: the model registry is not ready',
   'gateway-route-unknown': 'The panel gateway accepts only {{routes}} at /<contour>/v1/...',
   'gateway-contour-unknown': 'Contour “{{id}}” is not set up in the panel',
-  'gateway-contour-disabled': 'Contour “{{title}}” is turned off in the panel',
-  'gateway-contour-no-key': 'Contour “{{title}}” has no saved key',
   'gateway-section-closed-chat':
     'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
   'gateway-section-closed-groups':
-    'The Split groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+    'The Groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
   'gateway-section-closed-tests':
     'The Tests agent section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
   'gateway-section-closed-assistant':
@@ -78,7 +76,6 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
     'The permission rule “{{rule}}” needs a human confirmation, and there is nobody to ask',
   'gateway-answer-too-large':
     "The contour's answer is over 8 MB — the gateway does not assemble it whole. The same request as a stream comes without this ceiling",
-  'gateway-not-anthropic': 'The platform did not answer with an Anthropic dialect message',
   'gateway-mask-rules-broken': 'Data protection is on, but its rules cannot be read ({{error}})',
   'gateway-mask-unparsed': 'Data protection could not parse the request body',
   'gateway-mask-blocked':
@@ -89,9 +86,9 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
     'Contour “{{title}}” has no images endpoint declared in its manifest',
   'gateway-images-too-large':
     'The images endpoint answer is over 16 MB — the gateway does not assemble it',
-  'gateway-failed': 'AgentDeck: the gateway could not handle the request',
-  'gateway-ports-busy': 'ports {{from}}–{{to}} are busy: {{reason}}',
   'gateway-ports-busy-unknown': 'reason unknown',
+  'gateway-core-unknown': 'the core has not said yet whether the contour gateway is listening',
+  'gateway-core-waiting': 'the core contour gateway is waiting for port {{port}}: {{reason}}',
   'gateway-ceiling-cut':
     "The contour's answer broke off at second {{seconds}} — that is the platform's own ceiling for any answer, streams included. The network is not to blame: shorten the turn (less thinking, a shorter answer) or ask the contour owner to raise the ceiling",
   'gateway-url-not-http': 'The contour address is not http(s): {{url}}',
@@ -102,13 +99,6 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'gateway-headers-timeout': 'The contour did not start answering within {{seconds}} s',
   'gateway-headers-timeout-local':
     'The local model did not start answering within {{seconds}} s: a long prompt takes longer to process than allowed. Compact the history (/compact) or start a new chat',
-  'gateway-local-restarting':
-    'The model server is restarting after a failure — the request will be retried automatically',
-  'gateway-local-stopped':
-    'The model server is stopped — start it in the “Local models” section and the run will continue on its own',
-  'gateway-local-down':
-    'The model server is not answering: {{reason}}. Start it in the “Local models” section — the run will continue on its own',
-  'gateway-local-down-unknown': 'no reason given',
   'gateway-cert-failed':
     'The contour certificate did not verify: {{reason}}. Set the company root certificate in the contour settings',
   'gateway-no-connection': 'No connection to the contour: {{reason}}',
@@ -139,7 +129,6 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
   'gateway-flaw-stop-without-call': 'stop reason “call” without a single call',
   'gateway-request-aborted': 'Request cancelled',
   'proxy-failed': 'the proxy could not handle the request',
-  'proxy-not-configured': 'the proxy is not configured',
   'proxy-body-too-large': 'the request body is too large',
   'proxy-shape-unknown': 'the request shape does not parse',
   'proxy-body-not-json': 'the request body is not JSON',

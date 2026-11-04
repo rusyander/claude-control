@@ -15,15 +15,6 @@ export const agentTreeEn: typeof agentTreeRu = {
   last: 'last: {{what}}',
   open: 'Open transcript',
   openHint: 'Subagent transcript on the right — read only',
-  stop: 'Stop',
-  stopHint: 'Ask the CLI to stop this subagent — like “Stop agent” in the VS Code extension',
-  stopState: {
-    requested: 'stop requested',
-    absent: 'no live conversation process — nothing to stop',
-    refused: 'the CLI refused: {{message}}',
-    unconfirmed: 'no reply from the CLI',
-    failed: 'the request did not go through: {{message}}',
-  },
   pane: {
     title: 'Subagent transcript',
     readOnly: 'Read only: the subagent writes its own transcript',

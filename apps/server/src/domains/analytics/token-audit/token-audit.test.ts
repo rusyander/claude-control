@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,7 +18,7 @@ import {
   stepClass,
   totalHeadline,
 } from './token-audit.ts';
-import { foreignToolUse } from './step-class.ts';
+import { QWEN_TOOL_NAMES, foreignToolUse } from './step-class.ts';
 import { economyOf, wholeProjectCheck } from './economy.ts';
 import { formatSession } from './report.ts';
 import { appendMessage, createChat } from '../../provider-chat/store/store.ts';
@@ -456,6 +456,24 @@ describe('token-audit — классы шагов', () => {
     expect(stepClass([{ name: 'mcp__srv__jira_get_issue', input: {} }])).toBe('tracker');
     expect(stepClass([{ name: 'mcp__srv__other', input: {} }])).toBe('mcp');
     expect(stepClass([{ name: 'Grep', input: { pattern: 'x' } }])).toBe('read');
+  });
+});
+
+describe('token-audit — карта имён Qwen Code', () => {
+  it('совпадает с картой набора панели (kit-paths.mjs QWEN_TOOLS)', () => {
+    const kitPaths = fileURLToPath(
+      new URL('../../../../assets/kit/agentdeck-kit/hooks/lib/kit-paths.mjs', import.meta.url),
+    );
+    const block =
+      /const QWEN_TOOLS = \{([\s\S]*?)\};/.exec(readFileSync(kitPaths, 'utf8'))?.[1] ?? '';
+    const kit = Object.fromEntries(
+      [...block.matchAll(/(\w+):\s*'(\w+)'/g)].map((match) => [match[1], match[2]]),
+    );
+    expect(Object.keys(kit).length).toBeGreaterThan(5);
+    for (const [qwen, claude] of Object.entries(kit)) {
+      if (claude === 'Agent') expect(QWEN_TOOL_NAMES[qwen]).toBeUndefined();
+      else expect(QWEN_TOOL_NAMES[qwen], qwen).toBe(claude);
+    }
   });
 });
 

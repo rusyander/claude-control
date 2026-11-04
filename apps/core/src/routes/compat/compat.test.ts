@@ -33,7 +33,14 @@ function adapterOf(
   }));
   return {
     id: facts.id,
-    caps: { login: facts.login, channels, limitsChannel: facts.limitsChannel?.via ?? null },
+    // Защита ядра у каждого переходника таблицы — хук; без неё отказ `no_core_hook` (свой тест).
+    caps: {
+      login: facts.login,
+      channels,
+      limitsChannel: facts.limitsChannel?.via ?? null,
+      preToolHooks: true,
+      denyOverlay: false,
+    },
     bypassActive,
   };
 }
@@ -43,6 +50,11 @@ const stubRoute: CompatRoute = {
   caps: STUB_CAPS,
   availability: { state: 'value', onUnknown: 'retry-until' },
   credential: 'none',
+};
+/** Маршрут без диалекта Google: Gemini к нему только через перевод звена шлюза. */
+const noGoogleRoute: CompatRoute = {
+  ...stubRoute,
+  caps: { ...STUB_CAPS, dialects: STUB_CAPS.dialects.filter((d) => d !== 'google-genai') },
 };
 const ownRoute: CompatRoute = {
   id: 'local:own',
@@ -107,7 +119,8 @@ const EXPECTED: Record<string, { stub: string; own: string; login: string; open:
     stub: 'refused:bypass_setting:security.auth.selectedType',
     own: 'refused:bypass_setting:security.auth.selectedType',
     login: 'direct:login',
-    open: 'via-gateway:google-genai->openai-chat',
+    // Заглушка говорит на google-genai (этап 10): канал Gemini идёт к ней напрямую.
+    open: 'direct:google-genai',
   },
   qwen: {
     stub: 'direct:openai-chat',
@@ -189,6 +202,25 @@ describe('R:PR-05 compat — caps, never names, over all 10 CLIs', () => {
     );
     const p = basePolicy();
     const code = (d: CompatDecision): string => (d.kind === 'refused' ? d.code : d.kind);
+    // Заготовка (этап 10) отказывает первой: даже при пустом разрешённом наборе код — не «not_allowed».
+    const placeholder = { ...claude, built: false as const };
+    expect(code(compat(placeholder, stubRoute, model, p))).toBe('adapter_not_built');
+    expect(code(compat(placeholder, stubRoute, model, { ...p, allowed: [] }))).toBe(
+      'adapter_not_built',
+    );
+    // Без хука и без оверлея (03:60, P81) — отказ после заготовки и раньше набора: чинит его только
+    // переходник. Хватает одного из двух замков.
+    const gateless = {
+      ...claude,
+      caps: { ...claude.caps, preToolHooks: false, denyOverlay: false },
+    };
+    expect(code(compat(gateless, stubRoute, model, p))).toBe('no_core_hook');
+    expect(code(compat(gateless, stubRoute, model, { ...p, allowed: [] }))).toBe('no_core_hook');
+    expect(code(compat({ ...gateless, built: false as const }, stubRoute, model, p))).toBe(
+      'adapter_not_built',
+    );
+    const overlayOnly = { ...gateless, caps: { ...gateless.caps, denyOverlay: true } };
+    expect(code(compat(overlayOnly, stubRoute, model, p))).toBe('direct');
     expect(code(compat(claude, stubRoute, model, { ...p, allowed: [] }))).toBe('not_allowed');
     expect(
       code(
@@ -200,6 +232,29 @@ describe('R:PR-05 compat — caps, never names, over all 10 CLIs', () => {
         ),
       ),
     ).toBe('route_unavailable');
+    // Сервер человека лежит (проба `local:user` назвала причину) — свой код: поднять его может
+    // только человек. Причина без `absent` (неизвестно, `run`) отказа не делает.
+    const down = 'user_server_down: connect ECONNREFUSED 127.0.0.1:18080';
+    expect(
+      code(
+        compat(
+          claude,
+          { ...stubRoute, availability: { state: 'absent', onUnknown: 'run', downReason: down } },
+          model,
+          p,
+        ),
+      ),
+    ).toBe('user_server_down');
+    expect(
+      code(
+        compat(
+          claude,
+          { ...stubRoute, availability: { state: 'unknown', onUnknown: 'run', downReason: down } },
+          model,
+          p,
+        ),
+      ),
+    ).toBe('direct');
     expect(
       code(
         compat(
@@ -289,7 +344,9 @@ describe('R:PR-05 compat — caps, never names, over all 10 CLIs', () => {
     const noLimits = { ...claude, caps: { ...claude.caps, limitsChannel: null } };
     expect(code(compat(noLimits, ownRoute, model, p))).toBe('window_untellable');
     // Нет пары перевода — канала нет.
-    expect(code(compat(gemini, stubRoute, model, { ...p, translations: [] }))).toBe('no_channel');
+    expect(code(compat(gemini, noGoogleRoute, model, { ...p, translations: [] }))).toBe(
+      'no_channel',
+    );
     // Обход включён у человека — отказ с именем настройки, даже если канал есть.
     const on = adapterOf(
       CLI_RUN_FACTS.find((f) => f.id === 'gemini')!,
@@ -409,7 +466,7 @@ describe('R:PR-05 compat — caps, never names, over all 10 CLIs', () => {
         aider,
         ownRoute,
         model,
-        basePolicy({ candidates: [{ adapter: gemini, route: stubRoute, model }] }),
+        basePolicy({ candidates: [{ adapter: gemini, route: noGoogleRoute, model }] }),
       ),
     ).toMatchObject({ alternatives: [{ adapter: 'gemini', kind: 'via-gateway' }] });
   });

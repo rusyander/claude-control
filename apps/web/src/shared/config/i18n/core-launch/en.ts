@@ -34,6 +34,30 @@ export const coreLaunchEn: typeof coreLaunchRu = {
       'forge-only': 'Only the forge poller opens this preset, for the MR of a finished task.',
     },
   },
+  reviewLink: {
+    heading: 'Review an MR by link',
+    hint: 'The core reads the MR from the forge, reviews its changes in a copy of the MR branch and then asks what to do with the findings: fix in the copy, post to the MR, both or nothing. Nothing is pushed without your answer.',
+    url: 'MR or PR link',
+    urlHint: 'GitLab …/-/merge_requests/N or GitHub …/pull/N.',
+    repo: 'Repository path',
+    repoHint:
+      'The main checkout of the MR project: the core picks the forge and the project by its remote.',
+    open: 'Open the review',
+    retry: 'Retry with the same key',
+    problems: {
+      url: 'Not a GitLab MR or GitHub PR link.',
+      repo: 'Name the repository of the MR.',
+    },
+    refusal: {
+      review_link_unparsed: 'The link is not a GitLab MR or GitHub PR link.',
+      review_link_foreign_repo: 'The MR belongs to another project than the repository remote.',
+      review_link_closed: 'The MR is closed or merged: too late to review or push.',
+      review_link_unread: 'The forge or the repository could not be read.',
+      review_link_forge_unsupported:
+        'No forge API for this remote (push and link only): the MR cannot be read.',
+      'estimate-refused': 'The review task was not created.',
+    },
+  },
   estimate: {
     heading: 'Estimate',
     task: 'Task {{id}}',
@@ -166,7 +190,10 @@ export const coreLaunchEn: typeof coreLaunchRu = {
   },
   failure: {
     refusal: {
-      'core-absent': 'The task core is not running. Start it with `pnpm core`.',
+      'core-absent':
+        'The task core is not running and the panel supervisor is off — the panel will not start it.',
+      'core-starting': 'The task core is starting — retry in a few seconds.',
+      'core-fault': 'The task core does not start — restart it in the «Core tasks» section.',
       'core-unverified': 'The core did not verify itself — no request was sent to it.',
       'core-unreachable': 'The core does not answer.',
     },
@@ -187,6 +214,45 @@ export const coreLaunchEn: typeof coreLaunchRu = {
     network:
       'The answer did not arrive. A retry with the same key returns the same task, not a second one.',
     other: 'The request failed: {{message}}',
+  },
+  mcpPicks: {
+    heading: 'MCP servers for core tasks',
+    hint: "Your own MCP servers from each CLI's config. A tick gives the server to that step kind in every following task; without one the step sees only the core servers.",
+    notImplemented: 'The core does not serve MCP offers yet.',
+    loadError: 'MCP offers not read',
+    configError: 'Core settings not read — the picks cannot be saved',
+    empty: 'No core CLI offers MCP servers of its own.',
+    server: 'Server',
+    allByDefault: 'all offered',
+    allByDefaultHint: 'While on, the chat takes every offered server, new ones too.',
+    cell: '{{server}} — {{kind}}',
+    scope: { user: 'user', project: 'project' },
+    transport: { stdio: 'process', remote: 'URL' },
+    notCarried: 'not carried: {{reason}}',
+    unknown: 'offered by no CLI',
+    unknownHint:
+      'Picked in the settings but absent from every CLI config: the core drops it at launch and names the reason in the task journal.',
+    readOnly: 'Read-only kinds ({{kinds}}) take no human servers: their tools are unread.',
+    noReader: 'No MCP config reader: {{clis}} — their session gets only the core servers.',
+    unread: '{{file}} not parsed: {{reason}}',
+    project:
+      'This is the user layer. Servers from project files are offered by the core at launch when the repository is trusted — the task journal shows them.',
+    save: 'Save picks',
+    reset: 'Discard edits',
+    saved: 'Picks saved — they apply from the next step.',
+    kind: {
+      work: 'Work',
+      fix: 'Fixes',
+      'answer-reviewers': 'Answer reviewers',
+      custom: 'Custom step',
+      chat: 'Chat',
+      intake: 'Intake',
+      plan: 'Plan',
+      research: 'Research',
+      split: 'Split',
+      review: 'Review',
+      report: 'Report',
+    },
   },
   routes: {
     heading: 'Model routes',

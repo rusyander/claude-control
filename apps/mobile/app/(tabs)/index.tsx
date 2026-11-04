@@ -20,7 +20,6 @@ import { AskCard } from '../../src/features/inbox/AskCard/AskCard';
 import { localChatKey } from '../../src/features/inbox/chatKey';
 import { useSent, forgetSent } from '../../src/features/inbox/sent';
 import { useInboxChats } from '../../src/features/inbox/useInboxChats';
-import { WatcherChip } from '../../src/features/watcher/WatcherChip';
 import { LimitsStrip } from '../../src/features/usage-limits/LimitsStrip/LimitsStrip';
 import { stableChatKey } from '../../src/entities/inbox/stableChatKey';
 import { pendingCount } from '../../src/entities/inbox/pendingCount';
@@ -93,8 +92,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      {/* Фоновый наблюдатель панели: виден, только пока включён. */}
-      <WatcherChip enabled={configured} />
       {/* Спарен с несколькими компьютерами — выбор прямо здесь: главная показывает
           работу одного из них, и надо видеть, какого. */}
       {connection.panels.length > 1 ? (
@@ -190,6 +187,9 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.whereLink}>{t.home.changeProject}</Text>
             </Pressable>
+            {/* Задачи ядра: вопросы ядра отвечаются отсюда (подписью телефона), сюда же ведёт push. */}
+            <Button title={t.coreTask.listTitle} onPress={() => router.push('/core')} />
+
             {groups.length === 0 ? (
               <Empty
                 title={t.home.activeEmpty}

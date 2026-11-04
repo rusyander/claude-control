@@ -2,7 +2,7 @@ import { dirname } from 'node:path';
 import type { Fact } from '@agentdeck/contracts/core/facts';
 import { isSecretName } from '@agentdeck/dlp/secret-mask';
 import type { AdapterRegistry } from '../../adapters/index.ts';
-import { pinnedBaseOf, unitCopyOf } from '../../conductor/copy/index.ts';
+import { reviewBaseOf, unitCopyOf } from '../../conductor/copy/index.ts';
 import type { RunEconomy } from '../../conductor/run/run.types.ts';
 import type { PackFile, ReviewPackInput } from '../../context/review-pack/index.ts';
 import { reviewInputsOf } from '../../context/review-pack/index.ts';
@@ -13,6 +13,7 @@ import type { LiveTask } from '../../journal/resume.ts';
 import { diffFileOf, diffUnit } from '../../platform/git.ts';
 import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { SessionTokens } from '../../policy/session-tokens/session-tokens.ts';
+import { journaledSessionDir } from '../conductor-wiring/session-start.ts';
 import type { SessionKeyBook } from '../session-keys.ts';
 import type { ContextWiring } from './context.ts';
 import { createRunEconomy } from './continuation.ts';
@@ -36,8 +37,11 @@ export interface BootEconomyDeps {
   pin: () => Record<string, string>;
   /** Ключи маршрута, прочитанные дорогой для сеанса (P61); нет — только пин и токен. */
   keys?: Pick<SessionKeyBook, 'valuesOf'>;
-  /** Активный контур панели (уровень 1) — вход суда `tier`; нет — набор задачи как есть. */
-  contour?: ContourPolicy;
+  /**
+   * Активный контур панели (уровень 1) — вход суда `tier`, читается на каждый шаг (s10 G7: смена
+   * режима доходит без перезапуска); нет или `undefined` — набор задачи как есть.
+   */
+  contour?: () => ContourPolicy | undefined;
   /** Окно маршрута × модели — книга окон загрузки (`route-windows.ts`), та же у наблюдателя. */
   windowOf?: (routeId: string, model: string | null) => number | null;
   now?: () => number;
@@ -107,7 +111,8 @@ export async function unitReviewInput(
   unitId: string,
 ): Promise<Omit<ReviewPackInput, 'known'> | null> {
   const copy = unitCopyOf(task, unitId);
-  const base = pinnedBaseOf(task, unitId);
+  // Ревью MR по ссылке — от общего предка с целевой веткой (этап 10, F8), остальное — приколотая база.
+  const base = reviewBaseOf(task, unitId);
   if (!copy || !base) return null;
   const changed = await diffUnit(copy.dir, base);
   if (!('value' in changed)) return null;
@@ -146,8 +151,14 @@ export function bootEconomy(deps: BootEconomyDeps): BootEconomy {
     reviewPack: unitReviewInput,
     learned: () => learned,
     resumes: (adapter) => deps.adapters.get(adapter)?.caps.resume === true,
-    transcriptPresent: (adapter, conversationId) =>
-      deps.adapters.get(adapter)?.transcriptPresent?.(deps.pin(), conversationId),
+    transcriptPresent: (adapter, conversationId, where) =>
+      deps.adapters
+        .get(adapter)
+        ?.transcriptPresent?.(
+          deps.pin(),
+          conversationId,
+          journaledSessionDir(where.task, where.sessionId),
+        ),
     ...(deps.windowOf ? { windowOf: deps.windowOf } : {}),
   });
   return { run, known, history, learned: () => learned, ladders };

@@ -10,7 +10,7 @@ import { contourHeaders } from './transport.ts';
 
 /**
  * Сборка адреса и заголовков контура (DRV-04/05). Путь через саму пробу и шлюз
- * проверяют `probe.test.ts` и `gateway/upstream.test.ts`; здесь — края, которые
+ * проверяют `probe.test.ts` и `upstream/upstream.test.ts`; здесь — края, которые
  * через них перебирать дорого.
  */
 

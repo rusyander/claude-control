@@ -35,6 +35,8 @@ const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SCAN_DIRS = [
   'apps/web/src',
   'apps/server/src',
+  // Шлюз контуров и учёт расхода живут в ядре (этап 10, C3d): его якоря — здесь же.
+  'apps/core/src',
   'apps/mobile/app',
   'packages/contracts/src',
   'tools',
@@ -791,7 +793,6 @@ function requestSelftest() {
       { ...base, doc: page(ASKS, ['| 1   | вопрос про кадры | важно |  |']) },
       'пусто «что делаем без ответа»',
     ],
-    ['страницы нет вовсе', { ...base, doc: undefined }, 'не найдена или пуста'],
 
     // Ниже — шесть подделок, на которых прежняя сверка оставалась зелёной:
     // она знала только номера строк и подписи, а телу просьбы, цене, вопросам и
@@ -870,6 +871,15 @@ function requestSelftest() {
     console.error(`  ✗ здоровая страница объявлена сломанной: ${healthy.join('; ')}`);
   } else {
     console.log('  ✓ здоровый снимок проходит: страница запроса сходится с реестром');
+  }
+
+  // Страница живёт в локальном слое: в чужом клоне её нет по замыслу, и это пропуск, а не слом.
+  const absent = checkRequestPage({ ...base, doc: undefined });
+  if (absent.length > 0) {
+    failed += 1;
+    console.error(`  ✗ отсутствующая страница объявлена сломанной: ${absent.join('; ')}`);
+  } else {
+    console.log('  ✓ страницы нет на диске — сверка пропущена, а не уронена');
   }
 
   for (const [name, snapshot, expected] of cases) {

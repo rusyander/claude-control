@@ -78,7 +78,6 @@ export interface DeferredAskInput {
   reason: string;
   reasonCode?: DeferredReasonCode;
   reasonParams?: DeferredReasonParams;
-  kind?: DeferredAskKind;
   cwd?: string;
   shellCwd?: string;
   source?: DeferredAskSource;

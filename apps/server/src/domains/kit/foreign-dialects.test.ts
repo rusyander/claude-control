@@ -40,7 +40,7 @@ function run(event: string, payload: object, cli?: string, env: Record<string, s
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
       AGENTDECK_KIT_CLI: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: STATE,
       ...env,
     },
@@ -593,56 +593,6 @@ describe('inline-edit-guard по диалектам: cd $S/… раскрыва�
 });
 
 /**
- * P-23 (25.10, группа #5): `P=…; cat -n $P/a $P/b` печатал файлы мимо потолка чтения — 3 из 6
- * сохранённых выгрузок назвали файлы через переменную. Потолок один, `lib/bash-read-cap.mjs`;
- * проверяется, что каждый диалект набора до него доходит в звене группы.
- */
-describe('bash-read-cap по диалектам: путь через переменную той же команды считается (P-23)', () => {
-  const cap = join(dir, 'p23');
-  mkdirSync(cap, { recursive: true });
-  const body = Array.from({ length: 250 }, (_, i) => `export const v${i} = '${'x'.repeat(60)}';\n`);
-  writeFileSync(join(cap, 'a.ts'), body.join(''));
-  writeFileSync(join(cap, 'b.ts'), body.join(''));
-  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
-  const capped = (out: Out) => /bash-read-cap/.test(refusal(out) ?? '');
-
-  for (const { cli, call } of SHELLS) {
-    it(`${cli}: $P/a $P/b и цикл по $P — потолок, неизвестная переменная — нет`, () => {
-      const at = (tag: string, command: string) =>
-        capped(run('pre', call(`p23-${cli}-${tag}`, command, cap), cli, CHILD));
-      expect(at('cat', 'P=.; cat -n $P/a.ts $P/b.ts')).toBe(true);
-      expect(at('for', 'P=.; for f in $P/a.ts $P/b.ts; do cat "$f"; done')).toBe(true);
-      expect(at('unset', 'cat $UNSET/a.ts $UNSET/b.ts')).toBe(false);
-    });
-  }
-});
-
-/**
- * P-40 (26.10, аудит g1): `cat f &>/dev/null` считался печатью файла — `&>` / `&>>` уводят и stdout,
- * потолок чтения такой вызов не касается. Судья один, `lib/bash-read-cap.mjs` `redirected`;
- * проверяется, что каждый диалект набора до него доходит в звене группы (шаблон P-23).
- */
-describe('bash-read-cap по диалектам: вывод, уведённый &> / &>>, — не печать (P-40)', () => {
-  const cap = join(dir, 'p40');
-  mkdirSync(cap, { recursive: true });
-  const body = Array.from({ length: 250 }, (_, i) => `export const v${i} = '${'x'.repeat(60)}';\n`);
-  writeFileSync(join(cap, 'a.ts'), body.join(''));
-  writeFileSync(join(cap, 'b.ts'), body.join(''));
-  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
-  const capped = (out: Out) => /bash-read-cap/.test(refusal(out) ?? '');
-
-  for (const { cli, call } of SHELLS) {
-    it(`${cli}: &>/dev/null и &>>лог — пропуск, тот же cat в вывод — потолок`, () => {
-      const at = (tag: string, command: string) =>
-        capped(run('pre', call(`p40-${cli}-${tag}`, command, cap), cli, CHILD));
-      expect(at('print', 'cat -n a.ts b.ts')).toBe(true);
-      expect(at('null', 'cat -n a.ts b.ts &>/dev/null')).toBe(false);
-      expect(at('append', 'cat -n a.ts b.ts &>> .agent/tmp/out.log')).toBe(false);
-    });
-  }
-});
-
-/**
  * P-20 (25.10): стенограмму чужого CLI кит не читает, и гейт, пропущенный китом на PreToolUse, а
  * потом отказанный (человеком, правилами самого CLI, чужим хуком), читался исполненным: следующий
  * гейт получал «nothing was edited since» — правки кит тоже не видел. Теперь исполнение подтверждает
@@ -859,7 +809,7 @@ describe('rule-injector по диалектам: окно правила тек�
   const copy = mkdtempSync(join(process.cwd(), 'node_modules', '.kit-p29-rules-'));
   mkdirSync(join(copy, '.git'), { recursive: true });
   afterAll(() => rmSync(copy, { recursive: true, force: true }));
-  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+  const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
   const UI = join(copy, 'inst-admin-ui/src/pages/users/CreateRolePage/index.tsx')
     .split('\\')
     .join('/');

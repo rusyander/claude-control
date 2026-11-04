@@ -4,8 +4,8 @@ import { TREE_IDLE_REFETCH_MS, TREE_REFETCH_MS, treeRefetchMs } from './treeRefe
 
 /**
  * Итоговая проверка 25.09 (D1): дерево теперь спрашивается у любого открытого
- * разговора. Разговор без детей и разделения опрашивается редко, а дерево, где
- * идёт план (разбор — детей ещё нет), — часто: по нему заперта «Разделить».
+ * разговора. Разговор без детей, пауз и прогонов опрашивается редко, остальные —
+ * часто.
  */
 const lone: ChatTreeView = { root: 'чат', running: 0, nodes: [] };
 
@@ -18,13 +18,7 @@ describe('опрос дерева', () => {
     expect(treeRefetchMs(undefined)).toBe(TREE_REFETCH_MS);
   });
 
-  it('идёт разбор (запись плана без детей), пауза, прогон, дети — часто', () => {
-    const split = {
-      parentChatId: 'чат',
-      order: [],
-      groups: [],
-    } as unknown as ChatTreeView['split'];
-    expect(treeRefetchMs({ ...lone, split })).toBe(TREE_REFETCH_MS);
+  it('пауза, прогон, дети — часто', () => {
     expect(treeRefetchMs({ ...lone, paused: { at: 'x', chats: 0, pending: 0 } })).toBe(
       TREE_REFETCH_MS,
     );

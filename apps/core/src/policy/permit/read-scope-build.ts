@@ -48,11 +48,14 @@ export function buildReadScope(input: ReadScopeInput): BuiltReadScope {
     refused,
   );
   const temp = input.sessionTemp === undefined ? [] : accept([input.sessionTemp], refused);
+  const attached =
+    input.taskAttachments === undefined ? [] : accept([input.taskAttachments], refused);
   return {
     scope: {
       roots,
       human,
       ...(temp[0] === undefined ? {} : { ownTemp: temp[0] }),
+      ...(attached[0] === undefined ? {} : { attachments: attached[0] }),
       credentials: [...new Set(input.layer.credentials)],
     },
     refused,

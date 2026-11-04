@@ -1,52 +1,57 @@
 /**
- * Контур окружением прогона (X7): НАСТОЯЩИЕ Kimi Code, Goose, OpenCode и Gemini CLI
- * из чата панели → шлюз панели → стаб-контур.
+ * Контур у чата чужого CLI (X7): НАСТОЯЩИЕ Goose и OpenCode задачей ядра `chat@1` →
+ * шлюз контура ядра → стаб-контур.
  *
- * У этих трёх CLI нет переменных адреса в реестре и нет файловой цели: адрес
- * контура едет только окружением ОДНОГО прогона (`runEndpoint` в каталоге), в
- * переменных, которые задокументированы у каждого как перебивающие конфиг.
- * Обещание человеку — «с галочкой ни один запрос не уходит провайдером из
- * твоего конфига», и проверить его можно только настоящим CLI: таблица
- * `routing.run-endpoint.test.ts` доказывает решение, `check-platform-run-env.mjs`
- * — что окружение дошло до процесса, и ни та ни другая не знает, послушается ли
- * его сам CLI.
+ * Чат чужого CLI — задача ядра (этап 10, F2c): сервер заводит её тем же стартером, что
+ * продолжение и перенос (`startCoreForeignChat`), а галочка `foreign:<cli>` активного контура —
+ * разрешённый набор задачи (`coreContourRoutes` → `set-route` до запуска). Обещание человеку —
+ * «с галочкой ни один запрос не уходит провайдером из твоего конфига», и проверить его можно
+ * только настоящим CLI: таблицы решают маршрут, но не знают, послушается ли его сам CLI.
  *
- * Подменено только то, что над панелью и вне её: контур (`stub-platform.mjs`) и
- * «облако человека» — вторая заглушка, на которую смотрит конфиг каждого CLI.
- * Конфиги — во временных каталогах (`KIMI_CODE_HOME`, `APPDATA`/`HOME`,
- * `XDG_*`); настоящие `~/.kimi-code`, `%APPDATA%\Block\goose`, `~/.config/opencode`
- * не читаются и не пишутся. Чат, маршрут, спавн и шлюз — код панели, в этом
- * процессе. `GOOSE_DISABLE_KEYRING` — чтобы Goose не трогал связку ключей ОС.
- *
- * Gemini — другой путь к тому же обещанию: у него переменные адреса есть
- * (`GOOGLE_GEMINI_BASE_URL`), но говорит он диалектом Gemini API, и шлюз
- * переводит его на краю (`google-bridge.ts`). Заглушка человека отвечает ему
- * в форме Gemini; `~/.gemini` — во временном доме, системные настройки — тоже
- * (`GEMINI_CLI_SYSTEM_SETTINGS_PATH`). Настройка мимо контура у него — способ
- * входа не ключом API.
+ * Подменено только то, что над панелью и ядром: контур (`stub-platform.mjs`) и «облако
+ * человека» — вторая заглушка, на которую смотрит конфиг каждого CLI. Дом, конфиги и данные CLI —
+ * во временных каталогах (`APPDATA`/`HOME`, `XDG_*`); настоящие `%APPDATA%\Block\goose`,
+ * `~/.config/opencode` не читаются и не пишутся. Ядро, хост звеньев, шлюз и сеанс CLI — код ядра,
+ * настоящий; стартер и маршрут контура — код панели. `GOOSE_DISABLE_KEYRING` — чтобы Goose не
+ * трогал связку ключей ОС.
  *
  * Для каждого CLI:
- *   1. галочка стоит — ответ контура в переписке; наверх ушёл только
- *      `chat/completions` с ключом контура; след шлюза — раздел этого CLI;
- *      заглушка человека не получила НИ ОДНОГО запроса;
- *   2. контроль: галочка снята — тот же CLI идёт в заглушку человека. Без
- *      контроля «ни одного запроса человеку» было бы обещанием проверки, которая
- *      не умеет краснеть: конфиг мог просто не читаться;
- *   3. настройка, уводящая часть прогона мимо контура (Kimi `[secondary_model]`,
- *      Goose `GOOSE_LEAD_PROVIDER`, Gemini `security.auth.selectedType`):
- *      обязательный контур отказывает с её именем, и ни одна заглушка запроса
- *      не видит.
+ *   1. галочка стоит — ответ контура в ленте сеанса; наверх ушёл только `chat/completions` с
+ *      ключом контура; след шлюза есть; облако человека не получило НИ ОДНОГО запроса;
+ *   2. галочка снята при обязательном контуре — всё равно маршрут контура с моделью контура
+ *      (решение 02.11): ответ контура, наверх только контур, облако человека пусто;
+ *   2б. галочка снята при «по возможности» — маршрута у задачи нет: у Goose, OpenCode и Gemini
+ *      нет маршрута входа CLI (`cliLogin: false` — сеанс ядра конфиг человека не читает), ядро
+ *      отказывает до процесса, и ни контур, ни облако человека запроса не видят. Прежний контроль
+ *      «без галочки CLI идёт в облако человека» был правдой исполнителя панели, которого больше нет;
+ *   3. настройка конфига человека, уводящая часть прогона мимо контура (Goose
+ *      `GOOSE_LEAD_PROVIDER`; Gemini — `.env` с адресом и ключом облака человека в доме и в
+ *      каталоге над рабочим: Gemini ищет `.env` вверх от рабочего каталога): сеанс ядра её не
+ *      читает — прогон с галочкой по-прежнему целиком в контуре, облако человека пусто.
  *
- * Запуск: `STEER_CLI_DIR=<каталоги с kimi, goose, opencode, gemini через ;> node tools/qa/check-run-endpoint-cli.mjs`
- * Код 2 — «не проверено»: какого-то CLI нет.
+ * Gemini говорит протоколом Gemini API (`google-genai`): шлюз ядра переводит его в
+ * `chat/completions` контура. Kimi — строка вернётся, когда Kimi Code будет ставиться на Windows
+ * без глобальной установки (живой Kimi проверяется в контейнере, `tools/core-linux.mjs --clis`).
+ *
+ * Запуск: `[STEER_CLI_DIR=<каталоги с goose, opencode, gemini через ;>]
+ * node tools/qa/check-run-endpoint-cli.mjs [--only=gemini]` (или `ONLY=`). Код 2 — «не проверено»:
+ * какого-то CLI нет.
  */
 import { spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { delimiter, dirname, join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { setTimeout as wait } from 'node:timers/promises';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
 
 const IS_WIN = process.platform === 'win32';
 /** Собран из кусков: в репозитории не должно лежать присваивание, похожее на ключ. */
@@ -54,7 +59,19 @@ const SECRET = ['contour', 'x7', 'key', '5d1a'].join('-');
 const HUMAN_KEY = ['human', 'own', 'key'].join('-');
 const CONTOUR = 'x7-company';
 const HUMAN_REPLY = 'ОТВЕТ-ОБЛАКА-ЧЕЛОВЕКА';
-const ONLY = (process.env.ONLY ?? '').split(',').filter(Boolean);
+// `--only=<cli,…>` сильнее окружения: кейс блока «Тесты» выбирает строку аргументом (testName).
+const ONLY = (
+  process.argv
+    .slice(2)
+    .find((arg) => arg.startsWith('--only='))
+    ?.slice('--only='.length) ??
+  process.env.ONLY ??
+  ''
+)
+  .split(',')
+  .filter(Boolean);
+/** Срок одного хода настоящего CLI через ядро. */
+const TURN_MS = Number(process.env.TURN_MS ?? 170_000);
 
 let bad = 0;
 const check = (ok, text, detail) => {
@@ -63,7 +80,6 @@ const check = (ok, text, detail) => {
 };
 
 const CLI_NAMES = {
-  kimi: IS_WIN ? ['kimi.exe', 'kimi.cmd'] : ['kimi'],
   goose: IS_WIN ? ['goose.exe', 'goose.cmd'] : ['goose'],
   opencode: IS_WIN ? ['opencode.cmd', 'opencode.exe'] : ['opencode'],
   gemini: IS_WIN ? ['gemini.cmd'] : ['gemini'],
@@ -81,97 +97,21 @@ function findCli(id) {
   return undefined;
 }
 
-/** «Облако человека»: OpenAI-совместимая заглушка, которая пишет каждый запрос. */
-function startHumanCloud() {
+/**
+ * «Облако человека»: общая заглушка `packages/stub-model` (P120 — своего кода SSE у проверки
+ * нет). Наблюдатель `route` пишет КАЖДЫЙ запрос, и `/models` тоже.
+ */
+async function startHumanCloud() {
   const calls = [];
-  const server = createServer((req, res) => {
-    let raw = '';
-    req.on('data', (chunk) => (raw += chunk));
-    req.on('end', () => {
-      let body = {};
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        // Не JSON — модели в запросе нет, пишем без неё.
-      }
-      calls.push({ method: req.method, url: req.url, model: body.model });
-      // Gemini API: ответ в его форме, иначе контроль «без галочки» упал бы на
-      // разборе, а не показал, что конфиг человека действует.
-      if (/:(stream)?generateContent/i.test(req.url)) {
-        const candidate = {
-          candidates: [
-            {
-              content: { role: 'model', parts: [{ text: HUMAN_REPLY }] },
-              finishReason: 'STOP',
-              index: 0,
-            },
-          ],
-          usageMetadata: { promptTokenCount: 5, candidatesTokenCount: 2, totalTokenCount: 7 },
-        };
-        if (req.url.includes('streamGenerateContent')) {
-          res.writeHead(200, { 'content-type': 'text/event-stream' });
-          res.end(`data: ${JSON.stringify(candidate)}\r\n\r\n`);
-        } else {
-          res.writeHead(200, { 'content-type': 'application/json' });
-          res.end(JSON.stringify(candidate));
-        }
-        return;
-      }
-      if (req.url.includes(':countTokens')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ totalTokens: 5 }));
-        return;
-      }
-      if (req.url.includes('/models')) {
-        res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify({ object: 'list', data: [{ id: 'human-model', object: 'model' }] }));
-        return;
-      }
-      const base = { id: 'h1', created: 1, model: body.model };
-      const usage = { prompt_tokens: 5, completion_tokens: 2, total_tokens: 7 };
-      if (body.stream) {
-        res.writeHead(200, { 'content-type': 'text/event-stream' });
-        const frame = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
-        frame({
-          ...base,
-          object: 'chat.completion.chunk',
-          choices: [{ index: 0, delta: { role: 'assistant', content: HUMAN_REPLY } }],
-        });
-        frame({
-          ...base,
-          object: 'chat.completion.chunk',
-          choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
-          usage,
-        });
-        res.end('data: [DONE]\n\n');
-        return;
-      }
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          ...base,
-          object: 'chat.completion',
-          choices: [
-            {
-              index: 0,
-              message: { role: 'assistant', content: HUMAN_REPLY },
-              finish_reason: 'stop',
-            },
-          ],
-          usage,
-        }),
-      );
-    });
+  const model = await startStubModel({
+    models: ['human-model'],
+    script: () => ({ text: HUMAN_REPLY, usage: { input: 5, output: 2 } }),
+    route: ({ method, path, query, body }) => {
+      calls.push({ method, url: `${path}${query}`, model: body?.model });
+      return undefined;
+    },
   });
-  return new Promise((done) =>
-    server.listen(0, '127.0.0.1', () =>
-      done({
-        port: server.address().port,
-        calls,
-        close: () => new Promise((closed) => server.close(closed)),
-      }),
-    ),
-  );
+  return { port: model.port, calls, close: () => model.close() };
 }
 
 function put(file, text) {
@@ -179,23 +119,9 @@ function put(file, text) {
   writeFileSync(file, text, 'utf8');
 }
 
-/** Конфиги человека: каждый CLI без галочки пошёл бы в «облако человека». */
+/** Конфиги человека: CLI, читающий их, пошёл бы в «облако человека». */
 function humanConfigs(paths, humanPort) {
   const human = `http://127.0.0.1:${humanPort}`;
-  const kimi = [
-    'default_model = "human-model"',
-    '',
-    '[providers.humanp]',
-    'type = "openai"',
-    `base_url = "${human}/v1"`,
-    `api_key = "${HUMAN_KEY}"`,
-    '',
-    '[models.human-model]',
-    'provider = "humanp"',
-    'model = "human-upstream"',
-    'max_context_size = 100000',
-    '',
-  ].join('\n');
   const goose = [
     'GOOSE_PROVIDER: openai',
     'GOOSE_MODEL: human-model',
@@ -218,9 +144,7 @@ function humanConfigs(paths, humanPort) {
     small_model: 'humanp/human-model',
     agent: { build: { model: 'humanp/human-model' } },
   });
-  // Gemini: вход ключом API и адрес своего облака в `.env` — так человек и
-  // ходит в свой прокси Gemini.
-  const geminiSettings = JSON.stringify({ security: { auth: { selectedType: 'gemini-api-key' } } });
+  // Gemini: вход ключом в облако человека — так его настроил бы сам человек.
   const geminiEnv = [
     `GOOGLE_GEMINI_BASE_URL=${human}`,
     `GEMINI_API_KEY=${HUMAN_KEY}`,
@@ -228,15 +152,16 @@ function humanConfigs(paths, humanPort) {
     '',
   ].join('\n');
   return {
-    kimi,
     goose,
-    opencode,
+    geminiEnv,
     write: () => {
-      put(paths.kimi, kimi);
       put(paths.goose, goose);
       put(join(paths.gooseDir, 'secrets.yaml'), `OPENAI_API_KEY: ${HUMAN_KEY}\n`);
       put(paths.opencode, opencode);
-      put(paths.geminiSettings, geminiSettings);
+      put(
+        paths.geminiSettings,
+        JSON.stringify({ security: { auth: { selectedType: 'gemini-api-key' } } }),
+      );
       put(paths.geminiEnv, geminiEnv);
     },
   };
@@ -256,8 +181,8 @@ async function main() {
     process.exit(2);
   }
 
-  // Дом и конфиги CLI — временные ДО импорта кода панели и до первого спавна:
-  // процесс CLI наследует это окружение.
+  // Дом и конфиги CLI — временные ДО импорта кода панели и ядра и до первого спавна:
+  // хост сеанса ядра и процесс CLI наследуют это окружение.
   const root = mkdtempSync(join(tmpdir(), 'cc-x7-live-'));
   const appData = join(root, 'agentdeck');
   mkdirSync(appData, { recursive: true });
@@ -266,9 +191,6 @@ async function main() {
     USERPROFILE: join(root, 'home'),
     APPDATA: join(root, 'home', 'AppData', 'Roaming'),
     LOCALAPPDATA: join(root, 'home', 'AppData', 'Local'),
-    KIMI_CODE_HOME: join(root, 'kimi-home'),
-    KIMI_DISABLE_TELEMETRY: '1',
-    KIMI_CODE_NO_AUTO_UPDATE: '1',
     XDG_CONFIG_HOME: join(root, 'xdg', 'config'),
     XDG_DATA_HOME: join(root, 'xdg', 'data'),
     XDG_STATE_HOME: join(root, 'xdg', 'state'),
@@ -276,30 +198,24 @@ async function main() {
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_SHARE: '1',
     GOOSE_DISABLE_KEYRING: '1',
-    // Системные настройки Gemini читаются и из каталога ОС — уводим во временный.
-    GEMINI_CLI_SYSTEM_SETTINGS_PATH: join(root, 'gemini-system', 'settings.json'),
-    GEMINI_CLI_SYSTEM_DEFAULTS_PATH: join(root, 'gemini-system', 'system-defaults.json'),
-    // Без доверия к папке Gemini в безголовом режиме отказывает до запроса.
-    GEMINI_CLI_TRUST_WORKSPACE: 'true',
   });
   const cliDirs = present.map((id) => dirname(found[id]));
   process.env.PATH = [...cliDirs, process.env.PATH ?? process.env.Path ?? ''].join(delimiter);
 
   const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
-  const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
+  const { coreGateway } = await import('./core-gateway.mjs');
+  const { reapCoreSessions } = await import('./throwaway-stand.mjs');
   const { writePlatform, writeToken } =
     await import('../../apps/server/src/domains/platform/store/store.ts');
-  const { resolveRunRoute, runRouteOf } =
-    await import('../../apps/server/src/domains/platform/routing/routing.ts');
-  const { ProviderChatService } =
-    await import('../../apps/server/src/domains/provider-chat/ProviderChatService/ProviderChatService.ts');
-  const { createChat, readChat } =
-    await import('../../apps/server/src/domains/provider-chat/store/store.ts');
-  const { opencodeServe } =
-    await import('../../apps/server/src/domains/opencode-serve/opencode-serve.ts');
-  const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
-  const { gooseConfigDir, kimiCodeHome, opencodeConfigDir } =
+  const { coreContourRoutes } =
+    await import('../../apps/server/src/domains/platform/routing/core-contour.ts');
+  const { startCoreForeignChat, withRoutes } =
+    await import('../../apps/server/src/domains/chat/core-foreign/core-foreign-start.ts');
+  const { bootCore } = await import('../../apps/core/src/bootstrap/boot.ts');
+  const { createCoreCaller } = await import('../../apps/server/src/domains/core-ask/core-ask.ts');
+  const { createCoreChatPort } =
+    await import('../../apps/server/src/domains/chat/core-run/core-chat-port.ts');
+  const { gooseConfigDir, opencodeConfigDir } =
     await import('../../apps/server/src/providers/catalog/config-dirs.ts');
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
@@ -308,21 +224,16 @@ async function main() {
   const { startStubPlatform } = await import('./stub-platform.mjs');
 
   const paths = {
-    kimi: join(kimiCodeHome(), 'config.toml'),
     gooseDir: gooseConfigDir(),
     goose: join(gooseConfigDir(), 'config.yaml'),
     opencode: join(opencodeConfigDir(), 'opencode.json'),
     geminiSettings: join(homedir(), '.gemini', 'settings.json'),
     geminiEnv: join(homedir(), '.gemini', '.env'),
+    // Над каталогами задач (`<дом>/work/<cli>-<метка>`): Gemini ищет `.env` вверх от рабочего.
+    workEnv: join(root, 'home', 'work', '.env'),
   };
   // Страховка от записи мимо временного дома: каждый путь обязан лежать в нём.
-  for (const path of [
-    paths.kimi,
-    paths.goose,
-    paths.opencode,
-    paths.geminiSettings,
-    paths.geminiEnv,
-  ]) {
+  for (const path of [paths.goose, paths.opencode, paths.geminiSettings, paths.geminiEnv]) {
     if (!path.startsWith(root)) throw new Error(`конфиг CLI вне временного дома: ${path}`);
   }
 
@@ -330,8 +241,9 @@ async function main() {
   const human = await startHumanCloud();
   const configs = humanConfigs(paths, human.port);
   configs.write();
-  const gateway = new PlatformGateway();
-  const chats = new ProviderChatService();
+  // Шлюз держит ядро (этап 10): хост звеньев на временном доме, ядро — на том же доме.
+  const gateway = coreGateway();
+  let core;
   try {
     const store = new AppStore(appData);
     const platform = {
@@ -360,52 +272,113 @@ async function main() {
     writePlatform(store, platform);
     writeToken(appData, CONTOUR, SECRET);
     store.updateSettings({ activePlatformId: CONTOUR });
-    await gateway.start({ store, appDataDir: appData, port: 0, spendFlushMs: 0 });
-    const deps = {
-      store,
-      appDataDir: appData,
-      gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
-    };
-    // Проекция — та же, что у сборки сервера (`bootstrap/runtime/runtime.ts`).
-    chats.setPlatformRouting((origin, asked = '', runTag = '') =>
-      runRouteOf(resolveRunRoute(deps, origin, asked, runTag)),
-    );
+    await gateway.start({ appDataDir: appData });
+    core = await bootCore({ home: gateway.home(), build: 'x7-live-qa', panelAppData: appData });
+    const port = createCoreChatPort(createCoreCaller(() => gateway.home()));
 
-    /** Одно сообщение чату CLI; ответ — последнее сообщение переписки целиком. */
-    const turn = async (id, consumers, label) => {
-      writePlatform(store, { ...platform, consumers });
-      // Папка работы — внутри временного дома: Gemini ищет `.gemini/.env`, поднимаясь
-      // от неё, и из `<tmp>/work` дошёл бы до настоящего дома раньше временного.
+    /** Лента сеанса задачи: текст ответов и ошибки, пока сеанс не кончился или не вышел срок. */
+    const sessionText = async (taskId, deadline) => {
+      let sessionId = '';
+      let from = 0;
+      const texts = [];
+      for (;;) {
+        const view = await port.view(taskId).catch(() => null);
+        if (!sessionId) sessionId = view?.sessions?.[0]?.sessionId ?? '';
+        if (sessionId) {
+          const page = await port.page(taskId, sessionId, from).catch(() => null);
+          if (page) {
+            from = page.next;
+            for (const event of page.events) {
+              if (event.kind === 'assistant-text' || event.kind === 'error') {
+                texts.push(JSON.stringify(event.data));
+              }
+              if (event.kind === 'turn-end') return { view, texts, ended: true };
+            }
+            if (page.done) return { view, texts, ended: true };
+          }
+        }
+        const terminal = view && ['done', 'failed', 'cancelled'].includes(view.state);
+        if (terminal || Date.now() > deadline) return { view, texts, ended: Boolean(terminal) };
+        await wait(500);
+      }
+    };
+
+    /** Последние строки журнала задачи ядра (`<дом>/tasks/<id>/*.jsonl`) — для разбора провала. */
+    const journalTail = (taskId, count = 14) => {
+      try {
+        const dir = join(gateway.home(), 'tasks', taskId);
+        const name = readdirSync(dir).find((file) => file.endsWith('.jsonl'));
+        return readFileSync(join(dir, name), 'utf8')
+          .split('\n')
+          .filter(Boolean)
+          .slice(-count)
+          .map((line) => {
+            const row = JSON.parse(line);
+            return `${row.kind} ${JSON.stringify(row.data).slice(0, 220)}`;
+          });
+      } catch (error) {
+        return [`журнал не прочитан: ${error}`];
+      }
+    };
+
+    /** Один ход чата CLI задачей ядра, как его заводит сервер (`startCoreForeignChat`). */
+    const turn = async (id, consumers, label, mode = 'required') => {
+      writePlatform(store, { ...platform, consumers, mode });
+      // Ядро пересобирает маршруты по наблюдателю за state.json; здесь — тем же путём, сразу.
+      await gateway.refresh();
       const work = join(root, 'home', 'work', `${id}-${label}`);
       mkdirSync(work, { recursive: true });
-      const chat = createChat(appData, id, { title: label, workdir: work });
+      // Задача ядра работает в репозитории: оценка без git отказывает раньше маршрута.
+      for (const args of [
+        ['init', '-q', '-b', 'main'],
+        [
+          '-c',
+          'user.name=x7',
+          '-c',
+          'user.email=x7@example.invalid',
+          'commit',
+          '-q',
+          '--allow-empty',
+          '-m',
+          'init',
+        ],
+      ]) {
+        const git = spawnSync('git', args, { cwd: work, encoding: 'utf8', windowsHide: true });
+        if (git.status !== 0) throw new Error(`git ${args[0]}: ${git.stderr}`);
+      }
       const before = { stub: stub.calls.length, human: human.calls.length };
-      const eventsBefore = gateway.status().events.length;
-      const sent = chats.send(
-        appData,
-        id,
-        chat.id,
-        { text: 'скажи готов' },
-        { provider: getProvider(id), detect: () => true, timeoutMs: 150_000 },
-      );
-      if (!sent.ok) return { sent, reply: '', ups: [], humanCalls: [], events: [] };
-      const deadline = Date.now() + 170_000;
-      await wait(300);
-      while (chats.status(chat.id).isRunning && Date.now() < deadline) await wait(500);
-      if (chats.status(chat.id).isRunning)
-        console.log(`  (${id}/${label}: ответа нет за 170 с — прогон ещё идёт)`);
-      const messages = readChat(appData, id, chat.id)?.messages ?? [];
-      const last = messages.at(-1);
+      const eventsBefore = (await gateway.events()).length;
+      const routes = coreContourRoutes(store, `foreign:${id}`, id);
+      // Ядро не ответило — провал строки с причиной, а не обрыв проверки посреди CLI.
+      const started = await startCoreForeignChat(port, {
+        cli: id,
+        cwd: work,
+        prompt: 'скажи готов',
+        title: `x7 ${id} ${label}`,
+        ...withRoutes(routes),
+      }).catch((error) => ({ ok: false, code: 'core-unreachable', message: String(error) }));
+      const seen = started.ok
+        ? await sessionText(started.taskId, Date.now() + TURN_MS)
+        : { view: null, texts: [], ended: true };
+      if (started.ok) {
+        await port
+          .command(started.taskId, 'cancel', { reason: 'x7 live check done' })
+          .catch(() => undefined);
+      }
+      if (started.ok && (!seen.ended || !seen.texts.length)) {
+        // Почему нет ответа: хвост журнала задачи ядра — сеанс, маршрут, отказ.
+        console.log(`  (${id}/${label}: ответа нет; хвост журнала задачи)`);
+        for (const line of journalTail(started.taskId)) console.log(`    ${line}`);
+      }
       return {
-        sent,
-        reply: last?.role === 'assistant' ? String(last.content) : '',
-        all: JSON.stringify(messages),
+        routes,
+        started,
+        state: seen.view?.state ?? '',
+        reply: seen.texts.join('\n'),
         ups: stub.calls.slice(before.stub).filter((call) => call.method === 'POST'),
         humanCalls: human.calls.slice(before.human),
-        // Шлюз держит события новыми вперёд и не больше 50: новые — голова списка.
-        events: gateway
-          .status()
-          .events.slice(0, Math.max(0, gateway.status().events.length - eventsBefore)),
+        // След звена — старые сверху (не больше 50): новые — хвост списка.
+        events: (await gateway.events()).slice(eventsBefore),
       };
     };
 
@@ -413,17 +386,25 @@ async function main() {
       console.log(`\n── ${id} ──`);
       configs.write();
 
-      console.log('1. Галочка стоит: прогон через контур');
+      console.log('1. Галочка стоит: задача ядра через контур');
       const on = await turn(id, [`foreign:${id}`], 'on');
-      check(on.sent.ok, `${id}: сообщение принято`, JSON.stringify(on.sent));
-      check(on.reply.includes('готов'), `${id}: в переписке ответ контура`, on.reply.slice(0, 300));
+      check(
+        on.routes?.[0]?.route.id === `gateway:${CONTOUR}`,
+        `${id}: разрешённый набор задачи — маршрут контура ${on.routes?.[0]?.route.id ?? '—'}`,
+      );
+      check(on.started.ok, `${id}: задача ядра заведена и запущена`, JSON.stringify(on.started));
+      check(
+        on.reply.includes('готов'),
+        `${id}: в ленте сеанса ответ контура (задача ${on.state})`,
+        on.reply.slice(0, 300),
+      );
       check(
         on.ups.length > 0 && on.ups.every((call) => call.path.endsWith('/chat/completions')),
         `${id}: наверх ушёл chat/completions (${on.ups.length})`,
         on.ups.map((call) => call.path).join(', '),
       );
       check(
-        on.ups.every((call) => String(call.authorization).includes(SECRET)),
+        on.ups.length > 0 && on.ups.every((call) => String(call.authorization).includes(SECRET)),
         `${id}: наверх — ключ контура, подставленный шлюзом`,
       );
       check(
@@ -432,62 +413,102 @@ async function main() {
         JSON.stringify(on.humanCalls),
       );
       check(
-        on.events.length > 0 &&
-          on.events.every((event) => event.section === `foreign:${id}` && Boolean(event.runTag)),
-        `${id}: след шлюза — раздел чата ${id} с меткой прогона`,
-        JSON.stringify(on.events.map((event) => [event.path, event.section, event.runTag])),
+        on.events.length > 0,
+        `${id}: след шлюза контура о прогоне (${on.events.length})`,
+        JSON.stringify(on.events.slice(-3)),
       );
 
-      console.log('2. Контроль: галочка снята — тот же CLI идёт в облако человека');
-      const off = await turn(id, [], 'off');
+      // Решение 02.11: обязательный контур ведёт через себя каждого потребителя, галочка
+      // отмечена или нет, — снятая галочка не уводит прогон в облако человека и не роняет его.
+      console.log('2. Галочка снята, контур обязательный: всё равно через контур');
+      const forced = await turn(id, [], 'forced');
       check(
-        off.humanCalls.length > 0,
-        `${id}: без галочки запрос пришёл в облако человека — конфиг человека действует`,
-        `${off.reply.slice(0, 200)} ${off.all?.slice(-300) ?? ''}`,
+        forced.routes?.[0]?.route.id === `gateway:${CONTOUR}` &&
+          forced.routes[0].modelPattern === 'stub-chat',
+        `${id}: без галочки при «обязательно» набор — маршрут контура с моделью контура (${forced.routes?.[0]?.route.id ?? '—'} ${forced.routes?.[0]?.modelPattern ?? ''})`,
       );
-      check(off.ups.length === 0, `${id}: без галочки контур запроса не видел`);
+      check(
+        forced.started.ok && forced.reply.includes('готов'),
+        `${id}: задача пошла и ответил контур (задача ${forced.state})`,
+        `${JSON.stringify(forced.started)} ${forced.reply.slice(0, 200)}`,
+      );
+      check(
+        forced.ups.length > 0 &&
+          forced.ups.every((call) => String(call.authorization).includes(SECRET)),
+        `${id}: наверх — только контур с его ключом (${forced.ups.length})`,
+        forced.ups.map((call) => call.path).join(', '),
+      );
+      check(
+        forced.humanCalls.length === 0,
+        `${id}: облако человека не получило ни одного запроса`,
+        JSON.stringify(forced.humanCalls),
+      );
+
+      // «По возможности»: галочка решает, снятая — маршрута нет. У Goose и OpenCode нет маршрута
+      // входа CLI, так что набор ядра по умолчанию пуст и отказ один при любой политике ядра
+      // (ядро читает режим контура при загрузке — здесь от этого исход не зависит).
+      console.log(
+        '2б. Галочка снята, контур «по возможности»: маршрута нет — отказ ядра до процесса',
+      );
+      const off = await turn(id, [], 'off', 'best-effort');
+      check(
+        off.routes === undefined,
+        `${id}: без галочки при «по возможности» набор задачи не задан`,
+      );
+      check(
+        // Отказ именно маршрутом: CLI без маршрута входа вне набора по умолчанию. Другой код
+        // (нет git, ядро не ответило) значил бы, что до суда маршрута дело не дошло.
+        !off.started.ok && off.started.code === 'outside-allowed-set',
+        `${id}: ядро отказало задаче без маршрута по имени (${off.started.ok ? off.state : off.started.code})`,
+        `${JSON.stringify(off.started)} ${off.reply.slice(0, 200)}`,
+      );
+      check(
+        off.ups.length === 0 && off.humanCalls.length === 0,
+        `${id}: ни контур, ни облако человека запроса не видели (${off.ups.length}/${off.humanCalls.length})`,
+        JSON.stringify(off.humanCalls),
+      );
     }
 
-    console.log('\n3. Настройка конфига мимо контура — отказ обязательного контура');
-    const bypassCases = [
-      {
-        id: 'kimi',
-        setting: '[secondary_model] model',
-        write: () => put(paths.kimi, `${configs.kimi}\n[secondary_model]\nmodel = "human-model"\n`),
-      },
-      {
-        id: 'goose',
-        setting: 'GOOSE_LEAD_PROVIDER',
-        write: () =>
-          put(paths.goose, `${configs.goose}GOOSE_LEAD_PROVIDER: anthropic\nGOOSE_LEAD_MODEL: x\n`),
-      },
-      {
-        id: 'gemini',
-        setting: 'security.auth.selectedType',
-        write: () =>
-          put(
-            paths.geminiSettings,
-            JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } } }),
-          ),
-      },
-    ].filter((item) => present.includes(item.id));
-    for (const item of bypassCases) {
-      item.write();
-      const refused = await turn(item.id, [`foreign:${item.id}`], 'bypass');
+    if (present.includes('goose')) {
+      console.log('\n3. Настройка конфига человека мимо контура — сеанс ядра её не читает');
+      put(
+        paths.goose,
+        `${configs.goose}GOOSE_LEAD_PROVIDER: openai\nGOOSE_LEAD_MODEL: human-model\n`,
+      );
+      const bypass = await turn('goose', ['foreign:goose'], 'bypass');
       check(
-        (refused.all ?? '').includes(item.setting),
-        `${item.id}: отказ называет ${item.setting}`,
-        refused.all?.slice(-300),
+        bypass.reply.includes('готов') && bypass.ups.length > 0,
+        `goose: с GOOSE_LEAD_PROVIDER в конфиге человека прогон всё равно в контуре (${bypass.ups.length})`,
+        bypass.reply.slice(0, 300),
       );
       check(
-        refused.ups.length === 0 && refused.humanCalls.length === 0,
-        `${item.id}: ни контур, ни облако человека запроса не видели`,
-        `${refused.ups.length}/${refused.humanCalls.length}`,
+        bypass.humanCalls.length === 0,
+        'goose: облако человека не получило ни одного запроса',
+        JSON.stringify(bypass.humanCalls),
+      );
+    }
+
+    if (present.includes('gemini')) {
+      console.log(
+        '\n3. Gemini: `.env` облака человека над рабочим каталогом — сеанс ядра его не берёт',
+      );
+      put(paths.workEnv, configs.geminiEnv);
+      const bypass = await turn('gemini', ['foreign:gemini'], 'bypass');
+      rmSync(paths.workEnv, { force: true });
+      check(
+        bypass.reply.includes('готов') && bypass.ups.length > 0,
+        `gemini: с .env человека над рабочим каталогом прогон всё равно в контуре (${bypass.ups.length})`,
+        bypass.reply.slice(0, 300),
+      );
+      check(
+        bypass.humanCalls.length === 0,
+        'gemini: облако человека не получило ни одного запроса',
+        JSON.stringify(bypass.humanCalls),
       );
     }
   } finally {
-    chats.stopAll();
-    opencodeServe.dispose();
+    await core?.stop().catch(() => undefined);
+    if (gateway.home()) reapCoreSessions(gateway.home());
     await gateway.stop();
     await stub.close();
     await human.close();
@@ -506,7 +527,12 @@ async function main() {
 if (!process.features.typescript && !process.env.CC_X7_LIVE_RETRY) {
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', '--no-warnings', fileURLToPath(import.meta.url)],
+    [
+      '--experimental-strip-types',
+      '--no-warnings',
+      fileURLToPath(import.meta.url),
+      ...process.argv.slice(2),
+    ],
     { stdio: 'inherit', env: { ...process.env, CC_X7_LIVE_RETRY: '1' } },
   );
   process.exit(result.status ?? 1);

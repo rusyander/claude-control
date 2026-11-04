@@ -1,4 +1,5 @@
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -89,7 +90,6 @@ export const ORIGIN = 'http://localhost:8888';
 export interface Seeded {
   home: string;
   project: string;
-  group: string;
   rule: string;
   hook: string;
   skill: string;
@@ -268,45 +268,8 @@ export const ROWS: Readonly<Record<string, Row>> = {
   save_skill_file: [['card', (s) => ({ skill: s.skill, file: 'notes.md', content: 'x' })]],
   delete_skill_file: [['failed', (s) => ({ skill: s.skill, file: 'notes.md' })]],
   move_skill_file: [['failed', (s) => ({ skill: s.skill, from: 'notes.md', to: 'n.md' })]],
-  // actions-groups
+  // actions-app: legacy groups, read-only (stage 10)
   list_groups: [['done']],
-  read_group: [['done', (s) => ({ id: s.group })]],
-  save_group: [
-    ['failed', (s) => ({ id: s.group, name: 'sweep', env: { SWEEP_GROUP_TOKEN: 'new' } })],
-    ['card', (s) => ({ id: s.group, name: 'sweep 2' })],
-  ],
-  toggle_group: [['card', (s) => ({ id: s.group, isEnabled: false })]],
-  delete_group: [['card', (s) => ({ id: s.group })]],
-  draft_group: [['card', { name: 'fresh group' }]],
-  copy_group: [['card', (s) => ({ id: s.group })]],
-  draft_scenario: [
-    ['card', { name: 'scenario', steps: [{ title: bilingual('a'), prompt: bilingual('b') }] }],
-  ],
-  add_group_step: [
-    [
-      'card',
-      (s) => ({
-        id: s.group,
-        step: { anchor: 'work', title: bilingual('a'), prompt: bilingual('b') },
-      }),
-    ],
-  ],
-  move_group_step: [['failed', (s) => ({ id: s.group, stepId: 'step-1', position: 0 })]],
-  set_group_knobs: [['failed', (s) => ({ id: s.group, values: {} })]],
-  list_discovered_groups: [['done']],
-  run_group_discovery: [['card']],
-  import_discovered_group: [['failed', { key: 'none' }]],
-  copy_group_to_global: [['failed', (s) => ({ id: s.group })]],
-  apply_group_advice: [['card', (s) => ({ id: s.group, items: [{ kind: 'skill', id: 'x' }] })]],
-  merge_group_origin: [['failed', (s) => ({ id: s.group })]],
-  read_group_override: [['done', (s) => ({ id: s.group, path: s.project })]],
-  set_group_override: [['card', (s) => ({ id: s.group, path: s.project, enabled: true })]],
-  activate_groups_for_path: [['failed', (s) => ({ path: s.project })]],
-  list_resource_catalog: [['done']],
-  draft_group_step: [['card', (s) => ({ id: s.group, text: 'step', anchor: 'work' })]],
-  promote_group_step: [
-    ['failed', (s) => ({ id: s.group, stepId: 'step-1', type: 'rule', draft: 'x' })],
-  ],
   // actions-app: settings, endpoints, dlp, integrations
   get_settings: [['done']],
   update_settings: [['card', { theme: 'dark' }]],
@@ -358,13 +321,9 @@ export const ROWS: Readonly<Record<string, Row>> = {
   local_models_status: [['done']],
   kit_status: [['done']],
   read_env_passport: [['done']],
-  read_split_defaults: [['done']],
-  save_split_defaults: [['card', { parallelLight: 2 }]],
   // Сита: секрет в тексте выученного сита проверяет actions-sieves.integration.test.ts.
   read_sieves: [['done']],
   delete_learned_sieve: [['failed', { id: 'no-such-sieve' }]],
-  watcher_status: [['done']],
-  set_watcher: [['card', { enabled: true }]],
   list_models: [['done']],
   format_check: [['done']],
   read_account: [['done']],
@@ -410,11 +369,8 @@ export const ROWS: Readonly<Record<string, Row>> = {
   send_chat_message: [['card', { chat: CHAT, message: 'hello' }]],
   continue_chat_handoff: [['failed', { chat: CHAT }]],
   restart_chat_session: [['card', { chat: CHAT }]],
-  request_split: [['card', { chat: CHAT }]],
-  split_decline: [['card', { chat: CHAT }]],
-  set_chat_group: [['card', (s) => ({ chat: CHAT, group: s.group })]],
   stop_chat_run: [['failed', { chat: CHAT }]],
-  split_control: [['failed', { chat: CHAT, mode: 'pause_group' }]],
+  split_control: [['card', { chat: CHAT, mode: 'pause_all' }]],
   // sandbox
   list_sandbox_fixtures: [['done']],
   sandbox_probe_hook: [['card', (s) => ({ hook: s.hook })]],
@@ -423,7 +379,6 @@ export const ROWS: Readonly<Record<string, Row>> = {
   read_project_claude_md: [['done', proj()]],
   list_project_mcp: [['done', proj()]],
   list_project_permissions: [['done', proj()]],
-  read_project_group_choice: [['done', proj()]],
   read_project_copy_settings: [['done', proj()]],
   save_project_claude_md: [['card', proj({ content: 'x' })]],
   save_project_mcp_server: [
@@ -437,7 +392,6 @@ export const ROWS: Readonly<Record<string, Row>> = {
     ['failed', proj({ id: 'none', decision: 'deny', pattern: 'Bash(ls)' })],
   ],
   remove_project_permission: [['failed', proj({ id: 'none' })]],
-  set_project_group_choice: [['failed', proj({ groupKey: null })]],
   save_project_mirror_settings: [['card', proj({ include: ['.env'] })]],
   save_project_split_settings: [['card', proj({ deliver: false })]],
   project_git_status: [['done', p()]],
@@ -468,13 +422,7 @@ export const ROWS: Readonly<Record<string, Row>> = {
   read_chat_modes: [['done', { chat: CHAT }]],
   read_chat_spend: [['done']],
   request_chat_handoff: [['card', { chat: CHAT }]],
-  read_model_cascade: [['done', proj()]],
-  set_model_cascade: [['card', proj({ enabled: false })]],
-  set_review_after_work: [['card', proj({ enabled: false })]],
   list_lowered_runs: [['done']],
-  read_split_overlap: [['failed', { chat: CHAT }]],
-  split_accept_group: [['failed', { chat: CHAT, group: 0 }]],
-  split_resume_interrupted: [['failed', { chat: CHAT }]],
   read_model_pricing: [['done']],
   list_editors: [['done']],
   read_claude_access: [['done']],
@@ -484,7 +432,6 @@ export const ROWS: Readonly<Record<string, Row>> = {
   run_provider_check: [['card']],
   jira_transitions: [['failed', { key: 'PRJ-1' }]],
   portability_fidelity: [['done', { target: 'codex' }]],
-  summarize_resource: [['card', (s) => ({ type: 'skill', id: s.skill })]],
   read_project_changes: [['done', { chat: CHAT }]],
   read_worktree_bootstrap_log: [['failed', proj({ copy: 'none' })]],
   read_project_local_config: [['done', proj()]],
@@ -720,7 +667,7 @@ export async function seedThroughPanel(
   human: Human,
   project: string,
   contour: Record<string, unknown> = {},
-): Promise<string> {
+): Promise<void> {
   await human({ method: 'POST', url: '/api/projects', payload: { path: project, name: 'sweep' } });
   const { defaultOurRules, defaultPlatformRules } = await import('@agentdeck/contracts/platform');
   const { defaultPlatformTransport } = await import('@agentdeck/contracts/platform-transport');
@@ -838,23 +785,26 @@ export async function seedThroughPanel(
     url: '/api/credentials',
     payload: { value: JSON.stringify({ apiKey: STORES.panelApiKey }) },
   });
-  const created = await human({
-    method: 'POST',
-    url: '/api/groups',
-    payload: { name: 'sweep', members: [] },
+}
+
+/**
+ * Прежняя группа с секретом в env. Маршрутов записи у групп нет с этапа 10:
+ * группа ложится прямо в хранилище, как её оставила панель до этапа, а агент
+ * видит её только через `list_groups` — секрет обязан уйти маской.
+ */
+export function seedLegacyGroup(store: Pick<AppStore, 'saveGroup'>): void {
+  store.saveGroup({
+    id: 'sweep-legacy',
+    name: 'sweep',
+    description: '',
+    color: 'accent',
+    icon: 'folder',
+    members: [],
+    env: { SWEEP_GROUP_TOKEN: STORES.groupEnv },
+    projectPaths: [],
+    isEnabled: false,
+    order: 0,
   });
-  const group = (created.json() as { id: string }).id;
-  await human({
-    method: 'PUT',
-    url: `/api/groups/${group}`,
-    payload: {
-      name: 'sweep',
-      members: [],
-      env: { SWEEP_GROUP_TOKEN: STORES.groupEnv },
-      isEnabled: true,
-    },
-  });
-  return group;
 }
 
 /** Идентификатор записи, в JSON которой есть `marker`, — как его видит список панели. */

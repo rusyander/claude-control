@@ -45,94 +45,6 @@
         "height": 768
       }
     },
-    "agents/03-group": {
-      "light-ru": {
-        "file": "03-group.png",
-        "width": 790,
-        "height": 244
-      },
-      "light-en": {
-        "file": "03-group.en.png",
-        "width": 790,
-        "height": 244
-      },
-      "dark-ru": {
-        "file": "03-group.dark.png",
-        "width": 790,
-        "height": 244
-      },
-      "dark-en": {
-        "file": "03-group.dark.en.png",
-        "width": 790,
-        "height": 244
-      }
-    },
-    "autonomy/01-escalation": {
-      "light-ru": {
-        "file": "01-escalation.png",
-        "width": 880,
-        "height": 181
-      },
-      "light-en": {
-        "file": "01-escalation.en.png",
-        "width": 880,
-        "height": 181
-      },
-      "dark-ru": {
-        "file": "01-escalation.dark.png",
-        "width": 880,
-        "height": 181
-      },
-      "dark-en": {
-        "file": "01-escalation.dark.en.png",
-        "width": 880,
-        "height": 181
-      }
-    },
-    "autonomy/02-auto-pick": {
-      "light-ru": {
-        "file": "02-auto-pick.png",
-        "width": 825,
-        "height": 288
-      },
-      "light-en": {
-        "file": "02-auto-pick.en.png",
-        "width": 825,
-        "height": 270
-      },
-      "dark-ru": {
-        "file": "02-auto-pick.dark.png",
-        "width": 825,
-        "height": 288
-      },
-      "dark-en": {
-        "file": "02-auto-pick.dark.en.png",
-        "width": 825,
-        "height": 270
-      }
-    },
-    "autonomy/03-menu": {
-      "light-ru": {
-        "file": "03-menu.png",
-        "width": 376,
-        "height": 646
-      },
-      "light-en": {
-        "file": "03-menu.en.png",
-        "width": 376,
-        "height": 646
-      },
-      "dark-ru": {
-        "file": "03-menu.dark.png",
-        "width": 376,
-        "height": 646
-      },
-      "dark-en": {
-        "file": "03-menu.dark.en.png",
-        "width": 376,
-        "height": 646
-      }
-    },
     "basics/01-project-empty": {
       "light-ru": {
         "file": "01-project-empty.png",
@@ -269,66 +181,44 @@
       "light-ru": {
         "file": "07-menu.png",
         "width": 800,
-        "height": 1080
+        "height": 710
       },
       "light-en": {
         "file": "07-menu.en.png",
         "width": 800,
-        "height": 1080
+        "height": 710
       },
       "dark-ru": {
         "file": "07-menu.dark.png",
         "width": 800,
-        "height": 1080
+        "height": 710
       },
       "dark-en": {
         "file": "07-menu.dark.en.png",
         "width": 800,
-        "height": 1080
-      }
-    },
-    "basics/08-menu-actions": {
-      "light-ru": {
-        "file": "08-menu-actions.png",
-        "width": 800,
-        "height": 1080
-      },
-      "light-en": {
-        "file": "08-menu-actions.en.png",
-        "width": 800,
-        "height": 1080
-      },
-      "dark-ru": {
-        "file": "08-menu-actions.dark.png",
-        "width": 800,
-        "height": 1080
-      },
-      "dark-en": {
-        "file": "08-menu-actions.dark.en.png",
-        "width": 800,
-        "height": 1080
+        "height": 710
       }
     },
     "basics/09-agents": {
       "light-ru": {
         "file": "09-agents.png",
         "width": 800,
-        "height": 691
+        "height": 714
       },
       "light-en": {
         "file": "09-agents.en.png",
         "width": 800,
-        "height": 691
+        "height": 714
       },
       "dark-ru": {
         "file": "09-agents.dark.png",
         "width": 800,
-        "height": 691
+        "height": 714
       },
       "dark-en": {
         "file": "09-agents.dark.en.png",
         "width": 800,
-        "height": 691
+        "height": 714
       }
     },
     "basics/10-handoff": {
@@ -357,7 +247,7 @@
       "light-ru": {
         "file": "01-banner.png",
         "width": 1140,
-        "height": 543
+        "height": 561
       },
       "light-en": {
         "file": "01-banner.en.png",
@@ -367,320 +257,12 @@
       "dark-ru": {
         "file": "01-banner.dark.png",
         "width": 1140,
-        "height": 543
+        "height": 561
       },
       "dark-en": {
         "file": "01-banner.dark.en.png",
         "width": 1140,
         "height": 543
-      }
-    },
-    "deferred/02-hub": {
-      "light-ru": {
-        "file": "02-hub.png",
-        "width": 782,
-        "height": 351
-      },
-      "light-en": {
-        "file": "02-hub.en.png",
-        "width": 782,
-        "height": 351
-      },
-      "dark-ru": {
-        "file": "02-hub.dark.png",
-        "width": 782,
-        "height": 351
-      },
-      "dark-en": {
-        "file": "02-hub.dark.en.png",
-        "width": 782,
-        "height": 351
-      }
-    },
-    "deferred/03-card": {
-      "light-ru": {
-        "file": "03-card.png",
-        "width": 832,
-        "height": 217
-      },
-      "light-en": {
-        "file": "03-card.en.png",
-        "width": 832,
-        "height": 217
-      },
-      "dark-ru": {
-        "file": "03-card.dark.png",
-        "width": 832,
-        "height": 217
-      },
-      "dark-en": {
-        "file": "03-card.dark.en.png",
-        "width": 832,
-        "height": 217
-      }
-    },
-    "economy/01-where": {
-      "light-ru": {
-        "file": "01-where.png",
-        "width": 846,
-        "height": 111
-      },
-      "light-en": {
-        "file": "01-where.en.png",
-        "width": 846,
-        "height": 111
-      },
-      "dark-ru": {
-        "file": "01-where.dark.png",
-        "width": 846,
-        "height": 111
-      },
-      "dark-en": {
-        "file": "01-where.dark.en.png",
-        "width": 846,
-        "height": 111
-      }
-    },
-    "split/01-proposal": {
-      "light-ru": {
-        "file": "01-proposal.png",
-        "width": 905,
-        "height": 879
-      },
-      "light-en": {
-        "file": "01-proposal.en.png",
-        "width": 905,
-        "height": 879
-      },
-      "dark-ru": {
-        "file": "01-proposal.dark.png",
-        "width": 905,
-        "height": 879
-      },
-      "dark-en": {
-        "file": "01-proposal.dark.en.png",
-        "width": 905,
-        "height": 879
-      }
-    },
-    "split/02-tree": {
-      "light-ru": {
-        "file": "02-tree.png",
-        "width": 1440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "02-tree.en.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "02-tree.dark.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "02-tree.dark.en.png",
-        "width": 1440,
-        "height": 900
-      }
-    },
-    "split/03-hub": {
-      "light-ru": {
-        "file": "03-hub.png",
-        "width": 832,
-        "height": 900
-      },
-      "light-en": {
-        "file": "03-hub.en.png",
-        "width": 832,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "03-hub.dark.png",
-        "width": 832,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "03-hub.dark.en.png",
-        "width": 832,
-        "height": 900
-      }
-    },
-    "split/04-child-ask": {
-      "light-ru": {
-        "file": "04-child-ask.png",
-        "width": 768,
-        "height": 238
-      },
-      "light-en": {
-        "file": "04-child-ask.en.png",
-        "width": 768,
-        "height": 238
-      },
-      "dark-ru": {
-        "file": "04-child-ask.dark.png",
-        "width": 768,
-        "height": 238
-      },
-      "dark-en": {
-        "file": "04-child-ask.dark.en.png",
-        "width": 768,
-        "height": 238
-      }
-    },
-    "split/04b-card-ask": {
-      "light-ru": {
-        "file": "04b-card-ask.png",
-        "width": 806,
-        "height": 705
-      },
-      "light-en": {
-        "file": "04b-card-ask.en.png",
-        "width": 806,
-        "height": 705
-      },
-      "dark-ru": {
-        "file": "04b-card-ask.dark.png",
-        "width": 806,
-        "height": 705
-      },
-      "dark-en": {
-        "file": "04b-card-ask.dark.en.png",
-        "width": 806,
-        "height": 705
-      }
-    },
-    "split/05-overlap": {
-      "light-ru": {
-        "file": "05-overlap.png",
-        "width": 782,
-        "height": 131
-      },
-      "light-en": {
-        "file": "05-overlap.en.png",
-        "width": 782,
-        "height": 131
-      },
-      "dark-ru": {
-        "file": "05-overlap.dark.png",
-        "width": 782,
-        "height": 131
-      },
-      "dark-en": {
-        "file": "05-overlap.dark.en.png",
-        "width": 782,
-        "height": 131
-      }
-    },
-    "split/06-paused": {
-      "light-ru": {
-        "file": "06-paused.png",
-        "width": 832,
-        "height": 900
-      },
-      "light-en": {
-        "file": "06-paused.en.png",
-        "width": 832,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "06-paused.dark.png",
-        "width": 832,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "06-paused.dark.en.png",
-        "width": 832,
-        "height": 900
-      }
-    },
-    "split/07-worktrees": {
-      "light-ru": {
-        "file": "07-worktrees.png",
-        "width": 800,
-        "height": 1200
-      },
-      "light-en": {
-        "file": "07-worktrees.en.png",
-        "width": 800,
-        "height": 1200
-      },
-      "dark-ru": {
-        "file": "07-worktrees.dark.png",
-        "width": 800,
-        "height": 1200
-      },
-      "dark-en": {
-        "file": "07-worktrees.dark.en.png",
-        "width": 800,
-        "height": 1200
-      }
-    },
-    "split/08-move-tasks": {
-      "light-ru": {
-        "file": "08-move-tasks.png",
-        "width": 940,
-        "height": 880
-      },
-      "light-en": {
-        "file": "08-move-tasks.en.png",
-        "width": 940,
-        "height": 880
-      },
-      "dark-ru": {
-        "file": "08-move-tasks.dark.png",
-        "width": 940,
-        "height": 880
-      },
-      "dark-en": {
-        "file": "08-move-tasks.dark.en.png",
-        "width": 940,
-        "height": 880
-      }
-    },
-    "split/09-status-ask": {
-      "light-ru": {
-        "file": "09-status-ask.png",
-        "width": 806,
-        "height": 135
-      },
-      "light-en": {
-        "file": "09-status-ask.en.png",
-        "width": 806,
-        "height": 135
-      },
-      "dark-ru": {
-        "file": "09-status-ask.dark.png",
-        "width": 806,
-        "height": 135
-      },
-      "dark-en": {
-        "file": "09-status-ask.dark.en.png",
-        "width": 806,
-        "height": 135
-      }
-    },
-    "split/10-status-chat": {
-      "light-ru": {
-        "file": "10-status-chat.png",
-        "width": 1440,
-        "height": 900
-      },
-      "light-en": {
-        "file": "10-status-chat.en.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-ru": {
-        "file": "10-status-chat.dark.png",
-        "width": 1440,
-        "height": 900
-      },
-      "dark-en": {
-        "file": "10-status-chat.dark.en.png",
-        "width": 1440,
-        "height": 900
       }
     }
   }

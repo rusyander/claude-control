@@ -7,8 +7,7 @@ import { builtinKitDir } from './service.ts';
 
 /**
  * Отказы и пропуски стражей, найденные наблюдением за группой g5 (25.10): ребёнок судится по своему
- * журналу (`verify-throttle`, `bash-read-cap`), вывод чуть выше порога сохранения уходит в Read
- * (`bash-read-cap`), длинный heredoc в файл — в Write/Edit (`inline-edit-guard`), соседний гейт и гейт,
+ * журналу (`verify-throttle`), длинный heredoc в файл — в Write/Edit (`inline-edit-guard`), соседний гейт и гейт,
  * прерванный концом сессии, — не повтор (`gate-at-end`). Запуск — через диспетчер событий, как его зовёт
  * hooks.json, со своим журналом во временном каталоге.
  */
@@ -58,11 +57,8 @@ function pre(payload: Record<string, unknown>, env: NodeJS.ProcessEnv = {}): str
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
       AGENTDECK_KIT_STATE: join(dir, 'state'),
-      AGENTDECK_GROUP_STAGE: '',
-      AGENTDECK_GROUP_DELIVER_AHEAD: '',
-      AGENTDECK_SPLIT_CHILD: '',
+      AGENTDECK_STEP_KIND: '',
       ...env,
     },
     timeout: 15_000,
@@ -111,36 +107,6 @@ describe('verify-throttle: ребёнок судится по своему жу�
       transcript_path: parent,
     });
     expect(reason).not.toMatch(/this check already passed/);
-  });
-});
-
-describe('bash-read-cap: вывод выше порога сохранения уходит в Read', () => {
-  // g5 25.10 K2: 32 вывода чуть выше 8k (7.9–9.6k) — превью 2k, затем Read всего файла результата.
-  const row = `${'x'.repeat(80)};\n`;
-  writeFileSync(join(dir, 'a.ts'), row.repeat(220), 'utf8');
-  writeFileSync(join(dir, 'b.ts'), row.repeat(220), 'utf8');
-  const CHILD = { AGENTDECK_SPLIT_CHILD: '1' };
-  const bash = (command: string, extra: Record<string, unknown> = {}) =>
-    pre({ tool_input: { command }, transcript_path: transcript([say('сделай')]), ...extra }, CHILD);
-  const persisted = /bash-read-cap[\s\S]*persisted: a 2k preview/;
-
-  it("`sed -n '1,120p'` ~10k и `cat` ~18k (ниже 24k) — отказ с указанием на Read", () => {
-    expect(bash("sed -n '1,120p' a.ts")).toMatch(persisted);
-    expect(bash('cat a.ts')).toMatch(persisted);
-  });
-
-  it("`sed -n '1,90p'` ~7.5k проходит, два целых файла — прежний отказ по потолку", () => {
-    expect(bash("sed -n '1,90p' a.ts")).not.toMatch(/bash-read-cap/);
-    expect(bash('cat a.ts b.ts')).toMatch(/bash-read-cap[\s\S]*whole files/);
-  });
-
-  it('линия со своим журналом ограничивается, без своего файла — пропускается', () => {
-    const parent = transcript([]);
-    childOf(parent, 'capl1', []);
-    const lane = (agent_id: string) =>
-      pre({ tool_input: { command: 'cat a.ts b.ts' }, transcript_path: parent, agent_id }, CHILD);
-    expect(lane('capl1')).toMatch(/bash-read-cap/);
-    expect(lane('capl2')).not.toMatch(/bash-read-cap/);
   });
 });
 

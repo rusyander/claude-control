@@ -38,7 +38,7 @@ const BORN_SLACK_MS = 5e3;
 // A conversation's first record and the panel's stage time of the same start differ by seconds (convMark).
 const ADOPT_MS = 60e3;
 // Waste that compounds: the same class twice inside one turn = a burn loop (BURN, hi) — a group pauses at once.
-// Cheap classes are rowed and fixed, the group pauses at its next safe point (agentdeck-watchdog arms it).
+// Cheap classes are rowed and fixed, the unit pauses at its next safe point (a plugin arms it).
 export const WASTE_BURN = new Set(['rerun', 'repeat', 'sleep', 'err-repeat']);
 // max 120: every action reaches the watcher within 2 min even in a stretch with no flag (owner 25.10).
 export const DEFAULTS = { max: 120, settle: 8, batch: 60, poll: 2, budget: 8000, backlog: 12, from: 'end' };

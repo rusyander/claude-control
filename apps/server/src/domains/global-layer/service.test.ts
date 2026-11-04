@@ -241,6 +241,30 @@ describe('runComparison — настоящие репозитории и про�
     expect(readFileSync(join(configRoot, GLOBAL_MODULE), 'utf8')).toBe(WEAK_GLOBAL);
   }, 120_000);
 
+  // Сверку запускает наблюдатель на любую правку `~/.claude`. Сборка корпуса на
+  // spawnSync держала поток сервера секундами: все запросы панели вставали (dlp/gate
+  // 03-hook снимался русским под `language: en`). Десять случаев — восемьдесят
+  // вызовов git: даже на быстром диске синхронная сборка дала бы просвет больше порога.
+  it('сборка репозиториев случаев не держит поток сервера', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({ ...corpus.cases[0]!, id: `env-${i}` }));
+    write(join(root, 'corpus.json'), JSON.stringify({ ...corpus, cases: many }));
+    let last = performance.now();
+    let maxGap = 0;
+    const timer = setInterval(() => {
+      const now = performance.now();
+      maxGap = Math.max(maxGap, now - last);
+      last = now;
+    }, 10);
+    try {
+      const result = await runComparison({ pair: pairWith(join(root, 'corpus.json')), configRoot });
+      expect(result.cases).toBe(10);
+      expect(result.panel).toMatchObject({ ok: true, failing: 0 });
+    } finally {
+      clearInterval(timer);
+    }
+    expect(maxGap).toBeLessThan(250);
+  }, 120_000);
+
   it('нет модуля глобальной стороны — сторона не прошла, панель всё равно измерена', async () => {
     write(join(root, 'corpus.json'), JSON.stringify({ ...corpus, cases: [corpus.cases[0]] }));
     rmSync(join(configRoot, GLOBAL_MODULE));

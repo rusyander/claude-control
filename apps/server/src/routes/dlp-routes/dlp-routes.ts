@@ -35,7 +35,9 @@ import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, proxy: DlpProxy): void {
   const appDataDir = (): string => ctx.location.paths.appData;
 
-  app.get('/api/dlp', () => {
+  app.get('/api/dlp', async () => {
+    // Слушатель держит ядро: состояние и счётчики — его свежий ответ, а не память панели.
+    await proxy.refresh?.();
     return describeDlp(ctx.store, appDataDir(), proxy) satisfies DlpInfo;
   });
 
@@ -70,10 +72,10 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
       throw error;
     }
 
-    // Правила поменялись, а прокси уже работает со старым набором. Перезапуск
-    // здесь, а не «применится потом»: пока не перезапустили, панель показывала
-    // бы одни правила, а фильтровались бы другие.
-    if (proxy.running) void restart(ctx, appDataDir(), proxy);
+    // Прокси ядра читает правила на каждом запросе — новый набор действует со следующего.
+    // Такт ядра сейчас: сняли последнее включённое правило — слушатель закрывается сразу, а не
+    // через такт (прокси, который ничего не ищет, — не защита).
+    void proxy.refresh?.();
     const changed = readRules(appDataDir())
       .filter((rule) => before.get(rule.id) !== JSON.stringify(rule))
       .map((rule) => rule.id);
@@ -119,16 +121,27 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
     ctx.store.updateSettings({ dlp: { ...settings.dlp, enabled } });
   };
 
+  // Слушатель держит ядро по настройке `settings.dlp.enabled`, поэтому тумблер пишется ДО
+  // просьбы применить: ядро читает его из файла. Не открылось — тумблер возвращается назад,
+  // иначе после перезапуска ядро открыло бы прокси, которому человек получил отказ.
   app.post('/api/dlp/start', async (_request, reply) => {
     try {
-      await proxy.start(buildDlpRuntime(ctx.store, appDataDir()));
-      rememberEnabled(true);
+      buildDlpRuntime(ctx.store, appDataDir());
     } catch (error) {
       if (error instanceof DlpConfigError || error instanceof DlpRulesError) {
         return reply
           .code(400)
           .send({ error: 'dlp_misconfigured', message: error.message, ...codeOf(error) });
       }
+      throw error;
+    }
+    const was = ctx.store.getSettings().dlp.enabled;
+    rememberEnabled(true);
+    try {
+      await proxy.start();
+    } catch (error) {
+      rememberEnabled(was);
+      await proxy.stop().catch(() => undefined);
       // Занятый порт и отказ привязки — самая частая причина; текст системы
       // понятнее любой нашей формулировки.
       return reply.code(409).send({
@@ -141,8 +154,8 @@ export function registerDlpRoutes(app: FastifyInstance, ctx: ServerContext, prox
   });
 
   app.post('/api/dlp/stop', async () => {
-    await proxy.stop();
     rememberEnabled(false);
+    await proxy.stop();
     return describeDlp(ctx.store, appDataDir(), proxy) satisfies DlpInfo;
   });
 
@@ -174,15 +187,5 @@ function safeRules(appDataDir: string) {
     return readRules(appDataDir);
   } catch {
     return [];
-  }
-}
-
-async function restart(ctx: ServerContext, appDataDir: string, proxy: DlpProxy): Promise<void> {
-  try {
-    await proxy.start(buildDlpRuntime(ctx.store, appDataDir));
-  } catch {
-    // Причина уже видна в статусе; ронять ответ на сохранение правил из-за
-    // неудачного перезапуска нельзя — правила-то сохранились.
-    await proxy.stop();
   }
 }

@@ -1,5 +1,5 @@
 import type { ModelInfo } from '@agentdeck/contracts';
-import type { runAssistant } from '../assistant-runner/assistant-runner.ts';
+import type { OneShotResult } from '../core-ask/core-ask.types.ts';
 import type { CoreRoutesReader } from './steps-core-route.ts';
 
 /** Что нужно проверке от окружения (всё подменяемо в тестах). */
@@ -14,7 +14,11 @@ export interface ProviderCheckDeps {
   now?: () => Date;
   detectCli?: (command: string) => boolean;
   exists?: (path: string) => boolean;
-  runAssistantImpl?: typeof runAssistant;
+  /**
+   * Вопрос ядра «ask» названным CLI (`core-ask/one-shot.ts`); нет — шаг ассистента пропущен:
+   * своего запуска CLI у проверки больше нет.
+   */
+  ask?: (providerId: string, prompt: string, timeoutMs: number) => Promise<OneShotResult>;
   /** Таймаут одного запуска ассистента, мс. */
   assistantTimeoutMs?: number;
   /** Маршруты ядра исполнения задач (шаг «маршрут ядра»); ядро читается через сверенную строку. */

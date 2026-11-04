@@ -13,9 +13,6 @@ import { claudeRunFacts } from '@agentdeck/providers/claude';
  * списком: что не подошло, до CLI просто не доходит.
  */
 
-/** Идентификатор сессии Claude Code — UUID. */
-const SESSION_ID = /^[a-zA-Z0-9_-]{1,128}$/;
-
 /**
  * Имя модели: claude-opus-4-8, claude-sonnet-5, иногда с суффиксом в скобках.
  *
@@ -34,11 +31,6 @@ const MODEL = /^[a-zA-Z0-9._:/@+[\]-]{1,200}$/;
 const PLUGIN_ID = /^[a-zA-Z0-9._@/-]{1,200}$/;
 
 /** Небезопасное значение отбрасывается: продолжить без него лучше, чем выполнить чужое. */
-export function safeSessionId(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  return SESSION_ID.test(value) ? value : undefined;
-}
-
 export function safeModel(value: string | undefined): string | undefined {
   if (!value) return undefined;
   return MODEL.test(value) ? value : undefined;

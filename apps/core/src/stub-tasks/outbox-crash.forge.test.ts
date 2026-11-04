@@ -85,7 +85,9 @@ function repoWorld(kind: 'push' | 'ref-delete'): World {
   };
 }
 
-async function forgeWorld(kind: 'mr-create' | 'mr-update' | 'thread-reply'): Promise<World> {
+async function forgeWorld(
+  kind: 'mr-create' | 'mr-update' | 'thread-reply' | 'mr-comment',
+): Promise<World> {
   stub = await startStubForge({ scenario: 'review-threads-unseen' });
   const s = stub;
   const url = `${s.url}/acme/app.git`;
@@ -122,6 +124,21 @@ async function forgeWorld(kind: 'mr-create' | 'mr-update' | 'thread-reply'): Pro
       count: async () => {
         const mr = await port.mr(iid);
         return 'value' in mr && mr.value.bodyHash === mrBodyHash('t', 'new') ? 1 : 0;
+      },
+    };
+  }
+  if (kind === 'mr-comment') {
+    // Итог ревью по ссылке (этап 10, F8): своя заметка верхнего уровня с хешем тела.
+    const body = 'Замечания ревью (1)';
+    return {
+      port,
+      key: { kind, url, iid, bodyHash: noteHash(body) },
+      effect: async () => void (await port.comment(iid, body)),
+      count: async () => {
+        const all = await port.comments(iid);
+        if (!('value' in all)) throw new Error('comments unreadable');
+        return all.value.filter((n) => n.author === 'publisher' && n.bodyHash === noteHash(body))
+          .length;
       },
     };
   }
@@ -169,7 +186,7 @@ describe('outbox crash inside every publish action (P86, P10 reader half)', () =
       const world =
         kind === 'push' || kind === 'ref-delete'
           ? repoWorld(kind)
-          : await forgeWorld(kind as 'mr-create' | 'mr-update' | 'thread-reply');
+          : await forgeWorld(kind as 'mr-create' | 'mr-update' | 'thread-reply' | 'mr-comment');
       const fresh = await openFresh();
       let task: LiveTask | undefined;
       try {

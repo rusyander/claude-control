@@ -1,21 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathStep } from '@agentdeck/contracts/group-path';
-import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
-import {
-  chatPathHint,
-  chatPathSteps,
-  pathStepPrompt,
-  planPathTurn,
-  scanGateBlock,
-  scenarioLine,
-  skillInsertsLine,
-} from './path-steps.ts';
-
-const LINK: ChatLink = {
-  parentChatId: 'root',
-  createdAt: '2026-09-26T10:00:00.000Z',
-  stage: 'work',
-};
+import { chatPathSteps, scenarioLine, skillInsertsLine } from './path-steps.ts';
 
 function step(id: string, over: Partial<PathStep> = {}): PathStep {
   return {
@@ -30,208 +15,6 @@ function step(id: string, over: Partial<PathStep> = {}): PathStep {
     ...over,
   };
 }
-
-const GATED = step('a', { gate: { ru: 'тесты зелёные', en: 'tests are green' } });
-const gateBlock = (passed: boolean, note = 'checked'): string =>
-  `Done.\n\n\`\`\`agentdeck:gate\n${JSON.stringify({ passed, note })}\n\`\`\``;
-
-const turn = (over: Partial<Parameters<typeof planPathTurn>[0]>) =>
-  planPathTurn({
-    link: LINK,
-    stage: 'work',
-    steps: [GATED, step('b')],
-    ok: true,
-    paused: false,
-    text: 'stage answer',
-    task: 'stage task',
-    ...over,
-  });
-
-describe('planPathTurn', () => {
-  it('after the stage starts the first step and holds the stage answer', () => {
-    const decision = turn({});
-    expect(decision.kind).toBe('step');
-    if (decision.kind !== 'step') return;
-    expect(decision.step.id).toBe('a');
-    expect(decision.link.pathRun).toEqual({
-      done: ['a'],
-      pending: 'a',
-      held: { text: 'stage answer', task: 'stage task' },
-    });
-  });
-
-  it('a passed gate moves to the next step and keeps the held stage answer', () => {
-    const decision = turn({
-      link: { ...LINK, pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' } } },
-      text: gateBlock(true),
-      task: 'step prompt',
-    });
-    expect(decision.kind).toBe('step');
-    if (decision.kind !== 'step') return;
-    expect(decision.step.id).toBe('b');
-    expect(decision.link.pathRun?.held).toEqual({ text: 'S', task: 'T' });
-  });
-
-  it('a failed gate stops the chain with the note', () => {
-    const decision = turn({
-      link: { ...LINK, pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' } } },
-      text: gateBlock(false, 'two tests red'),
-    });
-    expect(decision).toEqual({ kind: 'gate-failed', step: GATED, note: 'two tests red' });
-  });
-
-  /**
-   * Забытый блок — не провал (F10, 12.10.2026): без человека рядом группа
-   * ждала бы его зря. Один раз шаг просят отчитаться тем же разговором; без
-   * блока и во второй раз — ждёт человека. Блок с `passed: false` — сразу.
-   */
-  it('a gated step without a gate block is asked to report once, not passed and not parked', () => {
-    const run = { done: ['a'], pending: 'a', held: { text: 'S', task: 'Задание стадии' } };
-    const decision = turn({ link: { ...LINK, pathRun: run }, text: 'I did it, trust me.' });
-    expect(decision.kind).toBe('step');
-    if (decision.kind !== 'step') return;
-    expect(decision.nudge).toBe(true);
-    expect(decision.step).toBe(GATED);
-    expect(decision.link.pathRun).toEqual({ ...run, nudged: true });
-    expect(decision.prompt).toContain('ended without the gate block');
-    expect(decision.prompt).toContain('tests are green');
-    expect(decision.prompt).toContain('agentdeck:gate');
-    expect(decision.prompt).toContain('Задание стадии');
-  });
-
-  it('a second turn without the gate block parks the chain', () => {
-    const decision = turn({
-      link: {
-        ...LINK,
-        pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' }, nudged: true },
-      },
-      text: 'Still no block.',
-    });
-    expect(decision).toEqual({ kind: 'gate-failed', step: GATED, note: '' });
-  });
-
-  it('the reminder belongs to its step: the next step starts without it', () => {
-    const decision = turn({
-      link: {
-        ...LINK,
-        pathRun: { done: ['a'], pending: 'a', held: { text: 'S', task: 'T' }, nudged: true },
-      },
-      text: gateBlock(true),
-    });
-    expect(decision.kind).toBe('step');
-    if (decision.kind !== 'step') return;
-    expect(decision.step.id).toBe('b');
-    expect(decision.nudge).toBeUndefined();
-    expect(decision.link.pathRun?.nudged).toBeUndefined();
-  });
-
-  it('a step turn that paused or failed waits, starting nothing', () => {
-    const pending: ChatLink = { ...LINK, pathRun: { done: ['a'], pending: 'a' } };
-    expect(turn({ link: pending, paused: true }).kind).toBe('wait');
-    expect(turn({ link: pending, ok: false }).kind).toBe('wait');
-  });
-
-  it('after the last step the conveyor continues with the HELD stage answer', () => {
-    const decision = turn({
-      link: {
-        ...LINK,
-        pathRun: { done: ['a', 'b'], pending: 'b', held: { text: 'review block', task: 'T' } },
-      },
-      text: 'step b answer',
-      task: 'step b prompt',
-    });
-    expect(decision).toEqual({
-      kind: 'continue',
-      text: 'review block',
-      task: 'T',
-      link: { ...LINK, pathRun: { done: ['a', 'b'] } },
-    });
-  });
-
-  it('a step already run in this chat is not started again on a later human turn', () => {
-    const decision = turn({ link: { ...LINK, pathRun: { done: ['a', 'b'] } }, text: 'human turn' });
-    expect(decision).toMatchObject({ kind: 'continue', text: 'human turn' });
-  });
-
-  it('a stage that paused gets no steps yet', () => {
-    expect(turn({ paused: true })).toEqual({
-      kind: 'continue',
-      text: 'stage answer',
-      task: 'stage task',
-    });
-  });
-});
-
-describe('scanGateBlock', () => {
-  it('reads the last closed block', () => {
-    expect(scanGateBlock(`${gateBlock(false)}\n${gateBlock(true, 'ok')}`)).toEqual({
-      passed: true,
-      note: 'ok',
-    });
-  });
-
-  it('a block without a boolean passed is no verdict', () => {
-    expect(scanGateBlock('```agentdeck:gate\n{"passed":"yes"}\n```')).toBeUndefined();
-  });
-});
-
-describe('pathStepPrompt', () => {
-  // Владелец 12.10.2026: перевод не подменяет слова владельца — оригинал идёт
-  // всегда, перевод только подсказкой после него.
-  it("sends the owner's original first, the translation only as an aid, and asks for the gate block", () => {
-    const prompt = pathStepPrompt(GATED, 'work');
-    expect(prompt).toContain('after the work stage: Step a');
-    expect(prompt).toContain('Сделай a');
-    expect(prompt.indexOf('Сделай a')).toBeLessThan(prompt.indexOf('Do a'));
-    expect(prompt).toContain("the owner's original above wins: Do a");
-    expect(prompt).toContain('This step is closed only when: тесты зелёные');
-    expect(prompt).toContain('agentdeck:gate');
-  });
-
-  it('a step written in English goes as is, without the Russian side as its original', () => {
-    const prompt = pathStepPrompt(step('e', { source: 'en' }), 'work');
-    expect(prompt.indexOf('Do e')).toBeLessThan(prompt.indexOf('Сделай e'));
-  });
-
-  it('one side only, or both equal — no aid line', () => {
-    const same = pathStepPrompt(step('s', { prompt: { ru: 'Run it', en: 'Run it' } }), 'work');
-    expect(same).not.toContain('for reference only');
-  });
-
-  it('falls back to the Russian side when English is empty', () => {
-    const prompt = pathStepPrompt(step('c', { prompt: { ru: 'Сделай c', en: ' ' } }), 'plan');
-    expect(prompt).toContain('Сделай c');
-    expect(prompt).not.toContain('agentdeck:gate');
-  });
-
-  it('a resource step names the skill to apply', () => {
-    const prompt = pathStepPrompt(
-      step('d', { kind: 'resource', resource: { type: 'skill', id: 'lint-all' } }),
-      'fix',
-    );
-    expect(prompt).toContain('Apply the skill `lint-all`');
-  });
-
-  it('язык ответа — по строке человека из задания стадии, а не по английскому шагу', () => {
-    const task = [
-      'Work stage. Follow the plan below and report.',
-      'Tasks of this group:',
-      '- Поправить вёрстку карточки заказа на узком экране',
-      '- Коротко',
-    ].join('\n');
-    const decision = turn({ task });
-    expect(decision.kind).toBe('step');
-    const prompt = decision.kind === 'step' ? decision.prompt : '';
-    expect(prompt).toContain(
-      'The human wrote, for example: "- Поправить вёрстку карточки заказа на узком экране"',
-    );
-    expect(prompt).not.toContain('Write your answer in the language of the task text');
-    // Человек пишет по-английски — строки с чужими буквами нет, общая строка остаётся.
-    expect(pathStepPrompt(GATED, 'work', 'Fix the order card on narrow screens.')).toContain(
-      'Write your answer in the language of the task text',
-    );
-  });
-});
 
 describe('chatPathSteps', () => {
   const groups = [
@@ -261,37 +44,6 @@ describe('chatPathSteps', () => {
   });
 });
 
-describe('chatPathHint', () => {
-  const groups = [
-    {
-      id: 'g1',
-      name: 'Tests first',
-      path: {
-        steps: [
-          step('s1', { anchor: 'fix', gate: { ru: 'зелёные', en: 'all green' } }),
-          step('s0', { anchor: 'plan' }),
-        ],
-      },
-    },
-    { id: 'empty', name: 'Empty' },
-  ];
-
-  it('lists the chosen group steps in path order, English, with gates', () => {
-    const hint = chatPathHint(groups, 'global:g1') ?? '';
-    expect(hint).toContain('group "Tests first"');
-    expect(hint.indexOf('After plan — Step s0')).toBeGreaterThan(-1);
-    expect(hint.indexOf('After plan')).toBeLessThan(hint.indexOf('After fix — Step s1: Do s1'));
-    expect(hint).toContain('Closed when: all green.');
-    expect(hint).not.toContain('Сделай');
-  });
-
-  it('no group, auto or a group without steps gives no hint', () => {
-    expect(chatPathHint(groups, 'auto')).toBeUndefined();
-    expect(chatPathHint(groups, 'global:empty')).toBeUndefined();
-    expect(chatPathHint(groups, 'global:none')).toBeUndefined();
-  });
-});
-
 describe('steps inside a skill and scenarios', () => {
   const inner = step('in', {
     within: { skillId: 'td', index: 3, after: 'BEFORE shots' },
@@ -307,9 +59,8 @@ describe('steps inside a skill and scenarios', () => {
     },
   ];
 
-  it('a step inside a skill is never a turn after the stage, and not in the stage hint', () => {
+  it('a step inside a skill is never a step after the stage', () => {
     expect(chatPathSteps(groups, 'global:g1', 'work').map((item) => item.id)).toEqual(['stage']);
-    expect(chatPathHint(groups, 'global:g1')).not.toContain('Do in');
   });
 
   it('the inserts line names the skill, the step it follows, and the gate', () => {
@@ -319,9 +70,8 @@ describe('steps inside a skill and scenarios', () => {
     expect(skillInsertsLine({ name: 'x', path: { steps: [step('stage')] } })).toBeUndefined();
   });
 
-  it('a scenario runs as one ordered line, never as stage turns or a stage hint', () => {
+  it('a scenario runs as one ordered line, never as steps after a stage', () => {
     expect(chatPathSteps(groups, 'global:s1', 'work')).toEqual([]);
-    expect(chatPathHint(groups, 'global:s1')).toBeUndefined();
     const line = scenarioLine(groups[1]!) ?? '';
     expect(line).toContain('scenario "Jira flow"');
     expect(line.indexOf('1. Step read: Do read')).toBeGreaterThan(-1);
@@ -331,11 +81,33 @@ describe('steps inside a skill and scenarios', () => {
 });
 
 describe('resource steps', () => {
+  const scenario = (resource: PathStep['resource']) =>
+    scenarioLine({
+      name: 'Tools',
+      flow: 'scenario',
+      path: { steps: [step('r', { kind: 'resource', resource, prompt: { ru: '', en: '' } })] },
+    }) ?? '';
+
   it('a utility step tells the model to RUN the script, not just follow it', () => {
-    const prompt = pathStepPrompt(
-      step('u', { kind: 'resource', resource: { type: 'script', id: 'lint-all.mjs' } }),
-      'work',
+    expect(scenario({ type: 'script', id: 'lint-all.mjs' })).toContain(
+      'Run the utility script `lint-all.mjs`',
     );
-    expect(prompt).toContain('Run the utility script `lint-all.mjs`');
+  });
+
+  it('a skill step names the skill to apply, another resource is followed', () => {
+    expect(scenario({ type: 'skill', id: 'lint-all' })).toContain('Apply the skill `lint-all`');
+    expect(scenario({ type: 'rule', id: 'no-any' } as PathStep['resource'])).toContain(
+      'The rule `no-any` is active for this step; follow it.',
+    );
+  });
+
+  it('an English side left empty falls back to the Russian one', () => {
+    const line =
+      scenarioLine({
+        name: 'Ru',
+        flow: 'scenario',
+        path: { steps: [step('c', { prompt: { ru: 'Сделай c', en: ' ' } })] },
+      }) ?? '';
+    expect(line).toContain('Сделай c');
   });
 });

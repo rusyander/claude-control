@@ -110,6 +110,21 @@ export const PUBLISH_READY_NEXT = [
 ] as const;
 export type PublishReadyNext = (typeof PUBLISH_READY_NEXT)[number];
 
+/**
+ * Ответ `GET /v1/delivery?copy=<папка>` — проба сдачи копии единицы тем же судом, что шаг
+ * публикации (`judgeUnit`), без пуша и записей в журнал. Его печатает `tests-cli delivery`:
+ * `unmet` — строки отказа как есть, `ready` — сдавать нечего. Ожидание форжа — тоже отказ
+ * (`next: 'wait-forge'`): сдача не доказана.
+ */
+export type DeliveryReply = {
+  taskId: string;
+  unitId: string;
+  copy: string;
+} & ({ verdict: 'ready' } | { verdict: 'refused'; next: PublishReadyNext; unmet: string[] });
+
+/** Ручка пробы: копия не принадлежит ни одной живой единице ядра (`404`). */
+export const DELIVERY_NOT_A_COPY = 'not-a-task-copy';
+
 export const COMMIT_SHAPES = ['kept', 'squashed', 're-messaged'] as const;
 export type CommitShape = (typeof COMMIT_SHAPES)[number];
 

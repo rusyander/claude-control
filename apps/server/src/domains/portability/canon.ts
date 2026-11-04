@@ -14,6 +14,11 @@ import type {
   NeedsEvidence,
 } from '@agentdeck/contracts/portable-env';
 import { CANON_VERSION } from '@agentdeck/contracts/portable-env';
+import type {
+  ServerMessageCode,
+  ServerMessageNestedParams,
+} from '@agentdeck/contracts/server-messages';
+import { matchText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Сборщики записей канона — общие для всех десяти импортёров.
@@ -106,19 +111,69 @@ export function needsFacts(facts: readonly EnvNeed[], evidence: NeedsEvidence): 
   return { resolution: 'facts', facts: [first, ...rest], evidence };
 }
 
-/** Рантайм записи не нужен — сказано вслух и сказано почему. */
-export function needsNone(why: string): EnvNeeds {
-  return { resolution: 'none', why };
+/**
+ * Рантайм записи не нужен — сказано вслух и сказано почему. `whyCode` — код того
+ * же текста: паспорт показывают и по-английски, а русская причина под английским
+ * заголовком читается как сбой перевода. Без кода — русский текст как есть.
+ */
+export function needsNone(why: string, whyCode?: string): EnvNeeds {
+  return whyCode ? { resolution: 'none', why, whyCode } : { resolution: 'none', why };
 }
 
 /** Вывести не удалось. ХУДШИЙ уровень верности и решение человека, а не молчание. */
-export function needsUndetermined(why: string): EnvNeeds {
-  return { resolution: 'undetermined', why };
+export function needsUndetermined(
+  why: string,
+  whyCode?: string,
+  whyParams?: Record<string, string>,
+): EnvNeeds {
+  if (!whyCode) return { resolution: 'undetermined', why };
+  return whyParams
+    ? { resolution: 'undetermined', why, whyCode, whyParams }
+    : { resolution: 'undetermined', why, whyCode };
 }
 
-/** Раздела нет либо он не прочитан — причина из закрытого словаря плюс подробность. */
-export function envSkip(kind: EnvItemKind, reason: EnvSkipReason, detail: string): EnvSkip {
-  return { kind, reason, detail };
+/**
+ * Раздела нет либо он не прочитан — причина из закрытого словаря плюс подробность.
+ *
+ * Подробность — русская строка сервера; `detailCode` рядом переводит её на
+ * экране (паспорт смотрят и по-английски). Сборщик, который пишет фразу сам,
+ * кладёт код рядом. Строка, пришедшая от читателя раздела (текст ошибки разбора),
+ * кода с собой не несёт — его восстанавливает `readerTextCode`; текст ОС
+ * (`ENOENT: …`) кода не имеет и показывается как есть.
+ */
+export function envSkip(
+  kind: EnvItemKind,
+  reason: EnvSkipReason,
+  detail: string,
+  detailCode?: ServerMessageCode,
+  detailParams?: ServerMessageNestedParams,
+): EnvSkip {
+  const coded = detailCode
+    ? { detailCode, ...(detailParams ? { detailParams } : {}) }
+    : readerTextCode(detail);
+  return { kind, reason, detail, ...coded };
+}
+
+/**
+ * Код строки, которую сервер собрал по шаблону (`serverText`). Вложенность глубже одного уровня схема паспорта не
+ * принимает — такая строка остаётся без кода, а не ломает разбор паспорта.
+ */
+export function readerTextCode(text: string): {
+  detailCode?: ServerMessageCode;
+  detailParams?: ServerMessageNestedParams;
+} {
+  const matched = matchText(text);
+  if (!matched) return {};
+  const params = matched.params ?? {};
+  const flat = Object.values(params).every(
+    (value) =>
+      typeof value !== 'object' ||
+      Object.values(value.params ?? {}).every((inner) => typeof inner !== 'object'),
+  );
+  if (!flat) return {};
+  return matched.params
+    ? { detailCode: matched.messageCode, detailParams: matched.params as ServerMessageNestedParams }
+    : { detailCode: matched.messageCode };
 }
 
 /**

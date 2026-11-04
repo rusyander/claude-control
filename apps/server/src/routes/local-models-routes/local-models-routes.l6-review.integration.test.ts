@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import type { PlatformGatewayEvent } from '@agentdeck/contracts';
 import type { LocalActivity, LocalServerInfo } from '@agentdeck/contracts/local-models';
 import type { ServerContext } from '../../context.ts';
 import { createLocalModels, loadCatalog } from '../../domains/local-models/service.ts';
@@ -12,6 +13,7 @@ import { readRecord } from '../../domains/local-models/server.ts';
 import { modelFilePath } from '../../domains/local-models/hf.ts';
 import type { KitService } from '../../domains/kit/service.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
+import { fakeCoreHold, refuse } from '../../domains/local-models/__fixtures__/fake-core-hold.ts';
 
 /**
  * Находки ревью L6 по настоящему сокету: маршрут, сервис, запись о сервере и файлы на диске во
@@ -51,6 +53,8 @@ let crash: boolean;
 /** Через сколько поднятый процесс начинает отвечать на `/health`; 0 — сразу. */
 let startDelayMs: number;
 let local: ReturnType<typeof createLocalModels>;
+/** Последний снимок книги контуров ядра, который панель отдаёт сервису (L6). */
+let coreEvents: PlatformGatewayEvent[] | undefined;
 
 const ENV = (): NodeJS.ProcessEnv => ({
   AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm'),
@@ -78,6 +82,7 @@ async function api<T>(
 }
 
 beforeEach(async () => {
+  coreEvents = undefined;
   root = mkdtempSync(join(tmpdir(), 'cc-local-l6-review-'));
   up = false;
   alive = new Set();
@@ -95,6 +100,7 @@ beforeEach(async () => {
     env: ENV(),
     port: PORT,
     os: 'linux',
+    coreEvents: () => coreEvents,
     fetchImpl: async (input) => {
       const url = String(input);
       if (!url.startsWith(`http://127.0.0.1:${PORT}`) || !up) throw new TypeError('fetch failed');
@@ -105,32 +111,25 @@ beforeEach(async () => {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: (() => {
-      const pid = nextPid++;
-      if (crash) {
-        return {
-          pid,
-          once: (event: string, callback: (code: number) => void) => {
-            if (event === 'exit') callback(1);
-          },
-          on: () => undefined,
-          unref: () => undefined,
-        };
-      }
-      alive.add(pid);
-      if (startDelayMs > 0)
-        setTimeout(() => {
-          up = alive.size > 0;
-        }, startDelayMs);
-      else up = true;
-      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      alive.delete(pid);
-      up = alive.size > 0;
-    },
-    supervise: { pidAlive: (pid) => alive.has(pid) },
-    testLoad: async () => ({ ok: true }),
+    hold: fakeCoreHold({
+      hold: () => {
+        const pid = nextPid++;
+        if (crash) throw refuse('local_load_failed', `router failed to load ${TAG} (exit 1)`);
+        alive.add(pid);
+        if (startDelayMs > 0)
+          setTimeout(() => {
+            up = alive.size > 0;
+          }, startDelayMs);
+        else up = true;
+        return pid;
+      },
+      release: (pid) => {
+        alive.delete(pid);
+        up = alive.size > 0;
+      },
+    }),
+    // Такт присмотра — доли секунды; таймер идёт только после `resume()` (проверка m4).
+    supervise: { pidAlive: (pid) => alive.has(pid), intervalMs: 20 },
   });
 
   app = Fastify();
@@ -150,7 +149,7 @@ afterEach(async () => {
 });
 
 describe('состояние локального прогона и перезапуск из чата (ревью m5)', () => {
-  it('GET /activity: простой — этап idle, сервер и окно; замер слоя, не влезающий в окно, — с действием', async () => {
+  it('GET /activity: простой — сервер, квантование и окно; этапов хода и замера слоя нет', async () => {
     const started = await api('POST', '/api/local-models/server/start', {
       tag: TAG,
       quant: 'Q4_K_M',
@@ -159,23 +158,50 @@ describe('состояние локального прогона и переза
     expect(started.status, JSON.stringify(started.body)).toBe(200);
     const idle = await api<LocalActivity>('GET', '/api/local-models/activity');
     expect(idle.status).toBe(200);
-    expect(idle.body).toMatchObject({
-      phase: 'idle',
-      inFlight: 0,
+    expect(idle.body).toEqual({
       model: TAG,
       quant: 'Q4_K_M',
       context: 32_768,
     });
-    expect(idle.body.layer).toBeUndefined();
-    local.upstream(TAG)?.layer(40_000);
-    const measured = await api<LocalActivity>('GET', '/api/local-models/activity');
-    expect(measured.body.layer).toMatchObject({
-      tokens: 40_000,
-      context: 32_768,
-      limit: 28_672,
-      fits: false,
-      fix: { context: 65_536 },
+  });
+
+  it('GET /activity: отказ сервера моделей из книги контуров ядра — код и текст до удачного ответа (L6)', async () => {
+    const event = (at: string, status: number, error?: string) =>
+      ({
+        at,
+        platformId: 'local-ollama',
+        path: '/v1/messages',
+        dialect: 'anthropic-messages',
+        status,
+        stages: [],
+        summarized: false,
+        violations: [],
+        masked: false,
+        blocked: false,
+        interrupted: false,
+        unknownFrames: [],
+        lost: [],
+        shimmed: [],
+        toolCalls: 0,
+        contourCalls: 0,
+        toolFlaws: [],
+        claimedWithoutCall: false,
+        totalTokens: 0,
+        ...(error ? { error } : {}),
+      }) as PlatformGatewayEvent;
+    expect(
+      (await api<LocalActivity>('GET', '/api/local-models/activity')).body.lastError,
+    ).toBeUndefined();
+    coreEvents = [event('2026-11-02T10:00:00.000Z', 500, 'Value is not callable: null at row 61')];
+    const refused = await api<LocalActivity>('GET', '/api/local-models/activity');
+    expect(refused.body).toMatchObject({
+      lastRequestAt: Date.parse('2026-11-02T10:00:00.000Z'),
+      lastError: { status: 500, message: 'Value is not callable: null at row 61' },
     });
+    coreEvents = [...coreEvents, event('2026-11-02T10:00:05.000Z', 200)];
+    const answered = await api<LocalActivity>('GET', '/api/local-models/activity');
+    expect(answered.body.lastError).toBeUndefined();
+    expect(answered.body.lastRequestAt).toBe(Date.parse('2026-11-02T10:00:05.000Z'));
   });
 
   it('POST /server/restart: тот же сервер заново, теми же параметрами; сервера нет — отказ с кодом', async () => {
@@ -219,7 +245,9 @@ describe('удаление при стёртой записи (ревью m4)', 
     for (const pid of alive) alive.delete(pid);
     up = false;
     crash = true;
-    expect(await local.upstream(TAG)?.revive()).toBe('failed');
+    await local.resume();
+    for (let waited = 0; waited < 3_000 && readRecord(paths()); waited += 20)
+      await new Promise((resolve) => setTimeout(resolve, 20));
     expect(readRecord(paths())).toBeUndefined();
     const refused = await api<{ messageCode?: string }>(
       'DELETE',

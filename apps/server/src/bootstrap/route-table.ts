@@ -12,16 +12,7 @@ import { registerProviderPluginsRoutes } from '../routes/provider-plugins-routes
 import { registerProviderSkillsRoutes } from '../routes/provider-skills-routes/provider-skills-routes.ts';
 import { registerProviderPermissionsRoutes } from '../routes/provider-permissions-routes/provider-permissions-routes.ts';
 import { registerProviderKeysRoutes } from '../routes/provider-keys-routes/provider-keys-routes.ts';
-import { registerGroupRoutes } from '../routes/group-routes/group-routes.ts';
-import { groupAsk } from '../routes/group-ask.ts';
-import { pausedGroupOf } from '../routes/chat/split-control-routes.ts';
-import type { GroupAsk } from '../domains/groups/model.ts';
-import type { ServerContext } from '../context.ts';
-import { registerGroupSourcesRoutes } from '../routes/group-sources-routes/group-sources-routes.ts';
-import { registerGroupPathRoutes } from '../routes/group-path-routes/group-path-routes.ts';
-import { registerGroupKnobsRoutes } from '../routes/group-knobs-routes/group-knobs-routes.ts';
-import { registerGroupDuplicateRoutes } from '../routes/group-duplicate-routes/group-duplicate-routes.ts';
-import { registerGroupDeliveryRoutes } from '../routes/group-delivery-routes/group-delivery-routes.ts';
+import { registerLegacyGroupsRoutes } from '../routes/legacy-groups-routes/legacy-groups-routes.ts';
 import { registerAnalyticsRoutes } from '../routes/analytics-routes/analytics-routes.ts';
 import { registerAnalyticsSessionRoutes } from '../routes/analytics-session-routes/analytics-session-routes.ts';
 import { registerModelRoutes } from '../routes/model-routes/model-routes.ts';
@@ -39,15 +30,9 @@ import { registerPluginRoutes } from '../routes/plugin-routes/plugin-routes.ts';
 import { registerAssistantRoutes } from '../routes/assistant-routes/assistant-routes.ts';
 import { registerScriptRoutes } from '../routes/script-routes/script-routes.ts';
 import { registerChatRoutes } from '../routes/chat-routes/chat-routes.ts';
-import { registerChatSplitRoutes } from '../routes/chat/split-routes.ts';
 import { registerChatCascadeRoutes } from '../routes/chat/cascade-routes.ts';
 import { registerChatHandoffRoutes } from '../routes/chat/handoff-routes.ts';
 import { registerChatTreeRoutes } from '../routes/chat/tree-routes/tree-routes.ts';
-import { registerChatGroupSettingsRoutes } from '../routes/chat/group-settings-routes/group-settings-routes.ts';
-import {
-  registerChatWatchSignalsRoutes,
-  registerGroupWatchCoverageRoutes,
-} from '../routes/chat/watch-signals-routes.ts';
 import { registerSandboxRoutes } from '../routes/sandbox-routes/sandbox-routes.ts';
 import { registerResourceRoutes } from '../routes/resource-routes/resource-routes.ts';
 import { registerBackupRoutes } from '../routes/backup-routes/backup-routes.ts';
@@ -63,38 +48,36 @@ import { registerDatabaseRoutes } from '../routes/database-routes/database-route
 import { registerApiExplorerRoutes } from '../routes/api-explorer-routes/api-explorer-routes.ts';
 import { registerLogsRoutes } from '../routes/logs-routes/logs-routes.ts';
 import { registerProjectGitRoutes } from '../routes/project-git-routes/project-git-routes.ts';
-import { registerSplitDefaultsRoutes } from '../routes/split-defaults-routes/split-defaults-routes.ts';
 import { registerSieveRoutes } from '../routes/sieve-routes.ts';
-import { registerVerifyLedgerRoutes } from '../routes/verify-ledger-routes.ts';
 import { registerProjectFilesRoutes } from '../routes/project-files-routes/project-files-routes.ts';
 import { registerProjectTestsRoutes } from '../routes/project-tests-routes/project-tests-routes.ts';
 import { registerProjectTestsPublishRoutes } from '../routes/project-tests/publish-routes.ts';
 import { registerIntegrationsRoutes } from '../routes/integrations-routes/integrations-routes.ts';
-import { registerTelegramAnswersRoutes } from '../routes/integrations/telegram-answers-routes.ts';
 import { registerProviderChatRoutes } from '../routes/provider-chat-routes/provider-chat-routes.ts';
-import { registerDlpRoutes } from '../routes/dlp-routes/dlp-routes.ts';
 import { registerCompromiseRoutes } from '../routes/compromise-routes.ts';
-import { registerPlatformRoutes } from '../routes/platform-routes/platform-routes.ts';
-import { registerLocalModelsRoutes } from '../routes/local-models-routes/local-models-routes.ts';
 import { registerMediaRoutes } from '../routes/media-routes/media-routes.ts';
 import { registerPromptGateRoutes } from '../routes/prompt-gate-routes.ts';
 import { registerPromptRoutes } from '../routes/prompt-routes/prompt-routes.ts';
-import { registerRemoteRoutes } from '../routes/remote-routes.ts';
 import { phoneSigningGateFor } from '../routes/phone-signing-routes/phone-signing-gate.ts';
 import { registerPhoneSigningRoutes } from '../routes/phone-signing-routes/phone-signing-routes.ts';
-import { registerPowerRoutes } from '../routes/power-routes.ts';
 import { registerMobileApkRoutes } from '../routes/mobile-apk-routes/mobile-apk-routes.ts';
 import { registerChangelogRoutes } from '../routes/changelog-routes/changelog-routes.ts';
 import { registerEventsRoutes } from '../routes/events-routes.ts';
 import { registerUsageLimitsRoutes } from '../routes/usage-limits-routes/usage-limits-routes.ts';
 import { createUsageLimits } from '../domains/usage-limits/usage-limits.ts';
 import { readClaudeCredentials } from '../lib/credentials/credentials.ts';
-import { registerWatcherRoutes } from '../routes/watcher-routes/watcher-routes.ts';
 import { registerDevRestartRoutes } from '../routes/dev-restart-routes/dev-restart-routes.ts';
 import { registerPanelAgentRoutes } from '../routes/panel-agent/panel-agent-routes/panel-agent-routes.ts';
 import { registerPanelAgentRunRoutes } from '../routes/panel-agent/run-routes/run-routes.ts';
-import { registerCoreProxyRoutes } from '../routes/core-proxy/core-proxy-routes.ts';
+import { coreSupervisorRoutes } from './runtime/core-supervisor-wiring.ts';
+import { gatewayRoutes } from './runtime/gateway-wiring.ts';
+import { localModelsRoutes } from './runtime/local-models-wiring.ts';
+import { notifyRoutes } from './runtime/notify-wiring.ts';
 import type { AccessGateDeps } from '../lib/access-gate/access-gate.ts';
+import { createBridgeTokenLedger } from '../lib/bridge-tokens/bridge-tokens.ts';
+import { coreHomeOf } from '../lib/hop-recorder.mjs';
+import { createCoreAskPort } from '../domains/core-ask/core-ask.ts';
+import { helperCarryOf } from '../domains/core-ask/helper-carry.ts';
 import type { Runtime } from './runtime/runtime.ts';
 
 /**
@@ -107,17 +90,10 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
   const {
     chatRuns,
     chatSession,
-    providerChats,
+    coreChats,
+    foreignCarry,
     handoffChains,
     treePause,
-    pendingAsks,
-    splitConveyor,
-    groupWatcher,
-    statusChats,
-    splitOverlap,
-    splitReview,
-    recheckMr,
-    splitView,
     projectRunner,
     projectTestRuns,
     projectTestManual,
@@ -133,19 +109,12 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     localModels,
     globalLayer,
     kit,
-    verifyLedger,
   } = runtime;
-  // Маршрут и порт спрашиваются на каждом запросе окна, а не здесь: галочка
-  // контура, снятая минуту назад, уже действует.
-  const helperRoute = {
-    runRoute: runtime.runRoute,
-    gatewayPort: runtime.gatewayPort,
-    claudeSwitchEnv: runtime.claudeSwitchEnv,
-  };
-
-  // Служебные вызовы групп идут тем же переключателем Claude, что и окно помощника.
-  const groupAskFor = (context: ServerContext): GroupAsk =>
-    groupAsk(context, runtime.claudeSwitchEnv);
+  // Служебные вопросы модели (помощники, ассистент, агент панели) — вопрос ядра «ask»: маршрут,
+  // контур и ключ судит ядро на каждом вопросе, галочка, снятая минуту назад, уже действует.
+  const askPort = createCoreAskPort(() => coreHomeOf());
+  // Окна помощника формы и структуры получают набор чужого CLI, как прежнее окно (G13).
+  const helperCarry = helperCarryOf(foreignCarry);
 
   return [
     // Первым: ворота «только человек» на каждый маршрут `human:*` журнала
@@ -165,16 +134,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerProviderSkillsRoutes,
     registerProviderPermissionsRoutes,
     registerProviderKeysRoutes,
-    registerGroupRoutes,
-    // Группы по областям (обнаружение, копия в общие, выбор, переопределение) и «Путь».
-    (instance, context) => registerGroupSourcesRoutes(instance, context, groupAskFor),
-    (instance, context) => registerGroupPathRoutes(instance, context, groupAskFor),
-    // «Числа» группы: сколько прогонов делают её скиллы.
-    (instance, context) => registerGroupKnobsRoutes(instance, context, groupAskFor),
-    // «Копировать группу»: независимая выключенная копия рядом с оригиналом.
-    registerGroupDuplicateRoutes,
-    // «Что из группы дойдёт до CLI»: чистый план слоя, без записи.
-    registerGroupDeliveryRoutes,
+    // Прежние группы — только чтение: работу ведёт ядро (этап 10, F1).
+    registerLegacyGroupsRoutes,
     registerAnalyticsRoutes,
     // «Перейти» / «Остановить» у сессий аналитики: прогоны панели знает реестр.
     (instance, context) => registerAnalyticsSessionRoutes(instance, context, chatRuns),
@@ -187,22 +148,22 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerPortabilityRoutes,
     // Перенос незакрытой работы к новому CLI (П6.1). Живёт отдельно от переноса
     // среды: тому хватает хранилища, а этому нужны реестр прогонов, память
-    // цепочек, права сессии и сервис чужих чатов — всё, что переживает запрос.
+    // цепочек, права сессии и ручки ядра для чужого CLI — всё, что переживает запрос.
     (instance, context) =>
       registerPortabilityCarryRoutes(instance, context, {
         runs: chatRuns,
         chains: handoffChains,
         session: chatSession,
-        providerChats,
+        coreChats,
+        foreignCarry,
       }),
     registerFormatCheckRoutes,
     registerPluginRoutes,
-    // Помощники формы и структуры идут маршрутом активного провайдера — тем же,
-    // что его чат: контур, набор панели и отказ доезжают и до лёгкого окна.
-    (instance, context) => registerAssistantRoutes(instance, context, helperRoute),
+    // Помощники формы и структуры, окно ассистента — вопросом ядра активным CLI.
+    (instance, context) => registerAssistantRoutes(instance, context, askPort, helperCarry),
     registerScriptRoutes,
     registerSandboxRoutes,
-    (instance, context) => registerResourceRoutes(instance, context, helperRoute),
+    (instance, context) => registerResourceRoutes(instance, context, askPort, helperCarry),
     registerBackupRoutes,
     registerHistoryRoutes,
     registerSearchRoutes,
@@ -210,20 +171,10 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerProjectLocalRoutes,
     registerProviderProjectRoutes,
     // Реестр прогонов git-маршрутам нужен ровно за одним: не дать снести рабочую
-    // копию, в которой прямо сейчас работает агент. Конвейер — чтобы поднятый
-    // потолок «сколько групп разом» сразу добирал очередь (журнал 25).
-    (instance, context) =>
-      registerProjectGitRoutes(instance, context, chatRuns, (path) =>
-        splitConveyor.kickProject(path),
-      ),
-    // Общие правила вкладки «Группы»: сменившийся общий потолок толкает очередь
-    // каждого проекта с разделением — так же, как потолок проекта.
-    (instance, context) =>
-      registerSplitDefaultsRoutes(instance, context, (path) => splitConveyor.kickProject(path)),
-    // Сита перед MR: выученные по тредам MR и счёт блокеров — та же вкладка «Группы».
+    // копию, в которой прямо сейчас работает агент.
+    (instance, context) => registerProjectGitRoutes(instance, context, chatRuns),
+    // Сита перед MR: выученные по тредам MR и счёт блокеров.
     registerSieveRoutes,
-    // Журнал проверок: сводка тени и повторов для плитки вкладки «Группы».
-    (instance, context) => registerVerifyLedgerRoutes(instance, context, verifyLedger),
     // Сверка сит панели с их копией в глобальном слое — вкладка «Глобальный слой».
     (instance, context) => registerGlobalLayerRoutes(instance, context, globalLayer),
     // Встроенный набор панели (В2): своя страница, режимы по CLI, копии «моё».
@@ -237,42 +188,17 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         chatRuns,
         chatSession,
         (chatId) => treePause.awaitsHuman(chatId),
-        (chatId) => statusChats.assignedOf(chatId),
-        // Пауза группы или всего дерева — решение человека: досылка вкладки её не снимает.
-        (chatId) =>
-          pausedGroupOf(context.store, splitConveyor)(chatId) || treePause.isPaused(chatId),
+        // Пауза дерева — решение человека: досылка вкладки её не снимает.
+        (chatId) => treePause.isPaused(chatId),
         runtime.outsideTurnEnded,
+        () => runtime.contours.summarizedIds(),
       ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
     registerChatCascadeRoutes,
-    // Группа и автономность чата, заметки главному чату — только хранилище.
-    registerChatGroupSettingsRoutes,
-    // Сигналы сторожа одиночных чатов — только хранилище: пишет их сторож.
-    registerChatWatchSignalsRoutes,
-    // Охват сторожа групп — строка настроек: считает сам сторож по своим сессиям.
-    (instance) => registerGroupWatchCoverageRoutes(instance, () => groupWatcher.coverageSummary()),
-    // Разделение задач по чатам заводит копии репозитория и открывает разговоры —
-    // у Claude через реестр прогонов, у чужого CLI через его собственный сервис.
-    // Поэтому оба живут дольше запроса и приходят сюда параметром.
-    (instance, context) =>
-      registerChatSplitRoutes(instance, context, {
-        runs: chatRuns,
-        providerChats,
-        session: chatSession,
-        gate: treePause,
-        conveyor: splitConveyor,
-        statusChats,
-        overlap: splitOverlap,
-        review: splitReview,
-        recheckMr,
-        asks: pendingAsks,
-        // «Разобрать…» тикетов групп: тот же служебный вызов модели, что у групп.
-        ticketAsk: (prompt) => groupAskFor(context)([{ role: 'user', content: prompt }], 'default'),
-      }),
     // Пауза дерева: «Остановить всё» / «Продолжить всё» у родителя и само
     // дерево для пульта. Объект переживает запрос — он же глушит автостарты.
-    (instance, context) => registerChatTreeRoutes(instance, context, treePause, splitView),
+    (instance, context) => registerChatTreeRoutes(instance, context, treePause),
     // Продолжение в чистой сессии: маршруты заводят новый разговор по кнопке, а
     // цепочки (тумблер автомата и номер шага) переживают запрос — как и реестр.
     (instance, context) =>
@@ -280,10 +206,10 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         runs: chatRuns,
         chains: handoffChains,
         session: chatSession,
-        providerChats,
+        coreChats,
+        foreignCarry,
       }),
-    (instance, context) =>
-      registerProviderChatRoutes(instance, context, providerChats, handoffChains),
+    (instance, context) => registerProviderChatRoutes(instance, context),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
     // Compose проекта: реестр действий живёт внутри маршрутов — идущий docker
     // compose панели при выходе не гасим, контейнеры и так остаются как есть.
@@ -312,59 +238,34 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Внешние интеграции. Адрес панели известен только здесь (порт задаётся
     // переменной окружения), а переходнику MCP он нужен, чтобы знать, куда идти.
     (instance, context) => registerIntegrationsRoutes(instance, context, selfBaseUrl),
-    // Ответы из Telegram: опрос бота живёт с сервером и отвечает маршрутами
-    // разговоров — ему нужны реестр прогонов, права сессии и чужие чаты.
-    (instance, context) =>
-      registerTelegramAnswersRoutes(instance, context, {
-        registry: chatRuns,
-        session: chatSession,
-        providerChats,
-        cover: runtime.telegramAnswersCover,
-        chatTitle: runtime.chatTitle,
-      }),
-    (instance, context) => registerDlpRoutes(instance, context, dlpProxy),
+    // Маршруты по зонам этапа 10 (`runtime/<зона>-wiring.ts`): каждая зона правит свой список.
+    // Ни один из них хуков не ставит, и все идут после хуков ответов Telegram, как и прежде.
+    // Уведомления: ответы из Telegram и устройства телефона.
+    ...notifyRoutes({
+      chatRuns,
+      chatSession,
+      telegramAnswersCover: runtime.telegramAnswersCover,
+      chatTitle: runtime.chatTitle,
+      notifyRun,
+    }),
+    // Шлюз контуров и прокси защиты данных.
+    ...gatewayRoutes({
+      dlpProxy,
+      platformGateway,
+      selfBaseUrl,
+      claudeSettingsRoute: runtime.claudeSettingsRoute,
+      localMcpPicks: runtime.localMcpPicks,
+    }),
     // Реестр подписанных компромиссов партии «контур». Своих зависимостей нет:
     // список статичен, а ведёт его сервер, чтобы снятая подпись гасла сама.
     registerCompromiseRoutes,
-    // Контуры: список, настройка, ключ и проба по кнопке. Сам поход в контур
-    // случается по нажатию, а не по расписанию; долгоживущий здесь только
-    // слушатель шлюза — он переживает запрос и потому приходит извне. Адрес
-    // панели нужен по той же причине, что и интеграциям: переходник MCP ходит
-    // не в контур, а сюда, и в его записи лежит только этот адрес.
+    // Локальные модели и сон машины с телефона.
+    ...localModelsRoutes({ localModels, kit, keepAwake: runtime.keepAwake }),
+    // Картинки и колоды из чата (Т9). Запрос в контур идёт через звено ядра под меткой
+    // панели (C3b): адрес и заглушку ключа даёт клиент учёта контуров.
     (instance, context) =>
-      registerPlatformRoutes(
-        instance,
-        context,
-        platformGateway,
-        selfBaseUrl,
-        runtime.claudeSettingsRoute,
-        runtime.localMcpPicks,
-      ),
-    // Локальные модели: работы с прогрессом переживают запрос, объект — из runtime.
-    (instance, context) => registerLocalModelsRoutes(instance, context, localModels, kit),
-    // Картинки из чата (Т9). Порт спрашивается у ЖИВОГО слушателя, а не у
-    // настроек: запрос в контур идёт через шлюз, а задуманный порт мог быть
-    // занят — тогда настройка указывает на чужой процесс.
-    (instance, context) =>
-      registerMediaRoutes(
-        instance,
-        context,
-        () => (platformGateway.status().running ? platformGateway.status().port : 0),
-        {
-          raise: () => runtime.platformGatewayAutoStart.ensure(),
-          failure: () => runtime.platformGatewayAutoStart.state().error,
-        },
-      ),
-    (instance, context) => registerRemoteRoutes(instance, context, notifyRun),
+      registerMediaRoutes(instance, context, (id, fresh) => runtime.contours.link(id, fresh)),
     registerPhoneSigningRoutes,
-    // Гибернация и сон машины с телефона; запрет на сон от локального прогона снимается перед сном.
-    (instance) =>
-      registerPowerRoutes(instance, {
-        awake: {
-          held: () => runtime.keepAwake.status().held,
-          release: () => runtime.keepAwake.stop(),
-        },
-      }),
     // Сборка APK телефона кнопкой из настроек — рядом с удалённым доступом.
     registerMobileApkRoutes,
     // Лента «Что нового»: описания из репозитория и факты из git.
@@ -388,27 +289,31 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
           changed: () => events.broadcast(['usage-limits'], ''),
         }),
       ),
-    // Фоновый наблюдатель: тумблер, статус и сбои со страницы. Сам объект живёт
-    // дольше запроса — его разбор идёт, пока тумблер включён.
-    (instance, context) => registerWatcherRoutes(instance, context, runtime.watcher),
     // Отложенный перезапуск dev-сервера: правки ждут живых ходов, панель это видит.
     registerDevRestartRoutes,
-    // Прокладка к ядру (07 фаза 2): дом ядра читается на каждом запросе — ядро могло
-    // перезапуститься на другом порте; команда — строка `human:` журнала возможностей.
-    (instance) => registerCoreProxyRoutes(instance),
+    // Прокладка к ядру — список зоны надзора за ядром.
+    ...coreSupervisorRoutes(
+      runtime.coreSupervisor,
+      runtime.chatStartCarry,
+      runtime.chatStartRoutes,
+    ),
     // Агент панели: действия исполняются настоящими маршрутами через `inject`,
     // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
     // решению по карточке — список своих источников.
     (instance, context) =>
-      registerPanelAgentRoutes(instance, context, { hub: events, pending: panelPending, access }),
-    // Ход агента: процесс `claude` с одним переходником. Адрес панели — тем же
-    // правилом, что у брокера прав чата; шлюз — живым портом, а не настройкой.
+      registerPanelAgentRoutes(instance, context, {
+        hub: events,
+        pending: panelPending,
+        access,
+        ...(access.bridges ? { bridges: access.bridges } : {}),
+      }),
+    // Ход агента: сессия ядра «ask» с одним мостом панели. Адрес панели — тем же правилом, что у
+    // брокера прав чата; маршрут и контур судит ядро.
     (instance, context) =>
       registerPanelAgentRunRoutes(instance, context, {
         selfBaseUrl: `http://127.0.0.1:${process.env.PORT ?? 5178}`,
-        gatewayPort: () =>
-          runtime.platformGateway.status().running ? runtime.platformGateway.status().port : 0,
-        claudeSwitchEnv: runtime.claudeSwitchEnv,
+        ask: askPort,
+        bridges: access.bridges ?? createBridgeTokenLedger(),
         pending: panelPending,
       }),
   ];

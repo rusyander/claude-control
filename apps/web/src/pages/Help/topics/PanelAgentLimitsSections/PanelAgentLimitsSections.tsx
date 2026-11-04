@@ -65,13 +65,9 @@ export function PanelAgentLimitsSections({ tr }: SectionProps) {
             nameHeader={tr('refusalsColumn')}
             descriptionHeader={tr('refusalsMeaningColumn')}
             rows={[
-              { ...row('refusalProvider'), badge: 'provider_unsupported', badgeTone: 'warning' },
-              { ...row('refusalCli'), badge: 'cli_not_found', badgeTone: 'warning' },
-              { ...row('refusalEndpoint'), badge: 'endpoint_unsupported', badgeTone: 'warning' },
-              { ...row('refusalContour'), badge: 'contour_unreachable', badgeTone: 'warning' },
+              row('refusalCore'),
               { ...row('refusalMask'), badge: 'data_mask_broken', badgeTone: 'danger' },
               { ...row('refusalBusy'), badge: 'busy', badgeTone: 'neutral' },
-              row('refusalLong'),
               { ...row('refusalTimeout'), badge: 'timeout', badgeTone: 'neutral' },
             ]}
           />

@@ -1,6 +1,0 @@
-{
-  "pid": 999999,
-  "since": "2026-10-26T12:00:00.000Z",
-  "files": ["apps/server/src/a.ts", "apps/server/src/b.ts"],
-  "waitingFor": "runs"
-}

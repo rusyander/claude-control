@@ -29,7 +29,8 @@
  */
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { makeHome, makePluginsDir, drop, HOME_DIR, PLUGINS_DIR } from './config-fixture.mjs';
 import { shootSkillsFirst, shootSkillsLiving } from './config-skills.mjs';
 import { shootCommandsFind, shootCommandsSources } from './config-commands.mjs';
@@ -60,12 +61,15 @@ const home = makeHome();
 makePluginsDir();
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-config' },
+  );
 
   started.push(
     spawn(
@@ -107,6 +111,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех десяти.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -137,6 +142,7 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   drop(HOME_DIR);
   drop(PLUGINS_DIR);
 }

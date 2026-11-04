@@ -24,7 +24,7 @@ function reason(tool_name: string, command: string, nvm: Record<string, string> 
       session_id: 'kit-nvm-use',
     }),
     encoding: 'utf8',
-    env: { ...env, ...nvm, AGENTDECK_SPLIT_CHILD: '', AGENTDECK_KIT_VARIANT: '' },
+    env: { ...env, ...nvm, AGENTDECK_STEP_KIND: '', AGENTDECK_KIT_VARIANT: '' },
     timeout: 15_000,
   });
   const text = out.stdout.trim();

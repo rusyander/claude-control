@@ -44,8 +44,10 @@ const rogue = (
   } as Parameters<typeof definePanelAction>[0]) as AnyPanelAction;
 
 const ROGUES: AnyPanelAction[] = [
-  // Человеческое (D2): разделение применяет только клик человека.
-  rogue('rogue_split', { route: () => ({ method: 'POST', url: '/api/chat/split', body: {} }) }),
+  // Человеческое (D2): автоподтверждение чата включает только клик человека.
+  rogue('rogue_auto_approve', {
+    route: () => ({ method: 'POST', url: '/api/chat/c1/auto-approve', body: {} }),
+  }),
   // Команда ядру (пауза, одобрение) — человеческая строка, а не «нет в реестре».
   rogue('rogue_core_command', {
     route: () => ({ method: 'POST', url: '/api/core/commands', body: { kind: 'pause' } }),
@@ -104,7 +106,7 @@ describe('capability ledger in the panel-agent executor', () => {
         hits[key] = (hits[key] ?? 0) + 1;
         return body;
       };
-    app.post('/api/chat/split', count('POST /api/chat/split'));
+    app.post('/api/chat/:chatId/auto-approve', count('POST /api/chat/:chatId/auto-approve'));
     app.post('/api/nowhere', count('POST /api/nowhere'));
     app.post('/api/core/commands', count('POST /api/core/commands'));
     app.post('/api/rules', count('POST /api/rules'));
@@ -173,7 +175,11 @@ describe('capability ledger in the panel-agent executor', () => {
   });
 
   it.each([
-    ['rogue_split', 'POST /api/chat/split', /human’s \(POST chat\/split\)/],
+    [
+      'rogue_auto_approve',
+      'POST /api/chat/:chatId/auto-approve',
+      /human’s \(POST chat\/:chatId\/auto-approve\)/,
+    ],
     ['rogue_core_command', 'POST /api/core/commands', /human’s \(POST core\/commands\)/],
     ['rogue_unknown', 'POST /api/nowhere', /POST nowhere, which is not in the ledger/],
     ['rogue_borrow', 'POST /api/rules', /POST rules is not granted to rogue_borrow/],

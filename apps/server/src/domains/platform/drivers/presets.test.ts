@@ -6,14 +6,13 @@ import {
   platformManifestOf,
   shimByClientTools,
 } from '@agentdeck/contracts/platform-presets';
-import { anthropicRequestToOpenAi, chooseToolRoute } from '../gateway/dialect/dialect.ts';
+import { chooseToolRoute } from '../tool-route/tool-route.ts';
 import { defaultOurRules, defaultPlatformRules, type Platform } from '@agentdeck/contracts';
 import { allDrivers, driverFor, driverOf } from './index.ts';
 import { enterprisePlatformDriver } from './enterprise-platform.ts';
 import { openAiCompatDriver } from './openai-compat.ts';
 import { contourHeaders } from '../transport/transport.ts';
 import { applyManagedRules } from '../rules-matrix/rules-matrix.ts';
-import { nativeMessagesPath } from '../gateway/anthropic-native.ts';
 
 /**
  * Пресеты — драйвер данными (DRV-03). Проверяется не таблица сама с собой, а
@@ -108,13 +107,14 @@ describe('пресеты: объявленное доезжает до пров�
     expect(headers.authorization).toBeUndefined();
   });
 
-  it('vLLM, LiteLLM, Ollama, OpenRouter — клиент Anthropic идёт к родной ручке', () => {
+  // Решение звена «клиент Anthropic идёт к родной ручке» по этим пресетам — тест ядра
+  // `apps/core/src/hop-host/gateway/drivers/conformance.test.ts` (этап 10, C3d); здесь — что манифест
+  // панели ручку объявляет.
+  it('vLLM, LiteLLM, Ollama, OpenRouter — родная ручка Anthropic объявлена', () => {
     for (const driver of ['vllm', 'litellm', 'ollama', 'llama-cpp', 'openrouter'] as const) {
-      const platform = contour({ driver });
-      expect(nativeMessagesPath(platform, driverOf(platform)), driver).toBe('messages');
+      expect(driverOf(contour({ driver })).anthropic?.messages, driver).toBe('messages');
     }
-    const compat = contour({ driver: 'openai-compat' });
-    expect(nativeMessagesPath(compat, driverOf(compat))).toBeUndefined();
+    expect(driverOf(contour({ driver: 'openai-compat' })).anthropic).toBeUndefined();
   });
 
   it('размышления уходят полем, которое объявил пресет', () => {
@@ -199,17 +199,8 @@ describe('переопределения контура поверх пресе�
 
     const route = chooseToolRoute({ toolShim: false, platformTools: false }, driver, () => '');
     expect(route).toEqual({ mode: 'native' });
-    const { body, lost } = anthropicRequestToOpenAi(
-      {
-        model: 'm',
-        messages: [{ role: 'user', content: 'привет' }],
-        tools: [{ name: 'calc', description: 'счёт', input_schema: { type: 'object' } }],
-      },
-      driver.requestFields,
-      route,
-    );
-    expect(body.tools).toHaveLength(1);
-    expect(lost.some((item) => item.field === 'tools')).toBe(false);
+    // Что поле при этом ДОЕЗЖАЕТ наверх без потери — тест ядра
+    // `apps/core/src/hop-host/gateway/drivers/conformance.test.ts` (мост шлюза ушёл в ядро, C3d).
 
     // А умолчание тумблера — как у `shim`: руки даёт только прослойка.
     expect(shimByClientTools(driver.clientTools)).toBe(true);

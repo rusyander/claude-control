@@ -45,29 +45,6 @@
   }
 }
 
-// Строка правила: тумблер и название в ряд, под ними — что именно правило
-// покрывает. Пояснение обязано быть на виду, а не в подсказке мыши: по одному
-// названию «Инфраструктура» человек не решит, что он разрешает.
-.ruleRow {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-2xs);
-  padding: var(--spacing-2xs);
-  border-radius: 8px;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--color-bg);
-  }
-}
-
-.ruleText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
 .divider {
   height: 1px;
   margin: var(--spacing-2xs) 0;

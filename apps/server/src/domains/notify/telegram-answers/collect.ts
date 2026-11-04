@@ -1,7 +1,6 @@
-import { basename } from 'node:path';
+import { CORE_PERMIT_TOOL } from '@agentdeck/contracts/chat-handoff';
 import type { ChatInbox, InboxAsk, InboxChat } from '@agentdeck/contracts/chat-inbox';
 import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
-import type { ForeignPendingAsk } from '../../provider-chat/ProviderChatService/ProviderChatService.ts';
 import { describeAsk } from './describe.ts';
 import type { AskSourceInfo, ChatRoute, PendingAskItem } from './telegram-answers.types.ts';
 
@@ -114,22 +113,13 @@ function chatItems(chat: InboxChat, defaultCli: string): PendingAskItem[] {
       calls.set(key, [...(calls.get(key) ?? []), ask]);
       continue;
     }
+    // Вопрос права задачи ядра: ответ на него — human-strict (нонс окна или подпись телефона),
+    // Telegram его не докажет. Уведомление со ссылкой шлёт `core-relay` по строке `human.asked`;
+    // копия здесь была бы сообщением с мёртвыми кнопками.
+    if (ask.toolName === CORE_PERMIT_TOOL) continue;
     const summary = summaryOf(ask.input);
     const description = describeAsk(ask.toolName, ask.input);
     const described = description ? { description } : {};
-    if (ask.kind === 'branchGate') {
-      if (!chat.runKey) continue;
-      items.push({
-        ...base,
-        key: `b:${chat.runKey}:${ask.toolUseId}`,
-        target: { kind: 'branchGate', runKey: chat.runKey, toolUseId: ask.toolUseId },
-        askedAt: ask.askedAt,
-        toolName: ask.toolName,
-        ...described,
-        ...(summary ? { summary } : {}),
-      });
-      continue;
-    }
     if (ask.relay) {
       items.push({
         ...base,
@@ -204,9 +194,6 @@ function chatItems(chat: InboxChat, defaultCli: string): PendingAskItem[] {
 
 export interface CollectInput {
   inbox: ChatInbox;
-  foreign: readonly ForeignPendingAsk[];
-  /** Имя CLI по id провайдера (`Codex CLI`). */
-  cliName: (providerId: string) => string;
   /** Имя основного CLI (`Claude Code`). */
   defaultCli: string;
   /** Имя чата панели по его ключу — для D-n, у записи которого имени нет. */
@@ -285,26 +272,7 @@ export function collectPendingAsks(input: CollectInput): PendingAskItem[] {
       reason: maskSecretsInText(deferredReasonRu(deferred)),
     });
   }
-  for (const pending of input.foreign) {
-    const what = [pending.ask.tool, pending.ask.title].filter(Boolean).join(': ');
-    items.push({
-      key: `f:${pending.chatId}:${pending.ask.id}`,
-      target: { kind: 'foreign', chatId: pending.chatId, askId: pending.ask.id },
-      openId: '',
-      source: {
-        project: pending.workdir ? basename(pending.workdir) : '',
-        chatTitle: '',
-        cli: input.cliName(pending.providerId),
-        ...(input.cliName(pending.providerId) !== input.defaultCli ? { otherCli: true } : {}),
-        app: 'agentdeck',
-      },
-      askedAt: pending.ask.at,
-      immediate: false,
-      ...(pending.ask.title || pending.ask.tool
-        ? { description: maskSecretsInText(String(pending.ask.title || pending.ask.tool)) }
-        : {}),
-      ...(what ? { summary: maskSecretsInText(what) } : {}),
-    });
-  }
+  // Вопросов прав чужих CLI здесь больше нет (этап 10, F2c): их ход — задача ядра, и вопрос ядра
+  // в Telegram и на телефон доставляет пересылка ядра (`core-ask-delivery.ts`).
   return items;
 }

@@ -403,6 +403,46 @@ describe('настоящий процесс, запущенный этим те�
   }, 60_000);
 
   /**
+   * Проход s10 (F3): у хоста сессии qwen в аргументах был «•» (U+2022). PowerShell пишет вывод
+   * CIM кодовой страницей консоли, а там «•» — байт 0x07: сырой BEL посреди JSON, `JSON.parse`
+   * отверг весь вывод — список CLI стал `undefined`, и «Где идёт сессия» отвечала 503 по ЛЮБОЙ
+   * сессии. Здесь настоящие CLI-процессы — с «•», с самим BEL и обычный — и настоящий
+   * `listCliProcesses` (CIM / `ps`): все в списке, «•» дошёл как есть, управляющих символов нет.
+   */
+  it('управляющий символ в командной строке одного процесса не роняет список остальных', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'cc-session-bel-'));
+    const fake = join(dir, 'claude.js');
+    writeFileSync(fake, 'setInterval(() => {}, 1000);');
+    const run = (...args: string[]) => {
+      const child = spawn(process.execPath, [fake, '--resume', ...args], { stdio: 'ignore' });
+      children.push(child);
+      return child.pid as number;
+    };
+    const bullet = run(ID, 'dot•dot');
+    const bel = run(ID, 'mark\u0007bell');
+    const plain = run(OTHER);
+
+    let listed: CliProcess[] | undefined;
+    let all = false;
+    for (let attempt = 0; attempt < 30 && !all; attempt += 1) {
+      await new Promise((done) => setTimeout(done, 300));
+      listed = await listCliProcesses();
+      all = [bullet, bel, plain].every((pid) => listed?.some((item) => item.pid === pid));
+    }
+    expect(listed, 'список CLI не получен').toBeDefined();
+    expect(all, 'не все три процесса в списке').toBe(true);
+    const line = (pid: number) => listed?.find((item) => item.pid === pid)?.commandLine ?? '';
+    for (const pid of [bullet, bel])
+      // eslint-disable-next-line no-control-regex -- управляющие символы и есть предмет проверки
+      expect(line(pid)).not.toMatch(/[\u0000-\u001F]/);
+    expect(line(bel)).toMatch(/mark.bell/);
+    if (process.platform === 'win32') {
+      expect(line(bullet)).toContain('dot•dot');
+      expect(line(bel)).toContain('mark bell');
+    }
+  }, 60_000);
+
+  /**
    * F-145: снимка процессов нет (таймаут или отказ системы, F-205) — снятие со
    * сверкой времени честно не трогает номер и отдаёт `[]`. Раньше это читалось
    * «процесса уже не было», хотя CLI сессии жив и работает. Настоящие здесь

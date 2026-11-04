@@ -159,66 +159,66 @@
       "light-ru": {
         "file": "01-webhook.png",
         "width": 1116,
-        "height": 545
+        "height": 514
       },
       "light-en": {
         "file": "01-webhook.en.png",
         "width": 1116,
-        "height": 545
+        "height": 514
       },
       "dark-ru": {
         "file": "01-webhook.dark.png",
         "width": 1116,
-        "height": 545
+        "height": 514
       },
       "dark-en": {
         "file": "01-webhook.dark.en.png",
         "width": 1116,
-        "height": 545
+        "height": 514
       }
     },
     "notify/02-webhook-checked": {
       "light-ru": {
         "file": "02-webhook-checked.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "light-en": {
         "file": "02-webhook-checked.en.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "dark-ru": {
         "file": "02-webhook-checked.dark.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "dark-en": {
         "file": "02-webhook-checked.dark.en.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       }
     },
     "notify/03-events": {
       "light-ru": {
         "file": "03-events.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "light-en": {
         "file": "03-events.en.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "dark-ru": {
         "file": "03-events.dark.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       },
       "dark-en": {
         "file": "03-events.dark.en.png",
         "width": 1116,
-        "height": 605
+        "height": 574
       }
     },
     "notify/04-telegram": {

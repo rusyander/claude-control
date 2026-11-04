@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { createServer, type Server, type IncomingMessage } from 'node:http';
 import type { Socket, AddressInfo } from 'node:net';
 import {
@@ -250,8 +250,16 @@ describe('живой прокси', () => {
     expect(seen).toHaveLength(0);
   });
 
-  it('без прокси и без своего корня транспорт остаётся встроенным', () => {
-    expect(createCaFetch('', {})).toBe(globalThis.fetch);
+  it('без прокси и без своего корня транспорт остаётся встроенным', async () => {
+    reset();
+    const builtin = vi.spyOn(globalThis, 'fetch');
+    try {
+      const response = await createCaFetch('', {})(`http://127.0.0.1:${targetPort}/v1/models`);
+      await expect(response.json()).resolves.toEqual({ via: 'target' });
+      expect(builtin).toHaveBeenCalledTimes(1);
+    } finally {
+      builtin.mockRestore();
+    }
     expect(createCaFetch('', { https_proxy: 'http://p:3128' })).not.toBe(globalThis.fetch);
   });
 });

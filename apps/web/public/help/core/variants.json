@@ -5,66 +5,88 @@
       "light-ru": {
         "file": "01-card.png",
         "width": 1004,
-        "height": 257
+        "height": 278
       },
       "light-en": {
         "file": "01-card.en.png",
         "width": 1004,
-        "height": 257
+        "height": 278
       },
       "dark-ru": {
         "file": "01-card.dark.png",
         "width": 1004,
-        "height": 257
+        "height": 278
       },
       "dark-en": {
         "file": "01-card.dark.en.png",
         "width": 1004,
-        "height": 257
+        "height": 278
       }
     },
     "ask/01-launch": {
       "light-ru": {
         "file": "01-launch.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "light-en": {
         "file": "01-launch.en.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "dark-ru": {
         "file": "01-launch.dark.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "dark-en": {
         "file": "01-launch.dark.en.png",
         "width": 988,
-        "height": 160
+        "height": 190
       }
     },
     "cap/01-round-cap": {
       "light-ru": {
         "file": "01-round-cap.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "light-en": {
         "file": "01-round-cap.en.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "dark-ru": {
         "file": "01-round-cap.dark.png",
         "width": 988,
-        "height": 160
+        "height": 190
       },
       "dark-en": {
         "file": "01-round-cap.dark.en.png",
         "width": 988,
-        "height": 160
+        "height": 190
+      }
+    },
+    "fault/01-fault": {
+      "light-ru": {
+        "file": "01-fault.png",
+        "width": 1004,
+        "height": 467
+      },
+      "light-en": {
+        "file": "01-fault.en.png",
+        "width": 1004,
+        "height": 467
+      },
+      "dark-ru": {
+        "file": "01-fault.dark.png",
+        "width": 1004,
+        "height": 467
+      },
+      "dark-en": {
+        "file": "01-fault.dark.en.png",
+        "width": 1004,
+        "height": 467
       }
     },
     "launch/01-form": {
@@ -197,6 +219,50 @@
         "file": "06-launch.dark.en.png",
         "width": 988,
         "height": 137
+      }
+    },
+    "launch/07-review-link": {
+      "light-ru": {
+        "file": "07-review-link.png",
+        "width": 988,
+        "height": 452
+      },
+      "light-en": {
+        "file": "07-review-link.en.png",
+        "width": 988,
+        "height": 452
+      },
+      "dark-ru": {
+        "file": "07-review-link.dark.png",
+        "width": 988,
+        "height": 452
+      },
+      "dark-en": {
+        "file": "07-review-link.dark.en.png",
+        "width": 988,
+        "height": 452
+      }
+    },
+    "launch/08-mcp-picks": {
+      "light-ru": {
+        "file": "08-mcp-picks.png",
+        "width": 988,
+        "height": 559
+      },
+      "light-en": {
+        "file": "08-mcp-picks.en.png",
+        "width": 988,
+        "height": 559
+      },
+      "dark-ru": {
+        "file": "08-mcp-picks.dark.png",
+        "width": 988,
+        "height": 559
+      },
+      "dark-en": {
+        "file": "08-mcp-picks.dark.en.png",
+        "width": 988,
+        "height": 559
       }
     },
     "scenarios/01-library": {
@@ -340,7 +406,7 @@
       "light-en": {
         "file": "03-check.en.png",
         "width": 625,
-        "height": 278
+        "height": 314
       },
       "dark-ru": {
         "file": "03-check.dark.png",
@@ -350,14 +416,14 @@
       "dark-en": {
         "file": "03-check.dark.en.png",
         "width": 625,
-        "height": 278
+        "height": 314
       }
     },
     "timeline/04-report": {
       "light-ru": {
         "file": "04-report.png",
         "width": 988,
-        "height": 900
+        "height": 897
       },
       "light-en": {
         "file": "04-report.en.png",
@@ -367,7 +433,7 @@
       "dark-ru": {
         "file": "04-report.dark.png",
         "width": 988,
-        "height": 900
+        "height": 897
       },
       "dark-en": {
         "file": "04-report.dark.en.png",

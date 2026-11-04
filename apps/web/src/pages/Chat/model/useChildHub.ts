@@ -3,37 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ChatSummary } from '@agentdeck/contracts';
 import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
-import type { TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
 import { agentRuns, type ActiveRunView } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
 import { chatKeys } from '@entities/Chat';
-import {
-  chatTreeKeys,
-  useAnswerHold,
-  useChatTree,
-  useCheckOverlap,
-  usePauseTree,
-  useReleaseGroup,
-  useResumeTree,
-  useReviewDecision,
-  useReviewPush,
-  useReviewRetry,
-} from '@entities/ChatTree';
-import {
-  collectReviews,
-  reviewTreeOf,
-  type ChildBranch,
-  type ChildPermission,
-  type ChildQuestion,
-  type ChildStageGroup,
-  type ReviewDecisionItem,
-  useResumeInterruptedGroups,
-} from '@features/ChatMessages';
+import { chatTreeKeys, useChatTree, usePauseTree, useResumeTree } from '@entities/ChatTree';
+import type { ChildPermission, ChildQuestion, ChildStageGroup } from '@features/ChatMessages';
 import { collectChildQuestions } from '../lib/childQuestions';
 import { collectChildPermissions } from '../lib/childPermissions';
 import { collectChildStages } from '../lib/childStages';
-import { treeForChat } from '../lib/treeForChat';
-import { groupDeliverOf } from '../lib/groupDeliverOf';
 import { withTreeAsks } from '../lib/withTreeAsks';
 import { toErrorMessage } from '../../../shared/api/toErrorMessage';
 
@@ -51,19 +28,10 @@ export interface ChildHub {
    */
   list: { id: string; title: string }[];
   /**
-   * Ветки уже заведённых детей. По ним карточка разделения понимает, что
-   * предложение отработано, и убирает кнопку: иначе она остаётся живой до
-   * следующей реплики агента, и второе нажатие заводит те же копии ещё раз.
-   */
-  branches: ChildBranch[];
-  /**
    * Группы разделения с их звеньями: на чём каждая стоит сейчас и чем ведётся.
    * Считается по веткам, а не по чатам — у одной группы разговоров до четырёх.
-   * С конвейером уровней (Т1) сюда входят и группы, у которых чата ещё нет.
    */
   stages: ChildStageGroup[];
-  /** Открыт чат группы разделения: её «До MR» из плана (O2). */
-  groupDeliver?: boolean;
   /**
    * Дерево разговоров с сервера: сколько идёт и стоит ли всё на паузе. Есть
    * только у разговора с детьми — у остальных спрашивать нечего.
@@ -73,41 +41,6 @@ export interface ChildHub {
   pauseAll: () => void;
   resumeAll: () => void;
   treeBusy: boolean;
-  /** Ответ на вопрос разбора группе с этим номером; пока идёт — `holdBusy`. */
-  answerHold: (index: number, answer: string) => void;
-  holdBusy: boolean;
-  /**
-   * Отпустить группу с этим номером, не дожидаясь предшественников: их цепочка
-   * могла не кончиться вовсе — прогон остановили, чат удалили, панель
-   * перезапустилась. Пока идёт — `releaseBusy`.
-   */
-  release: (index: number) => void;
-  releaseBusy: boolean;
-  /** «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну. */
-  resumeInterrupted: (index?: number) => void;
-  resumeInterruptedBusy: boolean;
-  /**
-   * Пересчитать пересечения веток (Т6). Панель считает их и сама — по концу
-   * цепочки любой группы, — но человек вправе спросить, не дожидаясь ничьего
-   * конца: агент мог насорить в чужом файле в середине работы.
-   */
-  checkOverlap: () => void;
-  overlapBusy: boolean;
-  /**
-   * Ревью чужих MR по ссылке (Т7), которые панель довела до списка замечаний.
-   *
-   * В родительском разговоре это все группы дерева, в чате самой группы — она
-   * одна: карточка одна и та же, а решать по ней человек может там, где ему
-   * удобнее. Источник у обоих мест один — связь чата с сервера.
-   */
-  reviews: ReviewDecisionItem[];
-  /** Решение по карточке; `all` — то же решение остальным ждущим группам дерева. */
-  reviewDecide: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
-  /** «Закоммитить и отправить в MR» — отдельным кликом после правок. */
-  reviewPush: (chatId: string) => void;
-  /** «Повторить итог ревью» (Д4). */
-  reviewRetry: (chatId: string) => void;
-  reviewBusy: boolean;
 }
 
 /**
@@ -123,12 +56,6 @@ export function useChildHub(
   chats: ChatSummary[] | undefined,
   parentChatId: string | undefined,
   runs: ActiveRunView[],
-  /**
-   * Чей ребёнок сам открытый разговор (Т7). Нужен ровно для одного: карточка
-   * решения по ревью показывается и В САМОЙ группе, а её состояние живёт в
-   * дереве родителя — своего у ребёнка нет.
-   */
-  ownParentChatId?: string,
 ): ChildHub {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -140,9 +67,6 @@ export function useChildHub(
       questions: collectChildQuestions(all, parentChatId, runs),
       permissions: collectChildPermissions(all, parentChatId, runs),
       list: children.map((chat) => ({ id: chat.id, title: chat.title || chat.id })),
-      branches: children.flatMap((chat) =>
-        chat.branch ? [{ branch: chat.branch, createdAt: chat.createdAt }] : [],
-      ),
     };
   }, [chats, parentChatId, runs]);
 
@@ -156,9 +80,7 @@ export function useChildHub(
 
   // Дерево и его пауза — с сервера: он знает связи и он же глушит автостарты в
   // стоящем дереве. После нажатия прогоны стартуют и гаснут ВНЕ этой вкладки,
-  // поэтому стор прогонов пересчитывается тем же путём, что после F5. Дерево
-  // спрашивается и без детей в списке: на разборе их ещё нет, а план уже идёт —
-  // по нему заперта «Разделить» и видна «Отменить план» (D1).
+  // поэтому стор прогонов пересчитывается тем же путём, что после F5.
   const tree = useChatTree(parentChatId, true);
   // Вопросы и права отцепленных групп — из записи сервера (журнал 30, 36, 62):
   // поток прогона видит только подключённая вкладка, а группу конвейера не
@@ -169,18 +91,11 @@ export function useChildHub(
   );
   const pause = usePauseTree();
   const resume = useResumeTree();
-  const hold = useAnswerHold();
-  const release = useReleaseGroup();
-  const overlap = useCheckOverlap();
   const settle = (): void => {
     void agentRuns.resumeActive();
     void queryClient.invalidateQueries({ queryKey: chatKeys.list });
     void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(parentChatId ?? '') });
   };
-  const resumeInterrupted = useResumeInterruptedGroups({
-    ...(parentChatId ? { parentChatId } : {}),
-    settle,
-  });
   const fail = (error: unknown): void => {
     toast.error(
       t('chat.cascade.tree.failed', {
@@ -219,207 +134,19 @@ export function useChildHub(
     });
   };
 
-  // Ответ на вопрос разбора уходит РОДИТЕЛЮ с номером группы: чата у стоящей
-  // группы ещё нет. Стартовала сразу или ждёт предшественников — говорит ответ.
-  const answerHold = (index: number, answer: string): void => {
-    if (!parentChatId || hold.isPending) return;
-    hold.mutate(
-      { parentChatId, index, answer },
-      {
-        onSuccess: (result) => {
-          const started = result.chats.find((chat) => chat.started);
-          toast.success(
-            started
-              ? t('chat.cascade.hub.holdStarted', { title: started.title })
-              : t('chat.cascade.hub.holdQueued'),
-          );
-          for (const failure of result.failures) {
-            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
-          }
-          settle();
-        },
-        onError: (error) =>
-          toast.error(
-            t('chat.cascade.hub.holdFailed', {
-              message: toErrorMessage(error),
-            }),
-          ),
-      },
-    );
-  };
-
-  // Отпустить ждущую группу: тот же адрес и тот же номер, что у ответа на
-  // вопрос разбора, — чата у стоящей группы по-прежнему нет. Отказ (409, группа
-  // уже не ждёт) показываем кодом сервера, а не строкой axios: «Request failed
-  // with status code 409» человеку не объясняет ничего.
-  const releaseGroup = (index: number): void => {
-    if (!parentChatId || release.isPending) return;
-    release.mutate(
-      { parentChatId, index },
-      {
-        onSuccess: (result) => {
-          const started = result.chats.find((chat) => chat.started);
-          toast.success(
-            started
-              ? t('chat.cascade.hub.releaseStarted', { title: started.title })
-              : t('chat.cascade.hub.releaseQueued'),
-          );
-          for (const failure of result.failures) {
-            toast.error(t('chat.split.failed', { title: failure.title, message: failure.message }));
-          }
-          settle();
-        },
-        onError: (error) =>
-          toast.error(t('chat.cascade.hub.releaseFailed', { message: toErrorMessage(error) })),
-      },
-    );
-  };
-
-  // Сверка веток: результат приезжает деревом, поэтому после ответа его и
-  // перезапрашиваем. Тост нужен только на «пусто» — там показывать нечего, и
-  // без него нажатие выглядело бы как ничего не сделавшее.
-  const checkOverlap = (): void => {
-    if (!parentChatId || overlap.isPending) return;
-    overlap.mutate(parentChatId, {
-      onSuccess: (view) => {
-        if (view.files.length === 0) toast.success(t('chat.cascade.overlap.clean'));
-        void queryClient.invalidateQueries({ queryKey: chatTreeKeys.tree(parentChatId) });
-      },
-      onError: (error) =>
-        toast.error(
-          t('chat.cascade.overlap.failed', {
-            message: toErrorMessage(error),
-          }),
-        ),
-    });
-  };
-
-  // Дерево РОДИТЕЛЯ открытого разговора (Т7): в нём лежит состояние ревью самой
-  // группы. Ключ тот же, что у пульта родителя, — открытые рядом вкладки берут
-  // один ответ, а не два.
-  const ownTree = useChatTree(ownParentChatId, Boolean(ownParentChatId));
-  const reviews = useMemo(
-    () =>
-      collectReviews({
-        ...(tree.data ? { own: tree.data } : {}),
-        ...(ownTree.data ? { parent: ownTree.data } : {}),
-        ...(parentChatId ? { chatId: parentChatId } : {}),
-      }),
-    [tree.data, ownTree.data, parentChatId],
-  );
-
-  const decision = useReviewDecision();
-  const push = useReviewPush();
-  const retry = useReviewRetry();
-  const treeOf = (chatId: string): string =>
-    reviewTreeOf(reviews, chatId, [ownParentChatId, parentChatId]);
-
-  const reviewDecide = (chatId: string, verdict: TaskSplitReviewDecision, all: boolean): void => {
-    if (decision.isPending) return;
-    decision.mutate(
-      { parentChatId: treeOf(chatId), chatId, decision: verdict, ...(all ? { all: true } : {}) },
-      {
-        onSuccess: (outcome) => {
-          const posted = outcome.applied.filter((one) => one.posted).length;
-          const failed = outcome.applied.find((one) => one.postError);
-          // Про комментарии говорим, только когда они были: «в MR: 0» после
-          // «починить» обещает действие, которого никто не просил.
-          toast.success(
-            posted > 0
-              ? t('chat.review.doneToast', { count: outcome.applied.length, posted })
-              : t('chat.review.donePlain', { count: outcome.applied.length }),
-          );
-          // Отказ форджа отдельной репликой: правки пошли, а комментарий нет —
-          // это половина исхода, и молчать о ней нельзя.
-          if (failed?.postError) {
-            toast.error(t('chat.review.postFailed', { message: failed.postError }));
-          }
-          settle();
-        },
-        onError: (error) =>
-          toast.error(
-            t('chat.review.failed', {
-              message: toErrorMessage(error),
-            }),
-          ),
-      },
-    );
-  };
-
-  const reviewPush = (chatId: string): void => {
-    if (push.isPending) return;
-    push.mutate(
-      { parentChatId: treeOf(chatId), chatId },
-      {
-        onSuccess: () => {
-          toast.success(t('chat.review.pushToast'));
-          settle();
-        },
-        onError: (error) =>
-          toast.error(
-            t('chat.review.failed', {
-              message: toErrorMessage(error),
-            }),
-          ),
-      },
-    );
-  };
-
-  const reviewRetry = (chatId: string): void => {
-    if (retry.isPending) return;
-    retry.mutate(
-      { parentChatId: treeOf(chatId), chatId },
-      {
-        onSuccess: () => {
-          toast.success(t('chat.review.retryToast'));
-          settle();
-        },
-        onError: (error) =>
-          toast.error(
-            t('chat.review.failed', {
-              message: toErrorMessage(error),
-            }),
-          ),
-      },
-    );
-  };
-
-  // Сводка групп считается с видом конвейера: без него группы, у которых чата
-  // ещё нет, в сводке отсутствовали бы вовсе.
   const isPaused = Boolean(tree.data?.paused);
-  const view = useMemo(() => treeForChat(tree.data, parentChatId), [tree.data, parentChatId]);
-  const split = view?.split;
   const stages = useMemo(() => {
-    const rows = collectChildStages(chats ?? [], parentChatId, runs, split);
+    const rows = collectChildStages(chats ?? [], parentChatId, runs);
     return isPaused ? rows.map((group) => ({ ...group, isPaused: true })) : rows;
-  }, [chats, parentChatId, runs, split, isPaused]);
-
-  const groupDeliver = groupDeliverOf(
-    ownTree.data,
-    (chats ?? []).find((chat) => chat.id === parentChatId),
-  );
+  }, [chats, parentChatId, runs, isPaused]);
 
   return {
     ...hub,
-    ...(groupDeliver === undefined ? {} : { groupDeliver }),
     ...asks,
     stages,
-    ...(view ? { tree: view } : {}),
+    ...(tree.data ? { tree: tree.data } : {}),
     pauseAll,
     resumeAll,
     treeBusy: pause.isPending || resume.isPending,
-    answerHold,
-    holdBusy: hold.isPending,
-    release: releaseGroup,
-    releaseBusy: release.isPending,
-    resumeInterrupted: resumeInterrupted.resume,
-    resumeInterruptedBusy: resumeInterrupted.busy,
-    checkOverlap,
-    overlapBusy: overlap.isPending,
-    reviews,
-    reviewDecide,
-    reviewPush,
-    reviewRetry,
-    reviewBusy: decision.isPending || push.isPending || retry.isPending,
   };
 }

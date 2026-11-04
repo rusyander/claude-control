@@ -47,8 +47,8 @@ export const projectsEn: typeof projectsRu = {
     diffGroups: 'Not groups and not the sandbox',
     diffGroupsText:
       'There is nothing here to switch a project rule or hook off with, and no way to ' +
-      'run a project’s set in the sandbox. Toggles, groups and the sandbox exist on the ' +
-      'user level only.',
+      'run a project’s set in the sandbox. Toggles and the sandbox exist on the user ' +
+      'level only, and the old groups are read-only now.',
     diffGit: 'Not a git client',
     diffGitText:
       'Saving edits the repository’s working tree and will land in the branch together ' +
@@ -159,7 +159,15 @@ export const projectsEn: typeof projectsRu = {
         'used only while it was made from the current text (in the frame one section awaits ' +
         're-compression and is sent verbatim); a hook replacement only while the team file is ' +
         'the one it improves. Path rules reach the agent on the first touch of a matching ' +
-        'file, as without the layer.',
+        'file, as without the layer. Claude Code chats get the layer; chats of other CLIs ' +
+        'run on the team files themselves. The .mcp.json servers approved in the project ' +
+        'settings reach the chat without the layer too: the core connects them. In a folder ' +
+        'without the trust mark a chat with the layer on does not start and names the ' +
+        'reason: the layer is repository content, and the files of an untrusted repository ' +
+        'never reach the session. The «Local layer» card says so in advance, before the ' +
+        'send: the «folder not trusted» badge and two ways out — trust the folder (open ' +
+        'claude in it in a terminal and answer «yes» to the trust question) or switch the ' +
+        'mode to «Off», and the chat then runs without the repository files.',
 
       shotsTitle: 'The frames are real',
       shotsText:

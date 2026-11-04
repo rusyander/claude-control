@@ -8,6 +8,8 @@
 - "All git operations" = commit, push (non-force), rebase, checkout -b, switch -c, cherry-pick, revert,
   this turn. Force-push / reset --hard / branch -D / tag / stash drop / DROP-TRUNCATE / kubectl delete
   need an answer (B/B′/D), never door A. **Merge has no door**: the merge is the user's to run.
+- A push whose ledger `06-gates` row is red stays blocked whatever door is open; commit / PR text with
+  an attribution trailer is refused before any door.
 - `destructive-consent` + `secret-guard` share the gate. Any delete of real files asks, flags
   irrelevant; free only in agent zones (system temp, the session scratchpad, `mktemp`, `<repo>/.agent/`,
   the kit state dir) and regenerable caches (`node_modules`, `.vite`, `.vitest`, `.gradle`,

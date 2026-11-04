@@ -118,6 +118,7 @@ export const contourRu: Record<ContourMessageCode, string> = {
   'contour-required-cli-config':
     'Контур «{{title}}» обязателен, а в конфиге CLI стоит {{setting}} — с ней прогон или его часть ушли бы мимо контура, а окружением CLI её не перебить. Прогон не запущен. Исправьте эту настройку в конфиге CLI либо верните провайдер по умолчанию.',
   'contour-target-assistant': 'Ассистент панели',
+  'contour-profile-name': 'Контур · {{title}}',
   'contour-bridge-script-missing':
     'Не найден скрипт переходника tools/mcp/platform.mjs — панель запущена не из своего репозитория.',
 };

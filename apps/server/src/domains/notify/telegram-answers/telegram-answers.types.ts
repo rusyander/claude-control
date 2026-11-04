@@ -91,7 +91,6 @@ export interface AskSourceInfo {
  */
 export type AskTarget =
   | { kind: 'permission'; runKey: string; toolUseId: string }
-  | { kind: 'branchGate'; runKey: string; toolUseId: string }
   | { kind: 'relayPermission'; toolUseId: string }
   | {
       kind: 'question';
@@ -107,7 +106,6 @@ export type AskTarget =
    * копию чужой сессии, а диалог там остался бы висеть.
    */
   | { kind: 'outsideQuestion'; chatId: string; client?: InboxClient }
-  | { kind: 'foreign'; chatId: string; askId: string }
   | { kind: 'deferred'; id: string };
 
 /** Что сейчас ждёт человека — одно ожидание, собранное из всех источников. */
@@ -212,7 +210,7 @@ export interface SentItem {
  */
 export interface ButtonAction {
   item: number;
-  act: 'allow' | 'deny' | 'here' | 'stop' | 'pick' | 'toggle' | 'done' | 'custom' | 'expand';
+  act: 'allow' | 'deny' | 'pick' | 'toggle' | 'done' | 'custom' | 'expand';
   /** Номер варианта (`pick`, `toggle`) и вопроса, к которому он относится. */
   option?: number;
   step?: number;
@@ -263,10 +261,14 @@ export interface PendingDelete {
 }
 
 /** Почему ожидание пропало из сводки, пока висело в Telegram. */
-export type Vanished = { kind: 'inPanel' } | { kind: 'stale' } | { kind: 'deferred'; id: string };
+/** `coreOnly` — вопрос права задачи ядра ещё ждёт, но Telegram на него ответить не может. */
+export type Vanished = { kind: 'inPanel' } | { kind: 'stale' } | { kind: 'coreOnly' };
 
-/** Исход применения ответа маршрутом панели. */
+/**
+ * Исход применения ответа маршрутом панели. `coreOnly` — маршрут отказал вопросу права задачи
+ * ядра (`core_permit_browser_only`): ответ ядру принимают только окно панели и телефон.
+ */
 export type ApplyOutcome =
   | { ok: true }
   | { ok: false; gone: true; detail?: string }
-  | { ok: false; gone?: false; detail: string };
+  | { ok: false; gone?: false; detail: string; coreOnly?: true };

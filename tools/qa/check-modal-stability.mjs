@@ -29,7 +29,7 @@
 import { writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
-import { STUBBED } from './group-stubs.mjs';
+import { STUBBED } from './legacy-groups-stub.mjs';
 import { PANEL_PAGES, findCreateButton, openPanelPage, pageSlug } from './panel-pages.mjs';
 import {
   OLD_SIZING_CSS,

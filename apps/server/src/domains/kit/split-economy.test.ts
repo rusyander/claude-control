@@ -1,24 +1,16 @@
 import { spawnSync } from 'node:child_process';
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { builtinKitDir } from './service.ts';
 
 /**
- * Экономия окна в звене группы разделения (фаза G, перенос в набор): повторная доставка правила
- * после сжатия — карточкой, ожидание файлов своего фонового агента опросом — отказ без выхода
- * повтором, правила набора на старте звена — карточкой группы. Всё через те же точки входа, что
- * зовёт hooks.json: диспетчер `run.mjs` и `session-rules.mjs`.
+ * Экономия окна в шаге задачи ядра (AGENTDECK_STEP_KIND, не `chat`): повторная доставка правила после
+ * сжатия — карточкой. Ожидание файлов своего фонового агента в шаге судится так же, как в сессии
+ * человека: отдельная ветка звена группы снята вместе с группами разделения (шаги ведёт ядро). Правила
+ * набора на старте — целиком в обоих случаях, карточки группы больше нет. Всё через те же точки входа,
+ * что зовёт hooks.json: диспетчер `run.mjs` и `session-rules.mjs`.
  */
 
 const KIT = builtinKitDir();
@@ -28,9 +20,9 @@ const dir = mkdtempSync(join(tmpdir(), 'kit-split-economy-'));
 const STATE = join(dir, 'state');
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-// Маркеры звена задаются явно в каждом вызове: окружение самого прогона тестов может их нести.
-const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
-const HUMAN = { AGENTDECK_SPLIT_CHILD: '', AGENTDECK_USER_MEMORY_OFF: '' };
+// Маркер шага задаётся явно в каждом вызове: окружение самого прогона тестов может их нести.
+const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
+const HUMAN = { AGENTDECK_STEP_KIND: '' };
 
 function spawnHook(args: string[], payload: object, env: Record<string, string>): string {
   const out = spawnSync(process.execPath, args, {
@@ -39,7 +31,7 @@ function spawnHook(args: string[], payload: object, env: Record<string, string>)
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: STATE,
       ...env,
     },
@@ -53,7 +45,7 @@ type HookOut = {
 };
 const parse = (out: string): HookOut => (out ? (JSON.parse(out) as HookOut) : {});
 
-describe('rule-injector: повторная доставка в звене группы — карточка (G.3)', () => {
+describe('rule-injector: повторная доставка в шаге задачи — карточка (G.3)', () => {
   const docker = (session: string, env: Record<string, string>) =>
     parse(
       spawnHook(
@@ -89,7 +81,7 @@ describe('rule-injector: повторная доставка в звене гр�
     compact(s, CHILD);
     const card = docker(s, CHILD);
     expect(card.length).toBeLessThanOrEqual(1000);
-    expect(card).toMatch(/— card \(split group/);
+    expect(card).toMatch(/— card \(task step/);
     expect(card).toMatch(/Read \S*situational-rules\/references\/docker-shared\.md/);
     expect(card).toMatch(/offset=\d+ limit=\d+/);
   });
@@ -100,7 +92,7 @@ describe('rule-injector: повторная доставка в звене гр�
     compact(s, HUMAN);
     const again = docker(s, HUMAN);
     expect(again).toContain(full.slice(0, 200));
-    expect(again).not.toMatch(/— card \(split group/);
+    expect(again).not.toMatch(/— card \(task step/);
   });
 
   it('сжатие убирает чужую недельную отметку `.sent`, свою оставляет', () => {
@@ -135,7 +127,7 @@ function transcript(records: object[]): string {
   return path;
 }
 
-describe('bg-wait-guard: ожидание файлов своего агента в звене группы (G.4)', () => {
+describe('bg-wait-guard: ожидание файлов своего агента (G.4)', () => {
   const lanes = [
     say('проведи ревью'),
     use('Agent', { description: 'review lane A', prompt: '…', run_in_background: true }, 'ag1'),
@@ -171,44 +163,17 @@ describe('bg-wait-guard: ожидание файлов своего агента
       ),
     ).hookSpecificOutput?.permissionDecisionReason ?? '';
 
-  it('агент работает — отказ, и повтор той же команды тоже отказ', () => {
-    expect(pre(poll, lanes, CHILD)).toMatch(/1700 s sleep loop waiting for files of an agent/);
-    expect(pre(poll, refused(lanes), CHILD)).toMatch(/does not lift it/);
-  });
-
-  // Группа 1 (23.10, #g1:345 и #g1:354 — дословно): 698 и 722 с хода на опросе отчётов своих
-  // полос через `stat -c %Y`; проверка файла была не `[ -f`, и страж знал только её. Теперь
-  // любой цикл со сном по файлам агента, пока тот идёт, — отказ, чем бы цикл ни проверял.
+  // Группа 1 (23.10, #g1:345 — дословно): опрос отчётов своих полос через `stat -c %Y`.
   const statLoop =
     'D=.agent/tmp/review-gor1298; for i in $(seq 1 150); do a=$(stat -c %Y $D/lane-A.md 2>/dev/null || echo 0); b=$(stat -c %Y $D/lane-B.md 2>/dev/null || echo 0); now=$(date +%s); if [ $a -gt 0 ] && [ $b -gt 0 ] && [ $((now-a)) -gt 240 ] && [ $((now-b)) -gt 240 ]; then echo "both stable after $i"; break; fi; sleep 10; done; ls -la $D/';
-  const g1 = [
-    statLoop,
-    'D=.agent/tmp/review-gor1298; for i in $(seq 1 170); do a=$(stat -c %Y $D/lane-A-r2.md 2>/dev/null || echo 0); b=$(stat -c %Y $D/lane-B-r2.md 2>/dev/null || echo 0); now=$(date +%s); if [ $a -gt 0 ] && [ $b -gt 0 ] && [ $((now-a)) -gt 240 ] && [ $((now-b)) -gt 240 ]; then echo "stable after $i"; break; fi; sleep 10; done; ls -la $D/*.md',
-    'for i in $(seq 1 60); do n=$(ls .agent/tmp/review-x/*.md 2>/dev/null | wc -l); [ "$n" -ge 2 ] && break; sleep 10; done',
-    'while ! grep -q "Журнал" .agent/tmp/review-x/lane-A.md 2>/dev/null; do sleep 20; done',
-    "for i in $(seq 1 90); do node -e \"process.exit(require('fs').existsSync('.agent/tmp/review-x/lane-A.md')?0:1)\" && break; sleep 10; done",
-  ];
 
-  it('опрос любым способом (stat, ls, grep, node) — отказ без выхода повтором', () => {
-    for (const command of g1) {
-      expect(pre(command, lanes, CHILD), command).toMatch(
-        /sleep loop waiting for files of an agent/,
-      );
-    }
-    expect(
-      pre(
-        statLoop,
-        [
-          ...lanes,
-          use('Bash', { command: statLoop }, 'p2'),
-          result('p2', '[ctx-guard] bg-wait-guard: …'),
-        ],
-        CHILD,
-      ),
-    ).toMatch(/does not lift it/);
+  it('шаг задачи судится как сессия человека: отказ, повтор его снимает', () => {
+    expect(pre(poll, lanes, CHILD)).toMatch(/while an agent this session spawned is running/);
+    expect(pre(poll, lanes, CHILD)).not.toMatch(/does not lift it/);
+    expect(pre(poll, refused(lanes), CHILD)).toBe('');
   });
 
-  it('вне группы опрос своего агента циклом ≥ 60 с — отказ с выходом повтором', () => {
+  it('опрос своего агента циклом ≥ 60 с — отказ с выходом повтором', () => {
     expect(pre(statLoop, lanes, HUMAN)).toMatch(/while an agent this session spawned is running/);
     expect(
       pre(
@@ -224,7 +189,7 @@ describe('bg-wait-guard: ожидание файлов своего агента
     expect(pre(statLoop, [...lanes, done], HUMAN)).toBe('');
   });
 
-  it('проходит: агент уже сообщил, вне группы, без агентов, короткий цикл, в субагенте', () => {
+  it('проходит: агент уже сообщил, без агентов, короткий цикл, в субагенте', () => {
     expect(pre(poll, [...lanes, done], CHILD)).toBe('');
     expect(pre(poll, lanes, HUMAN)).not.toMatch(/split-group run launched/);
     expect(pre(poll, [say('проведи ревью')], CHILD)).toBe('');
@@ -235,58 +200,26 @@ describe('bg-wait-guard: ожидание файлов своего агента
   });
 });
 
-describe('session-rules: карточка группы вместо правил набора (G.2)', () => {
+describe('session-rules: правила набора целиком и в шаге задачи (G.2)', () => {
   const start = (env: Record<string, string>, source = 'startup') =>
     parse(spawnHook([SESSION_RULES], { hook_event_name: 'SessionStart', source }, env))
       .hookSpecificOutput?.additionalContext ?? '';
   const standard = readFileSync(join(KIT, 'rules', 'standard.md'), 'utf8').trim();
   const localRule = readFileSync(join(KIT, 'rules', 'local.md'), 'utf8').trim();
 
-  it('звено без памяти пользователя получает карточку и после сжатия; правил целиком нет', () => {
-    for (const source of ['startup', 'compact']) {
-      const ctx = start(CHILD, source);
-      expect(ctx).toMatch(/^Kit root/);
-      expect(ctx).toContain('# Group rules card');
-      // Самопроверка доставки (g1 26.10, F6/F7): выход 0 — доказательство, факт — в строку до прогона.
-      expect(ctx).toContain('exit 0 is the proof for the MR description and threads');
-      expect(ctx).toContain('run the check once, after the last row edit');
-      expect(ctx).not.toContain(standard.slice(0, 200));
-      expect(ctx.length).toBeLessThan(3000);
+  it('сессия человека и шаг задачи получают правила целиком, карточки группы нет', () => {
+    for (const env of [HUMAN, CHILD]) {
+      for (const source of ['startup', 'compact']) {
+        const ctx = start(env, source);
+        expect(ctx).toContain(standard.slice(0, 200));
+        expect(ctx).not.toContain('# Group rules card');
+      }
     }
   });
 
-  it('локальный вариант: карточка, затем local.md последним словом', () => {
+  it('локальный вариант в шаге задачи: local.md последним словом', () => {
     const ctx = start({ ...CHILD, AGENTDECK_KIT_VARIANT: 'local' });
-    expect(ctx).toContain('# Group rules card');
     expect(ctx.endsWith(localRule)).toBe(true);
-    expect(ctx).not.toContain(standard.slice(0, 200));
-  });
-
-  it('без обоих маркеров — правила целиком, карточки нет', () => {
-    for (const env of [
-      HUMAN,
-      { ...HUMAN, AGENTDECK_SPLIT_CHILD: '1' },
-      { ...HUMAN, AGENTDECK_USER_MEMORY_OFF: '1' },
-    ]) {
-      const ctx = start(env);
-      expect(ctx).toContain(standard.slice(0, 200));
-      expect(ctx).not.toContain('# Group rules card');
-    }
-  });
-
-  it('нет файла карточки — правила целиком, а не пусто', () => {
-    // Копия набора во временной папке: встроенный набор не трогается.
-    const copy = join(dir, 'kit-copy', 'hooks');
-    mkdirSync(join(copy, 'cards'), { recursive: true });
-    mkdirSync(join(dir, 'kit-copy', 'rules'), { recursive: true });
-    writeFileSync(join(copy, 'session-rules.mjs'), readFileSync(SESSION_RULES));
-    writeFileSync(join(copy, 'cards', 'group-rules.md'), '# Group rules card\n');
-    writeFileSync(join(dir, 'kit-copy', 'rules', 'standard.md'), standard);
-    const run = () =>
-      parse(spawnHook([join(copy, 'session-rules.mjs')], { source: 'startup' }, CHILD))
-        .hookSpecificOutput?.additionalContext ?? '';
-    expect(run()).toContain('# Group rules card');
-    renameSync(join(copy, 'cards', 'group-rules.md'), join(copy, 'cards', 'gone.md'));
-    expect(run()).toContain(standard.slice(0, 200));
+    expect(ctx).not.toContain('# Group rules card');
   });
 });

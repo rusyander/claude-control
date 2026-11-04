@@ -11,11 +11,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
-import { canonical } from '../chat/group-command/paths.ts';
-import { reviewScratchMark } from '../chat/group-command/review-scratch.ts';
 import { builtinKitDir } from './service.ts';
 
 /**
@@ -180,12 +178,14 @@ describe('doc-bloat-guard: бюджет скилла', () => {
   };
   const run = (file: string) => docBloatGuard({ tool_input: { file_path: file } });
 
-  it('файл скилла до 16 КБ — страж молчит', () => {
-    expect(run(write('.claude/skills/s/SKILL.md', 10))).toBeNull();
+  // Бюджет скилла — 20 КБ (SKILL.md-указатель над ≥3 справочниками, skills-audit): 19 КБ на старом
+  // пороге 16 КБ давали ложное предупреждение.
+  it('файл скилла до 20 КБ — страж молчит', () => {
+    expect(run(write('.claude/skills/s/SKILL.md', 19))).toBeNull();
   });
 
-  it('файл скилла больше 16 КБ — страж предупреждает', () => {
-    expect(run(write('.claude/skills/big/SKILL.md', 17))).toMatch(/doc-bloat-guard/);
+  it('файл скилла больше 20 КБ — страж предупреждает', () => {
+    expect(run(write('.claude/skills/big/SKILL.md', 21))).toMatch(/doc-bloat-guard/);
   });
 
   it('прочий агентский документ того же размера — предупреждение остаётся', () => {
@@ -395,21 +395,24 @@ describe('review-plan: размер по токенам, файлы данных
     expect(made.stdout).toMatch(/≈\d+k tokens/);
   });
 
-  // Раунд 50k плюс бриф ≈9.5k оставлял под потолком 60k ≈0k. Планка — литералами: константа,
-  // сдвинутая в инструменте, не сдвигает её вместе с собой.
-  it('запас: раунд + потолок брифа + 15k рабочего места ≤ 60k; каждый записанный бриф под потолком', async () => {
+  // Замер по 290 полосам: база полосы до брифа ≈24k, пик контекста — медиана 134k. Потолок 95k = база
+  // 24k + бриф + раунд + 30k на чтение и пробы; раунд не меньше 25k (при ≈6.5k раундов — 36
+  // полосо-раундов вместо 7). Планка — литералами: константа, сдвинутая в инструменте, не сдвигает её.
+  it('запас: база 24k + раунд + потолок брифа + 30k рабочего места ≤ 95k; каждый записанный бриф под потолком', async () => {
     const m = (await import(pathToFileURL(join(TOOLS, 'review-plan.mjs')).href)) as {
       LANE_CONTEXT: number;
+      BASE_TOKENS: number;
       BRIEF_TOKENS: number;
       ROUND_TOKENS: number;
       estTokens: (bytes: number, lines: number) => number;
     };
-    expect(m.LANE_CONTEXT).toBe(60000);
-    expect(m.ROUND_TOKENS + m.BRIEF_TOKENS + 15000).toBeLessThanOrEqual(60000);
-    expect(m.ROUND_TOKENS).toBeGreaterThanOrEqual(30000);
+    expect(m.LANE_CONTEXT).toBe(95000);
+    expect(m.BASE_TOKENS).toBe(24000);
+    expect(m.ROUND_TOKENS + m.BRIEF_TOKENS + 24000 + 30000).toBeLessThanOrEqual(95000);
+    expect(m.ROUND_TOKENS).toBeGreaterThanOrEqual(25000);
     for (const l of p().lanes)
       for (const t of l.roundTokens ?? [Infinity])
-        expect(t + m.BRIEF_TOKENS + 15000).toBeLessThanOrEqual(60000);
+        expect(t + m.BRIEF_TOKENS + 24000 + 30000).toBeLessThanOrEqual(95000);
     const briefs = ['A', 'B'].map((l) => readFileSync(join(out, `lane-${l}-r1.prompt.md`), 'utf8'));
     for (const s of briefs)
       expect(m.estTokens(Buffer.byteLength(s, 'utf8'), s.split('\n').length)).toBeLessThanOrEqual(
@@ -431,11 +434,19 @@ describe('review-plan: размер по токенам, файлы данных
   });
 
   it('чистое удаление строк — диапазон N..N+1, а не одна строка', () => {
-    // `@@ -100,500 +99,0 @@`: удалённые строки стоят между строками 99 и 100 головы.
-    const del = p()
+    // `@@ -100,500 +99,0 @@`: удалённые строки стоят между строками 99 и 100 головы. Части файла
+    // теперь кроят его строки головы от шва (первая — со строки 1), так что удаление лежит внутри
+    // части, покрывающей обе строки, 99 и 100 (`to: null` — до конца файла).
+    const items = p()
       .chunks.flatMap((c) => c.items)
-      .find((it) => it.path === 'gone.txt' && it.from === 99);
-    expect(del).toMatchObject({ from: 99, to: 100 });
+      .filter((it) => it.path === 'gone.txt') as { from?: number; to?: number | null }[];
+    expect(items.length, JSON.stringify(items)).toBeGreaterThan(0);
+    expect(
+      items.some(
+        (it) => (it.from ?? 1) <= 99 && (it.to === null || it.to === undefined || it.to >= 100),
+      ),
+      JSON.stringify(items),
+    ).toBe(true);
   });
 
   it('файл данных — один чанк data у одной полосы, сводка по ключам в её промпте', () => {
@@ -537,7 +548,7 @@ describe('review-plan: размер по токенам, файлы данных
     expect(s.status).toBe(0);
     expect(s.stdout).toContain('tier: T2');
     expect(s.stdout).toContain(`rounds 0 of ${p().rounds}`);
-    expect(s.stdout).toContain('next: spawn round 1');
+    expect(s.stdout).toMatch(/next: spawn all \d+ planned lane-rounds/);
     expect(run('skeleton', '--plan', planFile).stdout).toContain('**Tier:** T2 — contract file');
   });
 });
@@ -576,12 +587,13 @@ describe('review-plan: промпт сверх потолка', () => {
     const p = run('prompt', '--plan', join(out, 'plan.json'), '--lane', lane, '--slug', 'wide');
     expect(p.status).toBe(0);
     expect(p.stderr).toContain('PROMPT OVER CAP: this prompt');
-  });
+    // Два `git diff` на каждый из 160 файлов кода (обычный и с контекстом функции): на Windows ~25 с в одиночку.
+  }, 120_000);
 });
 
 // g9: обе полосы читали 144 тестовых файла и 56 переводов, чей ru-двойник в диффе, — 42 полосо-раунда
 // там, где хватает ~31; полоса уходила за 160k и теряла журнал при сжатии.
-describe('review-plan: тесты и переводы — только полосе TEST, потолок контекста 60k', () => {
+describe('review-plan: тесты и переводы — только полосе TEST, потолок контекста 95k', () => {
   type Chunk = {
     id: string;
     kind?: string;
@@ -645,11 +657,13 @@ describe('review-plan: тесты и переводы — только поло�
     const tests = p.chunks.filter((c) => c.kind === 'test').map((c) => c.id);
     expect(tests.length).toBeGreaterThan(0);
     expect(tests.every((id) => B.chunks.includes(id) && !A.chunks.includes(id))).toBe(true);
-    expect(A.rounds.length).toBeLessThan(B.rounds.length);
+    // Документы теперь только у A (SPEC), тесты только у B: полосы равны, а сумма меньше двух
+    // читателей на чанк.
     expect(p.laneRounds).toBe(A.rounds.length + B.rounds.length);
     expect(p.laneRounds).toBeLessThan(2 * p.chunks.length);
     expect(r.stdout).toContain(`lane-rounds ${p.laneRounds}`);
-    expect(r.stdout).toContain('translations stay with both lanes: no --parity');
+    expect(r.stdout).toContain('translations are read as their own files: no --parity');
+    expect(r.stdout).toContain('SPEC lanes only: 4 docs/contract files');
   });
 
   it('с --parity перевод с ru-двойником в диффе — чанк i18n у B; ru и перевод без двойника читают обе', () => {
@@ -662,7 +676,8 @@ describe('review-plan: тесты и переводы — только поло�
     expect(tr?.items.every((it) => it.twin === 'docs/ru/x.mdx')).toBe(true);
     expect(B.chunks).toContain(tr?.id);
     expect(A.chunks).not.toContain(tr?.id);
-    expect(chunkOf(p, 'docs/ru/x.mdx')?.kind).toBeUndefined();
+    // Документы и контракты — чанки spec, их читает только SPEC-полоса A.
+    expect(chunkOf(p, 'docs/ru/x.mdx')?.kind).toBe('spec');
     expect(A.chunks).toContain(chunkOf(p, 'docs/en/only.mdx')?.id);
     expect(r.stdout).toMatch(
       /TEST lanes only: 2 test files, 2 translations \(twin in the diff, parity: content:check\)/,
@@ -672,7 +687,7 @@ describe('review-plan: тесты и переводы — только поло�
     expect(readA(plain.p) - readA(p)).toBe(60);
   });
 
-  it('промпт A запрещает читать тесты, промпт B помечает тесты и переводы своими; в обоих потолок 60k', () => {
+  it('промпт A запрещает читать тесты, промпт B помечает тесты и переводы своими; в обоих потолок 95k', () => {
     const { p } = par;
     const prompt = (lane: string, chunks: string[]) =>
       run(
@@ -697,10 +712,10 @@ describe('review-plan: тесты и переводы — только поло�
       '[translations, yours alone]: docs/en/x.mdx ← docs/ru/x.mdx · docs/uz/x.mdx ← docs/ru/x.mdx',
     );
     expect(b.stdout).not.toMatch(/never read a test file/);
-    for (const s of [a.stdout, b.stdout]) expect(s).toContain('Context cap ≈60k tokens');
+    for (const s of [a.stdout, b.stdout]) expect(s).toContain('Context cap ≈95k tokens');
   });
 
-  it('contextLine: бриф и дифф раунда вычтены из 60k, за потолком — вернуть с RERUN по непрочитанному', async () => {
+  it('contextLine: база, бриф и дифф раунда вычтены из 95k, за потолком — вернуть с RERUN по непрочитанному', async () => {
     const { contextLine } = (await import(pathToFileURL(join(TOOLS, 'review-plan.mjs')).href)) as {
       contextLine: (t: number) => string;
     };
@@ -715,10 +730,11 @@ describe('review-plan: тесты и переводы — только поло�
     expect(twinOf('docs/en/y.mdx', 'ru', set)).toBeNull();
     expect(twinOf('i18n/b.en.json', 'ru', set)).toBeNull();
     const cl = contextLine(35000);
-    expect(cl).toMatch(/Context cap ≈60k tokens/);
+    expect(cl).toMatch(/Context cap ≈95k tokens/);
+    expect(cl).toContain('your base ≈24k');
     expect(cl).toContain('this brief (≤ 10k)');
     expect(cl).toContain("round's diff (≈35k)");
-    expect(cl).toContain('leave ≈15k');
+    expect(cl).toContain('leave ≈26k');
     expect(cl).toMatch(/hand back at once.*RERUN/);
   });
 
@@ -788,12 +804,16 @@ describe('review-plan: клон для проб делает plan, промпт 
     }
   });
 
-  it('node_modules связан из копии при том же lockfile; метку клона узнаёт суд групп панели', () => {
+  it('node_modules связан из копии при том же lockfile; метка клона называет копию и ссылку', () => {
     expect(existsSync(join(clone, 'node_modules', 'dep', 'index.js'))).toBe(true);
     expect(lanePrompt('A')).toContain('node_modules linked from the checkout: .');
-    const mark = reviewScratchMark(join(clone, 'svc', 'a.ts'));
-    expect(mark?.source).toBe(canonical(repo));
-    expect(mark?.links).toEqual([canonical(join(clone, 'node_modules'))]);
+    const mark = JSON.parse(
+      readFileSync(join(clone, '.git', 'review-plan-scratch.json'), 'utf8'),
+    ) as { source?: string; head?: string; links?: string[] };
+    const same = (path: string) => resolve(path).replace(/\\/g, '/').toLowerCase();
+    expect(same(mark.source ?? '')).toBe(same(repo));
+    expect(mark.head).toBeTruthy();
+    expect((mark.links ?? []).map(same)).toEqual([same(join(clone, 'node_modules'))]);
   });
 
   it('prompt берёт клон из plan.json; второй plan на той же голове переиспользует клон', () => {

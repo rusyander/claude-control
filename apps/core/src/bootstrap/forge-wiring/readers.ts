@@ -118,12 +118,28 @@ export function forgeActionReaders(deps: ForgeReaderDeps = {}) {
     return `!${key.iid} ${key.threadId} note ${note.id}`;
   };
 
+  // Итог ревью по ссылке (этап 10, F8): своя заметка с тем же хешем тела после начала действия.
+  const mrComment: ActionFactReader = (action) => async () => {
+    const key = keyOf('mr-comment', action);
+    const port = forgeFor(key.url);
+    const me = known(await port.whoAmI());
+    if (!me) throw new Error('forge account unreadable');
+    const note = known(await port.comments(key.iid))?.find(
+      (n) =>
+        n.author === me.username &&
+        n.bodyHash === key.bodyHash &&
+        n.createdAt >= action.startedAt - FORGE_CLOCK_SKEW_MS,
+    );
+    return note ? `!${key.iid} note ${note.id}` : absent();
+  };
+
   return {
     push,
     'ref-delete': refDelete,
     'mr-create': mrCreate,
     'mr-update': mrUpdate,
     'thread-reply': threadReply,
+    'mr-comment': mrComment,
     // Трекера в ядре нет (решение G3): запись в трекер не доказать — всегда спросить человека.
     'tracker-write': () => () => {
       throw new Error('no core tracker adapter');

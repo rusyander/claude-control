@@ -8,7 +8,7 @@ import { Typography } from '@shared/ui/typography';
 import { EmptyState } from '@shared/ui/empty-state';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { LoadErrorCard } from '@shared/ui/load-error';
-import { CHAT_ROUTE } from '@shared/config/routes';
+import { CHAT_ROUTE, CORE_TASKS_ROUTE } from '@shared/config/routes';
 import { serverFieldText } from '@shared/config/i18n';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
@@ -203,7 +203,19 @@ export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: Test
                     {t('tests.runs.agentCli', { name: foreignAgentName(record.provider) })}
                   </Typography>
                 )}
-                {record.sessionId && (
+                {/* Прогон через ядро открывается задачей ядра: его сессия — сессия ядра, а не
+                    разговор чата, и ссылка в чат вела бы в пустоту. */}
+                {record.coreTaskId && (
+                  <Link
+                    to={CORE_TASKS_ROUTE}
+                    search={{ id: record.coreTaskId } as never}
+                    className={styles.runLink}
+                    data-core-task-open={record.coreTaskId}
+                  >
+                    {t('tests.runs.openCoreTask')}
+                  </Link>
+                )}
+                {!record.coreTaskId && record.sessionId && (
                   <Link
                     to={CHAT_ROUTE}
                     search={{ id: record.sessionId }}

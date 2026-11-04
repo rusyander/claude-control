@@ -28,6 +28,7 @@ function port(log: string[]): PublisherCommandPort {
       log.push(`clean ${input.refs.join(',')}`);
       return { deleted: input.refs, absent: [], failed: [] };
     },
+    delivery: async (copy) => ({ missing: copy }),
   };
 }
 

@@ -9,7 +9,6 @@ import type { SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts'
 import type { ServerContext } from '../../../context.ts';
 import { PendingAsks } from '../../../domains/chat/pending-asks/pending-asks.ts';
 import { registerChatTranscriptRoutes } from './transcript-routes.ts';
-import { retiredGroupsOf } from '../../../domains/chat/split-conveyor/split-conveyor.ts';
 
 /**
  * Метки «ждёт вас» и «принято» в списке чатов (итоговое ревью 25.09): раньше
@@ -238,7 +237,8 @@ describe('GET /api/chats — метки «ждёт вас» и «принято�
       ...previous,
       createdAt: '2026-09-25T12:00:00.000Z',
       groups: [{ index: 0, status: 'done', chatId: 'fresh' }],
-      retiredGroups: retiredGroupsOf(previous),
+      // Принятая группа и неубранная копия переживают план; убранная без «принято» — нет.
+      retiredGroups: [previous.groups[0], previous.groups[1]],
     } as unknown as SplitPlanRecord);
 
     const chats = await list();

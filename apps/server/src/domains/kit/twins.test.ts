@@ -264,7 +264,6 @@ describe('kit-twins on the real ledger', () => {
     expect(problems).toEqual([]);
     // Новые стражи обязаны быть побайтно равными в обеих копиях, а не «перенесёнными».
     for (const key of [
-      'hooks-lib:autonomous-pick.mjs',
       'hooks-lib:forge-merge-guard.mjs',
       'hooks-lib:mcp-shape-guard.mjs',
       'hooks-lib:nvm-use-guard.mjs',

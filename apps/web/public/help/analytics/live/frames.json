@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 700,
-      "shotAt": "2026-09-28T14:33:05.348Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 0 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Запущенных процессов Claude Code не найдено",
+      "shotAt": "2026-11-03T17:29:52.561Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 0 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Запущенных процессов Claude Code не найдено",
       "en": {
         "file": "01-idle.en.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:34:40.658Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 0 Claude Code processes running on this machine. There is no agent registry, so we count processes. No running Claude Code processes found"
+        "shotAt": "2026-11-03T17:32:12.848Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 0 Claude Code processes running on this machine. There is no agent registry, so we count processes. No running Claude Code processes found",
+        "seal": {
+          "png": "759cf69ad1f63dec",
+          "text": "d236bbf88a79e3f4"
+        }
       },
       "dark": {
         "file": "01-idle.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:36:10.105Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 0 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Запущенных процессов Claude Code не найдено"
+        "shotAt": "2026-11-03T17:34:19.810Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 0 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Запущенных процессов Claude Code не найдено",
+        "seal": {
+          "png": "9e567d0071724c40",
+          "text": "236c87efaf329922"
+        }
       },
       "darkEn": {
         "file": "01-idle.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:37:42.624Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 0 Claude Code processes running on this machine. There is no agent registry, so we count processes. No running Claude Code processes found"
+        "shotAt": "2026-11-03T17:36:56.587Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules CLAUDE.md Skills Commands Hooks Scripts Plugins Integrations and access MCP servers Permissions Environment Projects Testing Application Groups Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 0 Claude Code processes running on this machine. There is no agent registry, so we count processes. No running Claude Code processes found",
+        "seal": {
+          "png": "52f3d2375a6872f7",
+          "text": "cab20ee821c294e3"
+        }
+      },
+      "seal": {
+        "png": "338d7787a812b861",
+        "text": "236c87efaf329922"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 700,
-      "shotAt": "2026-09-28T14:33:12.034Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 2 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Показать процессы — 2 шт., 1.1 ГБ PID 24180 612 МБ PID 31044 488 МБ",
+      "shotAt": "2026-11-03T17:29:59.247Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 2 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Показать процессы — 2 шт., 1.1 ГБ PID 24180 612 МБ PID 31044 488 МБ",
       "en": {
         "file": "02-running.en.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:34:47.334Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 2 Claude Code processes running on this machine. There is no agent registry, so we count processes. Show processes — 2, 1.1 GB PID 24180 612 MB PID 31044 488 MB"
+        "shotAt": "2026-11-03T17:32:19.541Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 2 Claude Code processes running on this machine. There is no agent registry, so we count processes. Show processes — 2, 1.1 GB PID 24180 612 MB PID 31044 488 MB",
+        "seal": {
+          "png": "40025d405bc18818",
+          "text": "bb19573835a54846"
+        }
       },
       "dark": {
         "file": "02-running.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:36:16.792Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 2 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Показать процессы — 2 шт., 1.1 ГБ PID 24180 612 МБ PID 31044 488 МБ"
+        "shotAt": "2026-11-03T17:34:26.537Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Аналитика Расход токенов, сессии и работающие агенты — по локальным транскриптам Сегодня 7 дней 30 дней 90 дней За всё время Свои даты Сбросить CSV JSON Сводка Модели и проекты Инструменты и часы Сессии 1 Агенты и контур Что идёт прямо сейчас и что посчитано отдельно от транскриптов: живые агенты, прогоны параллельных агентов на модели дешевле заказанной и расход через контур. Период на эту вкладку не влияет, поэтому выбор периода и выгрузка здесь выключены. Работают прямо сейчас 2 Запущенные процессы Claude Code на этой машине. Реестра агентов не существует, поэтому считаем по процессам. Показать процессы — 2 шт., 1.1 ГБ PID 24180 612 МБ PID 31044 488 МБ",
+        "seal": {
+          "png": "8dc6d44d6cec38ed",
+          "text": "521055dbaa0a9a8f"
+        }
       },
       "darkEn": {
         "file": "02-running.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 700,
-        "shotAt": "2026-09-28T14:37:49.293Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 2 Claude Code processes running on this machine. There is no agent registry, so we count processes. Show processes — 2, 1.1 GB PID 24180 612 MB PID 31044 488 MB"
+        "shotAt": "2026-11-03T17:37:03.263Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Analytics Token spend, sessions and running agents — from local transcripts Today 7 days 30 days 90 days All time Custom dates Reset CSV JSON Summary Models and projects Tools and hours Sessions 1 Agents and contour What is running right now and what is counted apart from transcripts: live agents, parallel-agent runs on a cheaper model than ordered, and spend through the contour. The period does not affect this tab, so the period picker and export are off here. Running right now 2 Claude Code processes running on this machine. There is no agent registry, so we count processes. Show processes — 2, 1.1 GB PID 24180 612 MB PID 31044 488 MB",
+        "seal": {
+          "png": "d4b8154353e7691f",
+          "text": "bb19573835a54846"
+        }
+      },
+      "seal": {
+        "png": "17f9a9fcb20fed83",
+        "text": "521055dbaa0a9a8f"
       }
     }
   ]

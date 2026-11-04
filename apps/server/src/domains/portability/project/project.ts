@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import type { ClaudePaths } from '@agentdeck/contracts';
 import type { EnvScope } from '@agentdeck/contracts/portable-env';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
 import {
   resolveProviderEnvTargetFor,
@@ -68,6 +69,9 @@ export interface SectionTargets {
   readonly ownLayout: boolean;
   /** Почему не знает — фраза человеку; заполнена только при `supported: false`. */
   readonly why?: string;
+  /** Код `why` для перевода на экране паспорта. */
+  readonly whyCode?: ServerMessageCode;
+  readonly whyParams?: Record<string, string>;
   /** Один файл инструкций (`AGENTS.md`, `GEMINI.md`, …). */
   readonly instructionsFile?: string;
   readonly instructionsList?: ProviderInstructionsTarget;
@@ -134,6 +138,8 @@ const OWN_PROJECT_LAYOUT: Readonly<Record<string, true>> = { claude: true };
 export function projectSupport(provider: ConfigProvider): {
   supported: boolean;
   why?: string;
+  whyCode?: ServerMessageCode;
+  whyParams?: Record<string, string>;
 } {
   if (OWN_PROJECT_LAYOUT[provider.id]) return { supported: true };
   if (provider.capabilities.projects === 'ready' && provider.projectConfig) {
@@ -142,6 +148,8 @@ export function projectSupport(provider: ConfigProvider): {
   return {
     supported: false,
     why: `${provider.name} не документирует настроек уровня проекта — переносить их некуда`,
+    whyCode: 'portability-skip-project-undocumented',
+    whyParams: { provider: provider.name },
   };
 }
 
@@ -196,6 +204,7 @@ function projectTargets(provider: ConfigProvider, projectRoot: string | undefine
       supported: false,
       ownLayout: false,
       why: support.why,
+      ...(support.whyCode ? { whyCode: support.whyCode, whyParams: support.whyParams } : {}),
     };
   }
 

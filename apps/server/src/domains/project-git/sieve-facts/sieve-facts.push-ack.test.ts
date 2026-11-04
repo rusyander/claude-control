@@ -17,7 +17,8 @@ import { readSieveFacts } from './sieve-facts.ts';
 const DISPATCH = join(builtinKitDir(), 'hooks', 'lib', 'run.mjs');
 // Вне системного temp, как у остальных проверок кита: temp — сама по себе зона агента.
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), `.push-ack-${process.pid}`);
-afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
+// Windows держит только что закрытый git-процессом каталог (EBUSY): без повторов папка оставалась в src.
+afterAll(() => rmSync(ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 
 const D = {
   d0: '2026-09-01T10:00:00Z',
@@ -95,7 +96,7 @@ function kitPush(work: string, command: string): string {
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: join(ROOT, 'state'),
     },
     timeout: 30_000,

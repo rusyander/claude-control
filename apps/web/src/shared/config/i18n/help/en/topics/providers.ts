@@ -143,18 +143,16 @@ export const providersEn: typeof providersRu = {
       'allow). Hidden for Aider.',
     mapChat: 'Chat and assistant',
     mapChatValue:
-      'The full chat with streaming, attachments and parallel agents is Claude only. ' +
-      'Codex, Gemini, Qwen Code, Continue, Goose, Kimi Code, OpenCode and Aider get a ' +
-      'simpler chat of their own: the panel keeps the conversation, and every answer is a ' +
-      'separate CLI run (codex exec, gemini -p, qwen -p, cn -p, opencode run, ' +
-      'aider --message, goose run --no-session, kimi -p). For Codex, Qwen Code, Goose and ' +
-      'Kimi Code the answer goes through the CLI’s own server mode, for OpenCode its ' +
-      'opencode serve holds the conversation — with these five a message can be passed in ' +
-      'right in the middle of an answer; if the server does not come up, the answer runs ' +
-      'as an ordinary one-off launch. All eight have the “Allow edits” toggle, and what it ' +
-      'means for each is described in the “Chat” document. All eight have been run live ' +
-      'with the real CLI against a stand-in model; not with a real account of each ' +
-      'provider. Cursor has no model API of its own.',
+      'The full chat with streaming, attachments and parallel agents is Claude. A ' +
+      'conversation with another CLI runs in “Core chat”: the core holds the CLI session, ' +
+      'not the panel. The core can continue a started conversation with Claude, Codex, ' +
+      'Gemini CLI, Qwen Code, Goose and Kimi Code — from the transcript the CLI itself ' +
+      'confirmed (Gemini through the ACP session/load call). OpenCode and Cursor have no ' +
+      'continuation: every new turn starts the conversation afresh. Aider and Continue ' +
+      'the core does not launch at all: they have no hook before a tool call, so there is ' +
+      'nowhere to put the core’s judge — the refusal names the reason. Old panel ' +
+      'conversations with these CLIs open read-only. Only Claude has been checked with a ' +
+      'real account. Cursor has no model API of its own.',
     mapHooks: 'Hooks',
     mapHooksValue:
       'Works for Claude, Qwen Code, Kimi Code, Codex and OpenCode, but the models do not match. ' +
@@ -267,12 +265,10 @@ export const providersEn: typeof providersRu = {
     mapPanel: 'Always available',
     mapPanelValue:
       'Overview, search, groups, history, settings and help are the panel’s own ' +
-      'sections and do not depend on the provider. A group does not act the same ' +
-      'everywhere, though: Claude reads it from its own directories, Codex and Qwen Code ' +
-      'get the chosen groups as a layer on every run, and on the other CLIs a group does ' +
-      'not act — the panel says so on its card. Split-group economy levers reach the CLIs ' +
-      'differently too: under each lever in “Settings” → “Groups” stands a “Where it works:” ' +
-      'row — a mark per CLI, and for a lever that does not work there, the reason in the hint.',
+      'sections and do not depend on the provider. The old groups are read-only now and act ' +
+      'on no CLI: the task core does the work, and what reaches each CLI is up to its ' +
+      'adapter. The core carries its step economy levers to each CLI under that CLI’s own ' +
+      'key and names what a CLI cannot carry as a loss (help “Chat”, “Step economy”).',
 
     gapTitle: 'Why a section exists for one CLI and not for another',
     gapCaption:
@@ -336,8 +332,9 @@ export const providersEn: typeof providersRu = {
     noteMissingTitle: 'A missing CLI is not a breakage',
     noteMissingText:
       'Configuration is just files: you can edit it before the CLI itself is installed. ' +
-      'Without the CLI only the assistant is limited — it will ask for a key or show you ' +
-      'how to log in. Check that the executable is on PATH and restart the panel.',
+      'Without the CLI only the form assistant does not work: it runs as a core session ' +
+      'through that CLI, and the panel makes no direct call to the vendor API. Check that ' +
+      'the executable is on PATH and restart the panel.',
     noteSafeTitle: 'A placeholder writes nothing',
     noteSafeText:
       'An “in development” section opens a placeholder and sends no changes. That is ' +
@@ -424,8 +421,8 @@ export const providersEn: typeof providersRu = {
         'Each provider’s key is stored encrypted inside the panel and handed out masked ' +
         'only. It never reaches the foreign config. Unset, it is picked up from an ' +
         'environment variable and the panel names which one: ANTHROPIC_API_KEY, ' +
-        'OPENAI_API_KEY. With neither key nor variable but a CLI present, the assistant ' +
-        'goes through the CLI.',
+        'OPENAI_API_KEY. The form assistant runs only through the CLI itself — a core ' +
+        'session with no tools; a key alone, bypassing the CLI, does not start it.',
       switchFormat: '6. Formats checked against the schemas',
       switchFormatText:
         'The panel writes foreign configs from documentation, and documentation moves ' +
@@ -500,8 +497,9 @@ export const providersEn: typeof providersRu = {
     refusalNoCli: '“not found” on the provider card',
     refusalNoCliText:
       'The binary is not in the PATH of the process that started the panel’s server. ' +
-      'Configuration sections work regardless; for the assistant, install the CLI or set ' +
-      'a key. Restart the panel afterwards: PATH is read at startup.',
+      'Configuration sections work regardless; the assistant needs the CLI itself — a key ' +
+      'without the CLI does not start it. Restart the panel afterwards: PATH is read at ' +
+      'startup.',
     refusalStubSection: 'The section opens a placeholder',
     refusalStubSectionText:
       'That section’s format for that CLI has not been worked out yet. The placeholder ' +
@@ -510,7 +508,7 @@ export const providersEn: typeof providersRu = {
     refusalNoApi: '“has no model API of its own — a key cannot be set”',
     refusalNoApiText:
       'The provider has no API channel of its own: there is nowhere and no reason to keep ' +
-      'a key. Its assistant runs through the CLI only.',
+      'a key. The assistant runs through the CLI only anyway.',
     refusalKeyLength: '“The key is empty or exceeds the allowed length”',
     refusalKeyLengthText:
       'An empty string, or more than 8192 characters. Nothing is written to the file in ' +

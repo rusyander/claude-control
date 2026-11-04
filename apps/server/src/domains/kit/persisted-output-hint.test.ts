@@ -74,9 +74,8 @@ describe('persisted-output-hint — модель видела только пр�
         env: {
           ...process.env,
           AGENTDECK_KIT_VARIANT: '',
-          AGENTDECK_HEAVY_QUEUE_DIR: '',
+          AGENTDECK_STEP_KIND: '',
           AGENTDECK_KIT_STATE: join(dir, 'state'),
-          AGENTDECK_SPLIT_CHILD: '',
         },
         timeout: 15_000,
       }).stdout.trim();

@@ -263,15 +263,21 @@ const unverified = [];
  * стенд, а не про раздел: раздел проверяется заново, один раз.
  */
 const RELOADED = /Execution context was destroyed|because of a navigation|net::ERR_ABORTED/i;
+/**
+ * Содержимое не приехало за потолок ожидания `openPanelPage`: под нагрузкой полного гейта
+ * (04.11) «Сравнение — переменные» не успело за 10 с при обычных 2 с и было названо
+ * недосягаемым. Раздел открывается заново один раз; второй обход судит как обычно.
+ */
+const NOT_ARRIVED = 'содержимое раздела не приехало — второй заход';
 
 for (const entry of entries) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      await checkEntry(entry);
+      await checkEntry(entry, attempt);
       break;
     } catch (error) {
       const message = String(error.message).split('\n')[0];
-      if (attempt === 1 && RELOADED.test(message)) continue;
+      if (attempt === 1 && (RELOADED.test(message) || message === NOT_ARRIVED)) continue;
       // Раздел, который не открылся или не дал себя проверить (стенд лёг,
       // подмена отстала от разметки), — непроверенный поимённо, а не повод
       // уронить обход остальных.
@@ -282,7 +288,7 @@ for (const entry of entries) {
 }
 
 /** Один раздел целиком; в итог пишет только в конце, чтобы повтор не удвоил строки. */
-async function checkEntry(entry) {
+async function checkEntry(entry, attempt) {
   const { path, name } = entry;
   await openPanelPage(page, BASE, entry);
 
@@ -290,6 +296,7 @@ async function checkEntry(entry) {
   const ringless = stops.filter((s) => s.visible && !s.ring);
   const dialogOpen =
     (await page.locator('[role="dialog"]:not([aria-modal="false"]):visible').count()) > 0;
+  if (attempt === 1 && !dialogOpen && !stops.some((s) => s.inMain)) throw new Error(NOT_ARRIVED);
   const nonModalOpen =
     !dialogOpen && (await page.locator('[role="dialog"][aria-modal="false"]:visible').count()) > 0;
   const lines = [];

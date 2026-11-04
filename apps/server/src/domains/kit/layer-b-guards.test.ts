@@ -82,6 +82,8 @@ function transcript(records: object[]): string {
   return path;
 }
 
+// Шаг задачи для вызовов внутри `inStep` (bg-wait-guard): окружение прогона тестов само шаг не задаёт.
+let stepKind = '';
 function run(event: 'pre' | 'stop', payload: object, env: Record<string, string> = {}): string {
   const out = spawnSync(process.execPath, [DISPATCH, event], {
     input: JSON.stringify(payload),
@@ -89,7 +91,7 @@ function run(event: 'pre' | 'stop', payload: object, env: Record<string, string>
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: stepKind,
       AGENTDECK_KIT_STATE: join(dir, 'state'),
       ...env,
     },
@@ -344,22 +346,22 @@ describe('cmd-duration: одна команда — один ключ, долг�
   });
 });
 
-describe('SessionStart в группе разделения: строки для человека не печатаются', () => {
-  // Каталог очереди тяжёлых шагов панель ставит каждому запуску группы — по нему хук и узнаёт группу.
-  const session = (cwd: string, heavy: string) => {
+describe('SessionStart в шаге задачи: строки для человека не печатаются', () => {
+  // Шаг задачи ядро помечает AGENTDECK_STEP_KIND (не `chat`) — по нему хук и узнаёт шаг.
+  const session = (cwd: string, step: string) => {
     const out = spawnSync(process.execPath, [DISPATCH, 'session'], {
       input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd }),
       encoding: 'utf8',
       env: {
         ...process.env,
         AGENTDECK_KIT_VARIANT: '',
-        AGENTDECK_HEAVY_QUEUE_DIR: heavy,
+        AGENTDECK_STEP_KIND: step,
         AGENTDECK_KIT_STATE: join(dir, 'state'),
       },
       cwd,
       timeout: HOOK_SPAWN_MS,
     });
-    // «Тишина в группе» и снятый по сроку диспетчер дают один и тот же пустой stdout.
+    // «Тишина в шаге» и снятый по сроку диспетчер дают один и тот же пустой stdout.
     if (out.error || out.signal) {
       throw new Error(`hook dispatcher did not finish: ${out.error?.message ?? out.signal}`);
     }
@@ -369,11 +371,10 @@ describe('SessionStart в группе разделения: строки для
   mkdirSync(proj, { recursive: true });
   writeFileSync(join(proj, 'package.json'), '{"name":"p"}');
 
-  it('вне группы — предложение онбординга, в группе — тишина', () => {
+  it('вне шага и в чате — предложение онбординга, в шаге задачи — тишина', () => {
     expect(session(proj, '')).toMatch(/not onboarded/);
-    expect(session(proj, join(dir, 'queue'))).not.toMatch(
-      /not onboarded|context-budget|doc-hygiene/,
-    );
+    expect(session(proj, 'chat')).toMatch(/not onboarded/);
+    expect(session(proj, 'implement')).not.toMatch(/not onboarded|context-budget|doc-hygiene/);
   });
 });
 
@@ -398,9 +399,9 @@ describe('bg-wait-guard: сон и ls отчёта агента, пока он �
   });
 });
 
-describe('bg-wait-guard: группа разделения не снимает отказ повтором (E6)', () => {
-  // Замер 29.09–20.10: 2.3 ч таких циклов в деревьях разделения — лог своего фонового гейта,
-  // отказ снимался повтором той же команды. Панель сама будит прогон результатом команды.
+describe('bg-wait-guard: шаг задачи судится как сессия человека (E6 снят)', () => {
+  // Отказ без выхода повтором был веткой группы разделения (E6) и снят вместе с группами: в шаге
+  // задачи ядра ожидание судится так же, как у человека — повтор той же команды отказ снимает.
   const poll =
     'for i in $(seq 1 115); do grep -q "^EXIT" .agent/tmp/gate2.log && break; sleep 5; done; tail -40 .agent/tmp/gate2.log';
   const gate = [
@@ -417,41 +418,37 @@ describe('bg-wait-guard: группа разделения не снимает �
     use('Bash', { command }, 'p1'),
     result('p1', '[ctx-guard] bg-wait-guard: …', true),
   ];
-  const inSplit = <T>(fn: () => T): T => {
-    process.env.AGENTDECK_SPLIT_CHILD = '1';
+  const inStep = <T>(fn: () => T): T => {
+    stepKind = 'implement';
     try {
       return fn();
     } finally {
-      delete process.env.AGENTDECK_SPLIT_CHILD;
+      stepKind = '';
     }
   };
 
-  it('лог своего фонового гейта: вне группы повтор проходит, в группе — снова отказ', () => {
+  it('лог своего фонового гейта: повтор проходит и вне шага, и в шаге задачи', () => {
     expect(pre('Bash', { command: poll }, refusedAfter(gate))).toBe('');
-    expect(inSplit(() => pre('Bash', { command: poll }, refusedAfter(gate)))).toMatch(
-      /split-group run[\s\S]*End the turn/,
-    );
+    expect(inStep(() => pre('Bash', { command: poll }, refusedAfter(gate)))).toBe('');
   });
 
-  // Ревью 20.10: отказ без выхода ловил любое ожидание — и файл чужого процесса, и готовность
-  // сервера. Их не разбудит ничто, а закончивший ход ребёнок считается закончившим группу.
-  it('в группе ожидание не своей фоновой команды снимается повтором', () => {
+  it('в шаге ожидание не своей фоновой команды снимается повтором', () => {
     const foreign = refusedAfter([say('доведи до конца')]);
-    expect(inSplit(() => pre('Bash', { command: poll }, foreign))).toBe('');
+    expect(inStep(() => pre('Bash', { command: poll }, foreign))).toBe('');
     const presence = 'for i in {1..40}; do [ -f out/build.log ] && break; sleep 3; done';
-    expect(inSplit(() => pre('Bash', { command: presence }, [say('собери')]))).toMatch(
+    expect(inStep(() => pre('Bash', { command: presence }, [say('собери')]))).toMatch(
       /Repeat this exact call/,
     );
   });
 
-  it('в группе ожидание сервера опросом и по логу готовности остаётся разрешённым', () => {
+  it('в шаге ожидание сервера опросом и по логу готовности остаётся разрешённым', () => {
     const start = [say('подними стенд')];
     for (const command of [
       'until curl -s localhost:3000; do sleep 2; done; tail -5 server.log',
       'until grep -q "Local:" .agent/tmp/latest.log; do sleep 1; done',
       'for i in $(seq 1 30); do grep -q healthy .agent/tmp/healthcheck.log && break; sleep 2; done',
     ]) {
-      expect(inSplit(() => pre('Bash', { command }, start))).toBe('');
+      expect(inStep(() => pre('Bash', { command }, start))).toBe('');
     }
   });
 });
@@ -721,7 +718,7 @@ describe(
             session_id: session,
             cwd: work,
           },
-          { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' },
+          { AGENTDECK_STEP_KIND: 'implement' },
         );
         return out
           ? ((JSON.parse(out) as { hookSpecificOutput?: { permissionDecisionReason?: string } })
@@ -775,10 +772,8 @@ describe(
                 ...process.env,
                 AGENTDECK_KIT_VARIANT: '',
                 AGENTDECK_KIT_CLI: '',
-                AGENTDECK_HEAVY_QUEUE_DIR: '',
                 AGENTDECK_KIT_STATE: join(dir, 'state'),
-                AGENTDECK_SPLIT_CHILD: '1',
-                AGENTDECK_USER_MEMORY_OFF: '1',
+                AGENTDECK_STEP_KIND: 'implement',
               },
               timeout: HOOK_SPAWN_MS,
             });

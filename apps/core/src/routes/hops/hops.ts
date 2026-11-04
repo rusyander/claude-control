@@ -4,6 +4,7 @@ import {
   hopControlReplySchema,
   hopHostProcRowSchema,
   type HopControlReply,
+  type HopContours,
   type HopControlRequest,
   type HopHostLaunch,
   type HopHostProcRow,
@@ -14,8 +15,14 @@ import {
   type HopSpend,
   type HopStatus,
   type HopTag,
+  type HopUserGatewayState,
+  type HopDlpProxyConfig,
+  type HopDlpProxyState,
+  type HopUserRoute,
+  type CoreContourRunReply,
 } from '@agentdeck/contracts/core/hops';
 import type { RouteId } from '@agentdeck/contracts/core/routes';
+import type { PlatformSpendRecord } from '@agentdeck/contracts/platform';
 import { helperEnv, launchDetached } from '../../platform/detached-launch.ts';
 import { httpJson } from '../../platform/http-json.ts';
 import { hasValue, sleep } from '../../platform/os-kind.ts';
@@ -97,7 +104,7 @@ const dirKey = (dir: string | null | undefined): string | null =>
  */
 function sameAppData(
   found: { handle: HopHostHandle; status: HopStatus },
-  options: EnsureHopHostOptions,
+  options: Pick<EnsureHopHostOptions, 'panelAppData'>,
 ): HopHostHandle {
   const live = found.status.panelAppData ?? null;
   if (dirKey(live) !== dirKey(options.panelAppData))
@@ -106,6 +113,17 @@ function sameAppData(
       `live hop host ${found.handle.pid} reads panel data ${live ?? 'none'}, this core asks ${options.panelAppData ?? 'none'}`,
     );
   return found.handle;
+}
+
+/**
+ * Только живой хост, без запуска: читателю, которому нечего читать без трафика (извещения о
+ * бюджете), незачем заводить процесс. Чужой каталог панели — тот же отказ, что у `ensureHopHost`.
+ */
+export async function findHopHost(
+  options: Pick<EnsureHopHostOptions, 'home' | 'panelAppData'>,
+): Promise<HopHostHandle | undefined> {
+  const found = await handleOf(options.home, false);
+  return found ? sameAppData(found, options) : undefined;
 }
 
 /**
@@ -238,6 +256,70 @@ export function hopControl(
   message: HopControlRequest,
 ): Promise<HopControlReply> {
   return control(handle, message);
+}
+
+/**
+ * Шлюз человека на хосте (этап 10): порт и маршруты контуров целиком; `port: null` — закрыть.
+ * Значения по умолчанию спеки ставит клиент, как у регистрации.
+ */
+export async function configureUserGateway(
+  handle: HopHostHandle,
+  port: number | null,
+  routes: HopUserRoute[],
+): Promise<HopUserGatewayState | null> {
+  const full = routes.map((route) => {
+    const message = registerMessage(route.spec) as Extract<HopControlRequest, { op: 'register' }>;
+    return { ...route, spec: message.spec };
+  });
+  return unwrap(await control(handle, { op: 'user-gateway', port, routes: full }), 'user-gateway')
+    .state;
+}
+
+/** Прокси защиты данных человека (C3c): открыть/перенастроить, `null` — закрыть. */
+export async function configureDlpProxy(
+  handle: HopHostHandle,
+  config: HopDlpProxyConfig | null,
+): Promise<HopDlpProxyState | null> {
+  return unwrap(await control(handle, { op: 'dlp-proxy', config }), 'dlp-proxy').state;
+}
+
+/** Учёт контуров звена (C3b): след, счётчики от запуска, сводка сжатий, извещения о бюджете. */
+export async function contoursOf(handle: HopHostHandle): Promise<HopContours> {
+  return unwrap(await control(handle, { op: 'contours' }), 'contours').contours;
+}
+
+/** Постоянный учёт контуров по дням (то, что панель держала в `state.json` → `platformSpend`). */
+export async function contourSpend(
+  handle: HopHostHandle,
+): Promise<Record<string, PlatformSpendRecord>> {
+  return unwrap(await control(handle, { op: 'contour-spend' }), 'contour-spend').records;
+}
+
+/** Запись в учёт звена снаружи (шлюз панели, славший её, снят; засев проверок чтения). */
+export async function recordContour(
+  handle: HopHostHandle,
+  message: Omit<Extract<HopControlRequest, { op: 'contour-record' }>, 'op'>,
+): Promise<void> {
+  unwrap(await control(handle, { op: 'contour-record', ...message }), 'contour-record');
+}
+
+/** Факты прогона чужого CLI (сжатие по метке, вызовы инструментов с `since`). */
+export async function contourRun(
+  handle: HopHostHandle,
+  runTag: string,
+  since: number,
+): Promise<CoreContourRunReply> {
+  const { summarized, toolCalls } = unwrap(
+    await control(handle, { op: 'contour-run', runTag, since }),
+    'contour-run',
+  );
+  return { summarized, ...(toolCalls === undefined ? {} : { toolCalls }) };
+}
+
+/** Id сообщений со сжатием истории контуром — ленте Claude. */
+export async function contourSummarizedIds(handle: HopHostHandle): Promise<string[]> {
+  return unwrap(await control(handle, { op: 'contour-summarized' }), 'contour-summarized')
+    .messageIds;
 }
 
 export async function clearExhausted(handle: HopHostHandle, routeId: RouteId): Promise<boolean> {

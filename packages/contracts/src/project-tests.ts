@@ -627,6 +627,11 @@ export interface ProjectTestRun {
    * CLI её нет — прогон идёт без записи разговора.
    */
   sessionId?: string;
+  /**
+   * Задача ядра, которой идёт агент: сессию CLI держит ядро, и панель, перезапущенная
+   * посреди прогона, снимает задачу по этому id, а не оставляет её работать без хозяина.
+   */
+  coreTaskId?: string;
   /** Результаты по тест-поинтам — заполняются по ходу. */
   results?: ProjectTestPointResult[];
   summary?: ProjectTestRunSummary;
@@ -671,6 +676,8 @@ export interface ProjectTestRunRecord {
   tokens?: number;
   costUsd?: number;
   sessionId?: string;
+  /** Задача ядра агентского прогона — см. `ProjectTestRun.coreTaskId`. */
+  coreTaskId?: string;
   /**
    * Результаты — слово агента (`tests-cli record`), а не исполненная команда:
    * автоматическому кейсу такая запись прогон не заменяет (ревью 30.09).

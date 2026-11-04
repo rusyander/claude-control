@@ -1,0 +1,155 @@
+{
+  "title": {
+    "ru": "Обязательный контур ведёт через себя чат Claude, агента тестов и чаты чужих CLI и со снятой галочкой — прогон больше не падает",
+    "en": "A required contour routes Claude chat, the tests agent and foreign CLI chats through itself even with the box unticked — the run no longer fails"
+  },
+  "items": [
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Агент тестов или чат чужого CLI со снятой галочкой раздела при режиме контура «обязательно» падал отказом «нужна конкретная модель»: ядро и так ведёт такие задачи через шлюз контура, а модель контура до него не доходила. Теперь задача идёт через контур с моделью раздела, а без неё — с моделью контура.",
+        "en": "With the contour in «required» mode, a tests agent or foreign CLI chat whose section box was unticked failed with «needs a concrete model»: the core routes such tasks through the contour gateway anyway, but the contour model never reached it. Now the task goes through the contour with the section's model, or the contour's model when the section has none."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат Claude, который теперь идёт задачей ядра, не слушал галочку «Чат» контура: ход шёл набором ядра по умолчанию мимо контура. Теперь маршрут контура уходит ядру до выбора CLI — по галочке, а при режиме «обязательно» всегда.",
+        "en": "Claude chat, which now runs as a core task, ignored the contour «Chat» box: the turn used the core's default set and bypassed the contour. Now the contour route reaches the core before the CLI is chosen — by the box, and always under «required» mode."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Галочки разделов для задач ядра — чата Claude, агента тестов и чатов чужих CLI — решают только в режиме «по возможности». Пока режим «обязательно», под галочками в мастере и на вкладке «Доступ» стоит строка об этом.",
+        "en": "Section boxes for core tasks — Claude chat, the tests agent and foreign CLI chats — decide only in «best effort» mode. While the mode is «required», a line under the boxes in the wizard and on the «Access» tab says so."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правка контура — карточка, раздел, выбор правил, активный контур, защита данных — действовала в шлюзе только через несколько секунд после «сохранено»: первый запрос сразу после правки получал «контур не заведён» или шёл по прежним правилам. Теперь панель отвечает на сохранение после того, как ядро применило правку к шлюзу.",
+        "en": "A contour edit — the card, a section, the rules choice, the active contour, data protection — took effect in the gateway only a few seconds after «saved»: the first request right after the edit got «contour not set up» or followed the old rules. Now the panel answers a save after the core has applied the edit to the gateway."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Смена режима контура или активного контура не доходила до задач ядра до его перезапуска: ядро читало режим один раз при загрузке. Теперь режим действует с ближайшей команды ядра.",
+        "en": "Switching the contour mode or the active contour did not reach core tasks until the core restarted: the core read the mode once at boot. Now the mode takes effect from the next core command."
+      },
+      "area": { "ru": "Ядро", "en": "Core" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат через контур с моделью, выбранной в шапке («opus»), отказывал весь ход: ядру уходило имя вендора, которого контур не знает. Теперь выбор переводится картой соответствия контура, как в подписи шапки, а незнакомое имя заменяется моделью контура; глубина продумывания контуру не отправляется.",
+        "en": "A chat through a contour with a model picked in the header («opus») refused the whole turn: the core received a vendor name the contour does not know. Now the pick goes through the contour's name map, as the header caption shows, and an unknown name is replaced by the contour's model; thinking depth is not sent to the contour."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Контур, заведённый при работающем ядре, под режимом «обязательно» отказывал каждый ход «шлюз недоступен», пока ядро не перезапустят: маршрута нового контура у ядра не было. Теперь он становится маршрутом ядра в момент сохранения карточки.",
+        "en": "A contour created while the core was running refused every turn under «required» mode with «gateway is down» until the core restarted: the core had no route for the new contour. Now it becomes a core route the moment its card is saved."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задача ядра под обязательным контуром, которой никто не назвал модель, отказывала «нужна конкретная модель». Теперь она идёт моделью контура по умолчанию; модель, названная задачей или шагом, остаётся.",
+        "en": "A core task under a required contour that nobody named a model for refused with «needs a concrete model». Now it goes with the contour's default model; a model named by the task or the step stays."
+      },
+      "area": { "ru": "Контур", "en": "Contour" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отказ ядра в ходе чата показывался английской строкой ядра. Теперь чат в панели и на телефоне пишет причину словами интерфейса на выбранном языке: обязательный контур недоступен, маршруту нужна модель, модель не открыта ключу контура (с названием модели и контура) или общий отказ с кодом ядра.",
+        "en": "A core refusal of a chat turn showed the core's English line. Now the chat in the panel and on the phone names the reason in interface words in the chosen language: the required contour is unavailable, the route needs a model, the model is not open to the contour key (naming the model and the contour), or a general refusal with the core code."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Контур»: разделы «Доступ разделов» и цена режима «обязательно» говорят, что при нём задачи ядра идут через контур независимо от галочки, модель из шапки переводится картой контура, задача без модели идёт моделью контура по умолчанию, новый контур становится маршрутом без перезапуска, а смена режима действует без перезапуска ядра; «Конфигурация на карточке» — что сохранение отвечает после того, как ядро применило правку. Справка «Чат»: отказ ядра в ходе приходит словами интерфейса.",
+        "en": "Help document «Contour»: «Section access» and the price of «required» mode say that under it core tasks go through the contour regardless of the box, the header model goes through the contour's name map, a task with no model goes with the contour's default model, a new contour becomes a route without a restart, and a mode change takes effect without a core restart; «Configuration on the card» says that a save answers after the core has applied the edit. Help document «Chat»: a core refusal of a turn comes in interface words."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Карточка вопроса права задачи ядра в чате подписана значком «Вопрос ядра», а не служебным «core-permit», и показывает текст вопроса строкой, а не JSON с удвоенными обратными косыми в путях.",
+        "en": "The core task permission card in chat carries the «Core question» badge instead of the internal «core-permit», and shows the question as plain text rather than JSON with doubled backslashes in paths."
+      },
+      "area": { "ru": "Чат", "en": "Chat" },
+      "images": ["core-permit-before.png", "core-permit-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вопрос права ядра у субагента-ребёнка решается из окна родителя: «Разрешить» и «Запретить» на его карточке уходят ядру, а не маршрутом прогона ребёнка, который отвечал отказом.",
+        "en": "A child subagent's core permission question is decided from the parent window: «Allow» and «Deny» on its card reach the core instead of the child run route, which used to refuse."
+      },
+      "area": { "ru": "Чат", "en": "Chat" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Модель, повторившая тот же вызов после вопроса права, больше не поднимает второй такой же вопрос: ждущий остаётся одним, а на уже отвеченный ядро применяет записанный ответ — разрешает или отказывает без нового вопроса человеку.",
+        "en": "A model repeating the same call after a permission question no longer raises a second identical question: a pending one stays single, and on an answered one the core applies the recorded answer, allowing or refusing without asking the human again."
+      },
+      "area": { "ru": "Ядро", "en": "Core" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вопрос права в чате, который ведёт ядро, больше не приходит в Telegram сообщением с кнопками, которые не работали: ответ ядру требует окна панели или подписи телефона. О вопросе сообщает уведомление со ссылкой, а нажатие на кнопку старого сообщения сворачивает его в «🔒 Ответ ядру — в панели или с телефона» вместо ложного «Уже не актуально».",
+        "en": "A permission question in a chat the core runs no longer reaches Telegram as a message with buttons that did not work: an answer to the core needs the panel window or a phone signature. A notice with a link reports the question, and a press on a button of an older message collapses it into «🔒 Ответ ядру — в панели или с телефона» instead of a false «Уже не актуально»."
+      },
+      "area": { "ru": "Telegram", "en": "Telegram" }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Вопрос права в чате, который ведёт ядро, отвечается с телефона: на экране «Вопросы» и в чате карточка подписана значком «Вопрос ядра», а «Разрешить» и «Запретить» уходят ядру командой, подписанной ключом устройства, вместо маршрута прогона, который отвечал отказом. Без привязанного ключа ответ не уходит, и карточка называет причину.",
+        "en": "A permission question in a chat the core runs is answered from the phone: on the «Questions» screen and in chat the card carries the «Core question» badge, and «Allow» and «Deny» reach the core as a command signed with the device key instead of the run route, which used to refuse. Without a paired key no answer leaves and the card names the reason."
+      },
+      "area": { "ru": "Телефон", "en": "Phone" }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Чат» описывает значок «Вопрос ядра», вопрос ребёнка в окне родителя и повтор вызова без нового вопроса, ответ на вопрос ядра с телефона; справка «Телефон» — подписанный ответ ядру на экране «Вопросы»; справка «Интеграции» — что вопрос права ядра в чате приходит в Telegram только уведомлением.",
+        "en": "Help document «Chat» describes the «Core question» badge, a child's question in the parent window and a repeated call without a new question and the phone answering a core question; «Phone» describes the signed answer to the core on the «Questions» screen; «Integrations» says that a core permission question in chat reaches Telegram only as a notice."
+      },
+      "area": { "ru": "Справка", "en": "Help" }
+    }
+  ],
+  "images": [
+    {
+      "file": "core-permit-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: значок «core-permit» и вопрос ядра в виде JSON с удвоенными обратными косыми",
+        "en": "Before: a «core-permit» badge and the core question as JSON with doubled backslashes"
+      }
+    },
+    {
+      "file": "core-permit-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: значок «Вопрос ядра» и текст вопроса строкой",
+        "en": "After: the «Core question» badge and the question as plain text"
+      }
+    }
+  ]
+}

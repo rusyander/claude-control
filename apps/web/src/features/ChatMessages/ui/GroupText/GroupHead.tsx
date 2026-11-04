@@ -15,15 +15,15 @@ function stageLabel(step: StageStep, t: TFunction): string {
 }
 
 /**
- * Шапка группы: название с фишками состояния (чего ждёт, пауза, принята, MR
- * влит) и под ним путь звеньев — где группа сейчас. Делит верхний ряд карточки
+ * Шапка группы: название с фишками состояния (ждёт ответа, пауза) и под ним
+ * путь звеньев — где группа сейчас. Делит верхний ряд карточки
  * с кнопками группы (владелец 22.10.2026): кнопки справа больше не сжимают
  * тело карточки до узкой колонки — оно идёт под этим рядом во всю ширину, а
  * две строки шапки уравновешивают два ряда кнопок. Живёт внутри растянутой
  * кнопки «открыть чат», поэтому только строчные элементы и без действий.
  */
 export function GroupHead({ group }: { group: ChildStageGroup }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const track = stageTrack(group.stages);
   const current = track.at(-1);
   return (
@@ -39,64 +39,15 @@ export function GroupHead({ group }: { group: ChildStageGroup }) {
             variant="caption"
             weight="medium"
             as="span"
-            className={cn(
-              styles.chip,
-              (group.waitingFor === 'question' ||
-                group.waitingFor === 'decision' ||
-                group.waitingFor === 'human-op' ||
-                group.waitingFor === 'mr-red') &&
-                styles.chipAsk,
-            )}
+            className={cn(styles.chip, styles.chipAsk)}
             data-hub-waiting={group.waitingFor}
           >
             {t(`chat.cascade.hub.waitingFor.${group.waitingFor}`)}
           </Typography>
         )}
-        {group.isPaused && group.pausedByWatch === undefined && (
+        {group.isPaused && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
-          </Typography>
-        )}
-        {/* Пауза сторожа (F1): чья пауза и по какому правилу — снимает её только человек. */}
-        {group.isPaused && group.pausedByWatch !== undefined && (
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.chip}
-            title={t('groupWatch.pausedChipHint')}
-            data-hub-paused-by="watch"
-          >
-            {t('groupWatch.pausedChip', { rule: group.pausedByWatch || '—' })}
-          </Typography>
-        )}
-        {/* Принято человеком (TK-accepted) — отметка его приёмки, не панели. */}
-        {group.acceptance?.acceptedAt && (
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.chip}
-            title={new Date(group.acceptance.acceptedAt).toLocaleString(i18n.language)}
-            data-hub-accepted={group.acceptance.markedDoneAt ? 'marked' : 'accepted'}
-          >
-            {t(
-              group.acceptance.markedDoneAt
-                ? 'chat.cascade.hub.accept.markedMarker'
-                : 'chat.cascade.hub.accept.marker',
-            )}
-          </Typography>
-        )}
-        {/* MR влит или закрыт — перепроверять его нечего, и строка это говорит. */}
-        {group.mrClosed && (
-          <Typography
-            variant="caption"
-            color="subtle"
-            as="span"
-            className={styles.chip}
-            data-hub-mr-closed={group.mrClosed}
-          >
-            {t(`chat.cascade.hub.mrClosed.${group.mrClosed}`)}
           </Typography>
         )}
       </span>

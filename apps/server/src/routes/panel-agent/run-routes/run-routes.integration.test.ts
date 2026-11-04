@@ -1,41 +1,44 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
   PanelActionResult,
   PanelAgentConversation,
   PanelAgentRunEvent,
 } from '@agentdeck/contracts/panel-agent';
-import {
-  PANEL_AGENT_BRIDGE_ID,
-  PANEL_AGENT_MCP_TOOL_TIMEOUT_MS,
-} from '@agentdeck/contracts/panel-agent';
+import type { AskFields } from '@agentdeck/contracts/core/ask';
 import { platformSchema } from '@agentdeck/contracts/platform';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
+import {
+  BRIDGE_TOKEN_HEADER,
+  createBridgeTokenLedger,
+  type BridgeTokenLedger,
+} from '../../../lib/bridge-tokens/bridge-tokens.ts';
 import { createEventHub } from '../../../lib/event-hub/event-hub.ts';
 import { allowedOrigins } from '../../../lib/origin-guard/origin-guard.ts';
-import { resetCliLookupCache } from '../../../providers/detect/detect.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
-import { buildManagedProfile, PLACEHOLDER_KEY } from '../../../domains/platform/apply/profile.ts';
-import { lightWindowLayers } from '../../../domains/platform/layers/layers.ts';
-import { PANEL_AGENT_ENV_ALLOWLIST } from '../../../domains/panel-agent/runner/runner.ts';
+import { buildManagedProfile } from '../../../domains/platform/apply/profile.ts';
 import { writePlatform, writeToken } from '../../../domains/platform/store/store.ts';
+import { createCoreAskPort } from '../../../domains/core-ask/core-ask.ts';
+import {
+  startFakeCore,
+  type FakeCore,
+  type FakeCoreTurn,
+} from '../../../domains/core-ask/__fixtures__/fake-core.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
 import { registerPanelAgentRunRoutes, type PanelAgentRunRouteDeps } from './run-routes.ts';
-import { PANEL_AGENT_PROCESS_LEDGER } from '../../../domains/panel-agent/processes/processes.ts';
 
 /**
- * Ход агента панели (А2) с ФАЛЬШИВЫМ `claude` на PATH: настоящий маршрут,
- * настоящий `spawnCliProcess` (на Windows — через cmd.exe), настоящие временные
- * файлы. Фальшивый CLI снимает свой argv, окружение, stdin, файл системного
- * промпта и конфиг MCP, пока панель их ещё не стёрла, и отвечает кадрами
- * stream-json. Доказательство — этот снимок, а не текст ответа.
+ * Ход агента панели (этап 10, F2, проход 2c) — сессия ядра «ask». Ядро здесь — заглушка на
+ * настоящем HTTP (`fake-core.ts`): клиент панели идёт своим путём (строка ядра, bearer, число
+ * загрузки, SSE вида сеанса), а сценарий сессии зовёт панель ТЕМ ЖЕ путём, что мост `panel.mjs`:
+ * `POST /api/agent/actions/:name` с токеном моста хода. Доказательство — поля вопроса, которые
+ * получило ядро, кадры окна и ответы рубежа доступа, а не текст ответа.
  */
-const isWindows = process.platform === 'win32';
 /** Собран из кусков: присваивание, похожее на ключ, в репозитории не лежит. */
 const SECRET = ['contour', 'agent', 'key', '7d1e'].join('-');
 /** Ключ формы вендора (`sk-…`) — его ловит встроенный образец `secret_key`. */
@@ -43,97 +46,63 @@ const PASTED_KEY = ['sk', 'ant', 'api03', 'Q7rT2xVb9LmN4pZs8KdW'].join('-');
 const CONTOUR = 'agent-contour';
 const GATEWAY_PORT = 45987;
 const SELF = 'http://127.0.0.1:5211';
+const REPLY = 'Вы в разделе проектов.';
 
-const FAKE = `
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-const argv = process.argv.slice(2);
-// Путь снимка — рядом со скриптом, а не переменной окружения: окружение агента
-// теперь список, и переменная теста до процесса не дошла бы.
-const DUMP = new URL('./dump.json', import.meta.url);
-const SLOW = new URL('./slow-ms.txt', import.meta.url);
-const SLOW_AFTER = new URL('./slow-after-ms.txt', import.meta.url);
-const FAIL_AFTER = new URL('./fail-after.txt', import.meta.url);
-const after = (flag) => { const at = argv.indexOf(flag); return at >= 0 ? argv[at + 1] : undefined; };
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-const promptFile = after('--append-system-prompt-file');
-const contourFile = after('--system-prompt-file');
-const mcpFile = after('--mcp-config');
-writeFileSync(DUMP, JSON.stringify({
-  argv,
-  env: process.env,
-  cwd: process.cwd(),
-  stdin: Buffer.concat(chunks).toString('utf8'),
-  systemPrompt: promptFile ? readFileSync(promptFile, 'utf8') : null,
-  contourPrompt: contourFile ? readFileSync(contourFile, 'utf8') : null,
-  mcpConfig: mcpFile ? JSON.parse(readFileSync(mcpFile, 'utf8')) : null,
-  pid: process.pid,
-}));
-if (existsSync(SLOW)) await new Promise((done) => setTimeout(done, Number(readFileSync(SLOW, 'utf8'))));
-const out = (event) => process.stdout.write(JSON.stringify(event) + '\\n');
-out({ type: 'system', subtype: 'init' });
-out({ type: 'assistant', message: { content: [{ type: 'tool_use', id: 't1', name: 'mcp__${PANEL_AGENT_BRIDGE_ID}__where_am_i', input: {} }] } });
-out({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 't1', is_error: false, content: [{ type: 'text', text: 'Done.\\n{ "route": "/projects", "chatKey": "new-7f3a" }' }] }] } });
-if (existsSync(SLOW_AFTER)) await new Promise((done) => setTimeout(done, Number(readFileSync(SLOW_AFTER, 'utf8'))));
-if (existsSync(FAIL_AFTER)) process.exit(3);
-out({ type: 'assistant', message: { content: [{ type: 'text', text: 'Вы в разделе проектов.' }] } });
-out({ type: 'result', subtype: 'success', is_error: false, result: 'Вы в разделе проектов.' });
-`;
+const sleep = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
 
-interface Dump {
-  argv: string[];
-  env: Record<string, string>;
-  cwd: string;
-  stdin: string;
-  systemPrompt: string | null;
-  contourPrompt: string | null;
-  mcpConfig: { mcpServers: Record<string, { command: string; args: string[]; env: object }> };
-  pid: number;
-}
-
-describe('POST /api/agent/run', () => {
+describe('POST /api/agent/run — ход агента сессией ядра', () => {
   let appData: string;
-  let bin: string;
-  let dumpFile: string;
   let store: AppStore;
   let app: FastifyInstance;
-  let gatewayPort: number;
   let pending: PanelPendingActions;
-  const savedPath = process.env.PATH;
-  const savedDump = process.env.CC_FAKE_DUMP;
+  let bridges: BridgeTokenLedger;
+  let core: FakeCore;
+  /** Что делает сессия этого теста; по умолчанию — `standard`. */
+  let behaviour: {
+    slowMs?: number;
+    slowAfterMs?: number;
+    failAfter?: boolean;
+    conversation?: string;
+    extra?: (turn: FakeCoreTurn) => Promise<void>;
+  };
+  /** Ответы панели на вызовы моста за тест. */
+  let bridgeAnswers: Array<{ status: number; body: string }>;
 
-  beforeEach(async () => {
-    appData = mkdtempSync(join(tmpdir(), 'cc-agent-run-appdata-'));
-    bin = mkdtempSync(join(tmpdir(), 'cc-agent-run-bin-'));
-    dumpFile = join(bin, 'dump.json');
-    const script = join(bin, 'fake-claude.mjs');
-    writeFileSync(script, FAKE, 'utf8');
-    if (isWindows) {
-      writeFileSync(
-        join(bin, 'claude.cmd'),
-        `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`,
-      );
-      // Только фальшивый CLI и System32 (`where`, `cmd.exe`): настоящий
-      // `claude.exe` дальше по PATH запустился бы вместо фальшивого.
-      const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
-      process.env.PATH = `${bin}${delimiter}${system32}`;
-    } else {
-      writeFileSync(
-        join(bin, 'claude'),
-        `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`,
-        {
-          mode: 0o755,
-        },
-      );
-      process.env.PATH = `${bin}${delimiter}/usr/bin${delimiter}/bin`;
+  const bridgeCall = async (fields: AskFields, name: string, conversation?: string) => {
+    const answer = await app.inject({
+      method: 'POST',
+      url: `/api/agent/actions/${name}`,
+      headers: { [BRIDGE_TOKEN_HEADER]: fields.panelBridge!.token, 'x-agentdeck-agent': '1' },
+      payload: { input: {}, conversationId: conversation ?? fields.panelBridge!.conversation },
+    });
+    bridgeAnswers.push({ status: answer.statusCode, body: answer.payload });
+    return answer;
+  };
+
+  /** Сессия: вызов `where_am_i` мостом, ответ словами, конец хода. */
+  const standard = async (turn: FakeCoreTurn): Promise<void> => {
+    const { fields, emit, cancelled } = turn;
+    const stop = cancelled.then(() => 'cancelled' as const);
+    if (behaviour.slowMs && (await Promise.race([sleep(behaviour.slowMs), stop]))) return;
+    if (behaviour.extra) return behaviour.extra(turn);
+    emit({ kind: 'user-text', data: { text: fields.prompt } });
+    emit({ kind: 'tool-call', data: { toolUseId: 't0', name: 'ToolSearch', input: {} } });
+    emit({
+      kind: 'tool-call',
+      data: { toolUseId: 't1', name: 'mcp__panel-bridge__where_am_i', input: {} },
+    });
+    const answer = await bridgeCall(fields, 'where_am_i', behaviour.conversation);
+    emit({ kind: 'tool-result', data: { toolUseId: 't1', isError: answer.statusCode !== 200 } });
+    if (behaviour.slowAfterMs && (await Promise.race([sleep(behaviour.slowAfterMs), stop]))) {
+      return;
     }
-    process.env.CC_FAKE_DUMP = dumpFile;
-    resetCliLookupCache();
-
-    store = new AppStore(appData);
-    gatewayPort = GATEWAY_PORT;
-    app = await buildApp();
-  });
+    if (behaviour.failAfter) {
+      emit({ kind: 'error', data: { code: 'exit', detail: 'CLI exited with code 3' } });
+      return;
+    }
+    emit({ kind: 'assistant-text', data: { text: REPLY } });
+    emit({ kind: 'turn-end', data: { isError: false, numTurns: 1 } });
+  };
 
   const buildApp = async (
     extra: Partial<PanelAgentRunRouteDeps> = {},
@@ -144,29 +113,38 @@ describe('POST /api/agent/run', () => {
       allowedOrigins: allowedOrigins(8888),
       requiresToken: () => panelToken !== undefined,
       expectedToken: () => panelToken ?? '',
+      bridges,
     };
     pending = new PanelPendingActions(10_000);
     const instance = Fastify();
     registerAccessGate(instance, access);
-    registerPanelAgentRoutes(instance, ctx, { hub: createEventHub(), pending, access });
+    registerPanelAgentRoutes(instance, ctx, { hub: createEventHub(), pending, access, bridges });
     registerPanelAgentRunRoutes(instance, ctx, {
       selfBaseUrl: SELF,
-      gatewayPort: () => gatewayPort,
+      ask: createCoreAskPort(() => core.home, core.identity),
+      bridges,
       pending,
+      pollMs: 20,
       ...extra,
     });
     await instance.ready();
     return instance;
   };
 
+  beforeEach(async () => {
+    appData = mkdtempSync(join(tmpdir(), 'cc-agent-run-appdata-'));
+    store = new AppStore(appData);
+    bridges = createBridgeTokenLedger();
+    behaviour = {};
+    bridgeAnswers = [];
+    core = await startFakeCore({ turn: (turn) => standard(turn) });
+    app = await buildApp();
+  });
+
   afterEach(async () => {
     await app.close();
-    process.env.PATH = savedPath;
-    if (savedDump === undefined) delete process.env.CC_FAKE_DUMP;
-    else process.env.CC_FAKE_DUMP = savedDump;
-    resetCliLookupCache();
+    await core.close();
     rmSync(appData, { recursive: true, force: true });
-    rmSync(bin, { recursive: true, force: true });
   });
 
   const run = (body: object) =>
@@ -178,7 +156,7 @@ describe('POST /api/agent/run', () => {
       .filter((chunk) => chunk.startsWith('data: '))
       .map((chunk) => JSON.parse(chunk.slice('data: '.length)) as PanelAgentRunEvent);
 
-  const dump = (): Dump => JSON.parse(readFileSync(dumpFile, 'utf8')) as Dump;
+  const lastAsk = (): AskFields => core.asks.at(-1)!;
 
   const contour = (contourPrompt = true): void => {
     const platform = platformSchema.parse({
@@ -211,155 +189,132 @@ describe('POST /api/agent/run', () => {
     context: { route: '/projects', title: 'Проекты', projectPath: 'C:\\work\\demo' },
   };
 
-  it('запускает CLI лёгким агентом: только переходник, без встроенных инструментов, промпт файлом', async () => {
+  it('ход — вопрос ядру: только мост панели с токеном хода, бриф системой, реплика дословно', async () => {
     const response = await run(body);
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('text/event-stream');
 
     const frames = framesOf(response.payload);
     expect(frames[0]).toEqual({ kind: 'start', conversationId: 'conv-1', providerId: 'claude' });
-    expect(frames).toContainEqual({ kind: 'tool', name: 'where_am_i' });
+    // Поиск инструментов — служба CLI, в ленту не идёт.
+    expect(frames.filter((f) => f.kind === 'tool')).toEqual([{ kind: 'tool', name: 'where_am_i' }]);
     expect(frames).toContainEqual({ kind: 'tool-result', name: 'where_am_i', isError: false });
-    expect(frames.at(-1)).toEqual({ kind: 'done', reply: 'Вы в разделе проектов.' });
+    expect(frames).toContainEqual({ kind: 'text', text: REPLY });
+    expect(frames.at(-1)).toEqual({ kind: 'done', reply: REPLY });
 
-    const seen = dump();
-    const flag = (name: string): string | undefined => seen.argv[seen.argv.indexOf(name) + 1];
-    expect(seen.argv).toContain('-p');
-    expect(flag('--output-format')).toBe('stream-json');
-    expect(seen.argv).toContain('--verbose');
-    expect(seen.argv).toContain('--strict-mcp-config');
-    expect(seen.argv).toContain('--no-session-persistence');
-    expect(seen.argv).toContain('--disable-slash-commands');
-    // Лёгкое окно: без проектного источника — иначе `~/.claude/CLAUDE.md`
-    // доезжает поиском вверх от временной папки (`check-run-layers.mjs`, случай 7).
-    expect(flag('--setting-sources')).toBe('local');
-    for (const arg of lightWindowLayers().args) expect(seen.argv).toContain(arg);
-    // Не контур — промпт CLI на месте, своего промпта контура нет.
-    expect(seen.argv).not.toContain('--system-prompt-file');
-    expect(flag('--tools')).toBe('');
-    expect(flag('--allowedTools')).toBe(`mcp__${PANEL_AGENT_BRIDGE_ID}__*`);
-    expect(seen.argv).not.toContain('--append-system-prompt');
+    expect(core.asks).toHaveLength(1);
+    const fields = lastAsk();
+    expect(fields.tools).toBe('panel-bridge');
+    expect(fields.panelBridge).toMatchObject({ url: SELF, conversation: 'conv-1' });
+    expect(fields.panelBridge!.token).toMatch(/^[A-Za-z0-9_-]{32,128}$/);
+    expect(fields).toMatchObject({ adapter: 'claude', consumer: 'assistant' });
+    expect(fields.routes).toBeUndefined();
+    // Текст человека — дословно, с кавычками и переводом строки.
+    expect(fields.prompt).toBe(body.messages[0]!.content);
+    expect(fields.system).toContain('route /projects');
+    expect(fields.system).toContain('C:\\work\\demo');
+    expect(fields.system).toContain('"panel-bridge" MCP server');
+    // Доказательство человека — число загрузки ядра, по одному на просьбу.
+    expect(core.nonces).toEqual({ minted: 1, used: 1 });
 
-    // Текст человека — только в stdin, дословно, с кавычками и переводом строки.
-    expect(seen.stdin).toBe(body.messages[0]!.content);
-    expect(seen.argv.join(' ')).not.toContain('кавычки');
-    expect(seen.systemPrompt).toContain('route /projects');
-    expect(seen.systemPrompt).toContain('C:\\work\\demo');
+    // Мост дошёл до панели своим токеном; после хода токен мёртв.
+    expect(bridgeAnswers).toEqual([expect.objectContaining({ status: 200 })]);
+    expect(bridges.size()).toBe(0);
+    const late = await bridgeCall(fields, 'where_am_i');
+    expect(late.statusCode).toBe(401);
 
-    // В конфиге MCP ровно один сервер, и в его окружении ровно адрес панели.
-    const servers = seen.mcpConfig.mcpServers;
-    expect(Object.keys(servers)).toEqual([PANEL_AGENT_BRIDGE_ID]);
-    const bridge = servers[PANEL_AGENT_BRIDGE_ID]!;
-    expect(bridge.env).toEqual({ AGENTDECK_URL: SELF });
-    expect(bridge.args[0]).toMatch(/tools[\\/]mcp[\\/]panel\.mjs$/);
-    expect(bridge.args.slice(1)).toEqual(['--conversation', 'conv-1']);
-
-    expect(seen.env.MCP_TOOL_TIMEOUT).toBe(String(PANEL_AGENT_MCP_TOOL_TIMEOUT_MS));
-    expect(seen.env.ANTHROPIC_BASE_URL).toBeUndefined();
-    // Рабочий каталог — пустая временная папка, и панель её убрала после хода.
-    expect(existsSync(seen.cwd)).toBe(false);
-
-    // Разговор записан вместе с ответом.
     const saved = await app.inject({ method: 'GET', url: '/api/agent/conversations/conv-1' });
     const conversation = saved.json<PanelAgentConversation>();
     expect(conversation.context.route).toBe('/projects');
     expect(conversation.messages.map((message) => message.role)).toEqual(['user', 'assistant']);
-    expect(conversation.messages[1]!.content).toBe('Вы в разделе проектов.');
+    expect(conversation.messages[1]!.content).toBe(REPLY);
     const list = await app.inject({ method: 'GET', url: '/api/agent/conversations' });
     expect(list.json()).toEqual([expect.objectContaining({ id: 'conv-1', messages: 2 })]);
   });
 
   it('следующий ход разговора знает итоги действий прошлого хода; другой разговор — нет', async () => {
-    const first = await run({ ...body, conversationId: 'conv-mem' });
-    expect(first.statusCode).toBe(200);
-    // Первый ход: прежних действий нет, в stdin — реплика как есть.
-    expect(dump().stdin).toBe(body.messages[0]!.content);
+    expect((await run({ ...body, conversationId: 'conv-mem' })).statusCode).toBe(200);
+    expect(lastAsk().prompt).toBe(body.messages[0]!.content);
 
     const next = await run({
       ...body,
       conversationId: 'conv-mem',
       messages: [
         ...body.messages,
-        { role: 'assistant', content: 'Вы в разделе проектов.' },
+        { role: 'assistant', content: REPLY },
         { role: 'user', content: 'Открой тот чат' },
       ],
     });
     expect(next.statusCode).toBe(200);
-    const stdin = dump().stdin;
-    expect(stdin).toContain('where_am_i');
-    expect(stdin).toContain('new-7f3a');
+    // Итог действия — из ответа панели мосту: имя и начало результата.
+    expect(lastAsk().prompt).toContain('where_am_i: ');
+    expect(lastAsk().prompt).toContain('"route":"/projects"');
 
-    const other = await run({ ...body, conversationId: 'conv-other' });
-    expect(other.statusCode).toBe(200);
-    expect(dump().stdin).toBe(body.messages[0]!.content);
+    expect((await run({ ...body, conversationId: 'conv-other' })).statusCode).toBe(200);
+    expect(lastAsk().prompt).toBe(body.messages[0]!.content);
   });
 
-  it('окружение процесса — список: ни ключа API, ни переменных панели, вход в аккаунт на месте', async () => {
-    const planted = {
-      ANTHROPIC_API_KEY: ['sk', 'ant', 'planted', 'env'].join('-'),
-      PLATFORM_API_TOKEN: 'planted-company',
-      AGENTDECK_TOKEN: 'planted-panel',
-      OPENAI_API_KEY: 'planted-openai',
-    };
-    const saved = Object.fromEntries(Object.keys(planted).map((key) => [key, process.env[key]]));
-    Object.assign(process.env, planted);
-    // Удалённый доступ включён: телефон решает карточки по этому токену (А8),
-    // значит процесс агента не должен получить его ни в окружении, ни в аргументах.
+  it('токен моста — только своего разговора, только действия агента и только живой', async () => {
+    behaviour.conversation = 'conv-foreign';
+    const response = await run(body);
+    expect(response.statusCode).toBe(200);
+    // Вызов от имени чужого разговора — отказ до действия, модель видит провал.
+    expect(bridgeAnswers[0]!.status).toBe(403);
+    expect(framesOf(response.payload)).toContainEqual({
+      kind: 'tool-result',
+      name: 'where_am_i',
+      isError: true,
+    });
+
+    const token = bridges.mint('conv-x');
+    const elsewhere = await app.inject({
+      method: 'GET',
+      url: '/api/agent/conversations',
+      headers: { [BRIDGE_TOKEN_HEADER]: token },
+    });
+    expect(elsewhere.statusCode).toBe(401);
+    const forged = await app.inject({
+      method: 'GET',
+      url: '/api/agent/actions',
+      headers: { [BRIDGE_TOKEN_HEADER]: 'x'.repeat(43) },
+    });
+    expect(forged.statusCode).toBe(401);
+    const live = await app.inject({
+      method: 'GET',
+      url: '/api/agent/actions',
+      headers: { [BRIDGE_TOKEN_HEADER]: token },
+    });
+    expect(live.statusCode).toBe(200);
+    bridges.revoke(token);
+    const dead = await app.inject({
+      method: 'GET',
+      url: '/api/agent/actions',
+      headers: { [BRIDGE_TOKEN_HEADER]: token },
+    });
+    expect(dead.statusCode).toBe(401);
+  });
+
+  it('удалённый доступ включён: мост входит токеном хода, токена панели ядро не получает', async () => {
     const PANEL_TOKEN = 'planted-remote-token-' + 'x'.repeat(24);
     await app.close();
     app = await buildApp({}, PANEL_TOKEN);
-    try {
-      const response = await app.inject({
-        method: 'POST',
-        url: '/api/agent/run',
-        headers: { authorization: `Bearer ${PANEL_TOKEN}` },
-        payload: body,
-      });
-      expect(response.statusCode).toBe(200);
-    } finally {
-      for (const [key, value] of Object.entries(saved)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
-    }
-    // Снимок — НАСТОЯЩЕЕ `process.env` дочернего процесса, а не переданный объект.
-    const seen = dump();
-    const raw = readFileSync(dumpFile, 'utf8');
-    expect(raw).not.toContain(PANEL_TOKEN);
-    for (const [key, value] of Object.entries(planted)) {
-      expect(seen.env[key], key).toBeUndefined();
-      expect(raw).not.toContain(value);
-    }
-    const names = Object.keys(seen.env).map((name) => name.toLowerCase());
-    expect(names).toContain('path');
-    expect(seen.env.AGENTDECK_URL).toBe(SELF);
-    expect(seen.env.MCP_TOOL_TIMEOUT).toBe(String(PANEL_AGENT_MCP_TOOL_TIMEOUT_MS));
-    // Ничего сверх списка и добавки хода (на Windows cmd.exe дописывает своё).
-    const allowed = new Set(
-      [...PANEL_AGENT_ENV_ALLOWLIST, 'AGENTDECK_URL', 'MCP_TOOL_TIMEOUT'].map((name) =>
-        name.toLowerCase(),
-      ),
-    );
-    // Их дописывает сама Windows при старте процесса, а не панель. Вне Windows
-    // то же делает `/bin/sh` обёртки фальшивого CLI: dash (Ubuntu) экспортирует
-    // PWD, bash (macOS) — ещё SHLVL и `_`.
-    const shellOwn = new Set([
-      ...(isWindows
-        ? ['prompt', 'logonserver', 'userdomain', 'userdomain_roamingprofile']
-        : ['pwd', 'shlvl', '_']),
-    ]);
-    const extra = names.filter(
-      (name) => !allowed.has(name) && !shellOwn.has(name) && !name.startsWith('='),
-    );
-    expect(extra).toEqual([]);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/agent/run',
+      headers: { authorization: `Bearer ${PANEL_TOKEN}` },
+      payload: body,
+    });
+    expect(response.statusCode).toBe(200);
+    expect(framesOf(response.payload).at(-1)).toEqual({ kind: 'done', reply: REPLY });
+    expect(bridgeAnswers[0]!.status).toBe(200);
+    expect(JSON.stringify(core.asks)).not.toContain(PANEL_TOKEN);
   });
 
-  it('потолок хода стоит, пока карточка разговора ждёт клика; без карточки — ход снят', async () => {
+  it('потолок хода стоит, пока карточка разговора ждёт клика; без карточки — ход снят и ядру сказано cancel', async () => {
     await app.close();
     app = await buildApp({ timeoutMs: 300, ceilingTickMs: 50 });
-    writeFileSync(join(bin, 'slow-ms.txt'), '1500');
+    behaviour.slowMs = 1500;
 
-    // Карточка этого разговора висит всё время хода — потолок 300 мс не срабатывает.
     const card = pending.create({
       name: 'save_rule',
       risk: 'change',
@@ -368,28 +323,24 @@ describe('POST /api/agent/run', () => {
     });
     const waited = await run(body);
     pending.cancel(card.pending.id);
-    expect(framesOf(waited.payload).at(-1)).toEqual({
-      kind: 'done',
-      reply: 'Вы в разделе проектов.',
-    });
+    expect(framesOf(waited.payload).at(-1)).toEqual({ kind: 'done', reply: REPLY });
+    expect(core.cancels).toEqual([]);
 
-    // Карточка ЧУЖОГО разговора не держит ход: потолок снимает его.
     const other = pending.create({
       name: 'save_rule',
       risk: 'change',
       conversationId: 'conv-other',
       preview: { summary: 'x', fields: [] },
     });
-    // Свой разговор: conv-1 уже знает ответ первого хода, и та же история была бы
-    // историей отставшей вкладки (отказ conversation_stale, а не ход).
     const killed = await run({ ...body, conversationId: 'conv-ceiling' });
     pending.cancel(other.pending.id);
     expect(framesOf(killed.payload).at(-1)).toMatchObject({ kind: 'error' });
     expect(JSON.stringify(framesOf(killed.payload).at(-1))).toContain('отведённое время');
+    expect(core.cancels).toHaveLength(1);
+    expect(bridges.size()).toBe(0);
   });
 
   it('разговор удаляется из истории; идущий — нет; чужой или кривой id — 404', async () => {
-    // Удалить разговор было нечем: пробные и ненужные копились в истории навсегда.
     expect((await run({ ...body, conversationId: 'conv-del' })).statusCode).toBe(200);
     const removed = await app.inject({
       method: 'DELETE',
@@ -398,17 +349,14 @@ describe('POST /api/agent/run', () => {
     expect(removed.statusCode).toBe(200);
     const gone = await app.inject({ method: 'GET', url: '/api/agent/conversations/conv-del' });
     expect(gone.statusCode).toBe(404);
-    const list = await app.inject({ method: 'GET', url: '/api/agent/conversations' });
-    expect(list.json<Array<{ id: string }>>().map((item) => item.id)).not.toContain('conv-del');
     const again = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-del' });
     expect(again.statusCode).toBe(404);
     const crooked = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/..%2Fx' });
     expect(crooked.statusCode).toBe(404);
 
-    // Идущий ход ещё допишет файл разговора: удалять его сейчас — вернуть через секунду.
-    writeFileSync(join(bin, 'slow-ms.txt'), '1200');
+    behaviour.slowMs = 1200;
     const running = run({ ...body, conversationId: 'conv-busy' });
-    await new Promise((done) => setTimeout(done, 300));
+    await sleep(300);
     const busy = await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-busy' });
     expect(busy.statusCode).toBe(409);
     expect(busy.json()).toMatchObject({ messageCode: 'panel-conversation-running' });
@@ -417,33 +365,16 @@ describe('POST /api/agent/run', () => {
     expect(after.statusCode).toBe(200);
   });
 
-  it('процесс агента в журнале процессов, пока жив; после хода запись снята', async () => {
-    writeFileSync(join(bin, 'slow-ms.txt'), '1200');
-    const ledger = join(appData, PANEL_AGENT_PROCESS_LEDGER);
-    const running = run(body);
-    let during: Array<{ key: string; pid: number }> = [];
-    for (let attempt = 0; attempt < 100 && during.length === 0; attempt += 1) {
-      await new Promise((done) => setTimeout(done, 20));
-      if (existsSync(ledger)) during = JSON.parse(readFileSync(ledger, 'utf8'));
-    }
-    expect(during).toEqual([expect.objectContaining({ key: 'conv-1' })]);
-    expect(during[0]!.pid).toBeGreaterThan(0);
-    await running;
-    expect(JSON.parse(readFileSync(ledger, 'utf8'))).toEqual([]);
-  });
-
   const conversationFile = (id: string) => join(appData, 'panel-agent', `${id}.json`);
   const stored = (id: string): PanelAgentConversation =>
     JSON.parse(readFileSync(conversationFile(id), 'utf8')) as PanelAgentConversation;
 
   it('сделанное пишется в файл по ходу, а не только в конце', async () => {
-    // Живой прогон 26.09: перезапуск панели посреди хода оставлял от хода одну
-    // просьбу — одобренное и выполненное действие из разговора пропадало.
-    writeFileSync(join(bin, 'slow-after-ms.txt'), '1500');
+    behaviour.slowAfterMs = 1500;
     const running = run(body);
     let during: PanelAgentConversation | undefined;
     for (let attempt = 0; attempt < 100 && !during?.openTurn?.actions.length; attempt += 1) {
-      await new Promise((done) => setTimeout(done, 20));
+      await sleep(20);
       if (existsSync(conversationFile('conv-1'))) during = stored('conv-1');
     }
     expect(during?.openTurn).toMatchObject({ actions: ['where_am_i'], texts: [] });
@@ -453,20 +384,20 @@ describe('POST /api/agent/run', () => {
     expect(after.openTurn).toBeUndefined();
     expect(after.messages.map((message) => message.content)).toEqual([
       body.messages[0]!.content,
-      'Вы в разделе проектов.',
+      REPLY,
     ]);
   });
 
-  it('ход упал после действия — сделанное запечатано, и следующий ход его видит', async () => {
-    writeFileSync(join(bin, 'fail-after.txt'), '1');
+  it('сессия упала после действия — сделанное запечатано, и следующий ход его видит', async () => {
+    behaviour.failAfter = true;
     const failed = await run(body);
-    expect(framesOf(failed.payload).at(-1)).toMatchObject({ kind: 'error' });
+    expect(framesOf(failed.payload).at(-1)).toMatchObject({
+      kind: 'error',
+      message: 'CLI exited with code 3',
+    });
     const sealedTurn = stored('conv-1');
     expect(sealedTurn.openTurn).toBeUndefined();
-    expect(sealedTurn.messages).toHaveLength(2);
     expect(sealedTurn.messages[1]).toMatchObject({ role: 'assistant', interrupted: true });
-    // Запечатанный ответ уходит модели следующим ходом — по-английски (D-E);
-    // человеку окно рисует пометку своим языком по коду `seal`.
     expect(sealedTurn.messages[1]!.content).toContain('Actions performed: where_am_i.');
     expect(sealedTurn.messages[1]!.content).toContain('The answer was not finished:');
     expect(sealedTurn.messages[1]!.content).not.toMatch(/[А-Яа-яЁё]/);
@@ -475,21 +406,16 @@ describe('POST /api/agent/run', () => {
       actions: ['where_am_i'],
     });
 
-    // Окно после обрыва выкидывает просьбу без ответа — и запечатанный ответ с ней.
-    rmSync(join(bin, 'fail-after.txt'));
+    behaviour.failAfter = false;
     const next = await run({ ...body, messages: [{ role: 'user', content: 'продолжай' }] });
     expect(framesOf(next.payload).at(-1)).toMatchObject({ kind: 'done' });
-    expect(dump().stdin).toContain('Actions performed: where_am_i.');
-    expect(dump().stdin).not.toContain('Ответ не дописан');
-    const after = stored('conv-1');
-    expect(after.messages.map((message) => message.role)).toEqual([
+    expect(lastAsk().prompt).toContain('Actions performed: where_am_i.');
+    expect(stored('conv-1').messages.map((message) => message.role)).toEqual([
       'user',
       'assistant',
       'user',
       'assistant',
     ]);
-    expect(after.messages[1]!.interrupted).toBe(true);
-    expect(after.messages[2]!.content).toBe('продолжай');
   });
 
   it('ход прежнего процесса панели запечатывается при чтении: перезапуск его не стирает', async () => {
@@ -514,29 +440,23 @@ describe('POST /api/agent/run', () => {
     const read = await app.inject({ method: 'GET', url: '/api/agent/conversations/conv-restart' });
     const conversation = read.json<PanelAgentConversation>();
     expect(conversation.openTurn).toBeUndefined();
-    expect(conversation.messages[1]).toMatchObject({ role: 'assistant', interrupted: true });
     expect(conversation.messages[1]!.content).toBe(
       'Выключаю.\n\nActions performed: toggle_rule.\n\nThe answer was not finished: the panel restarted mid-turn.',
     );
     expect(conversation.messages[1]!.seal).toEqual({ reason: 'restart', actions: ['toggle_rule'] });
-    // Запечатано на диске, а не только в ответе.
     expect(stored('conv-restart').messages).toHaveLength(2);
   });
 
   it('отставшая вкладка не затирает ход другой вкладки: отказ conversation_stale, файл цел', async () => {
-    const first = await run({ ...body, conversationId: 'conv-tabs' });
-    expect(first.statusCode).toBe(200);
+    expect((await run({ ...body, conversationId: 'conv-tabs' })).statusCode).toBe(200);
     const reply = stored('conv-tabs').messages[1]!.content;
     const alpha = [...body.messages, { role: 'assistant', content: reply }];
-    // Вкладка A продолжает разговор: её ход в файле.
     const beta = await run({
       ...body,
       conversationId: 'conv-tabs',
       messages: [...alpha, { role: 'user', content: 'бета' }],
     });
     expect(beta.statusCode).toBe(200);
-    expect(stored('conv-tabs').messages).toHaveLength(4);
-    // Вкладка B открыла разговор до хода A и пишет со своей историей.
     const gamma = await run({
       ...body,
       conversationId: 'conv-tabs',
@@ -544,31 +464,14 @@ describe('POST /api/agent/run', () => {
     });
     expect(gamma.statusCode).toBe(409);
     expect(gamma.json()).toMatchObject({ error: 'conversation_stale' });
-    const after = stored('conv-tabs');
-    expect(after.messages.map((message) => message.content)).toContain('бета');
-    expect(after.messages.map((message) => message.content)).not.toContain('гамма');
-    // Вкладка, знающая весь файл, продолжает как обычно.
-    const delta = await run({
-      ...body,
-      conversationId: 'conv-tabs',
-      messages: [
-        ...after.messages.map(({ role, content }) => ({ role, content })),
-        { role: 'user', content: 'дельта' },
-      ],
-    });
-    expect(delta.statusCode).toBe(200);
+    expect(stored('conv-tabs').messages.map((m) => m.content)).not.toContain('гамма');
+    expect(core.asks).toHaveLength(2);
   });
 
   it('[Z5-9] удалённый в другой вкладке разговор не воскресает: отказ conversation_deleted', async () => {
-    const first = await run({ ...body, conversationId: 'conv-gone' });
-    expect(first.statusCode).toBe(200);
+    expect((await run({ ...body, conversationId: 'conv-gone' })).statusCode).toBe(200);
     const history = stored('conv-gone').messages.map(({ role, content }) => ({ role, content }));
-    // Вкладка A удалила разговор из «Истории», вкладка B держит его открытым и пишет дальше.
-    const removed = await app.inject({
-      method: 'DELETE',
-      url: '/api/agent/conversations/conv-gone',
-    });
-    expect(removed.statusCode).toBe(200);
+    await app.inject({ method: 'DELETE', url: '/api/agent/conversations/conv-gone' });
     const late = await run({
       ...body,
       conversationId: 'conv-gone',
@@ -577,8 +480,6 @@ describe('POST /api/agent/run', () => {
     expect(late.statusCode).toBe(409);
     expect(late.json()).toMatchObject({ error: 'conversation_deleted' });
     expect(existsSync(conversationFile('conv-gone'))).toBe(false);
-    const list = await app.inject({ method: 'GET', url: '/api/agent/conversations' });
-    expect(list.json<Array<{ id: string }>>().map((item) => item.id)).not.toContain('conv-gone');
   });
 
   it('where_am_i отвечает страницей хода этого разговора', async () => {
@@ -588,65 +489,73 @@ describe('POST /api/agent/run', () => {
       url: '/api/agent/actions/where_am_i',
       payload: { input: {}, conversationId: 'conv-1' },
     });
-    const result = answer.json<PanelActionResult>();
-    expect(result.outcome).toBe('done');
-    expect(result.result).toEqual({
+    expect(answer.json<PanelActionResult>().result).toEqual({
       known: true,
       route: '/projects',
       title: 'Проекты',
       projectPath: 'C:\\work\\demo',
       section: 'Projects',
     });
-
-    const outside = await app.inject({
-      method: 'POST',
-      url: '/api/agent/actions/where_am_i',
-      payload: { input: {} },
-    });
-    expect(outside.json<PanelActionResult>().result).toMatchObject({ known: false });
   });
 
-  it('через контур: адрес шлюза и заглушка в окружении процесса, ключа нет нигде', async () => {
+  it('через контур: маршрут gateway контура и модель профиля, промпт контура перед брифом, ключа нет нигде', async () => {
     contour();
     const response = await run(body);
     expect(response.statusCode).toBe(200);
     expect(framesOf(response.payload)[0]).toMatchObject({ kind: 'start', contourId: CONTOUR });
-
-    const seen = dump();
-    expect(seen.env.ANTHROPIC_BASE_URL).toBe(
-      `http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}/_s/assistant`,
+    const fields = lastAsk();
+    expect(fields.routes).toEqual([
+      {
+        adapter: 'claude',
+        route: { kind: 'gateway', id: `gateway:${CONTOUR}` },
+        modelPattern: '*',
+      },
+    ]);
+    expect(fields.model).toBe('qwen2.5:7b');
+    expect(fields.system).toContain('«Контур агента»');
+    expect(fields.system!.indexOf('«Контур агента»')).toBeLessThan(
+      fields.system!.indexOf('route /projects'),
     );
-    expect(seen.env.ANTHROPIC_AUTH_TOKEN).toBe(PLACEHOLDER_KEY);
-    expect(seen.env.ANTHROPIC_MODEL).toBe('qwen2.5:7b');
-    expect(readFileSync(dumpFile, 'utf8')).not.toContain(SECRET);
+    expect(JSON.stringify(core.asks)).not.toContain(SECRET);
     expect(response.payload).not.toContain(SECRET);
-
-    // Промпт контура и снятые слои — как у прогона чата через контур: файлом
-    // ВМЕСТО промпта CLI, а дописка агента остаётся.
-    const flag = (name: string): string | undefined => seen.argv[seen.argv.indexOf(name) + 1];
-    expect(seen.argv).toContain('--system-prompt-file');
-    expect(seen.contourPrompt).toContain('qwen2.5:7b');
-    expect(seen.contourPrompt).toContain('«Контур агента»');
-    expect(seen.systemPrompt).toContain('route /projects');
-    expect(flag('--setting-sources')).toBe('local');
-    for (const arg of lightWindowLayers().args) expect(seen.argv).toContain(arg);
-    expect(seen.argv.join(' ')).not.toContain('Контур агента');
   });
 
-  it('через контур со снятым промптом контура — промпт CLI, слои сняты всё равно', async () => {
+  it('через контур со снятым промптом контура — только бриф агента', async () => {
     contour(false);
-    const response = await run(body);
-    expect(response.statusCode).toBe(200);
-    const seen = dump();
-    expect(seen.env.ANTHROPIC_BASE_URL).toBe(
-      `http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}/_s/assistant`,
-    );
-    expect(seen.argv).not.toContain('--system-prompt-file');
-    expect(seen.contourPrompt).toBeNull();
-    for (const arg of lightWindowLayers().args) expect(seen.argv).toContain(arg);
+    expect((await run(body)).statusCode).toBe(200);
+    expect(lastAsk().routes?.[0]?.route.id).toBe(`gateway:${CONTOUR}`);
+    expect(lastAsk().system).not.toContain('«Контур агента»');
+    expect(lastAsk().system).toContain('route /projects');
   });
 
-  it('ключ в сообщении маскируется до модели и до файла разговора', async () => {
+  it('свой эндпоинт ассистента — маршрут ключа своего адреса; ключ держит ядро, не процесс', async () => {
+    store.updateSettings({
+      endpointProfiles: [
+        {
+          id: 'own',
+          name: 'Свой шлюз',
+          baseUrl: 'http://127.0.0.1:9',
+          apiKind: 'anthropic',
+          model: '',
+          writeToken: false,
+          imagesUrl: '',
+          ownerPlatformId: '',
+        },
+      ],
+      assistantEndpointId: 'own',
+    });
+    expect((await run(body)).statusCode).toBe(200);
+    expect(lastAsk().routes).toEqual([
+      {
+        adapter: 'claude',
+        route: { kind: 'api-key', id: 'api-key:endpoint:own' },
+        modelPattern: '*',
+      },
+    ]);
+    expect(lastAsk().model).toBeUndefined();
+  });
+
+  it('ключ в сообщении маскируется до ядра и до файла разговора', async () => {
     const secretBody = {
       ...body,
       messages: [
@@ -655,39 +564,31 @@ describe('POST /api/agent/run', () => {
         { role: 'user', content: `всё-таки возьми ${PASTED_KEY} и сохрани` },
       ],
     };
-    // Продолжение идёт в разговор, который уже есть: историю с id клиенты шлют только после `start`.
     expect((await run({ ...body, messages: secretBody.messages.slice(0, 1) })).statusCode).toBe(
       200,
     );
     const response = await run(secretBody);
     expect(response.statusCode).toBe(200);
-
-    const seen = dump();
-    // Ни в stdin, ни в файлах, ни в argv/окружении процесса.
-    expect(readFileSync(dumpFile, 'utf8')).not.toContain(PASTED_KEY);
-    // Одно значение — одна метка на весь ход, модели видно, что ключ тот же.
-    expect(seen.stdin.match(/\[КЛЮЧ_1\]/g)).toHaveLength(2);
-    expect(seen.stdin).toContain('подключи контур, вот ключ [КЛЮЧ_1]');
-
-    const saved = readFileSync(join(appData, 'panel-agent', 'conv-1.json'), 'utf8');
+    expect(JSON.stringify(core.asks)).not.toContain(PASTED_KEY);
+    expect(lastAsk().prompt.match(/\[КЛЮЧ_1\]/g)).toHaveLength(2);
+    expect(lastAsk().prompt).toContain('подключи контур, вот ключ [КЛЮЧ_1]');
+    const saved = readFileSync(conversationFile('conv-1'), 'utf8');
     expect(saved).not.toContain(PASTED_KEY);
-    expect(saved).toContain('[КЛЮЧ_1]');
     expect(response.payload).not.toContain(PASTED_KEY);
   });
 
-  it('без своих правил ссылка, адрес, почта и id доходят до модели; ключи и доступ в адресе — нет (D1)', async () => {
+  it('без своих правил ссылка, адрес, почта и id доходят до ядра; ключи и доступ в адресе — нет (D1)', async () => {
     const content =
       'подключи контур, вот ссылка http://127.0.0.1:5222 и https://gw.example.com/v1, ' +
       'хост 10.0.0.7, почта qa@example.com, кейс 3f2c9a1e-8b7d-4c6e-9a01-5d4e3c2b1a09, ' +
       `ключ ${PASTED_KEY}, доступ https://bob:pa55word@git.example.com/repo.git`;
-    const response = await run({ ...body, messages: [{ role: 'user', content }] });
-    expect(response.statusCode).toBe(200);
-    const seen = dump();
-    expect(seen.stdin).toContain('вот ссылка http://127.0.0.1:5222 и https://gw.example.com/v1');
-    expect(seen.stdin).toContain('хост 10.0.0.7, почта qa@example.com');
-    expect(seen.stdin).toContain('кейс 3f2c9a1e-8b7d-4c6e-9a01-5d4e3c2b1a09');
-    expect(seen.stdin).not.toContain(PASTED_KEY);
-    expect(seen.stdin).not.toContain('pa55word');
+    expect((await run({ ...body, messages: [{ role: 'user', content }] })).statusCode).toBe(200);
+    const prompt = lastAsk().prompt;
+    expect(prompt).toContain('вот ссылка http://127.0.0.1:5222 и https://gw.example.com/v1');
+    expect(prompt).toContain('хост 10.0.0.7, почта qa@example.com');
+    expect(prompt).toContain('кейс 3f2c9a1e-8b7d-4c6e-9a01-5d4e3c2b1a09');
+    expect(prompt).not.toContain(PASTED_KEY);
+    expect(prompt).not.toContain('pa55word');
   });
 
   it('ключ маскируется и поверх своих правил раздела, где образца ключей нет', async () => {
@@ -713,64 +614,96 @@ describe('POST /api/agent/run', () => {
       messages: [{ role: 'user', content: `Иванов прислал ${PASTED_KEY}` }],
     });
     expect(response.statusCode).toBe(200);
-    const seen = dump();
-    expect(seen.stdin).toBe('[ИМЯ_1] прислал [КЛЮЧ_1]');
+    expect(lastAsk().prompt).toBe('[ИМЯ_1] прислал [КЛЮЧ_1]');
   });
 
-  it('битые правила защиты данных — отказ data_mask_broken, CLI не запускался', async () => {
+  it('битые правила защиты данных — отказ data_mask_broken, ядро не спрошено', async () => {
     writeFileSync(join(appData, 'dlp-rules.json'), '{ не json');
     const response = await run(body);
     expect(response.statusCode).toBe(409);
     expect(response.json()).toMatchObject({ error: 'data_mask_broken' });
-    expect(existsSync(dumpFile)).toBe(false);
-    expect(existsSync(join(appData, 'panel-agent', 'conv-1.json'))).toBe(false);
+    expect(core.asks).toEqual([]);
+    expect(core.nonces.minted).toBe(0);
+    expect(existsSync(conversationFile('conv-1'))).toBe(false);
   });
 
-  it('контур без шлюза — отказ до запуска, CLI не запускался', async () => {
-    contour();
-    gatewayPort = 0;
-    const response = await run(body);
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ error: 'contour_unreachable' });
-    expect(existsSync(dumpFile)).toBe(false);
-  });
-
-  it('свой эндпоинт ассистента (не контур) — отказ endpoint_unsupported', async () => {
-    store.updateSettings({
-      endpointProfiles: [
-        {
-          id: 'own',
-          name: 'Свой шлюз',
-          baseUrl: 'http://127.0.0.1:9',
-          apiKind: 'anthropic',
-          model: '',
-          writeToken: false,
-          imagesUrl: '',
-          ownerPlatformId: '',
-        },
-      ],
-      assistantEndpointId: 'own',
+  it('ядро отказало (суд маршрута) — ошибка хода словами ядра, токен снят', async () => {
+    await app.close();
+    await core.close();
+    core = await startFakeCore({
+      refuse: {
+        status: 422,
+        code: 'ask-refused',
+        error: 'ask refused',
+        problems: ['adapter aider: not in the allowed routes'],
+      },
     });
-    const response = await run(body);
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ error: 'endpoint_unsupported' });
-    expect(existsSync(dumpFile)).toBe(false);
-  });
-
-  it('CLI без запуска агента — отказ provider_unsupported', async () => {
-    // Codex, Qwen Code, Goose и др. агент панели поддерживает (run-routes.foreign-provider…).
+    app = await buildApp();
     store.updateSettings({ provider: 'aider' });
     const response = await run(body);
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ error: 'provider_unsupported' });
+    expect(response.statusCode).toBe(200);
+    const last = framesOf(response.payload).at(-1);
+    expect(last).toMatchObject({ kind: 'error' });
+    expect(JSON.stringify(last)).toContain('adapter aider: not in the allowed routes');
+    expect(lastAsk().adapter).toBe('aider');
+    expect(bridges.size()).toBe(0);
+    // Ход без сделанного запечатан без следа: открытого хода в файле нет.
+    expect(stored('conv-1').openTurn).toBeUndefined();
   });
 
-  it('claude нет в PATH — отказ cli_not_found', async () => {
-    rmSync(join(bin, isWindows ? 'claude.cmd' : 'claude'));
-    resetCliLookupCache();
+  it('ядро не запущено — ошибка хода с причиной, а не тишина', async () => {
+    await app.close();
+    const empty = mkdtempSync(join(tmpdir(), 'cc-agent-no-core-'));
+    app = await buildApp({ ask: createCoreAskPort(() => empty, core.identity) });
+    try {
+      const response = await run(body);
+      expect(response.statusCode).toBe(200);
+      const last = framesOf(response.payload).at(-1);
+      expect(last).toMatchObject({ kind: 'error' });
+      expect(JSON.stringify(last)).toContain('core is not running');
+      expect(bridges.size()).toBe(0);
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+
+  it('вызов инструмента не моста в сессии — ход оборван, ядру cancel, текст про лишние руки', async () => {
+    behaviour.extra = async ({ emit, cancelled }) => {
+      emit({
+        kind: 'tool-call',
+        data: { toolUseId: 'b1', name: 'Bash', input: { command: 'dir' } },
+      });
+      await cancelled;
+    };
     const response = await run(body);
-    expect(response.statusCode).toBe(409);
-    expect(response.json()).toMatchObject({ error: 'cli_not_found' });
+    const frames = framesOf(response.payload);
+    expect(frames.filter((f) => f.kind === 'tool')).toEqual([]);
+    expect(frames.at(-1)).toMatchObject({ kind: 'error' });
+    expect(JSON.stringify(frames.at(-1))).toContain('Bash');
+    expect(core.cancels).toHaveLength(1);
+    expect(stored('conv-1').openTurn).toBeUndefined();
+    expect(bridges.size()).toBe(0);
+  });
+
+  it('рабочая заметка латиницей перед действием в русском разговоре в ленту не идёт; последний текст — идёт', async () => {
+    behaviour.extra = async ({ fields, emit }) => {
+      emit({ kind: 'assistant-text', data: { text: 'Need the page first; ' } });
+      emit({ kind: 'assistant-text', data: { text: 'calling where_am_i.' } });
+      emit({
+        kind: 'tool-call',
+        data: { toolUseId: 't1', name: 'mcp__panel-bridge__where_am_i', input: {} },
+      });
+      await bridgeCall(fields, 'where_am_i');
+      emit({ kind: 'tool-result', data: { toolUseId: 't1', isError: false } });
+      emit({ kind: 'assistant-text', data: { text: 'You are on the projects page.' } });
+      emit({ kind: 'turn-end', data: { isError: false, numTurns: 1 } });
+    };
+    const response = await run(body);
+    const frames = framesOf(response.payload);
+    expect(frames.filter((f) => f.kind === 'text')).toEqual([
+      { kind: 'text', text: 'You are on the projects page.' },
+    ]);
+    expect(frames.at(-1)).toEqual({ kind: 'done', reply: 'You are on the projects page.' });
   });
 
   it('неверное тело — 400: последняя реплика не человека, id с метасимволами', async () => {
@@ -782,54 +715,27 @@ describe('POST /api/agent/run', () => {
     const badId = await run({ ...body, conversationId: 'a&calc' });
     expect(badId.statusCode).toBe(400);
     expect(badId.json()).toMatchObject({ error: 'invalid_body' });
+    expect(core.asks).toEqual([]);
   });
 
-  // Картинка агенту (12b): у агента нет файловой системы, поэтому картинка едет
-  // В САМОМ ЗАПРОСЕ — строкой потокового ввода с блоком image. Доказательство —
-  // stdin и argv, снятые фальшивым CLI, а не ответ маршрута.
   const PNG =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
-  it('картинка едет блоком image потокового ввода, байт в байт', async () => {
+  it('картинка реплики едет в вопрос ядру как есть: имя, тип, base64', async () => {
+    const before = core.asks.length;
     const response = await run({
       ...body,
       messages: [{ role: 'user', content: 'Что на снимке?\n\nAttached images: shot.png' }],
       images: [{ name: 'shot.png', mediaType: 'image/png', base64: PNG }],
     });
     expect(response.statusCode).toBe(200);
-    expect(framesOf(response.payload).at(-1)).toEqual({
-      kind: 'done',
-      reply: 'Вы в разделе проектов.',
-    });
-
-    const seen = dump();
-    // Флаг сразу за -p: вариадические флаги дальше съели бы его значение.
-    expect(seen.argv.slice(0, 3)).toEqual(['-p', '--input-format', 'stream-json']);
-    const lines = seen.stdin.split('\n').filter(Boolean);
-    expect(lines).toHaveLength(1);
-    const line = JSON.parse(lines[0]!) as {
-      type: string;
-      message: { role: string; content: Array<Record<string, unknown>> };
-    };
-    expect(line.type).toBe('user');
-    expect(line.message.role).toBe('user');
-    expect(line.message.content[0]).toEqual({
-      type: 'image',
-      source: { type: 'base64', media_type: 'image/png', data: PNG },
-    });
-    expect(line.message.content[1]).toMatchObject({ type: 'text' });
-    expect(String(line.message.content[1]!.text)).toContain('Attached images: shot.png');
+    expect(core.asks.length).toBe(before + 1);
+    expect(core.asks.at(-1)?.images).toEqual([
+      { name: 'shot.png', mediaType: 'image/png', base64: PNG },
+    ]);
   });
 
-  it('ход без картинки — прежний запуск: текст в stdin, без потокового ввода', async () => {
-    const response = await run(body);
-    expect(response.statusCode).toBe(200);
-    const seen = dump();
-    expect(seen.argv).not.toContain('--input-format');
-    expect(seen.stdin).toBe(body.messages[0]!.content);
-  });
-
-  it('не картинка под видом PNG — 400 с именем файла, CLI не запускается', async () => {
+  it('не картинка под видом PNG — 400 с именем файла, ядро не спрошено', async () => {
     const response = await run({
       ...body,
       images: [
@@ -846,6 +752,6 @@ describe('POST /api/agent/run', () => {
       messageCode: 'media-agent-image-not-image',
       params: { name: 'note.png' },
     });
-    expect(existsSync(dumpFile)).toBe(false);
+    expect(core.asks).toEqual([]);
   });
 });

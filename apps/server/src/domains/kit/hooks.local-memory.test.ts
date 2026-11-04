@@ -138,33 +138,37 @@ describe('context-watch: пороги по окну', () => {
     ).toMatchObject({ floor: 150_000 });
   });
 
-  // E1: продолжение и следующую стадию группы ведёт панель — совет «/clear»
-  // заставлял группу просить чистую сессию, которая перечитывала всё заново.
-  // N8 (g5 25.10): обычная просьба про PROGRESS.md в группе вставлялась и не
-  // исполнялась — окно ведёт панель, состояние копии живёт в её блокноте.
-  it('N8: группа разделения — обычной просьбы нет, у границы сжатия — блокнот копии, без PROGRESS.md и «/clear»', () => {
+  // E1: продолжение и следующий шаг ведёт ядро — совет «/clear» заставлял шаг
+  // просить чистую сессию, которая перечитывала всё заново.
+  // N8 (g5 25.10): обычная просьба про PROGRESS.md в шаге вставлялась и не
+  // исполнялась — окно ведёт ядро, состояние шага живёт в блокноте из его вводной.
+  it('N8: шаг задачи — обычной просьбы нет, у границы сжатия — блокнот из вводной, без PROGRESS.md и «/clear»', () => {
     delete process.env.AGENTDECK_KIT_VARIANT;
     delete process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
+    delete process.env.AGENTDECK_STEP_KIND;
     expect(run(160_000)).toContain('/clear');
-    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    process.env.AGENTDECK_STEP_KIND = 'chat';
+    expect(run(160_000)).toContain('/clear');
+    process.env.AGENTDECK_STEP_KIND = 'implement';
     expect(run(160_000)).toBeNull();
     const mark = watch.limitsFor(process.env as Record<string, string>).urgent;
     const urgent = run(mark + 1_000) ?? '';
-    expect(urgent).toContain('.agent/run/notebook.agent.md');
+    expect(urgent).toContain('task notebook your brief names');
     expect(urgent).not.toContain('PROGRESS.md');
     expect(urgent).not.toContain('/clear');
   });
 });
 
-describe('clear-advisor: группа разделения', () => {
-  it('со второго сжатия обычной сессии советует «/clear», группе — молчит', async () => {
+describe('clear-advisor: шаг задачи ядра', () => {
+  it('со второго сжатия обычной сессии советует «/clear», шагу задачи — молчит', async () => {
     const advisor = (await import(
       pathToFileURL(join(LIB, 'postcompact-clear-advisor.mjs')).href
     )) as { default: (input: unknown) => { systemMessage: string } | null };
     const input = { session_id: `advisor-${Date.now()}` };
+    delete process.env.AGENTDECK_STEP_KIND;
     expect(advisor.default(input)).toBeNull();
     expect(advisor.default(input)?.systemMessage).toContain('/clear');
-    process.env.AGENTDECK_SPLIT_CHILD = '1';
+    process.env.AGENTDECK_STEP_KIND = 'implement';
     expect(advisor.default(input)).toBeNull();
   });
 });

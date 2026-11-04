@@ -48,11 +48,6 @@ export function MessageBubble({
   isRunning,
   costUnit,
   timing,
-  onSplit,
-  onKeepHere,
-  isSplitPending,
-  splitCeiling,
-  childBranches,
   handoff,
   mediaChatId,
   mediaModel,
@@ -161,7 +156,7 @@ export function MessageBubble({
             // не читается, а решение принимается по составу, не по формату.
             // Порядок разборов не важен — языки блоков разные, и каждый скан
             // видит только свой.
-            // Блок `escalate` — служебный: заметку главному чату рисует его карточка.
+            // Блок `escalate` — служебный: в текст ленты не идёт.
             // Только у ответа агента: человек, описавший формат, видит свой пример.
             const split = scanSplitBlocks(
               isUser ? block.text : withoutSieveBlocks(withoutEscalateBlocks(block.text)),
@@ -210,20 +205,7 @@ export function MessageBubble({
                     </ul>
                   )}
                   {split.proposals.map((proposal, position) => (
-                    <TaskSplitCard
-                      key={position}
-                      proposal={proposal}
-                      // Делить можно только по ПОСЛЕДНЕМУ предложению: карточка
-                      // из середины истории давно отработана, и заводить по ней
-                      // ветки десять ходов спустя никто не просил.
-                      onSplit={isLast ? (options) => onSplit?.(proposal, options) : undefined}
-                      onKeepHere={isLast ? onKeepHere : undefined}
-                      isPending={isSplitPending}
-                      ceiling={splitCeiling}
-                      disabled={isRunning}
-                      childBranches={childBranches}
-                      proposedAt={message.timestamp}
-                    />
+                    <TaskSplitCard key={position} proposal={proposal} />
                   ))}
                   {/* Блок предложения, который панель не поняла, остаётся выше
                       текстом — и без этой строки человек видит простыню JSON, не

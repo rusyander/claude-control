@@ -9,6 +9,7 @@ import { localPaths } from './paths.ts';
 import { IDLE_SLEEP_SECONDS, readRecord, sameShape, serverArgs } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
+import { fakeCoreHold } from './__fixtures__/fake-core-hold.ts';
 
 /**
  * Qwen3.8 27B в каталоге (15.10): рекомендуется агенту на 24 ГБ, Qwen3.6 27B Coding —
@@ -43,6 +44,8 @@ let root: string;
 let up: boolean;
 let spawned: string[][];
 let killed: number[];
+/** Что держит «ядро» к началу проверки; ничего — чистая машина. */
+let coreHeld: number | undefined;
 
 const fakeServerNet: FetchLike = async (input) => {
   if (!String(input).startsWith(`http://127.0.0.1:${PORT}`)) throw new TypeError('fetch failed');
@@ -70,15 +73,18 @@ function service() {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, args: string[]) => {
-      spawned.push(args);
-      up = true;
-      return { pid: 4242, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      killed.push(pid);
-      up = false;
-    },
+    hold: fakeCoreHold({
+      ...(coreHeld ? { initial: { pid: coreHeld, model: Q38 } } : {}),
+      hold: ({ flags }) => {
+        spawned.push(flags);
+        up = true;
+        return 4242;
+      },
+      release: (pid) => {
+        killed.push(pid);
+        up = false;
+      },
+    }),
   });
 }
 
@@ -99,6 +105,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'cc-local-q38-'));
   spawned = [];
   killed = [];
+  coreHeld = undefined;
   up = false;
   const runtimeDir = join(localPaths(root, ENV()).runtime, 'llama-b11583');
   mkdirSync(runtimeDir, { recursive: true });
@@ -200,6 +207,8 @@ describe('Qwen3.8 27B в каталоге', () => {
     if (!fresh) throw new Error('no record');
     const { templateKwargs: _dropped, ...old } = fresh;
     writeFileSync(paths.pidFile, JSON.stringify({ ...old, pid: 999_999_998 }));
+    // Ядро держит тот сервер, переживший перезапуск панели.
+    coreHeld = 999_999_998;
     spawned = [];
     killed = [];
     up = true;
@@ -225,11 +234,9 @@ describe('Qwen3.8 27B в каталоге', () => {
     up = true;
     const local = service();
     expect(local.restartPending()).toBe(true);
-    expect(local.upstream(Q38)?.deferredInline).toBe(false);
     expect(await local.applyPending()).toBe(true);
     expect(spawned).toHaveLength(1);
     expect(readRecord(paths)?.templateHash).toBe(fresh.templateHash);
-    expect(local.upstream(Q38)?.deferredInline).toBe(true);
     // Шаблон тот же — после следующего запуска панели ждать нечего.
     expect(service().restartPending()).toBe(false);
   });

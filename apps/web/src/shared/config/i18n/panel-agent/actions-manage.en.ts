@@ -2,12 +2,8 @@ import type { panelActionsManageRu } from './actions-manage.ru.ts';
 
 /** English titles of the agent's actions over the panel itself (U5b). */
 export const panelActionsManageEn: Record<keyof typeof panelActionsManageRu, string> = {
-  read_split_defaults: 'Shared split group rules',
-  save_split_defaults: 'Change the shared group rules',
   read_sieves: 'Pre-MR sieves',
   delete_learned_sieve: 'Remove a learned sieve',
-  watcher_status: 'Watcher state',
-  set_watcher: 'Switch the watcher on or off',
   list_models: 'Model catalog',
   format_check: 'CLI format check',
   read_account: 'CLI account',

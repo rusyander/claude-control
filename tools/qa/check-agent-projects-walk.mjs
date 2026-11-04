@@ -34,6 +34,8 @@ await runOnStand(
     label: 'agent-projects-walk',
     web: false,
     fakeCli: { claude: FAKE_PANEL_AGENT_PROJECTS_CLI_SOURCE },
+    // Ход агента панели идёт через ядро (s10): без `core` он отказывает «core is not running».
+    core: true,
     seed: ({ root }) => {
       project = join(root, 'walk-project');
       mkdirSync(project, { recursive: true });

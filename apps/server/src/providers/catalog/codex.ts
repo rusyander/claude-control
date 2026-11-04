@@ -97,13 +97,8 @@ export const codexProvider: ConfigProvider = {
   endpointFile: endpointFileOf(facts, codexConfigToml),
   // Детект «конфиг найден» (Ф7): каталог ~/.codex. Только проверка существования.
   configLocations: () => [codexHome()],
-  // Группа Claude едет на прогон накладкой поверх конфига Codex (`-c`, корни
-  // скиллов app-server, хуки надзирателем). Пока писатель накладки не
-  // зарегистрирован в `domains/groups/run-layer/run-layer.ts`, прогон получает честное
-  // «слоя нет», а не тумблер каталогов Claude.
-  groupLayer: 'codex-overlay',
   // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, таблица §1). Ключи —
-  // `-c` на запуск (`economy-run/codex.ts` → `kit/codex.ts`): конфиг человека цел.
+  // верхний уровень `config.toml` дома сеанса (ядро: `apps/core/src/adapters/economy-carry.ts`): конфиг человека цел.
   // Имена обоих ключей сверены со списком полей конфига в бинарнике codex-cli 0.155.1.
   groupEconomy: {
     channel: 'codex',
@@ -115,7 +110,7 @@ export const codexProvider: ConfigProvider = {
       // чтобы предел оболочки не урезал чтение. Ноль у любого из двух — ключа нет.
       // Ключ уходит, ТОЛЬКО если предел меньше 2500 токенов — собственного предела
       // Codex (`CODEX_DEFAULT_TOOL_OUTPUT_TOKENS`, замер 0.155.1): больший ключ не
-      // ужал бы, а поднял предел (`economy-run/codex.ts`). Следствие: при чтении по
+      // ужал бы, а поднял предел (`codexEconomy` ядра). Следствие: при чтении по
       // умолчанию (10 000 токенов) рычаг оболочки ОДИН ключа не даёт никогда — ключ
       // появляется, лишь когда чтение опущено ниже 2500 и оболочка не выше 9996 знаков.
       bashOutputChars: { support: 'native' },
@@ -126,15 +121,6 @@ export const codexProvider: ConfigProvider = {
       // в бинарнике): app-server и `exec` его сами не подтягивают, а панель шлёт в
       // `turn/start` лишь текст (`live/codex-session.ts`).
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      // Доставка — на младшей модели лестницы (`modelLadder`), а не на «Sonnet»
-      // (`provider-chat/cascade/cheap-deliver.ts`); семейства нет в каталоге, через контур
-      // нет строки карты для неё — модель работы; аккаунт её отверг — доставка заново
-      // на модели работы. Глубина не выше глубины младшей ступени (`medium`).
-      sonnetDeliver: { support: 'emulated' },
-      // Пауза — по времени последней записи переписки Codex; решает панель.
-      freshOnColdResume: { support: 'emulated' },
-      // Скрытый пинг поменял бы отпечаток живой сессии, а наценки за запись у OpenAI нет.
-      keepWarm: { support: 'disproportionate', note: 'economy-note-keep-warm-cost' },
       // Строка привычек — нейтральная часть той же строки, что у Claude.
       workHabits: { support: 'emulated' },
     },

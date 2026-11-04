@@ -262,7 +262,8 @@ describe('class runners of zone F through the check queue', () => {
       };
 
       const green = await check();
-      expect(green.units).toMatchObject([{ unit: '.', verdict: 'pass' }]);
+      // Ответ целиком — в сообщение: «no-verdict» без причины не разобрать (g13 p10, полный прогон).
+      expect(green.units, JSON.stringify(green)).toMatchObject([{ unit: '.', verdict: 'pass' }]);
       expect(logOf(green)).toMatch(/^applied: 001_pets\.up\.sql\ndown: reverted\n/);
       expect((await recordOf(w, copy, green)).rec.classOutcome).toMatchObject({
         class: 'migration',
@@ -271,7 +272,7 @@ describe('class runners of zone F through the check queue', () => {
 
       writeFileSync(join(copy, 'db', '001_pets.down.sql'), 'SELECT 1;\n');
       const red = await check();
-      expect(red.verdict).toBe('fail');
+      expect(red.verdict, JSON.stringify(red)).toBe('fail');
       expect(logOf(red)).toMatch(/\ndown: differs\n/);
       const redRec = await recordOf(w, copy, red);
       expect(redRec.rec.classOutcome).toMatchObject({

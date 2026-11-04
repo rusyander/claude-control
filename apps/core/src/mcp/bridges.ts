@@ -1,4 +1,4 @@
-import { PERMIT_TOOL } from '@agentdeck/contracts/core/model-tools';
+import { PERMIT_TOOL, sessionToolsFor } from '@agentdeck/contracts/core/model-tools';
 import { CORE_VARS } from '../adapters/launcher/env.ts';
 import type { CoreClient } from './core-client.ts';
 import type { McpHandlers, McpToolDef } from './stdio-server.ts';
@@ -19,6 +19,8 @@ export interface BridgeEnv {
   url: string;
   token: string;
   procs?: string;
+  /** Вид шага сессии (`AGENTDECK_STEP_KIND`): по нему мост сам строит список, если ядро молчит. */
+  stepKind?: string;
 }
 
 /** Окружение сессии, выставленное запуском (`adapters/launcher/env.ts`). Нет — мост не стартует. */
@@ -26,9 +28,29 @@ export function bridgeEnv(env: NodeJS.ProcessEnv): BridgeEnv | { missing: string
   const url = env[CORE_VARS.coreUrl];
   const token = env[CORE_VARS.access];
   const procs = env[CORE_PROCS_VAR];
+  const stepKind = env[CORE_VARS.stepKind];
   const missing = [...(url ? [] : [CORE_VARS.coreUrl]), ...(token ? [] : [CORE_VARS.access])];
-  return url && token ? { url, token, ...(procs ? { procs } : {}) } : { missing };
+  return url && token
+    ? { url, token, ...(procs ? { procs } : {}), ...(stepKind ? { stepKind } : {}) }
+    : { missing };
 }
+
+/**
+ * Сколько мост ждёт список от ядра, прежде чем отдать свой (мс). Живое ядро отвечает за
+ * миллисекунды; CLI ждёт `tools/list` меньше, чем длится перезапуск ядра (аренда `STALE_MS`
+ * 15 с + подъём; Claude Code 2.1 — меньше ~35 с, проба g13 p10), и без ответа сеанс
+ * остаётся без `step_done` до конца — шаг кончается по сроку.
+ */
+export const LIST_PATIENCE_MS = 5_000;
+
+export interface AgentdeckBridgeOptions {
+  /** Вид шага из окружения сессии; нет — список только от ядра, как прежде. */
+  stepKind?: string;
+  patienceMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const pause = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
 
 function failure(outcome: Awaited<ReturnType<CoreClient['get']>>): string {
   if (outcome.kind === 'unreachable') return `core unreachable: ${outcome.reason}`;
@@ -36,10 +58,32 @@ function failure(outcome: Awaited<ReturnType<CoreClient['get']>>): string {
   return `core refused (${outcome.status}): ${String(body?.code ?? '')} ${String(body?.error ?? '')}`.trim();
 }
 
-export function agentdeckHandlers(client: CoreClient): McpHandlers {
+export function agentdeckHandlers(
+  client: CoreClient,
+  opts: AgentdeckBridgeOptions = {},
+): McpHandlers {
+  const { stepKind } = opts;
+  const own = stepKind ? sessionToolsFor(stepKind) : [];
   return {
     async list() {
-      const got = await client.get('/v1/session/tools');
+      const asked = client.get('/v1/session/tools');
+      // Ядро не ответило в срок (перезапуск на старте сессии) — список того же вида шага той же
+      // функцией, что у ядра (`sessionToolsFor`). Решает по-прежнему ядро: вызов инструмента
+      // идёт к нему и ждёт его подъёма; список прав не даёт. Ответ ядра в срок — его ответ,
+      // и отказ тоже (токен не принят — не маскируем своим списком).
+      const got =
+        own.length > 0
+          ? await Promise.race([
+              asked,
+              (opts.sleep ?? pause)(opts.patienceMs ?? LIST_PATIENCE_MS).then(
+                () => 'late' as const,
+              ),
+            ])
+          : await asked;
+      if (got === 'late') {
+        void asked.catch(() => undefined);
+        return own as McpToolDef[];
+      }
       if (got.kind !== 'reply' || got.status !== 200) return { error: failure(got) };
       const tools = (got.body as { tools?: unknown } | null)?.tools;
       // 200 без списка — сбой ядра, названный клиенту, а не `undefined` дальше (core-s2 F-74).

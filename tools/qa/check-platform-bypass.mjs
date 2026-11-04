@@ -6,10 +6,10 @@
  * мимо контура в облако вендора (шлюз не поднят или ключ не сохранён). Без этого
  * режим пришлось бы убрать — тихий уход данных ровно то, от чего контур защищает.
  *
- * Сервер здесь не решает ничего: план прогона (`/api/platform-run-plan/*`) и чат
- * чужого CLI подменяются на лету, настройки на диске не трогаются. Проверяются
- * ОБЕ шапки — своего чата и чата чужого CLI, — потому что подпись живёт в двух
- * местах, и молчание одной из них и есть тихий уход.
+ * Сервер здесь не решает ничего: план прогона (`/api/platform-run-plan/*`)
+ * подменяется на лету, настройки на диске не трогаются. Шапка чата чужого CLI
+ * больше не проверяется: этот чат только читает прежние разговоры (этап 10, F2c),
+ * прогонов из него нет — ход чужого CLI идёт задачей ядра в `/core/chat`.
  *
  * Запуск: `node tools/qa/check-platform-bypass.mjs` при поднятом `pnpm dev`
  * (`APP_URL` — другой адрес фронта).
@@ -46,26 +46,6 @@ async function openChat(provider) {
   await page.route('**/api/platform-run-plan/**', (route) =>
     json(route, { ...plan, rules: RULES, effort: true }),
   );
-  if (provider !== 'claude') {
-    const chat = {
-      id: 'qa1',
-      providerId: provider,
-      title: 'Проверка',
-      createdAt: '2026-09-17T10:00:00.000Z',
-      updatedAt: '2026-09-17T10:00:00.000Z',
-      messageCount: 0,
-    };
-    await page.route('**/api/provider-runner', (route) =>
-      json(route, { providerId: provider, providerName: 'Codex', mode: 'cli' }),
-    );
-    await page.route('**/api/provider-chat/chats', (route) => json(route, [chat]));
-    await page.route('**/api/provider-chat/chats/qa1/status', (route) =>
-      json(route, { chatId: 'qa1', isRunning: false, partial: '' }),
-    );
-    await page.route('**/api/provider-chat/chats/qa1', (route) =>
-      json(route, { ...chat, messages: [] }),
-    );
-  }
   return page;
 }
 
@@ -102,16 +82,6 @@ check(
   !refused.includes('Мимо контура') && refused.includes('сообщение будет отклонено'),
   'обязательный контур не уходит, а отказывает — и подпись у него своя',
 );
-
-// --- Чат чужого CLI ---------------------------------------------------------
-const foreign = await headerText('codex', 'gatewayDown');
-check(foreign.includes('Проверка'), 'чужой чат открылся');
-check(
-  foreign.includes('Мимо контура') && foreign.includes('облако вендора'),
-  'чужой чат: уход мимо контура назван в шапке',
-);
-const foreignOff = await headerText('codex', 'consumerOff');
-check(!foreignOff.includes('Мимо контура'), 'чужой чат: без ухода метки нет');
 
 await browser.close();
 console.log(bad === 0 ? '\nКаждый уход мимо контура назван.' : `\nПроблем: ${bad}`);

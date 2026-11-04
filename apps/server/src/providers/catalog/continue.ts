@@ -106,7 +106,7 @@ export const continueProvider: ConfigProvider = {
   // Детект «конфиг найден» (Ф7): каталог ~/.continue. Только проверка существования.
   configLocations: () => [continueHome()],
   // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, живая проба `cn` 1.5.47).
-  // Переменные окружения запуска (`economy-run/continue.ts`); каждый ответ — свой `cn -p`.
+  // Переменные окружения запуска (ядро: `apps/core/src/adapters/economy-carry.ts`); каждый ответ — свой `cn -p`.
   groupEconomy: {
     channel: 'continue',
     support: {
@@ -121,10 +121,6 @@ export const continueProvider: ConfigProvider = {
       // Срока кэша у `cn` нет ни ключом, ни переменной.
       cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      // Модель — из config.yaml человека, лестницы моделей у панели нет.
-      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
-      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
-      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
       workHabits: { support: 'emulated' },
     },
   },

@@ -11,7 +11,7 @@ import { subscribe } from 'node:diagnostics_channel';
  * Точка записи — одна на все запуски: канал `child_process` из
  * `node:diagnostics_channel`, который Node публикует при создании любого
  * `ChildProcess` (`spawn`, `execFile`, `exec`, `fork`) — и CLI чата
- * (`ChatRunner`, `cli-spawn.ts`), и посредник, и dev-сервер, и любой будущий
+ * (`cli-spawn.ts`), и посредник, и dev-сервер, и любой будущий
  * запуск. Перечислять места запуска руками значило бы пропустить следующее.
  * Синхронные `spawnSync`/`execFileSync` в канал не попадают: их процесс
  * кончается до возврата вызова.

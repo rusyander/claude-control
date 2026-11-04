@@ -71,8 +71,8 @@ describe('«Что получил агент»', () => {
     expect(hub([GROUP], 'codex')).toContain('data-received-open="codex:sess-1"');
   });
 
-  it('у группы без чата кнопки нет: прогонов ещё не было', () => {
-    const waiting: ChildStageGroup = { ...GROUP, chatId: '', pending: 'waiting', groupIndex: 1 };
+  it('у строки без чата кнопки нет: прогонов ещё не было', () => {
+    const waiting: ChildStageGroup = { ...GROUP, chatId: '' };
     expect(hub([waiting])).not.toContain('data-received-open');
   });
 });

@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Тарифы моделей и расчёт стоимости токенов — общие для панели и ядра, без сети и файлов",
   "exports": {
-    "./pricing": "./src/pricing.ts"
+    "./pricing": "./src/pricing.ts",
+    "./contour-spend": "./src/contour-spend.ts"
   },
   "scripts": {
     "type-check": "tsc --noEmit",

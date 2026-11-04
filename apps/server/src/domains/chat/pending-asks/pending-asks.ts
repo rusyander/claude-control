@@ -88,6 +88,9 @@ export class PendingAsks {
         toolName: event.toolName,
         input: event.input,
         askedAt: this.now(),
+        // Вопрос права ядра: окну хаба нужны поля ядра, иначе решение ребёнка ушло бы маршрутом
+        // прогона и получило бы отказ `core_permit_browser_only`.
+        ...(event.core ? { core: event.core } : {}),
       });
     }
   }

@@ -197,14 +197,13 @@ export function cardOf(item: PendingAskItem): ItemCard {
   }
   if (kind === 'question' || kind === 'relayQuestion') return { kind: 'question', ...base };
   const essence = essenceOf(item);
-  const branch = kind === 'branchGate';
-  const title = branch ? `Первая правка в основной копии: ${essence.text}` : essence.text;
+  const title = essence.text;
   const details = item.launch ? launchCode(item) : item.summary;
   return {
     kind: kind === 'deferred' ? 'decision' : 'permission',
     ...base,
     title: clip(maskSecretsInText(title), 400),
-    ...(essence.isCode && !branch ? { titleIsCode: true } : {}),
+    ...(essence.isCode ? { titleIsCode: true } : {}),
     ...(kind === 'deferred' ? { deferredId: item.target.id } : {}),
     ...(item.reason ? { reason: clip(maskSecretsInText(item.reason), 300) } : {}),
     ...(details ? { code: clip(maskSecretsInText(details), DETAIL_LIMIT) } : {}),
@@ -417,13 +416,6 @@ export function keyboardOf(message: SentMessage, sign: (n: number) => string): I
     const kind = item.target.kind;
     // Только для чтения: ни вариантов, ни «Ответить» — отвечают там, где сессия.
     if (kind === 'outsideQuestion') return;
-    if (kind === 'branchGate') {
-      rows.push([
-        button(index, '✍️ Писать здесь', { act: 'here' }),
-        button(index, '⛔ Не писать', { act: 'stop' }),
-      ]);
-      return;
-    }
     if (kind !== 'question' && kind !== 'relayQuestion') {
       rows.push([
         button(index, '✅ Разрешить', { act: 'allow' }),
@@ -464,12 +456,10 @@ export function keyboardOf(message: SentMessage, sign: (n: number) => string): I
 export const OUTCOME = {
   allowed: (at?: number) => `✅ Разрешено · ${clock(at)}`,
   denied: (at?: number) => `⛔ Запрещено · ${clock(at)}`,
-  here: (at?: number) => `✍️ Писать здесь · ${clock(at)}`,
-  stop: (at?: number) => `⛔ Не писать · ${clock(at)}`,
   answer: (text: string, at?: number) => `✅ Ответ: ${clip(text, 300)} · ${clock(at)}`,
   inPanel: (at?: number) => `💻 Отвечено в панели · ${clock(at)}`,
   stale: (at?: number) => `⌛ Уже не актуально · ${clock(at)}`,
-  deferred: (id: string, at?: number) => `⏳ Отложено как ${id} · ${clock(at)}`,
+  coreOnly: (at?: number) => `🔒 Ответ ядру — в панели или с телефона · ${clock(at)}`,
   expanded: () => '➡️ Ниже отдельным сообщением',
 } as const;
 
@@ -482,6 +472,7 @@ export const TOAST = {
   customPrompt: 'Напишите ответ в ответ на сообщение ниже',
   pickFirst: 'Сначала выберите хотя бы один вариант',
   next: 'Принято — следующий вопрос',
+  coreOnly: 'Ответ ядру — в панели или с телефона',
 } as const;
 
 /** Просьба написать свой ответ — коротко: вопрос уже стоит выше в чате. */

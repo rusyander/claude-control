@@ -18,9 +18,14 @@ export interface PanelWiring {
   hopFactsOf(routeId: string): RouteHopFacts;
   /**
    * Активный контур панели как политика уровня 1 (06 §Precedence): `required` сводит набор
-   * к `gateway:<id>`. Контур не выбран — `undefined`.
+   * к `gateway:<id>`. Контур не выбран — `undefined`. Читается заново на КАЖДЫЙ зов (s10 G7):
+   * смена режима или активного контура доходит до следующей команды и шага без перезапуска ядра.
    */
   contour(routeKnown: (routeId: string) => boolean): ContourPolicy | undefined;
+  /** Профили, прочитанные заново сейчас (шлюз человека видит новые и выключенные контуры). */
+  profilesNow(): PanelProfiles;
+  /** Каталог данных панели этой загрузки; `null` — без панели. */
+  appData: string | null;
 }
 
 /**
@@ -46,7 +51,8 @@ export function contourPolicyOf(
       gateway = 'unknown';
     }
   }
-  return { contourId: card.id, mode: card.mode, gateway };
+  const model = card.defaultModel.trim();
+  return { contourId: card.id, mode: card.mode, gateway, ...(model ? { model } : {}) };
 }
 
 const NO_PROFILES: PanelProfiles = {
@@ -55,6 +61,7 @@ const NO_PROFILES: PanelProfiles = {
   dlpOn: false,
   contourMask: {},
   activeContourId: null,
+  forceStream: true,
   problems: [],
 };
 
@@ -77,13 +84,21 @@ export function panelWiring(
   const profiles = appData ? readPanelProfiles(appData) : NO_PROFILES;
   // Запись панели, которая не прочиталась, названа в журнале ядра, а не пропала молча.
   for (const problem of profiles.problems) note('panel.profile.unread', { problem });
+  const profilesNow = (): PanelProfiles => (appData ? readPanelProfiles(appData) : NO_PROFILES);
   return {
     ...(appData
       ? { sources: { keys: { credentialPresent: keyPresencePort(appData) }, profiles, hops } }
       : {}),
     hops,
-    hopFactsOf: (routeId) => routeHopFacts(profiles, routeId),
+    // Факты звена — со свежего чтения (s10 G7): контур, заведённый после загрузки, получает свою
+    // маску и драйвер, а не факты маршрута не из профилей.
+    hopFactsOf: (routeId) => routeHopFacts(profilesNow(), routeId),
+    // Политика — со свежего чтения: человек переключил режим на карточке, а ядро живёт дальше.
+    // Маршрут контура, заведённого после загрузки, появляется в реестре на `POST /v1/contours/apply`
+    // (пересборка маршрутов панели); до неё шлюз `down`, то есть отказ, а не облако вендора.
     contour: (routeKnown) =>
-      contourPolicyOf(profiles, routeKnown, appData ? keyPresencePort(appData) : undefined),
+      contourPolicyOf(profilesNow(), routeKnown, appData ? keyPresencePort(appData) : undefined),
+    profilesNow,
+    appData: appData ?? null,
   };
 }

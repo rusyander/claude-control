@@ -25,6 +25,8 @@ export type ProofClass = 'human' | 'human-strict';
  */
 export const COMMAND_PROOF_CLASS: Record<AuthorityKind, ProofClass> = {
   estimate: 'human',
+  // Лёгкая сессия панели (этап 10, F2): создаёт задачу и запускает CLI — класс оценки и запуска.
+  ask: 'human',
   launch: 'human',
   pause: 'human',
   resume: 'human',
@@ -35,6 +37,8 @@ export const COMMAND_PROOF_CLASS: Record<AuthorityKind, ProofClass> = {
   'edit-scenario': 'human',
   'edit-split': 'human',
   'message-to-step': 'human',
+  // Конец чата — тот же класс, что ход в нём: человек закрывает свой разговор (этап 10).
+  'end-chat': 'human',
   answer: 'human-strict',
   'edit-requirements': 'human-strict',
   'approve-split': 'human-strict',

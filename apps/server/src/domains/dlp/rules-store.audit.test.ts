@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DlpRule } from '@agentdeck/contracts';
@@ -85,6 +85,31 @@ describe('запись правил', () => {
       saveRules(dir, [rule({ id: 'dup', name: 'A' }), rule({ id: 'dup', name: 'B' })]),
     ).toThrow(/идентификатор повторяется/);
     expect(readRules(dir)).toEqual([]);
+  });
+});
+
+// Перенесено из `DlpProxy.test.ts` (C3c): запись правил осталась панели, прокси держит ядро.
+describe('хранилище правил', () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'dlp-rules-store-'));
+  });
+
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('пишет и читает набор', () => {
+    saveRules(dir, [rule({ id: 'names', name: 'Сотрудники' })]);
+    expect(readRules(dir).map((item) => item.id)).toEqual(['names']);
+  });
+
+  it('битый файл — ОШИБКА, а не «правил нет»', () => {
+    // Пустой список после порчи файла означал бы прокси, пропускающий наружу всё и
+    // сообщающий при этом, что защита работает.
+    writeFileSync(join(dir, 'dlp-rules.json'), '{ не json', 'utf8');
+    expect(() => readRules(dir)).toThrow(DlpRulesError);
   });
 });
 

@@ -1,5 +1,6 @@
 import { publicationOf } from '../../journal/reduce/publish.ts';
 import { END_REASON } from '../next/next.types.ts';
+import { stepAskIn, titleLangOf } from '../scenario/titles.ts';
 import * as hook from './hooks.ts';
 import { failStep, settle, stepCtx, stepMove, type PerformCtx } from './moves.ts';
 import type { StepCtx } from './run.types.ts';
@@ -14,7 +15,8 @@ export async function runCoreStep(ctx: PerformCtx, stepId: string): Promise<void
   const s = stepCtx(ctx, stepId);
   if (!s) return;
   if (s.def.kind === 'ask-human') {
-    const ask = s.def.ask!;
+    // Вопрос пресета — на языке задачи (этап 10, F8); вопрос человека — как записан.
+    const ask = stepAskIn(s.def, titleLangOf(ctx.task.state.created?.lang))!;
     ctx.deps.raise({
       source: 'scenario-step',
       stepId,

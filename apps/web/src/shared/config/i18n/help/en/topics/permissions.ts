@@ -75,9 +75,8 @@ export const permissionsEn: typeof permissionsRu = {
       'mcp__orders__refund_order). Among those, the strongest decision wins: deny beats ' +
       'ask, ask beats allow — regardless of the file and the order of lines. If no rule ' +
       'matched, you are asked for confirmation — and asked where the work is happening: ' +
-      'in a terminal that is Claude’s own question, in the panel chat it is an “the agent ' +
-      'asks for permission” card right in the conversation, and the run waits until you ' +
-      'answer. The panel runs the same analysis on its own side too — that is what draws ' +
+      'in a terminal that is Claude’s own question. The panel chat is a core task, and there ' +
+      'the core asks with a «Core question» card (below). The panel runs the same analysis on its own side too — that is what draws ' +
       'the “not in effect” badge and the warning inside the form.',
 
     guide: {
@@ -328,29 +327,20 @@ export const permissionsEn: typeof permissionsRu = {
       'settings.local.json, an ordinary one into settings.json. They cannot be mixed. ' +
       'Priority is shared regardless: a deny in the personal file beats an allow in the ' +
       'main one exactly as it would otherwise.',
-    noteChatTitle: 'In the panel chat confirmation arrives as a card',
+    noteChatTitle: 'In the panel chat the core asks',
     noteChatText:
-      'The “ask” decision works here too: the agent’s request appears as an “the agent ' +
-      'asks for permission” card with Allow and Deny buttons, and the run waits until you ' +
-      'press one; with no answer for 10 minutes («Settings» → «Models») the card becomes a ' +
-      'D-n item in «Awaiting decision» and the agent goes on with the rest (the «Chat» ' +
-      'document); at 0 the card waits as long as it takes. Auto-approve silently lets ' +
-      'through only what is reversible: reading always passes, even with the toggle off, ' +
-      'while anything irreversible (deleting, wiping history, publishing outward, a ' +
-      'download executed on the spot — curl … | sh, | python, | iex) asks whatever the ' +
-      'toggle says. Push --force-with-lease is an ordinary write: git itself refuses if ' +
-      'someone else’s work appeared on the remote; only force beyond the lease (--force, ' +
-      '-f, +branch) asks. Deleting branches, tags and the stash and any git merge always ' +
-      'ask, regardless of the rules. PowerShell tool commands are judged by the same rules ' +
-      'as Bash: Remove-Item -Recurse is a deletion, git push --force from PowerShell wipes ' +
-      'history; a program launched through Start-Process is judged by what it will run: ' +
-      "Start-Process cmd -ArgumentList '/c','rd','/s','/q','src' is a deletion too. Your own “ask” " +
-      'and “deny” rules outrank auto-approve — a matching call brings the card back; a ' +
-      'PowerShell(…) rule matches regardless of case, as PowerShell itself does. Your ' +
-      '“allow” on an MCP tool by name (mcp__server__tool) the panel applies even where the ' +
-      'whole server is handed to it to decide — in split groups: such a tool runs without ' +
-      'a card, except deleting and merging. An allow on the whole server does not count ' +
-      'here. The edit toggle is an extra “read only” fuse, not a replacement for confirmation.',
+      'A panel chat turn runs as a core task, and the core decides the step’s permissions. ' +
+      'Starting the chat is your permission to edit inside the project root. An edit of a path ' +
+      'the task needs a grant for is held by the core until you answer: the question goes into ' +
+      'the task journal, the panel shows a «Core question» card with Allow and Deny buttons, ' +
+      'and the step waits. The answer goes to the core from the chat window itself (Allow ' +
+      'grants that path) or from a phone with a bound key; the panel server may not answer for ' +
+      'you, and Telegram only reports such a question. The «Auto-approve permissions» toggle, ' +
+      'set to «Permissions auto», grants the task edits on the whole repository — no such questions then. Only the core ' +
+      'publishes: the agent does not push, open MRs or write to the forge itself, and the core ' +
+      'refuses such a command whatever the toggle says (the «Chat» document). Your MCP server ' +
+      'that talks to GitLab or GitHub only reads in a core task. In a terminal your rules still ' +
+      'decide; a PowerShell(…) rule matches regardless of case, as PowerShell itself does.',
     noteProviderTitle: 'Other providers use a different model',
     noteProviderText:
       'With the Codex provider these are not allow/ask/deny lists but two config.toml keys: ' +
@@ -382,7 +372,11 @@ export const permissionsEn: typeof permissionsRu = {
       'array of [[permission.rules]], each with a pattern (Read, Bash(git push*), ' +
       'mcp__server__tool) and an allow / ask / deny decision. Order matters: the rules are ' +
       'checked top to bottom. An unknown field inside the permission block makes the ' +
-      'section read-only — the panel does not edit blindly. ' +
+      'section read-only — the panel does not edit blindly. The same goes for a mode outside ' +
+      'those three (default or plan, for example): Kimi silently drops such a value on startup ' +
+      'and asks every time, so the panel does not pass it off as manual — it shows the section ' +
+      'read-only and names the value; fix it in the file (kimi doctor config reports the same ' +
+      'error). ' +
       'OpenCode uses yet another model — the permission key ' +
       'of opencode.json (global and per-project): the edit (file edits), bash (shell ' +
       'commands), webfetch (network fetches) and read (file reads) tools each get an ' +

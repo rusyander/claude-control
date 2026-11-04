@@ -1,11 +1,11 @@
 /**
  * Основы чата на одноразовой панели (Ф22): кейсы chat-001, chat-003, chat-005,
- * chat-007, chat-009, ни разу не гонявшиеся.
+ * chat-009, ни разу не гонявшиеся.
  *
  * Подменена только модель — фальшивый `claude` (`fake-cli-chat-basics.mjs`) на
  * PATH одноразовой панели; всё между ним и человеком настоящее: поле ввода,
  * маршрут отправки, процесс CLI с его argv, сохранение вложений в папку чата,
- * мост прав `perm-guard` из `--mcp-config`, правила «Разрешать без вопроса»,
+ * мост прав `perm-guard` из `--mcp-config`,
  * разбор известной ошибки CLI и лента. Свидетельства — что ДОШЛО до процесса
  * (`turns.jsonl`: argv, рабочая папка, текст хода, решение моста) и что видно
  * человеку.
@@ -15,8 +15,6 @@
  * - chat-005: Sonnet и «Низкая» в шапке доходят до процесса `--model`/`--effort`;
  * - chat-003: PNG и PDF — две карточки над полем, оба вложения в сообщении,
  *   процесс прочитал их байты (размер картинки и число страниц);
- * - chat-007: «Удаление файлов» выключено — карточка прав с командой, отказ
- *   оставляет файл; включено — карточки нет, файл удалён; после F5 включено;
  * - chat-009: устаревший CLI — карточка ошибки словами интерфейса, сырой текст
  *   рядом, а не вместо.
  *
@@ -25,7 +23,7 @@
  *
  * Запуск: node tools/qa/check-chat-basics.mjs   (браузеры: pnpm qa:setup)
  */
-import { existsSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { deflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
@@ -82,7 +80,8 @@ const TWO_PAGE_PDF = [
 ].join('\n');
 
 await runOnStand(
-  { label: 'chat-basics', fakeCli: { claude: FAKE_BASICS_CLI } },
+  // Чат Claude идёт через ядро (s10): без `core` ход отказывает «core is not running».
+  { label: 'chat-basics', fakeCli: { claude: FAKE_BASICS_CLI }, core: true },
   async (stand, check) => {
     const browser = await chromium.launch();
     const turns = () => readTurns(stand.read, stand.bin);
@@ -281,75 +280,6 @@ await runOnStand(
         (await lines()).includes('Картинка PNG 3×2, в PDF страниц: 2'),
         attachTurn?.text,
       );
-
-      // ---------------------------------------------------------------- chat-007
-      console.log('chat-007: «Удаление файлов» спрашивает или нет');
-      await newChat();
-      await input.fill('УДАЛИ: удали tmp-delete-me.txt командой rm');
-      await input.press('Enter');
-      const deny = page.getByRole('button', { name: 'Запретить' }).last();
-      const asked = await deny
-        .waitFor({ timeout: 30_000 })
-        .then(() => true)
-        .catch(() => false);
-      check('выключенное правило: панель спрашивает права', asked);
-      check(
-        'в карточке — команда',
-        asked && (await page.getByText('rm tmp-delete-me.txt').count()) > 0,
-      );
-      if (asked) await deny.click();
-      const denied = await turnOf('delete', 1);
-      check('отказ дошёл до процесса', denied?.decision === 'deny', `decision=${denied?.decision}`);
-      check('файл на месте', Boolean(denied?.target && existsSync(denied.target)));
-      await wait(1500);
-      check(
-        'агент сообщает об отказе',
-        (await lines()).includes('Мне отказали в удалении — файл на месте.'),
-      );
-
-      const rule = async () => {
-        await page.getByRole('button', { name: 'Настройки чата' }).first().click();
-        const toggle = page.getByRole('switch', { name: /^Удаление файлов/ }).first();
-        await toggle.waitFor({ timeout: 10_000 });
-        return toggle;
-      };
-      // Переключатель меняется после ответа сервера: под нагрузкой стенда ответ
-      // дольше 800 мс, поэтому ждём состояния (до 10 с), а не времени.
-      const switched = async (toggle, want) => {
-        for (let attempt = 0; attempt < 20; attempt++) {
-          if ((await toggle.getAttribute('aria-checked')) === want) return true;
-          await wait(500);
-        }
-        return false;
-      };
-      const toggleOn = await rule();
-      await toggleOn.click();
-      check('правило «Удаление файлов» включено', await switched(toggleOn, 'true'));
-      await page.keyboard.press('Escape');
-      await wait(400);
-      await input.fill('УДАЛИ: ещё раз удали tmp-delete-me.txt');
-      await input.press('Enter');
-      const allowed = await turnOf('delete', 2);
-      check(
-        'включённое правило: карточки нет, разрешено само',
-        allowed?.decision === 'allow',
-        `decision=${allowed?.decision}`,
-      );
-      check('файл удалён', Boolean(allowed?.target) && !existsSync(allowed.target));
-      check(
-        'карточки прав нет',
-        (await page.getByRole('button', { name: 'Запретить' }).count()) === 0,
-      );
-
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await input.waitFor({ timeout: 30_000 });
-      await dismissAccess(page);
-      await wait(1500);
-      const afterReload = await rule();
-      check('после F5 правило по-прежнему включено', await switched(afterReload, 'true'));
-      await afterReload.click();
-      check('выключено обратно', await switched(afterReload, 'false'));
-      await page.keyboard.press('Escape');
 
       // ---------------------------------------------------------------- chat-009
       console.log('chat-009: известная ошибка CLI словами');

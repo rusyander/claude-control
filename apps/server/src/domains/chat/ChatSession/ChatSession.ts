@@ -8,7 +8,6 @@ import {
   type PermissionRequest,
   type ChatPermissionReply,
   type PermissionDecideOutcome,
-  type DeferOptions,
 } from '../ChatPermissions/ChatPermissions.ts';
 
 /**
@@ -310,35 +309,6 @@ export class ChatSession {
     // И с диска: иначе остановленный разговор после перезапуска снова молчал бы.
     this.remember(key, undefined);
     if (chatId !== key) this.remember(chatId, undefined);
-    // Ответ «писать здесь» жил ровно этот прогон: следующий начинается снова в
-    // основной копии, и молчать о ветке ему не с чего.
-    this.branchGateSettled.delete(key);
-  }
-
-  /**
-   * Прогоны, где ворота ветки уже отработали: человек ответил «писать здесь».
-   * Спрашивать второй раз нечего — он сказал это про весь прогон, а не про один
-   * файл, и карточка на каждую следующую правку была бы ровно тем, от чего
-   * уходили. Копия сюда не пишется намеренно: после переезда прогон идёт в ней,
-   * а там ворота молчат сами (`isMainWorkingCopy` уже ложь).
-   */
-  private readonly branchGateSettled = new Set<string>();
-
-  /** Человек решил писать в основной копии — до конца этого прогона. */
-  settleBranchGate(chatId: string): void {
-    const key = this.registry.resolveKey(chatId);
-    this.branchGateSettled.add(key);
-    // Тот же предел и по той же причине, что у тумблеров: карта живёт в памяти
-    // процесса и читается только по ключу.
-    for (const oldest of this.branchGateSettled) {
-      if (this.branchGateSettled.size <= MAX_TOGGLES) break;
-      this.branchGateSettled.delete(oldest);
-    }
-  }
-
-  /** Отработали ли уже ворота ветки в этом прогоне. */
-  isBranchGateSettled(chatId: string): boolean {
-    return this.branchGateSettled.has(this.registry.resolveKey(chatId));
   }
 
   /**
@@ -349,23 +319,11 @@ export class ChatSession {
    * разговора. Ответ, остановка и сводка телефона ищут запрос по ключу прогона,
    * и запрос под синонимом не снимал бы никто.
    */
-  requestPermission(
-    request: PermissionRequest,
-    defer?: DeferOptions,
-  ): Promise<ChatPermissionReply> {
-    return this.permissions.request(
-      {
-        ...request,
-        runId: this.registry.resolveKey(request.runId),
-      },
-      undefined,
-      defer,
-    );
-  }
-
-  /** Номер D-n, которым карточка этого вызова стала по сроку «отложить». */
-  deferredIdOf(runId: string, toolUseId: string): string | undefined {
-    return this.permissions.deferredIdOf(this.registry.resolveKey(runId), toolUseId);
+  requestPermission(request: PermissionRequest): Promise<ChatPermissionReply> {
+    return this.permissions.request({
+      ...request,
+      runId: this.registry.resolveKey(request.runId),
+    });
   }
 
   /** Висящие запросы прав всех разговоров — для сводки ожиданий телефона. */

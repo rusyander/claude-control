@@ -103,8 +103,14 @@ export type EnvNeeds =
       readonly facts: readonly [EnvNeed, ...EnvNeed[]];
       readonly evidence: NeedsEvidence;
     }
-  | { readonly resolution: 'none'; readonly why: string }
-  | { readonly resolution: 'undetermined'; readonly why: string };
+  | ({ readonly resolution: 'none'; readonly why: string } & EnvNeedsWhyCode)
+  | ({ readonly resolution: 'undetermined'; readonly why: string } & EnvNeedsWhyCode);
+
+/** Код текста причины для перевода в интерфейсе; русский `why` — запасной. */
+export interface EnvNeedsWhyCode {
+  readonly whyCode?: string;
+  readonly whyParams?: Readonly<Record<string, string>>;
+}
 
 /** События сессии — те, что не про инструменты. */
 export const sessionEvents = [
@@ -224,6 +230,19 @@ export interface EnvSource {
 }
 
 /**
+ * Подстановки кода текста: строка, число или вложенный код. Та же форма, что
+ * `ServerMessageNestedParams` (`server-messages.ts`), своей копией — модуль
+ * словаря самодостаточен и ничего не импортирует.
+ */
+export interface EnvTextMessage {
+  readonly messageCode: string;
+  readonly params?: EnvTextParams;
+}
+export type EnvTextParams = {
+  readonly [name: string]: string | number | EnvTextMessage | undefined;
+};
+
+/**
  * Общая часть любой записи.
  *
  * `id` — идентичность внутри канона (`<вид>:<имя>`), по нему идёт идемпотентный
@@ -235,6 +254,10 @@ interface EnvItemBase {
   readonly kind: EnvItemKind;
   readonly source: EnvSource;
   readonly intent: string;
+  /** Код `intent` для перевода в интерфейсе; русский `intent` — запасной. В отпечаток не входит. */
+  readonly intentCode?: string;
+  /** Подстановки кода; фраза из частей (необязательный хвост, «без описания») везёт их вложенными кодами. */
+  readonly intentParams?: EnvTextParams;
   readonly trigger: EnvTrigger;
   readonly blocking: EnvBlocking;
   readonly needs: EnvNeeds;
@@ -541,6 +564,12 @@ export interface EnvSkip {
   readonly reason: EnvSkipReason;
   /** Подробность для человека: какой файл, какой формат. */
   readonly detail: string;
+  /**
+   * Код `detail` для перевода в интерфейсе; русская строка — запасная для клиента,
+   * которому код незнаком. Строка чужого источника (текст ошибки ОС) кода не имеет.
+   */
+  readonly detailCode?: string;
+  readonly detailParams?: EnvTextParams;
 }
 
 /**
@@ -559,6 +588,9 @@ export interface EnvSectionState {
   readonly enabled: boolean;
   /** Каким ключом раздел выключен — человек читает это на экране. */
   readonly detail: string;
+  /** Код `detail` для перевода; русская строка — запасная. */
+  readonly detailCode?: string;
+  readonly detailParams?: EnvTextParams;
 }
 
 /** Паспорт среды одного провайдера на одном уровне. */
@@ -609,6 +641,19 @@ function needsSignature(needs: EnvNeeds): string {
 }
 
 /**
+ * Коды текстов (`intentCode`, `needs.whyCode`) — подача для перевода, а не
+ * содержимое: паспорт, снятый до появления кодов, обязан совпасть с нынешним,
+ * иначе подписка объявила бы изменившейся каждую запись.
+ */
+const PRESENTATION_KEYS = new Set(['intentCode', 'intentParams']);
+
+function withoutWhyCode(needs: unknown): unknown {
+  if (needs === null || typeof needs !== 'object') return needs;
+  const { whyCode: _code, whyParams: _params, ...rest } = needs as Record<string, unknown>;
+  return rest;
+}
+
+/**
  * СОДЕРЖИМОЕ записи в отпечатке. Без него отпечаток не менялся от правки тела
  * правила, команды хука или текста инструкций — то есть ровно от того, ради
  * обнаружения чего он существует (инвариант 7, «человек правил файл цели
@@ -620,8 +665,8 @@ function needsSignature(needs: EnvNeeds): string {
 function contentSignature(item: EnvItem): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(item as unknown as Record<string, unknown>)) {
-    if (key === 'source' || value === undefined) continue;
-    parts.push(`${key}=${stableString(value)}`);
+    if (key === 'source' || PRESENTATION_KEYS.has(key) || value === undefined) continue;
+    parts.push(`${key}=${stableString(key === 'needs' ? withoutWhyCode(value) : value)}`);
   }
   return parts.sort().join('');
 }

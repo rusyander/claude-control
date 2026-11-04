@@ -13,10 +13,6 @@ import {
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import { AUTONOMOUS_PERMISSION_MODE } from '../../domains/chat/ChatWorkspace/ChatWorkspace.ts';
-import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
-import type { ChatLink } from '../../lib/app-store/app-store.types.ts';
-import { wireGroupActivation } from '../../bootstrap/group-activation-wiring/group-activation-wiring.ts';
 
 /**
  * Продолжение работы в чистой сессии: маршруты и планировщик вместе.
@@ -106,7 +102,17 @@ describe('маршруты продолжения в чистой сессии',
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      providerChats: new ProviderChatService(),
+      coreChats: {
+        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
+        estimate: async () => ({
+          ok: false as const,
+          code: 'no-core',
+          message: 'no core in this test',
+        }),
+        command: async () => {
+          throw new Error('no core in this test');
+        },
+      },
       session: new ChatSession(registry),
     });
     await app.ready();
@@ -204,7 +210,17 @@ describe('маршруты продолжения в чистой сессии',
       registerChatHandoffRoutes(busy, ctxOf(root, store), {
         runs: registry,
         chains: new HandoffChains(),
-        providerChats: new ProviderChatService(),
+        coreChats: {
+          // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
+          estimate: async () => ({
+            ok: false as const,
+            code: 'no-core',
+            message: 'no core in this test',
+          }),
+          command: async () => {
+            throw new Error('no core in this test');
+          },
+        },
         session: new ChatSession(registry),
       });
       await busy.ready();
@@ -230,7 +246,17 @@ describe('маршруты продолжения в чистой сессии',
       registerChatHandoffRoutes(quiet, ctxOf(root, store), {
         runs: registry,
         chains,
-        providerChats: new ProviderChatService(),
+        coreChats: {
+          // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
+          estimate: async () => ({
+            ok: false as const,
+            code: 'no-core',
+            message: 'no core in this test',
+          }),
+          command: async () => {
+            throw new Error('no core in this test');
+          },
+        },
         session: new ChatSession(registry),
       });
       await quiet.ready();
@@ -793,528 +819,5 @@ ${block(PROPOSAL)}`,
     expect(chains.shouldNoticeContext(['чат-1'], 215_000)).toBe(false);
     // Выросло ещё на шаг — повод сказать снова.
     expect(chains.shouldNoticeContext(['чат-1'], 240_000)).toBe(true);
-  });
-});
-
-/**
- * Конвейер «работа → ревью → фикс» на живом реестре прогонов.
- *
- * Планировщик у реестра один, и звенья конвейера едут через него же: проверяется
- * не только то, ЧТО заводится, но и то, что оно заводится на правильной модели,
- * с правильной дописской и ровно один раз.
- */
-/** Каталоги конфигурации рядом с временным хранилищем — включение группы пишет только туда. */
-function groupPaths(root: string) {
-  return {
-    root,
-    appData: join(root, 'agentdeck'),
-    settings: join(root, 'settings.json'),
-    settingsLocal: join(root, 'settings.local.json'),
-    claudeMd: join(root, 'CLAUDE.md'),
-    secretsEnv: join(root, 'secrets.env'),
-    skills: join(root, 'skills'),
-    hooks: join(root, 'hooks'),
-    mcpConfig: join(root, '.claude.json'),
-  };
-}
-
-describe('планировщик конвейера подбора модели', () => {
-  const CWD = 'C:/work/проект-worktrees/rename';
-
-  /**
-   * `tools` — вызовы инструментов, которые ход сделал до текста ответа;
-   * `context` — окно последнего шага (расход), по нему группа выбирает сессию (E1).
-   */
-  function fakeRun(
-    text: string,
-    tools: readonly string[] = [],
-    onStart?: () => void,
-    context?: number,
-  ): RunLike {
-    return {
-      start: async (_options, onEvent) => {
-        onStart?.();
-        tools.forEach((name, index) =>
-          onEvent({ kind: 'tool', name, input: {}, id: `toolu_${index}` }),
-        );
-        if (context) {
-          onEvent({ kind: 'usage', input: context, output: 0, cacheRead: 0, cacheCreation: 0 });
-        }
-        onEvent({ kind: 'text', text });
-        onEvent({ kind: 'done', costUsd: 0, durationMs: 1, sessionId: 'sess-работа' });
-      },
-      stop: () => undefined,
-    };
-  }
-
-  function build(
-    text: string,
-    options: {
-      hasWork?: boolean;
-      tools?: readonly string[];
-      store?: AppStore;
-      dir?: string;
-      stat?: () => number | undefined;
-      context?: number;
-    } = {},
-  ) {
-    const chains = new HandoffChains();
-    const { store } = options;
-    /** Включённые группы в момент, когда прогон реально стартовал, — по порядку стартов. */
-    const enabledAtStart: string[][] = [];
-    const registry = new ChatRunRegistry(() =>
-      fakeRun(
-        text,
-        options.tools,
-        () => {
-          if (store) {
-            enabledAtStart.push(
-              store
-                .getGroups()
-                .filter((group) => group.isEnabled)
-                .map((group) => group.id),
-            );
-          }
-        },
-        options.context,
-      ),
-    );
-    const links = new Map<string, ChatLink>();
-    // Со store связи живут там же, где в runtime: включение группы читает дерево из него.
-    const readLink = (key: string) => (store ? store.getChatLink(key) : links.get(key));
-    const writeLink = (key: string, link: ChatLink) =>
-      store ? store.setChatLink(key, link) : void links.set(key, link);
-    if (store) {
-      wireGroupActivation({ store, paths: groupPaths(options.dir ?? ''), chatRuns: registry });
-    }
-    const runs: {
-      chatId: string;
-      model?: string;
-      effort?: string;
-      append?: string;
-      permissionMode?: string;
-      prompt?: string;
-    }[] = [];
-    // Реестр подменён не полностью: прогоны настоящие, а вот с чем их запустили
-    // — видно только отсюда, поэтому старт перехватывается обёрткой.
-    const start = registry.start.bind(registry);
-    registry.start = (chatId, opts, meta) => {
-      runs.push({
-        chatId,
-        ...(opts.model ? { model: opts.model } : {}),
-        ...(opts.effort ? { effort: opts.effort } : {}),
-        ...(opts.appendSystemPrompt ? { append: opts.appendSystemPrompt } : {}),
-        ...(opts.permissionMode ? { permissionMode: opts.permissionMode } : {}),
-        ...(opts.prompt ? { prompt: opts.prompt } : {}),
-      });
-      return start(chatId, opts, meta);
-    };
-
-    registry.setHandoffPlanner(
-      createHandoffPlanner({
-        runs: registry,
-        chains,
-        session: new ChatSession(registry),
-        selfBaseUrl: 'http://127.0.0.1:5178',
-        ...(options.stat ? { stat: options.stat } : {}),
-        cascade: {
-          linkOf: (aliases) => aliases.map(readLink).find(Boolean),
-          saveLink: (chatId, link) => void writeLink(chatId, link),
-          markReviewed: (aliases, at) => {
-            for (const key of aliases) {
-              const link = readLink(key);
-              if (link) writeLink(key, { ...link, reviewedAt: at });
-            }
-          },
-          hasWork: () => options.hasWork ?? true,
-          settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
-        },
-      }),
-    );
-    return { chains, registry, links, runs, enabledAtStart };
-  }
-
-  const WORK_LINK: ChatLink = {
-    parentChatId: 'родитель',
-    createdAt: '2026-09-07T10:00:00.000Z',
-    title: 'Переименования',
-    branch: 'split/rename',
-    model: 'sonnet',
-    effort: 'medium',
-    kind: 'mechanical',
-    lowered: true,
-    stage: 'work',
-    ceilingModel: 'claude-opus-5',
-    ceilingEffort: 'high',
-  };
-
-  /** Прогон одного звена от старта до завершения планировщика. */
-  async function run(
-    registry: ChatRunRegistry,
-    chatId: string,
-    permissionMode?: string,
-  ): Promise<void> {
-    registry.start(
-      chatId,
-      { prompt: 'переименуй foo в bar', cwd: CWD, ...(permissionMode ? { permissionMode } : {}) },
-      { projectPath: CWD },
-    );
-    await new Promise((done) => setTimeout(done, 20));
-  }
-
-  it('продолжение группы с чистого листа несёт задание группы, а не реплику закрытого хода (F6)', async () => {
-    // Окно у сжатия (150k из 200k): только тогда группе положен чистый лист (E1).
-    const { chains, registry, links } = build(`Этап закрыт.\n\n${block(PROPOSAL)}`, {
-      stat: () => Date.now() + 10_000,
-      context: 150_000,
-    });
-    const task = 'ЗАДАНИЕ ГРУППЫ ЦЕЛИКОМ: переименовать foo в bar, тесты зелёные, MR.';
-    links.set('чат-группа', { ...WORK_LINK, task });
-    chains.setAuto(['чат-группа'], true);
-
-    registry.start(
-      'чат-группа',
-      { prompt: 'Ответ на твой вопрос: да, вариант A.', cwd: CWD },
-      { projectPath: CWD },
-    );
-    await new Promise((done) => setTimeout(done, 20));
-
-    const next = registry.active().find((one) => one.chatId.startsWith('new-'));
-    expect(next).toBeDefined();
-    expect(chains.rootTaskOf([next?.chatId ?? ''])).toBe(task);
-  });
-
-  it('звено группы идёт в авторежиме, даже если прогон работы режим потерял', async () => {
-    // Усыновлённый после перезапуска прогон приходит без режима — живой прогон
-    // 24.09.2026: ревью и правки групп встали на невидимой карточке прав.
-    const { registry, links, runs } = build('Готово, переименовал.');
-    links.set('чат-работа', WORK_LINK);
-
-    await run(registry, 'чат-работа');
-
-    const review = runs.find((item) => item.chatId.startsWith('new-'));
-    expect(review?.permissionMode).toBe(AUTONOMOUS_PERMISSION_MODE);
-  });
-
-  it('группа без права правок так и идёт без него', async () => {
-    const { registry, links, runs } = build('Готово, переименовал.');
-    links.set('чат-работа', WORK_LINK);
-
-    await run(registry, 'чат-работа', 'default');
-
-    const review = runs.find((item) => item.chatId.startsWith('new-'));
-    expect(review?.permissionMode).toBe('default');
-  });
-
-  it('после понижённой работы сам заводит ревью на потолке', async () => {
-    const { registry, links, runs } = build('Готово, переименовал.');
-    links.set('чат-работа', WORK_LINK);
-
-    await run(registry, 'чат-работа');
-
-    const review = runs.find((item) => item.chatId.startsWith('new-'));
-    expect(review?.model).toBe('claude-opus-5');
-    expect(review?.effort).toBe('high');
-    // Планка сдачи работы в ревью не уезжает: она сказала бы проверяющему
-    // ровно обратное тому, зачем его завели.
-    expect(review?.append ?? '').not.toContain('BELOW the ceiling');
-    expect(links.get(review?.chatId ?? '')?.stage).toBe('review');
-    // Отметка о проверке — на работе, по её собственному ключу.
-    expect(links.get('чат-работа')?.reviewedAt).toBeTruthy();
-  });
-
-  // Раунд 4: звено конвейера стартует мимо маршрута отправки — явная группа
-  // родителя до него не доезжала.
-  it('звено конвейера стартует с включённой группой родителя', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'cc-stage-group-'));
-    try {
-      mkdirSync(join(dir, 'agentdeck'), { recursive: true });
-      const store = new AppStore(join(dir, 'agentdeck'));
-      store.saveGroup({
-        id: 'x',
-        name: 'Набор X',
-        description: '',
-        color: 'accent',
-        icon: 'folder',
-        members: [],
-        env: {},
-        isEnabled: false,
-        order: 0,
-        projectPaths: [],
-      });
-      store.setChatGroupSettings('родитель', { groupChoice: 'global:x' });
-      // Своё «auto» у работы: группу включает именно старт звена, а не её прогон.
-      store.setChatGroupSettings('чат-работа', { groupChoice: 'auto' });
-      store.setChatLink('чат-работа', WORK_LINK);
-      const { registry, runs, enabledAtStart } = build('Готово, переименовал.', { store, dir });
-
-      await run(registry, 'чат-работа');
-
-      const review = runs.findIndex((item) => item.chatId.startsWith('new-'));
-      expect(review).toBeGreaterThan(0);
-      expect(enabledAtStart[0]).not.toContain('x');
-      expect(enabledAtStart[review]).toContain('x');
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('пустой дифф не стоит прогона на потолке', async () => {
-    const { registry, links, runs } = build('Ничего не понадобилось.', { hasWork: false });
-    // Работа на потолке: понижённая без правок идёт заново на потолке (F4) —
-    // здесь речь только о ревью пустого диффа.
-    links.set('чат-работа', {
-      ...WORK_LINK,
-      lowered: false,
-      model: 'claude-opus-5',
-      effort: 'high',
-    });
-
-    await run(registry, 'чат-работа');
-
-    expect(runs.filter((item) => item.chatId.startsWith('new-'))).toHaveLength(0);
-  });
-
-  it('замечания ревью заводят правки обратно на модели работы', async () => {
-    const verdict = ['```agentdeck:review', '{"findings":["поправь ChatSplit.ts:88"]}', '```'];
-    const { registry, links, runs } = build(`Проверил.\n${verdict.join('\n')}`);
-    // Без ревьюера в связи прохода проверки за правками нет: тест — про модель
-    // правок, а заглушка отвечает правкам тем же вердиктом, и проверка, начатая
-    // в ту же миллисекунду, перезаписала бы связь правок своим ключом `new-<ms>`.
-    const reviewLink: ChatLink = {
-      ...WORK_LINK,
-      stage: 'review',
-      model: 'claude-opus-5',
-      effort: 'high',
-      lowered: false,
-      workModel: 'sonnet',
-      workEffort: 'medium',
-    };
-    delete reviewLink.ceilingModel;
-    links.set('чат-ревью', reviewLink);
-
-    await run(registry, 'чат-ревью');
-
-    const fix = runs.find((item) => item.chatId.startsWith('new-'));
-    expect(fix?.model).toBe('sonnet');
-    expect(fix?.effort).toBe('medium');
-    // Правки идут ниже потолка — планка сдачи им нужна.
-    expect(fix?.append ?? '').toContain('BELOW the ceiling');
-    expect(links.get(fix?.chatId ?? '')?.stage).toBe('fix');
-  });
-
-  it('конец правок заводит проход проверки на ревьюере группы (U6)', async () => {
-    const { registry, links, runs } = build('Поправил ChatSplit.ts:88, тест зелёный.');
-    links.set('чат-правки', {
-      ...WORK_LINK,
-      stage: 'fix',
-      model: 'sonnet',
-      effort: 'medium',
-      workModel: 'sonnet',
-      workEffort: 'medium',
-      fixFindings: ['поправь ChatSplit.ts:88'],
-    });
-
-    await run(registry, 'чат-правки');
-
-    const verify = runs.filter((item) => item.chatId.startsWith('new-'));
-    expect(verify).toHaveLength(1);
-    expect(verify[0]?.model).toBe(WORK_LINK.ceilingModel);
-    expect(verify[0]?.prompt).toContain('VERIFYING those fixes');
-    // У проверки нет планки сдачи: она не пишет код.
-    expect(verify[0]?.append ?? '').not.toContain('BELOW the ceiling');
-    expect(links.get(verify[0]?.chatId ?? '')).toMatchObject({
-      stage: 'review',
-      fixFindings: ['поправь ChatSplit.ts:88'],
-    });
-  });
-
-  it('ревью без замечаний закрывает цепочку', async () => {
-    const verdict = ['```agentdeck:review', '{"findings":[]}', '```'];
-    const { registry, links, runs } = build(`Проверил.\n${verdict.join('\n')}`);
-    links.set('чат-ревью', { ...WORK_LINK, stage: 'review', workModel: 'sonnet' });
-
-    await run(registry, 'чат-ревью');
-
-    expect(runs.filter((item) => item.chatId.startsWith('new-'))).toHaveLength(0);
-  });
-
-  /**
-   * Ключевой предохранитель: человек дописал ребёнку второе сообщение, прогон
-   * снова закончился успешно — и второй проверки той же работы быть не должно.
-   */
-  it('второе сообщение работе не заводит второе ревью', async () => {
-    const { registry, links, runs } = build('И это тоже готово.');
-    links.set('чат-работа', WORK_LINK);
-
-    await run(registry, 'чат-работа');
-    await run(registry, 'чат-работа');
-
-    expect(runs.filter((item) => item.chatId.startsWith('new-'))).toHaveLength(1);
-  });
-
-  /**
-   * Уровни (Т1) через тот же планировщик: план кончился — стартует работа
-   * ровно один раз; разбор уходит конвейеру, а не в звенья; конец цепочки
-   * группы доходит до конвейера с её связью.
-   */
-  describe('уровни разделения', () => {
-    function buildLevels(
-      text: string,
-      options: { hasWork?: boolean; tools?: readonly string[] } = {},
-    ) {
-      const built = build(text, options.tools ? { tools: options.tools } : {});
-      const planned: string[] = [];
-      const ended: { branch?: string; ok: boolean; status?: string }[] = [];
-      const triaged: string[] = [];
-      built.registry.setHandoffPlanner(
-        createHandoffPlanner({
-          runs: built.registry,
-          chains: built.chains,
-          session: new ChatSession(built.registry),
-          selfBaseUrl: 'http://127.0.0.1:5178',
-          cascade: {
-            linkOf: (aliases) => aliases.map((key) => built.links.get(key)).find(Boolean),
-            saveLink: (chatId, link) => void built.links.set(chatId, link),
-            markReviewed: () => undefined,
-            markPlanned: (aliases) => void planned.push(...aliases),
-            hasWork: () => options.hasWork ?? true,
-            settings: () => ({ taskSplitInitiative: true, handoffInitiative: false }),
-          },
-          split: {
-            onTriageFinished: (finished) => {
-              triaged.push(finished.chatId);
-              return { kind: 'notice', code: 'triageApplied', text: 'применён' };
-            },
-            onChainEnded: (link, outcome) =>
-              void ended.push({
-                ...(link.branch ? { branch: link.branch } : {}),
-                ok: outcome.status !== 'failed',
-                status: outcome.status,
-              }),
-          },
-        }),
-      );
-      return { ...built, planned, ended, triaged };
-    }
-
-    const PLAN_LINK: ChatLink = {
-      ...WORK_LINK,
-      stage: 'plan',
-      model: 'claude-opus-5',
-      effort: 'high',
-      workModel: 'sonnet',
-      workEffort: 'medium',
-      task: 'переименуй foo в bar',
-      owns: ['src/rename'],
-    };
-
-    it('после плана заводит работу на подобранной модели и помечает план отработанным', async () => {
-      // Прогон-заглушка отвечает одним текстом всем: работе после плана тоже, и
-      // без диффа её цепочка кончается сразу — так виден и конец цепочки.
-      const { registry, links, runs, planned, ended } = buildLevels(
-        'Готово.\n```agentdeck:plan\n## Шаги\n1. Найти foo\n```',
-        { hasWork: false },
-      );
-      links.set('чат-план', PLAN_LINK);
-
-      await run(registry, 'чат-план');
-
-      const work = runs.find((item) => item.chatId.startsWith('new-'));
-      expect(work?.model).toBe('sonnet');
-      expect(work?.effort).toBe('medium');
-      expect(work?.append).toContain('BELOW the ceiling');
-      expect(links.get(work?.chatId ?? '')).toMatchObject({ stage: 'work', lowered: true });
-      expect(planned).toContain('чат-план');
-      // План — не цепочка: конвейер узнаёт о конце РАБОТЫ, а не плана.
-      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'done' }]);
-    });
-
-    it('план без блока: работа стартует с пометкой, что плана нет', async () => {
-      const { registry, links, runs } = buildLevels('Не разобрался.');
-      links.set('чат-план', PLAN_LINK);
-      const seen: { stage?: string; planMissing?: boolean }[] = [];
-      registry.start('чат-план', { prompt: 'план', cwd: CWD }, { projectPath: CWD });
-      registry.attach('чат-план', 0, {
-        send: ({ event }) => {
-          if (event.kind === 'handoff') {
-            seen.push({
-              ...(event.stage ? { stage: event.stage } : {}),
-              ...(event.planMissing ? { planMissing: true } : {}),
-            });
-          }
-        },
-        close: () => undefined,
-      });
-      await new Promise((done) => setTimeout(done, 20));
-
-      expect(runs.some((item) => item.chatId.startsWith('new-'))).toBe(true);
-      expect(seen).toEqual([{ stage: 'work', planMissing: true }]);
-    });
-
-    // Живой прогон 25.09: план спросил человека, и панель тут же завела работу
-    // по недописанному плану — ответ ушёл в чат, который уже никто не читал.
-    it('план кончился вопросом — работа не заводится, группа ждёт человека', async () => {
-      const { registry, links, runs, planned, ended } = buildLevels(
-        'Разделить по модулям или одним коммитом?',
-      );
-      links.set('чат-план', PLAN_LINK);
-
-      await run(registry, 'чат-план');
-
-      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
-      expect(planned).toEqual([]);
-      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
-    });
-
-    it('разбор идёт конвейеру, а не в звенья', async () => {
-      const { registry, links, runs, triaged } = buildLevels('Развёл.');
-      links.set('чат-разбор', { ...WORK_LINK, stage: 'triage', branch: undefined as never });
-
-      await run(registry, 'чат-разбор');
-
-      expect(triaged).toEqual(['чат-разбор']);
-      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
-    });
-
-    it('конец цепочки группы доходит до конвейера: работа на потолке — сразу, правки — тоже', async () => {
-      const { registry, links, ended } = buildLevels('Сделал.');
-      links.set('чат-работа', { ...WORK_LINK, lowered: false });
-      links.set('чат-правки', { ...WORK_LINK, stage: 'fix', branch: 'split/fix' });
-
-      await run(registry, 'чат-работа');
-      await run(registry, 'чат-правки');
-
-      expect(ended).toEqual([
-        { branch: 'split/rename', ok: true, status: 'done' },
-        { branch: 'split/fix', ok: true, status: 'done' },
-      ]);
-    });
-
-    it('ход работы кончился вопросом — группа ждёт человека, ревью не заводится (Д3)', async () => {
-      const { registry, links, ended, runs } = buildLevels('Переименовать и api.ts тоже?');
-      links.set('чат-работа', { ...WORK_LINK, lowered: true });
-
-      await run(registry, 'чат-работа');
-
-      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
-      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
-    });
-
-    // Живой прогон 23.09: ребёнок спросил, как велит Д16, инструментом, получил
-    // «вопрос показан карточкой — заверши ход» и ответил «Жду ваш выбор…» без
-    // вопросительного знака. Группа закрылась «готово», ждавшие пошли бы от
-    // недоделанной ветки.
-    it('вопрос инструментом AskUserQuestion — тоже ожидание человека, даже без «?» в тексте', async () => {
-      const { registry, links, ended, runs } = buildLevels('Жду ваш выбор между красным и синим.', {
-        tools: ['AskUserQuestion'],
-      });
-      links.set('чат-работа', { ...WORK_LINK, lowered: true });
-
-      await run(registry, 'чат-работа');
-
-      expect(ended).toEqual([{ branch: 'split/rename', ok: true, status: 'awaiting' }]);
-      expect(runs.filter((item) => item.chatId.startsWith('new-'))).toEqual([]);
-    });
   });
 });

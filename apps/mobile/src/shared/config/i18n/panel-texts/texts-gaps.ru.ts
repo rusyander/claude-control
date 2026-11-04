@@ -22,9 +22,7 @@ type GapsTexts = { [C in PanelTextCode]?: string } & {
 export const panelTextsGapsRu = {
   'journal-read-chat-modes': 'Режимы чата',
   'journal-read-chat-spend': 'Расход чатов за сеанс',
-  'journal-read-model-cascade': 'Подбор модели под задачу',
   'journal-list-lowered-runs': 'Понижённые прогоны',
-  'journal-read-split-overlap': 'Пересечения веток разделения',
   'journal-read-model-pricing': 'Цены моделей',
   'journal-list-editors': 'Редакторы кода',
   'journal-browse-folders': 'Обзор папок',
@@ -46,33 +44,6 @@ export const panelTextsGapsRu = {
     'Стандартная просьба кнопки «Закрыть этап»: подвести итог и подготовить продолжение',
   'value-handoff-request-next':
     'Агент чата ответит блоком продолжения; перейти в новую сессию решаете вы (или агент панели по вашей просьбе — отдельной карточкой)',
-  'journal-set-model-cascade': 'Подбор модели под задачу',
-  'summary-set-model-cascade-on': 'Включить подбор модели под задачу в проекте «{{name}}»',
-  'summary-set-model-cascade-off': 'Выключить подбор модели под задачу в проекте «{{name}}»',
-  'value-model-cascade-on':
-    'Следующие прогоны чатов этого проекта (и его копий) сами выбирают модель под род работы',
-  'value-model-cascade-off':
-    'Следующие прогоны чатов этого проекта (и его копий) идут на выбранной вами модели',
-  'journal-set-review-after-work': 'Ревью после работы',
-  'summary-set-review-after-work-on': 'Включить ревью после работы в проекте «{{name}}»',
-  'summary-set-review-after-work-off': 'Выключить ревью после работы в проекте «{{name}}»',
-  'value-review-after-work-on':
-    'Группы следующих разделений этого проекта (и его копий) после работы получают ревью на потолке',
-  'value-review-after-work-off':
-    'Группы следующих разделений этого проекта (и его копий) после работы идут сразу в доставку, без ревью',
-  'journal-split-accept-group': 'Приёмка группы разделения',
-  'summary-split-accept': 'Принять доставленную группу «{{group}}» разделения чата «{{chat}}»',
-  'summary-split-unaccept':
-    'Снять отметку «принято» с группы «{{group}}» разделения чата «{{chat}}»',
-  'value-split-accept-effect':
-    'Группа получает отметку «принято» в плане разделения; её ветка, копия и чат не меняются',
-  'value-split-unaccept-effect':
-    'Отметка «принято» снимается; ветка, копия и чат группы не меняются',
-  'journal-split-resume-interrupted': 'Продолжение оборванных групп разделения',
-  'summary-split-resume-interrupted': 'Продолжить оборванные группы разделения чата «{{chat}}»',
-  'label-split-interrupted-groups': 'Оборванные группы',
-  'value-split-resume-interrupted-effect':
-    'Каждая группа продолжается своей сессией с восстановлением состояния; ход тратит лимит подписки',
   'journal-run-provider-check': 'Проверка провайдера',
   'summary-run-provider-check': 'Проверить провайдера «{{name}}» на этой машине',
   'label-provider-check-model-call': 'Вызов модели',
@@ -80,11 +51,6 @@ export const panelTextsGapsRu = {
   'value-provider-check-model-call-off': 'Нет — только CLI, файлы и настройки',
   'value-provider-check-effect':
     'Запись и чтение проверяются на временной копии; ваши файлы не меняются, итог сохраняется бейджем',
-  'journal-summarize-resource': 'Краткое описание ресурса',
-  'summary-summarize-resource': 'Описать «{{name}}» коротко',
-  'label-resource-kind': 'Вид ресурса',
-  'value-summarize-resource-effect':
-    'Если описания ещё нет, панель один раз зовёт дешёвую модель (тратит лимит) и запоминает ответ',
   'journal-refresh-defect-states': 'Обновление статусов дефектов',
   'summary-refresh-defect-states': 'Обновить статусы дефектов проекта «{{name}}» из трекера',
   'label-defects-tracked': 'Дефектов у кейсов',

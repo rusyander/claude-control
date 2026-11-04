@@ -2,14 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { AssistantRunRequest, AssistantRunResult } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
-import { askAssistant } from '../../domains/assistant/assistant.ts';
-import { helperAskFor, type HelperRouteWiring } from '../../domains/assistant-route.ts';
-import {
-  runAssistant,
-  type AssistantMessage,
-} from '../../domains/assistant-runner/assistant-runner.ts';
-import { resolveAssistantEndpoint } from '../../domains/endpoints/endpoints.ts';
-import { getActiveProvider } from '../../providers/registry.ts';
+import { askAssistant, coreHelperAsk } from '../../domains/assistant/assistant.ts';
+import type {
+  AskCarry,
+  CoreAskPort,
+  OneShotMessage,
+} from '../../domains/core-ask/core-ask.types.ts';
+import { askMasked, assistantRunResultOf } from '../../domains/core-ask/one-shot.ts';
 import { readAgentImages } from '../../lib/agent-images/agent-images.ts';
 
 /** Тело с картинками: до восьми по 3,75 МБ в base64 — предел по умолчанию (1 МБ) мал. */
@@ -55,18 +54,22 @@ export function invalidAssistBody(error: z.ZodError) {
  *
  * `/api/assist` — помощник по заполнению форм: лёгкое окно (D4, 28.09) —
  * тело проверяется схемой, история в нём же, секреты полей — маской до модели.
- * Идёт маршрутом активного провайдера (`domains/assistant-route.ts`): профиль
- * «Ассистент панели», иначе Claude по подписке или чужой CLI маршрутом его чата;
- * отказ маршрута — `error` с кодом в ответе 200, как и прочие сбои окна.
- * `/api/assistant/run` — мультимодельный ассистент по активному провайдеру
- * (Ф6b): claude делегирует своему существующему CLI-пути, прочие идут через
- * новые раннеры (cli/api) по switch. Секреты/ключи не логируем.
+ * Оба маршрута — вопрос ядра «ask» без инструментов активным CLI (этап 10, F2b,
+ * `domains/core-ask/one-shot.ts`): профиль «Ассистент панели» и контур судит ядро;
+ * отказ — `error` с кодом в ответе 200, как и прочие сбои окна.
+ * `/api/assistant/run` — окно ассистента: история реплик одним текстом, секреты
+ * под маской до ядра. Секреты/ключи не логируем.
  */
 export function registerAssistantRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  /** Маршрут провайдера для окна помощника — тот же `runRoute`, что у чатов. */
-  helperRoute: HelperRouteWiring,
+  /** Ядро: каждый вопрос окна — его сессия «ask». */
+  ask: CoreAskPort,
+  /**
+   * Набор панели чужому CLI помощника формы (`helperCarryOf`, G13) — только `/api/assist`, как
+   * прежнее окно; `/api/assistant/run` набора не получал.
+   */
+  carry?: AskCarry,
 ): void {
   app.post<{ Body: unknown }>('/api/assist', { bodyLimit: ASSIST_BODY_LIMIT }, (request, reply) => {
     const parsed = assistBodySchema.safeParse(request.body ?? {});
@@ -75,10 +78,9 @@ export function registerAssistantRoutes(
     if (!images.ok) return reply.code(400).send(images.refusal);
     // Маршрут решается на КАЖДЫЙ запрос: активный CLI, профиль ассистента и
     // галочки контура меняются на лету, и окно обязано идти тем, что выбрано сейчас.
-    const appDataDir = ctx.location.paths.appData;
     return askAssistant(
       { ...parsed.data, images: images.images },
-      helperAskFor(ctx.store, appDataDir, helperRoute),
+      coreHelperAsk(ask, ctx.store, ctx.location.paths.appData, carry),
     );
   });
 
@@ -88,7 +90,7 @@ export function registerAssistantRoutes(
     async (request, reply) => {
       const images = readAgentImages(request.body?.images);
       if (!images.ok) return reply.code(400).send(images.refusal);
-      const messages: AssistantMessage[] = Array.isArray(request.body?.messages)
+      const messages: OneShotMessage[] = Array.isArray(request.body?.messages)
         ? request.body.messages
             .filter((m) => m && typeof m.content === 'string')
             .map((m) => ({
@@ -110,24 +112,13 @@ export function registerAssistantRoutes(
       if (lastUser >= 0 && images.images.length > 0) {
         messages[lastUser] = { ...messages[lastUser]!, images: images.images };
       }
-      const provider = getActiveProvider(ctx.store);
-      const result = await runAssistant(provider, messages, {
-        appDataDir: ctx.location.paths.appData,
-        // Только кэш: ассистент не должен ждать сеть ради имени модели.
-        models: ctx.models.current(provider.modelVendors ?? []).models,
-        // IDEA-8: id диалога включает сессионный режим у тех CLI, кто его заявил
-        // (сейчас OpenCode). Не прислали — всё идёт one-shot, как и раньше.
-        conversationId:
-          typeof request.body?.conversationId === 'string' && request.body.conversationId.trim()
-            ? request.body.conversationId.trim().slice(0, 120)
-            : undefined,
-        // Свой эндпоинт панели, если он выбран в настройках: тогда ассистент идёт
-        // по этому адресу, а не в облако вендора и не через подписочный CLI.
-        endpoint: resolveAssistantEndpoint(ctx.store, ctx.location.paths.appData),
-        // Переключатель Claude на локальную модель — тот же, что у помощника формы.
-        ...(helperRoute.claudeSwitchEnv ? { claudeEnv: helperRoute.claudeSwitchEnv } : {}),
+      // Вся история — одним текстом каждого вопроса: памяти между вопросами у сессии ядра нет,
+      // `conversationId` (прежний сессионный режим `opencode serve`) больше ничего не меняет.
+      const result = await askMasked(ask, ctx.store, ctx.location.paths.appData, {
+        title: 'panel assistant',
+        messages,
       });
-      return result satisfies AssistantRunResult;
+      return assistantRunResultOf(result) satisfies AssistantRunResult;
     },
   );
 }

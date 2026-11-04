@@ -1,5 +1,6 @@
 import type { EnvSkip, McpServerItem, McpTransport } from '@agentdeck/contracts/portable-env';
 import { envItemId, envSkip, needsNone } from './canon.ts';
+import { codedIntent, nested, type CodedIntent } from './intent-codes.ts';
 import type { EnvSourceFactory } from './normalize-types.ts';
 
 /**
@@ -71,6 +72,8 @@ export function normalizeMcpServers(
           'mcpServer',
           'unsupported_format',
           `${server.name}: транспорт «${server.transport}» не описан ни у одного CLI`,
+          'portability-skip-mcp-transport',
+          { name: server.name, transport: String(server.transport) },
         ),
       );
       continue;
@@ -81,7 +84,15 @@ export function normalizeMcpServers(
     // исчезает молча и не превращается в stdio, как её видит обычный читатель
     // панели.
     if (transport === 'sdk') {
-      skipped.push(envSkip('mcpServer', 'unsupported_format', `${server.name}: ${SDK_REASON}`));
+      skipped.push(
+        envSkip(
+          'mcpServer',
+          'unsupported_format',
+          `${server.name}: ${SDK_REASON}`,
+          'portability-skip-mcp-sdk',
+          { name: server.name },
+        ),
+      );
     }
 
     const envKeys = [...Object.keys(server.env ?? {}), ...Object.keys(server.headers ?? {})].sort();
@@ -90,10 +101,13 @@ export function normalizeMcpServers(
       id: envItemId('mcpServer', server.name),
       kind: 'mcpServer',
       source: source('file', server.sourceFile ?? undefined),
-      intent: `${intentOf(server, transport)}${server.enabled === false ? ' — выключен' : ''}`,
+      ...intentOf(server, transport),
       trigger: { on: 'always' },
       blocking: 'inapplicable',
-      needs: needsNone('MCP-сервер поднимается вместе с CLI и фактов разговора не требует'),
+      needs: needsNone(
+        'MCP-сервер поднимается вместе с CLI и фактов разговора не требует',
+        'portability-needs-mcp',
+      ),
       // Сервер — это процесс или сеть, и человек обязан это видеть до переноса.
       sideEffects: transport === 'stdio' ? ['runs_process'] : ['network'],
       name: server.name,
@@ -122,10 +136,28 @@ export function normalizeMcpServers(
   return { items, skipped };
 }
 
-function intentOf(server: McpServerInput, transport: McpTransport): string {
-  if (transport === 'sdk') return `${server.name}: ${SDK_REASON}`;
-  if (transport === 'stdio') {
-    return `сервер инструментов ${server.name}: запускается командой ${server.command ?? '—'}`;
+function intentOf(server: McpServerInput, transport: McpTransport): CodedIntent {
+  const { name } = server;
+  const offRu = server.enabled === false ? ' — выключен' : '';
+  const off = offRu ? nested('portability-intent-mcp-off') : '';
+  if (transport === 'sdk') {
+    return codedIntent(`${name}: ${SDK_REASON}${offRu}`, 'portability-intent-mcp-sdk', {
+      name,
+      off,
+    });
   }
-  return `сервер инструментов ${server.name}: ${server.url ?? '—'}`;
+  if (transport === 'stdio') {
+    const command = server.command ?? '—';
+    return codedIntent(
+      `сервер инструментов ${name}: запускается командой ${command}${offRu}`,
+      'portability-intent-mcp-stdio',
+      { name, command, off },
+    );
+  }
+  const url = server.url ?? '—';
+  return codedIntent(`сервер инструментов ${name}: ${url}${offRu}`, 'portability-intent-mcp-url', {
+    name,
+    url,
+    off,
+  });
 }

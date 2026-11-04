@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:33:48.906Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Список плагинов не получен: claude not found (PATH процесса панели). Установленные 0 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. Плагины не установлены",
+      "shotAt": "2026-11-03T16:32:04.122Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Список плагинов не получен: claude not found (PATH процесса панели). Установленные 0 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. Плагины не установлены",
       "en": {
         "file": "01-no-cli.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:36:12.550Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Список плагинов не получен: claude not found (PATH процесса панели). Installed 0 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. No plugins installed"
+        "shotAt": "2026-11-03T16:35:17.380Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Список плагинов не получен: claude not found (PATH процесса панели). Installed 0 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. No plugins installed",
+        "seal": {
+          "png": "33748b05d7fc9856",
+          "text": "5043fd9bca1297a1"
+        }
       },
       "dark": {
         "file": "01-no-cli.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:38:34.381Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Список плагинов не получен: claude not found (PATH процесса панели). Установленные 0 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. Плагины не установлены"
+        "shotAt": "2026-11-03T16:38:31.857Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Список плагинов не получен: claude not found (PATH процесса панели). Установленные 0 Каталог Маркетплейсы 2 Свой плагин Плагины, которые уже стоят: включить, выключить, обновить или удалить. Изменения применятся после перезапуска Claude Code. Плагины не установлены",
+        "seal": {
+          "png": "9f425ef222ce8e04",
+          "text": "bb4b00f777e9be96"
+        }
       },
       "darkEn": {
         "file": "01-no-cli.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:40:54.338Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Список плагинов не получен: claude not found (PATH процесса панели). Installed 0 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. No plugins installed"
+        "shotAt": "2026-11-03T16:41:40.313Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Список плагинов не получен: claude not found (PATH процесса панели). Installed 0 Catalogue Marketplaces 2 Own plugin Plugins already in place: enable, disable, update or remove. Changes apply after Claude Code restarts. No plugins installed",
+        "seal": {
+          "png": "3f8a43b8646a418d",
+          "text": "5043fd9bca1297a1"
+        }
+      },
+      "seal": {
+        "png": "09609a56017bc25d",
+        "text": "bb4b00f777e9be96"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:33:59.073Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин",
+      "shotAt": "2026-11-03T16:32:15.099Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин",
       "en": {
         "file": "02-scaffold.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:36:22.600Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin"
+        "shotAt": "2026-11-03T16:35:28.342Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin",
+        "seal": {
+          "png": "813ecefd07d6158a",
+          "text": "ccb95f3942aa1074"
+        }
       },
       "dark": {
         "file": "02-scaffold.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:38:44.281Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин"
+        "shotAt": "2026-11-03T16:38:42.767Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин",
+        "seal": {
+          "png": "b3b5ebc435fbaa51",
+          "text": "9dfdf329e2de3b24"
+        }
       },
       "darkEn": {
         "file": "02-scaffold.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:41:04.285Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin"
+        "shotAt": "2026-11-03T16:41:51.070Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin",
+        "seal": {
+          "png": "7e8e0e837237c9a9",
+          "text": "ccb95f3942aa1074"
+        }
+      },
+      "seal": {
+        "png": "fe3bedb77de22969",
+        "text": "9dfdf329e2de3b24"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:34:01.660Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин Каркас плагина создан C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Каркас плагина создан",
+      "shotAt": "2026-11-03T16:32:17.696Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин Каркас плагина создан C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Каркас плагина создан",
       "en": {
         "file": "03-created.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:36:25.209Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin Plugin skeleton created C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Plugin skeleton created"
+        "shotAt": "2026-11-03T16:35:30.936Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin Plugin skeleton created C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Plugin skeleton created",
+        "seal": {
+          "png": "6fbea68b13590987",
+          "text": "5d42a7c2d270f044"
+        }
       },
       "dark": {
         "file": "03-created.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:38:46.877Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин Каркас плагина создан C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Каркас плагина создан"
+        "shotAt": "2026-11-03T16:38:45.361Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Плагины Наборы команд, скиллов и агентов из маркетплейсов Как это работает Установленные 3 Каталог Маркетплейсы 2 Свой плагин Каркас своего плагина по формату Claude Code в выбранной папке. Создать плагин Соберём каркас плагина по формату Claude Code в выбранной папке: манифест .claude-plugin/plugin.json и выбранные части. Плагин ляжет подпапкой с именем плагина. Имя плагина Станет именем папки и полем name в манифесте: строчные буквы, цифры и дефис. Описание Автор Папка назначения Выбрать папку C:/work/claude-help-plugins Что включить в каркас Команды (commands/) Субагенты (agents/) Скиллы (skills/) Хуки (hooks/hooks.json) Создать плагин Каркас плагина создан C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Каркас плагина создан",
+        "seal": {
+          "png": "5798ba20696f2cee",
+          "text": "850593319edacf1a"
+        }
       },
       "darkEn": {
         "file": "03-created.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:41:06.888Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin Plugin skeleton created C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Plugin skeleton created"
+        "shotAt": "2026-11-03T16:41:53.670Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Plugins Bundles of commands, skills and agents from marketplaces How it works Installed 3 Catalogue Marketplaces 2 Own plugin A skeleton of your own plugin in the Claude Code format, in a folder you choose. Create a plugin Generates a plugin skeleton in the Claude Code format inside the chosen folder: the .claude-plugin/plugin.json manifest and the selected parts. The plugin lands in a subfolder named after the plugin. Plugin name Becomes the folder name and the manifest name field: lowercase letters, digits and hyphens. Description Author Destination folder Choose folder C:/work/claude-help-plugins What to include Commands (commands/) Subagents (agents/) Skills (skills/) Hooks (hooks/hooks.json) Create plugin Plugin skeleton created C:\\work\\claude-help-plugins\\release-kit .claude-plugin/plugin.json, README.md, commands/example.md, skills/release-kit/SKILL.md Plugin skeleton created",
+        "seal": {
+          "png": "0191fca1315d916a",
+          "text": "5d42a7c2d270f044"
+        }
+      },
+      "seal": {
+        "png": "99d5ea522c67bb54",
+        "text": "850593319edacf1a"
       }
     }
   ]

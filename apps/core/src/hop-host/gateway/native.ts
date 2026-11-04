@@ -17,12 +17,14 @@ import {
   maskOutgoing,
   refuseUpstreamStatus,
   sendUpstream,
+  countContour,
   traceOf,
   type GatewayRequest,
 } from './common.ts';
 import { errorBody, statusOfErrorCode } from './dialect/dialect.ts';
 import { expandDeferredTools } from './local-window/deferred-tools.ts';
 import { NativeThinkFilter, withoutThinkMessage } from './native-think/native-think.ts';
+import { applyRequestRules } from './request-rules.ts';
 import { hopText } from './texts.ts';
 
 /**
@@ -48,9 +50,11 @@ export async function nativeChat(
   clientBody: Record<string, unknown>,
 ): Promise<void> {
   const { ctx, entry, driver } = g;
+  // Правила контура (Т7) и на родной ручке: те же поля, что ушли бы через мост.
+  const ruled = applyRequestRules(clientBody, entry.spec.requestRules);
   const prepared = hasFeature(entry.spec, 'deferred-tools')
-    ? expandDeferredTools(clientBody, true)
-    : clientBody;
+    ? expandDeferredTools(ruled, true)
+    : ruled;
   const model = typeof prepared.model === 'string' ? prepared.model : '';
   const vault = new AliasVault(
     driver.placeholderPattern ? { avoid: driver.placeholderPattern } : {},
@@ -154,19 +158,36 @@ export async function nativeChat(
       : facts.complete
         ? 200
         : 502;
-  traceOf(g, {
-    status,
-    masked: guarded.masked,
-    tokens: facts.totalTokens,
-    ...(sent.reply.retried ? { retried: true } : {}),
-    ...(failure
-      ? { error: failure }
-      : facts.upstreamError
-        ? { error: facts.upstreamError.message }
-        : facts.complete
-          ? {}
-          : { error: hopText('gateway-answer-truncated') }),
+  const unreported = status === 200 && facts.totalTokens === 0;
+  countContour(g, {
+    model,
+    promptTokens: facts.promptTokens,
+    completionTokens: facts.completionTokens,
+    totalTokens: facts.totalTokens,
+    ...(facts.cachedTokens ? { cacheReadTokens: facts.cachedTokens } : {}),
+    ...(facts.cacheWriteTokens ? { cacheWriteTokens: facts.cacheWriteTokens } : {}),
+    ...(facts.cacheWrite1hTokens ? { cacheWrite1hTokens: facts.cacheWrite1hTokens } : {}),
+    ...(unreported ? { unreported: true as const } : {}),
   });
+  traceOf(
+    g,
+    {
+      status,
+      masked: guarded.masked,
+      tokens: facts.totalTokens,
+      ...(sent.reply.retried ? { retried: true } : {}),
+      ...(unreported ? { usageUnreported: true as const } : {}),
+      ...(failure
+        ? { error: failure }
+        : facts.upstreamError
+          ? { error: facts.upstreamError.message }
+          : facts.complete
+            ? {}
+            : { error: hopText('gateway-answer-truncated') }),
+    },
+    // Родная ручка: вызовы инструментов идут полем `tool_use`, а не прослойкой.
+    facts.toolCalls > 0 ? { nativeCalls: facts.toolCalls } : undefined,
+  );
 }
 
 /**

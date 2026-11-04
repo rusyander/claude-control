@@ -1,6 +1,7 @@
 import { relative } from 'node:path';
 import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { PermissionAsk } from '../../adapters/adapter.types.ts';
+import { FORGE_MCP_RULE, forgeMcpVerdict } from '../../adapters/forge/mcp-tools.ts';
 import { matchesAny, toSlashes } from '../../lib/glob/glob.ts';
 import { CI_READ_COMMANDS } from '../../lib/publish-commands.ts';
 import { homeDir } from '../../platform/os-kind.ts';
@@ -109,6 +110,15 @@ export function decidePermit(
       ) {
         return deny('grant-required', `edit of ${rel} needs a grant for this task`, 5);
       }
+      // Границы сеанса от вызывающего (этап 10, F6): вне масок `scope.edit` — отказ, а не сигнал
+      // владения: агент тестов, починивший код вместо записи результата, исказил бы прогон.
+      if (ctx.scope && !matchesAny(rel, ctx.scope.edit, fold, 'rooted')) {
+        return deny(
+          'outside-scope',
+          `edit of ${rel}: this session writes only ${ctx.scope.edit.join(', ')}`,
+          null,
+        );
+      }
       // Свои пути — от корня копии: `src` единицы не значит чужой `pkg/src` (F-06).
       const owned = ctx.ownedPaths.length === 0 || matchesAny(rel, ctx.ownedPaths, fold, 'rooted');
       return owned
@@ -127,7 +137,9 @@ export function decidePermit(
       const home = homeDir();
       const analysis = analyzeExec(ask.argv ?? [], ask.display, {
         home,
-        heads: ctx.deny.commands.map((prefix) => prefix[0] ?? ''),
+        heads: [...ctx.deny.commands, ...(ctx.scope?.denyCommands ?? [])].map(
+          (prefix) => prefix[0] ?? '',
+        ),
         primary: ask.tool === 'PowerShell' ? 'ps' : 'bash',
       });
       // Флаги форджа до глагола (`gh -R o/r pr create`) — ещё формы той же команды.
@@ -145,6 +157,18 @@ export function decidePermit(
         return publishes
           ? deny('platform-step', 'publishing is a platform step', null)
           : deny('platform-step', 'CI state is read by the core (task ciWait)', null);
+      }
+      // Команды, запрещённые сеансу вызывающим (этап 10, F6): те же формы разобранного argv, что у
+      // публикации, — опции git, обёртки, цепочки; своя причина, это не шаг платформы.
+      const scoped = ctx.scope?.denyCommands.find((prefix) =>
+        forms.some((form) => matchPrefix(form, prefix) === 'yes'),
+      );
+      if (scoped) {
+        return deny(
+          'scope-command',
+          `command ${scoped.join(' ')} is forbidden for this session`,
+          null,
+        );
       }
       // Псевдоним, настройка или remote, которые префикс не увидит (pushurl, hooksPath, include).
       if (analysis.hazards.length > 0 && ctx.deny.commands.some((p) => p[0] === 'git')) {
@@ -186,11 +210,22 @@ export function decidePermit(
       }
       return { allow: true, signal: null, reason: 'exec matches no publishing form' };
     }
-    case 'mcp':
+    case 'mcp': {
       if (matchesAny(ask.target, ctx.deny.mcpTools)) {
         return deny('denied-tool', `${ask.target} is in the platform deny set`, null);
       }
+      // Сервер форжа человека только читает (P82): запись и непрочитанное имя — дорога публикатора.
+      const forge = forgeMcpVerdict(ask.target, ctx.deny.forgeMcpServers ?? []);
+      if (forge && forge.cls !== 'read') {
+        const why = forge.cls === 'write' ? 'a forge write' : 'not proven read-only';
+        return deny(
+          'forge-mcp-write',
+          `${FORGE_MCP_RULE}: ${forge.tool} of forge server ${forge.server} is ${why} — platform step, the core publishes`,
+          null,
+        );
+      }
       return { allow: true, signal: null, reason: 'mcp tool not denied' };
+    }
     case 'net':
       return { allow: true, signal: null, reason: 'network' };
     case 'conversation':

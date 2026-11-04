@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ClaudePaths, SlashCommand } from '@agentdeck/contracts';
+import type { NestedServerMessage } from '@agentdeck/contracts/server-messages';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { readSkills, SKILLS_DISABLED_DIR } from '../skills/skills.ts';
 import { FILE_LIMIT, isDirectory, readJson } from './io.ts';
@@ -18,18 +19,19 @@ export function readClaudeCommands(
   // бы выдумать этому уровню путь, которого у него нет.
   paths: Pick<ClaudePaths, 'root' | 'skills' | 'settings'>,
   store: AppStore,
-): { commands: SlashCommand[]; notes: string[] } {
+): { commands: SlashCommand[]; notes: string[]; notesCodes: (NestedServerMessage | null)[] } {
   const notes: string[] = [];
+  const notesCodes: (NestedServerMessage | null)[] = [];
   const commands: SlashCommand[] = [
     ...skillCommands(paths.skills, store),
     ...commandFiles(join(paths.root, 'commands'), 'md', ':', {
       source: 'command',
       owner: 'commands/',
     }),
-    ...pluginCommands(join(paths.root, 'plugins'), paths.settings, notes),
+    ...pluginCommands(join(paths.root, 'plugins'), paths.settings, notes, notesCodes),
   ];
 
-  return { commands: sortCommands(commands), notes };
+  return { commands: sortCommands(commands), notes, notesCodes };
 }
 
 /**
@@ -76,6 +78,7 @@ function pluginCommands(
   pluginsRoot: string,
   settingsPath: string,
   notes: string[],
+  notesCodes: (NestedServerMessage | null)[],
 ): SlashCommand[] {
   const registry = readJson(join(pluginsRoot, 'installed_plugins.json')) as
     { version?: unknown; plugins?: Record<string, unknown> } | undefined;
@@ -86,6 +89,16 @@ function pluginCommands(
       `Реестр плагинов installed_plugins.json версии ${String(registry.version ?? 'без номера')}: ` +
         `Claude Code читает только версию ${REGISTRY_VERSION}, команды этих плагинов в палитру не попадают.`,
     );
+    notesCodes.push({
+      messageCode: 'commands-plugin-registry-version',
+      params: {
+        version:
+          registry.version === undefined || registry.version === null
+            ? { messageCode: 'plugin-registry-no-version' }
+            : String(registry.version),
+        expected: REGISTRY_VERSION,
+      },
+    });
     return [];
   }
 
@@ -98,6 +111,10 @@ function pluginCommands(
     if (!installPath) continue;
     if (!existsSync(installPath)) {
       notes.push(`Плагин «${id}»: каталог установки не найден (${installPath}).`);
+      notesCodes.push({
+        messageCode: 'commands-plugin-dir-missing',
+        params: { id, path: installPath },
+      });
       continue;
     }
 

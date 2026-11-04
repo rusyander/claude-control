@@ -12,6 +12,11 @@ import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
 import type { ServerContext } from '../../../context.ts';
 import type { EventHub } from '../../../lib/event-hub/event-hub.ts';
 import { isValidApiToken } from '../../../lib/api-token/api-token.ts';
+import {
+  BRIDGE_TOKEN_HEADER,
+  type BridgeTokenLedger,
+} from '../../../lib/bridge-tokens/bridge-tokens.ts';
+import { panelActionNote } from '../../../domains/panel-agent/brief/brief.ts';
 import { parseBody } from '../../../lib/request-body.ts';
 import {
   appendAgentJournal,
@@ -49,6 +54,11 @@ export interface PanelAgentRouteDeps {
   helpWebSrc?: string;
   /** Срок ожидания кадра сессии у потоковых действий — для тестов; по умолчанию 20 с. */
   streamHeadTimeoutMs?: number;
+  /**
+   * Книга токенов моста (`bridge-tokens.ts`): вызов моста — только от имени своего разговора, а
+   * итог действия ложится в память хода (следующий ход разговора видит ключи и id).
+   */
+  bridges?: Pick<BridgeTokenLedger, 'ownerOf' | 'note'>;
 }
 
 const callSchema = z.object({
@@ -57,6 +67,30 @@ const callSchema = z.object({
 });
 
 const decisionSchema = z.object({ decision: z.enum(['approve', 'reject']) });
+
+/** Исходы, которые мост отдаёт модели ошибкой инструмента (`renderOutcome` в `panel.mjs`). */
+const FAILED_OUTCOMES = new Set<string>(['invalid', 'unknown', 'failed']);
+
+/**
+ * Итог вызова моста строкой памяти: имя, пометка отказа и начало того, что увидела модель —
+ * результат действия или сообщение панели. Тело не JSON исхода — записи нет.
+ */
+function bridgeNoteOf(name: string, payload: string): string | undefined {
+  let body: Partial<PanelActionResult>;
+  try {
+    body = JSON.parse(payload) as Partial<PanelActionResult>;
+  } catch {
+    return undefined;
+  }
+  if (typeof body.outcome !== 'string') return undefined;
+  const page = body.page ? `opened ${body.page.route}. ` : '';
+  const text =
+    body.outcome === 'done'
+      ? `${page}${body.result === undefined ? '' : JSON.stringify(body.result)}`
+      : `${body.outcome}${body.message ? `: ${body.message}` : ''}`;
+  const failed = FAILED_OUTCOMES.has(body.outcome) && body.messageCode !== 'stale_preview';
+  return panelActionNote(name, failed, text || 'done');
+}
 
 /**
  * Агент панели на сервере (А1): список действий, вызов, ждущие карточки,
@@ -96,6 +130,18 @@ export function registerPanelAgentRoutes(
 
   app.post<{ Params: { name: string }; Body: unknown }>(
     '/api/agent/actions/:name',
+    {
+      // Итог вызова моста — в память хода: ответ действия уходит одним телом из многих мест
+      // обработчика, и записать его на выходе надёжнее, чем помнить о том в каждом `return`.
+      onSend: (request, _reply, payload, done) => {
+        const bridge = request.headers[BRIDGE_TOKEN_HEADER];
+        if (typeof bridge === 'string' && deps.bridges && typeof payload === 'string') {
+          const note = bridgeNoteOf((request.params as { name: string }).name, payload);
+          if (note) deps.bridges.note(bridge, note);
+        }
+        done(null, payload);
+      },
+    },
     async (request, reply): Promise<PanelActionResult> => {
       const action = byName.get(request.params.name);
       if (!action) {
@@ -104,6 +150,16 @@ export function registerPanelAgentRoutes(
 
       const call = callSchema.safeParse(request.body);
       const conversationId = call.success ? call.data.conversationId : undefined;
+      // Токен моста выдан ходу ОДНОГО разговора: вызов от имени чужого (карточка, страница
+      // человека, память действий) — отказ до действия. Живость токена проверил ещё рубеж доступа.
+      const bridge = request.headers[BRIDGE_TOKEN_HEADER];
+      if (typeof bridge === 'string' && deps.bridges?.ownerOf(bridge) !== conversationId) {
+        reply.code(403);
+        return {
+          outcome: 'invalid',
+          message: 'This session may act only for its own conversation.',
+        };
+      }
       const parsed = call.success
         ? action.input.safeParse(call.data.input ?? {})
         : { success: false as const, error: call.error };

@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatSummary } from '@agentdeck/contracts';
 import { AUTONOMOUS_PICK_MARKER } from '@agentdeck/contracts/chat-group-settings';
+import { CORE_PERMIT_TOOL } from '@agentdeck/contracts/chat-handoff';
+import { chatInboxSchema } from '@agentdeck/contracts/chat-inbox';
 import type { Record } from '../ChatRecords/ChatRecords.ts';
+import { ChatRunRegistry } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import { ChatSession } from '../ChatSession/ChatSession.ts';
 import {
   ASKED_CACHE_MAX,
   buildInbox,
@@ -178,6 +182,50 @@ describe('buildInbox', () => {
     });
   });
 
+  it('вопрос права задачи ядра несёт поля ядра: по ним телефон отвечает подписанными командами (G9)', () => {
+    // Карточка — через настоящий брокер прав, как её ставит ход чата задачей ядра (`core-run`).
+    const session = new ChatSession(new ChatRunRegistry());
+    const core = {
+      taskId: 'task-1',
+      askId: 'ask-1',
+      point: 5,
+      options: ['grant', 'refuse'],
+      project: 'r1',
+      globs: ['migrations/1.sql'],
+    };
+    void session.requestPermission({
+      runId: 'new-1',
+      toolName: CORE_PERMIT_TOOL,
+      input: { question: 'The step needs a grant to edit migrations/1.sql (Edit)' },
+      toolUseId: 'ask-1',
+      core,
+    });
+    void session.requestPermission({
+      runId: 'new-1',
+      toolName: 'Bash',
+      input: { command: 'ls' },
+      toolUseId: 't2',
+    });
+    const inbox = buildInbox(
+      sources({
+        chats: [summary()],
+        runs: [{ key: 'new-1', sessionId: 's1', startedAt: NOW - 60_000 }],
+        permissions: session.pendingPermissions(),
+      }),
+    );
+    const asks = inbox.chats[0]?.asks ?? [];
+    expect(asks.find((a) => a.key === 'p:ask-1')).toMatchObject({
+      kind: 'permission',
+      toolName: CORE_PERMIT_TOOL,
+      input: { question: 'The step needs a grant to edit migrations/1.sql (Edit)' },
+      core,
+    });
+    // Обычная карточка CLI полей ядра не получает — её решает маршрут прогона.
+    expect(asks.find((a) => a.key === 'p:t2')).not.toHaveProperty('core');
+    expect(chatInboxSchema.parse(inbox).chats[0]?.asks).toEqual(asks);
+    session.abort('new-1');
+  });
+
   it('запрос прав без живого прогона не показывается', () => {
     const inbox = buildInbox(
       sources({
@@ -189,32 +237,6 @@ describe('buildInbox', () => {
     );
     expect(inbox.chats[0]?.asks).toEqual([]);
     expect(inbox.chats[0]?.status).toBe('idle');
-  });
-
-  it('ворота ветки — свой вид и свой ключ', () => {
-    // Путь прогона сводка проверяет на диске (основная копия git), поэтому он
-    // абсолютный на ЛЮБОЙ ОС: `C:/work/app` вне Windows — относительный, и
-    // разрешался от каталога запуска тестов — внутри git-копии это давало имя
-    // её основного репозитория вместо `app`.
-    const app = join(tmpdir(), 'cc-inbox-no-such-dir', 'app');
-    const inbox = buildInbox(
-      sources({
-        runs: [{ key: 'k', startedAt: NOW, projectPath: app, prompt: 'Почини\nподробно' }],
-        permissions: [
-          {
-            runId: 'k',
-            toolUseId: 't2',
-            toolName: 'Edit',
-            input: {},
-            askedAt: iso(0),
-            kind: 'branchGate',
-          },
-        ],
-      }),
-    );
-    // Чата без транскрипта нет в списке — название из первой строки задания.
-    expect(inbox.chats[0]).toMatchObject({ id: 'k', title: 'Почини', project: 'app' });
-    expect(inbox.chats[0]?.asks[0]).toMatchObject({ kind: 'branchGate', key: 'g:t2' });
   });
 
   it('вопрос из транскрипта — по строке на вопрос, со счётчиком', () => {

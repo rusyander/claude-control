@@ -97,7 +97,7 @@ export function SettingsPage() {
           {activeTab === 'providers' && <ProvidersTab />}
           {activeTab === 'models' && <ModelsTab settings={settings} patch={patch} />}
           {activeTab === 'prompts' && <PromptsTab />}
-          {activeTab === 'groups' && <GroupsTab settings={settings} patch={patch} />}
+          {activeTab === 'groups' && <GroupsTab />}
           {activeTab === 'globalLayer' && <GlobalLayerTab />}
           {activeTab === 'integrations' && <IntegrationsTab />}
           {activeTab === 'spend' && <SpendTab settings={settings} patch={patch} />}

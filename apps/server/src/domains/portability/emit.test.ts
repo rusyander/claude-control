@@ -16,7 +16,6 @@ import { emitEnvironment, emitterProviderIds, hasEmitter } from './emit/index.ts
 import { UnknownEmitProviderError, type EmitPlan } from './emit/types.ts';
 import { KINDS_NOT_YET_EMITTED } from './emit/context.ts';
 import { level } from './fidelity/fidelity.ts';
-import { panelSupervisorHooks } from './supervisor/panel-hooks.ts';
 
 /**
  * Эмиттеры среды (П2.1): канон → десять CLI.
@@ -717,14 +716,14 @@ describe('перенос в чужие CLI', () => {
    * Уровень Э обещает человеку: «механизма у цели нет, поведение держит панель
    * вокруг своего запуска». У хука это обещание сегодня не выполняется, и
    * проверка держит ровно этот факт, а не желаемое: на диск цели запись не
-   * ложится (`runtime_only` — писателя у неё нет), а надзиратель чужого прогона
-   * собирается ИЗ СОСТОЯНИЯ ПАНЕЛИ и канона не читает вовсе.
+   * ложится (`runtime_only` — писателя у неё нет). Своего надзирателя чужого
+   * прогона у панели больше нет: ход чужого CLI ведёт ядро задач.
    *
    * Сказано это и человеку — в справке и в `docs/LIMITATIONS-PROVIDERS.ru.md`.
    * Появится чтение хуков канона рантаймом — проверка покраснеет и заставит
    * переписать обе стороны разом, а не разойтись молча.
    */
-  it('хук уровня «эмуляцией» не едет ни файлом, ни надзирателем', () => {
+  it('хук уровня «эмуляцией» не едет файлом', () => {
     const sessionHook = env.items.find(
       (item) => item.kind === 'hook' && item.trigger.on === 'session',
     );
@@ -739,17 +738,6 @@ describe('перенос в чужие CLI', () => {
     const entry = plan.entries.find((candidate) => candidate.itemId === sessionHook.id);
     expect(entry?.outcome).toBe('runtime_only');
     expect(plan.writes.some((write) => write.itemIds.includes(sessionHook.id))).toBe(false);
-
-    // Конец пути: что бы ни лежало в каноне, надзиратель играет только записи
-    // самой панели — выключенная калитка и пустой список групп дают пусто.
-    expect(
-      panelSupervisorHooks({
-        settings: { promptGate: { enabled: false, action: 'block' } },
-        groups: [],
-        hooksDir: join(home, 'hooks'),
-        skillsDir: join(home, 'skills'),
-      }),
-    ).toEqual([]);
   });
 
   it('повторное применение не удваивает записи ни у одной цели', () => {

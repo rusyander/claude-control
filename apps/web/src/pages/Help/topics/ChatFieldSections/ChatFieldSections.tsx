@@ -139,10 +139,6 @@ export function ChatFieldSections() {
         <Callout tone="info" title={tr('autoApproveTitle')}>
           {tr('autoApproveText')}
         </Callout>
-
-        <Callout tone="info" title={tr('rulesTitle')}>
-          {tr('rulesText')}
-        </Callout>
       </HelpSection>
 
       <HelpSection title={tr('historyTitle')} caption={tr('historyCaption')}>

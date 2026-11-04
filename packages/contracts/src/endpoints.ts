@@ -37,8 +37,12 @@ export const endpointProfileSchema = object({
    * `anthropic` и `google` — корень хоста (`https://gw.example.com`),
    * `openai-compat` — адрес вместе с версией (`http://127.0.0.1:11434/v1`),
    * как этого и ждут `OPENAI_BASE_URL` и его аналоги.
+   *
+   * Пустой — черновик: «Добавить профиль» заводит профиль без адреса, адрес
+   * человек вписывает следующим шагом. Применить и проверить связь такой профиль
+   * не дадут сами эти ручки (`endpoint-base-url-invalid`), ядро его пропускает.
    */
-  baseUrl: string().min(1),
+  baseUrl: string(),
   apiKind: zodEnum(endpointApiKinds),
   /** Имя модели на этом адресе. Пусто — переменную модели не трогаем. */
   model: string().default(''),

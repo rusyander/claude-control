@@ -9,7 +9,15 @@ import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { managedProfileId } from '../../domains/platform/apply/profile.ts';
 import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
-import { PlatformGateway } from '../../domains/platform/gateway/listener/listener.ts';
+import {
+  createCoreGatewayView,
+  type CoreGatewayView,
+} from '../../domains/platform/gateway-view/gateway-view.ts';
+import {
+  listeningGateway,
+  memoryContours,
+  type MemoryContours,
+} from '../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { registerPlatformRoutes } from './platform-routes.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
@@ -61,7 +69,10 @@ let app: FastifyInstance;
 let store: AppStore;
 /** Сколько раз панель вышла наружу за тест. Ноль везде, кроме `/check`. */
 let calls: string[];
-let gateway: PlatformGateway;
+let gateway: CoreGatewayView;
+/** Порт шлюза человека у ядра: трафика в тестах маршрутов нет, слушатель — тест ядра. */
+const GATEWAY_PORT = 5_179;
+let contours: MemoryContours;
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'cc-platform-routes-'));
@@ -83,12 +94,12 @@ beforeEach(async () => {
     );
   });
 
-  // Активация поднимает погашенный шлюз сама — настоящий слушатель. Порт 0:
-  // занятый 5179 живой панели на этой же машине иначе увёл бы тест к соседу.
-  store.updateSettings({
-    platformGateway: { ...store.getSettings().platformGateway, port: 0 },
-  });
-  gateway = new PlatformGateway();
+  // Шлюз держит ядро (этап 10, C3d): панель спрашивает его учёт (`memoryContours`), а шлюз
+  // человека «слушает» на `GATEWAY_PORT`. Слушатель и порт проверяет тест ядра
+  // `apps/core/src/hop-host/user-gateway.integration.test.ts`.
+  contours = memoryContours();
+  contours.setUserGateway(listeningGateway(GATEWAY_PORT));
+  gateway = createCoreGatewayView({ store, appDataDir: appData, contours });
   app = Fastify();
   registerPlatformRoutes(
     app,
@@ -102,7 +113,6 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await gateway.stop();
   await app.close();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -659,11 +669,11 @@ describe('platform routes: активность контура (Т2)', () => {
     ]);
   });
 
-  it('погашенный шлюз активация поднимает сама: настройка включена, слушатель жив', async () => {
+  it('погашенный шлюз активация поднимает сама: настройка включена, ядро спрошено, шлюз слушает', async () => {
     // Живое подключение 14.09.2026: шлюз был выключен, активация кончилась
     // красным «Шлюз не поднят», и чат с галочкой уходил мимо контура. Теперь
-    // маршрут активации включает настройку и поднимает слушатель тем же
-    // порядком, что кнопка мастера.
+    // маршрут активации включает настройку и спрашивает ядро свежим тем же
+    // порядком, что кнопка мастера (шлюз держит ядро, C3d).
     writePlatform(store, PLATFORM);
     expect(store.getSettings().platformGateway.enabled).toBe(false);
 
@@ -673,10 +683,33 @@ describe('platform routes: активность контура (Т2)', () => {
     expect(res.json().probe.outcome).toBe('ok');
     expect(store.getSettings().activePlatformId).toBe('company-dev');
     expect(store.getSettings().platformGateway.enabled).toBe(true);
+    expect(contours.refreshes).toBeGreaterThan(0);
     expect(gateway.status().running).toBe(true);
-    // Пробный запрос дошёл до шлюза и дальше до контура: причина — не «шлюз не поднят».
+    // Пробный запрос ушёл в шлюз: причина — не «шлюз не поднят».
     expect(res.json().smoke.detail ?? '').not.toContain('Шлюз не');
     expect(calls[0]).toBe('https://api.dev.example.ru/v1/models');
+  });
+
+  it('пробный запрос активации уходит в шлюз после того, как ядро применило включённый контур', async () => {
+    // Съёмка 03.11: активация включала контур в state.json и тут же слала пробный запрос, а ядро
+    // узнавало о включении хуком `onSend` уже после ответа — шлюз отвечал 403 «Контур выключен
+    // в панели», и карточка нового контура краснела без вины контура.
+    writePlatform(store, PLATFORM);
+    const gatewayUrl = `http://127.0.0.1:${GATEWAY_PORT}/`;
+    let appliesAtSmoke = -1;
+    vi.stubGlobal('fetch', (url: string) => {
+      calls.push(String(url));
+      if (String(url).startsWith(gatewayUrl)) appliesAtSmoke = contours.applies;
+      return Promise.resolve(
+        new Response(MODELS, { headers: { 'content-type': 'application/json' } }),
+      );
+    });
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/company-dev/activate' });
+
+    expect(res.statusCode).toBe(200);
+    expect(calls.some((url) => url.startsWith(gatewayUrl))).toBe(true);
+    expect(appliesAtSmoke).toBeGreaterThan(0);
   });
 
   it('`?probe=skip`: контур активен и шлюз поднят без единого запроса в сеть', async () => {
@@ -696,10 +729,10 @@ describe('platform routes: активность контура (Т2)', () => {
     expect(calls).toEqual([]);
   });
 
-  it('«Поднять шлюз» с карточки: выключенная настройка включается, слушатель жив, в сеть ни шагу', async () => {
+  it('«Поднять шлюз» с карточки: выключенная настройка включается, ядро спрошено, в сеть ни шагу', async () => {
     // Живое подключение 14.09.2026: на карточке висело «Шлюз не поднят», а
     // кнопка жила только в мастере на последнем шаге. Маршрут делает то же, что
-    // активация: включает настройку и поднимает слушатель одним вызовом.
+    // активация: включает настройку и спрашивает ядро, слушает ли его шлюз.
     writePlatform(store, { ...PLATFORM, enabled: true });
     store.updateSettings({ activePlatformId: PLATFORM.id });
     expect(store.getSettings().platformGateway.enabled).toBe(false);
@@ -709,14 +742,39 @@ describe('platform routes: активность контура (Т2)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().settings.enabled).toBe(true);
     expect(res.json().status.running).toBe(true);
+    expect(res.json().status.address).toBe(`http://127.0.0.1:${GATEWAY_PORT}`);
     expect(store.getSettings().platformGateway.enabled).toBe(true);
-    expect(gateway.status().running).toBe(true);
+    expect(contours.refreshes).toBeGreaterThan(0);
     expect(calls).toEqual([]);
 
     // Повтор по живому шлюзу — не перезапуск и не ошибка.
     const again = await app.inject({ method: 'POST', url: '/api/platforms/gateway/start' });
     expect(again.statusCode).toBe(200);
     expect(again.json().status.port).toBe(res.json().status.port);
+  });
+
+  it('шлюз ядра ждёт порт — «Поднять шлюз» отвечает 409 словами ядра, настройка всё равно включена', async () => {
+    contours.setUserGateway({
+      ...listeningGateway(GATEWAY_PORT),
+      state: 'waiting',
+      lastError: 'EADDRINUSE',
+    });
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/gateway/start' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().messageCode).toBe('gateway-not-started');
+    expect(res.json().detail).toContain('EADDRINUSE');
+    expect(store.getSettings().platformGateway.enabled).toBe(true);
+  });
+
+  it('ядро не ответило — «Поднять шлюз» отвечает 409, а не зелёным', async () => {
+    contours.setUserGateway(null);
+
+    const res = await app.inject({ method: 'POST', url: '/api/platforms/gateway/start' });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().detail).toBeTruthy();
   });
 
   it('возврат по кнопке чистит поле активного контура и не ходит в сеть', async () => {
@@ -1019,7 +1077,11 @@ describe('инвариант 1: ни один ответ раздела не с�
           location: { paths: { root, appData } },
           store: new AppStore(appData),
         } as unknown as ServerContext,
-        new PlatformGateway(),
+        createCoreGatewayView({
+          store: new AppStore(appData),
+          appDataDir: appData,
+          contours: memoryContours(),
+        }),
       );
       await booted.ready();
 
@@ -1033,34 +1095,36 @@ describe('инвариант 1: ни один ответ раздела не с�
 });
 
 describe('platform routes: расход и бюджет (Т8)', () => {
-  /** Расход прямо в состоянии панели — так его пишет шлюз, минуя маршруты. */
+  /** Расход в учёте звена ядра (C3b) — так его видит панель после опроса, минуя маршруты. */
   const seedSpend = (patch: { usd?: number; exhaustedAt?: string } = {}): void => {
-    store.savePlatformSpend({
-      platformId: PLATFORM.id,
-      days: [
-        {
-          day: '2026-09-01',
-          requests: 1,
-          promptTokens: 3_000_000,
-          completionTokens: 0,
-          totalTokens: 3_000_000,
-          money: { usd: 9, pricedTokens: 3_000_000, unpricedTokens: 0, unpricedModels: [] },
-        },
-        {
-          day: '2026-09-10',
-          requests: 2,
-          promptTokens: 2_000_000,
-          completionTokens: 0,
-          totalTokens: 2_000_000,
-          money: {
-            usd: patch.usd ?? 20,
-            pricedTokens: 0,
-            unpricedTokens: 2_000_000,
-            unpricedModels: ['corp-l'],
+    contours.setRecords({
+      [PLATFORM.id]: {
+        platformId: PLATFORM.id,
+        days: [
+          {
+            day: '2026-09-01',
+            requests: 1,
+            promptTokens: 3_000_000,
+            completionTokens: 0,
+            totalTokens: 3_000_000,
+            money: { usd: 9, pricedTokens: 3_000_000, unpricedTokens: 0, unpricedModels: [] },
           },
-        },
-      ],
-      ...(patch.exhaustedAt ? { exhaustedAt: patch.exhaustedAt } : {}),
+          {
+            day: '2026-09-10',
+            requests: 2,
+            promptTokens: 2_000_000,
+            completionTokens: 0,
+            totalTokens: 2_000_000,
+            money: {
+              usd: patch.usd ?? 20,
+              pricedTokens: 0,
+              unpricedTokens: 2_000_000,
+              unpricedModels: ['corp-l'],
+            },
+          },
+        ],
+        ...(patch.exhaustedAt ? { exhaustedAt: patch.exhaustedAt } : {}),
+      },
     });
   };
 
@@ -1110,7 +1174,7 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     writePlatform(store, PLATFORM);
     seedSpend({ exhaustedAt: '2026-09-10T10:00:00.000Z' });
 
-    // Читается из состояния на диске — то есть переживает перезапуск панели.
+    // Читается из учёта звена ядра (его файл переживает перезапуск, тест книги).
     const before = (await app.inject({ method: 'GET', url: '/api/platforms' })).json().platforms[0];
     expect(before.budget).toMatchObject({
       exhausted: true,
@@ -1123,6 +1187,8 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     });
     expect(cleared.json().cleared).toBe(true);
     expect(cleared.json().budget.exhausted).toBe(false);
+    // Снимает звено ядра — оба места разом (карточка и отказ маршрута сеансов).
+    expect(contours.cleared).toEqual(['company-dev']);
 
     // Повтор — не отказ: снимать уже нечего, и это законное состояние кнопки.
     const again = await app.inject({
@@ -1135,11 +1201,17 @@ describe('platform routes: расход и бюджет (Т8)', () => {
     expect(again.json().total.totalTokens).toBe(5_000_000);
   });
 
-  it('удалённый контур уносит свой расход: идентификатор заводят заново', async () => {
+  it('ядро не ответило на снятие отметки — отказ, а не ложное «снято»', async () => {
     writePlatform(store, PLATFORM);
-    seedSpend();
+    seedSpend({ exhaustedAt: '2026-09-10T10:00:00.000Z' });
+    contours.clearExhausted = () => Promise.reject(new Error('core unreachable'));
 
-    await app.inject({ method: 'DELETE', url: '/api/platforms/company-dev' });
-    expect(store.getPlatformSpend()['company-dev']).toBeUndefined();
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/api/platforms/company-dev/spend/exhausted',
+    });
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
   });
+  // Удалённый контур уносит свой расход — это делает книга звена ядра (`records()` забывает
+  // контуры, которых панель больше не знает): тест `contour-book.test.ts`.
 });

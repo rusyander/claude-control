@@ -28,9 +28,17 @@ export interface OverrideStatus {
  */
 export type LayerReason = 'off' | 'no-config' | 'on' | 'gain' | 'no-gain' | 'broken';
 
+/**
+ * Доверие Claude Code к папке проекта (F-86): слой — содержимое репозитория, ядро везёт его только
+ * в доверенную папку. `unknown` — запись не прочлась; решение всё равно за ядром.
+ */
+export type FolderTrust = 'trusted' | 'untrusted' | 'unknown';
+
 export interface LocalLayerStatus {
   root: string;
   mode: LocalLayerMode;
+  /** Доверие папке — ответ ручки проекта; сборка слоя его не знает. */
+  folderTrust?: FolderTrust;
   /** Есть ли `layer.json`: без него слой не собирается вовсе. */
   configured: boolean;
   used: boolean;

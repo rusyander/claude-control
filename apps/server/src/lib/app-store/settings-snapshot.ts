@@ -1,8 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { groupEconomyChanges } from '@agentdeck/contracts/group-economy';
-import { groupWatchChanges } from '@agentdeck/contracts/group-watch';
 import type { AppState } from './app-store.types.ts';
 import {
   dropSplitLevers,
@@ -50,8 +48,6 @@ const STATE_KEYS = {
   runnerPrefs: 'portable',
   settings: 'portable',
   projectCodeLayout: 'portable',
-  projectCascade: 'portable',
-  projectReviewAfterWork: 'portable',
   // Рычаги решений (`settings-snapshot-levers.ts`): пересылка вопросов на телефон
   // (`human:rights`) и приём черновиков тестов без просмотра — у каждой машины свои.
   outsideRelay: 'local',
@@ -69,8 +65,6 @@ const STATE_KEYS = {
   chatPins: 'local',
   splitPlans: 'local',
   splitPlanMoves: 'local',
-  groupWatchSignals: 'local',
-  chatWatchSignals: 'local',
   groupWaitResumes: 'local',
   doneMigrations: 'local',
   pushDevices: 'local',
@@ -85,11 +79,9 @@ const STATE_KEYS = {
   platformSmoke: 'local',
   platformActivationNotice: 'local',
   platformGatewayPort: 'local',
-  platformThinkTail: 'local',
   chatGroupSettings: 'local',
   chatKeyAliases: 'local',
   chatForks: 'local',
-  chatEscalations: 'local',
 } as const satisfies Record<keyof AppState, 'portable' | 'local'>;
 
 export const PORTABLE_KEYS = (Object.keys(STATE_KEYS) as (keyof AppState)[]).filter(
@@ -166,13 +158,7 @@ export function portableOf(state: AppState, context: PathContext): Record<string
     if (state[key] !== undefined) picked[key] = state[key];
   }
   if (state.settings) {
-    // Рычаги экономии — только отличия от умолчаний, как и в state.json: иначе
-    // снимок, применённый на другой машине, заморозил бы там все умолчания.
-    const settings: Record<string, unknown> = {
-      ...state.settings,
-      groupEconomy: groupEconomyChanges(state.settings.groupEconomy),
-      groupWatch: groupWatchChanges(state.settings.groupWatch),
-    };
+    const settings: Record<string, unknown> = { ...state.settings };
     for (const key of LOCAL_SETTINGS) delete settings[key];
     picked.settings = settings;
   }

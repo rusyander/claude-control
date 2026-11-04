@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../../context.ts';
-import type { ChatAwaitingView, SplitPlanView } from '@agentdeck/contracts/chat-handoff';
+import type { ChatAwaitingView } from '@agentdeck/contracts/chat-handoff';
 import type { TreePause } from '../../../domains/chat/tree-pause/tree-pause.ts';
 
 /**
@@ -16,20 +16,13 @@ export function registerChatTreeRoutes(
   app: FastifyInstance,
   _ctx: ServerContext,
   tree: TreePause,
-  /** Конвейер уровней (Т1) по ключам дерева; нет — пульт без него. */
-  split?: (chatIds: string[]) => SplitPlanView | undefined,
 ): void {
   // Кто из деревьев ждёт человека — вкладка звонит по нему и скрытой.
   app.get('/api/chat/awaiting', (): ChatAwaitingView => ({ chats: tree.awaiting() }));
 
-  app.get<{ Params: { id: string } }>('/api/chat/:id/tree', (request) => {
-    const view = tree.view(request.params.id);
-    // Запись конвейера лежит под ключом родителя — временным или настоящим;
-    // дерево знает оба, и по любому из них пульт получает уровни.
-    const keys = [view.root, ...view.nodes.flatMap((node) => [node.chatId, ...node.aliases])];
-    const plan = split?.(keys);
-    return plan ? { ...view, split: plan } : view;
-  });
+  app.get<{ Params: { id: string } }>('/api/chat/:id/tree', (request) =>
+    tree.view(request.params.id),
+  );
 
   app.post<{ Params: { id: string } }>('/api/chat/:id/tree/pause', (request) =>
     tree.pause(request.params.id),

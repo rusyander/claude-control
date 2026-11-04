@@ -59,7 +59,6 @@ function info(models: CatalogModel[], device: LocalModelsInfo['device'] = 'gpu')
     hardware: { gpus: [RTX_4090], ramGb: 95, platform: 'win32', arch: 'x64', detectedBy: '' },
     catalog: { version: 1, checkedAt: '2026-10', models },
     installed: [],
-    importable: [],
     jobs: [],
     choices: {},
     connect: { model: '' },

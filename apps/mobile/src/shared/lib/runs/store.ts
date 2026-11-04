@@ -247,6 +247,16 @@ export function applyEvent(id: string, event: ChatEvent): void {
       break;
     case 'error':
       next.error = event.message;
+      // Текст самой панели по коду (s10 G7): экран чата покажет перевод кода на языке телефона
+      // (`runErrorText`); здесь словаря нет — стор живёт без react-native.
+      next.errorPanel =
+        event.panel && event.code
+          ? {
+              message: event.message,
+              code: event.code,
+              ...(event.params ? { params: event.params } : {}),
+            }
+          : undefined;
       next.errorRetriable = event.retriable === true;
       break;
     case 'permission': {
@@ -255,7 +265,12 @@ export function applyEvent(id: string, event: ChatEvent): void {
         ? run.permissions
         : [
             ...run.permissions,
-            { toolName: event.toolName, input: event.input, toolUseId: event.toolUseId },
+            {
+              toolName: event.toolName,
+              input: event.input,
+              toolUseId: event.toolUseId,
+              ...(event.core ? { core: event.core } : {}),
+            },
           ];
       break;
     }

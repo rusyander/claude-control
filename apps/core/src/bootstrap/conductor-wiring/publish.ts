@@ -28,6 +28,7 @@ export function publishWiringFor(
       coreHome: deps.layout.root,
       scenariosDir: deps.layout.scenarios,
       note: deps.note,
+      ...(deps.panelAppData === undefined ? {} : { panelAppData: deps.panelAppData }),
     },
     options,
   );

@@ -3,7 +3,7 @@ import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/plat
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Platform } from '@agentdeck/contracts';
+import type { Platform, PlatformSpendRecord } from '@agentdeck/contracts';
 import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { promptText, savePrompt } from '../../prompts/prompts.ts';
@@ -365,19 +365,23 @@ describe('прогон через контур', () => {
       expect(runRouteOf(resolveRunRoute(deps, 'chat')).budgetExhausted).toBeUndefined();
 
       // Отказ 402 записан и держится до ручного сброса: тёплый пинг в такой
-      // контур — заведомый отказ, и место спавна должно знать это заранее.
-      store.savePlatformSpend({
-        platformId: PLATFORM.id,
-        days: [],
-        exhaustedAt: '2026-10-22T10:00:00.000Z',
-      });
+      // контур — заведомый отказ, и место спавна должно знать это заранее. Учёт ведёт
+      // звено ядра (C3b) — маршрут читает его последний ответ.
+      let spend: Record<string, PlatformSpendRecord> = {
+        [PLATFORM.id]: {
+          platformId: PLATFORM.id,
+          days: [],
+          exhaustedAt: '2026-10-22T10:00:00.000Z',
+        },
+      };
+      deps = { ...deps, contourSpend: () => spend };
       const route = runRouteOf(resolveRunRoute(deps, 'chat'));
       expect(route.budgetExhausted).toBe(true);
       // Обычный ход не отказывает: решает контур, и его 402 доезжает до CLI сам.
       expect(route.refusal).toBeUndefined();
       expect(route.env.ANTHROPIC_BASE_URL).toBe('http://127.0.0.1:5179/company-dev/_s/chat');
 
-      store.savePlatformSpend({ platformId: PLATFORM.id, days: [] });
+      spend = { [PLATFORM.id]: { platformId: PLATFORM.id, days: [] } };
       expect(runRouteOf(resolveRunRoute(deps, 'chat')).budgetExhausted).toBeUndefined();
     });
 

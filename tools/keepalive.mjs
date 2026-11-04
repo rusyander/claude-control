@@ -15,10 +15,10 @@
  * (после стартовой паузы) — перезапуск ровно той половины, которая молчит,
  * с нарастающей паузой, чтобы не долбиться в цикле по мёртвому порту.
  *
- * Третий порт — шлюз контуров (по умолчанию 5179), и только когда он включён в
- * настройках панели: своего процесса у шлюза нет, он живёт внутри серверной
- * половины, поэтому считается её вторым условием жизни. Молчащий шлюз при живом
- * сервере — это CLI без модели, о котором человек узнаёт последним.
+ * Шлюз контуров (по умолчанию 5179) показывается в `status`, но перезапуска не
+ * вызывает: с этапа 10 его держит ядро AgentDeck — свой процесс, за которым этот
+ * сторож не следит. Перезапуск серверной половины молчащий шлюз не поднял бы,
+ * а лишь гонял бы здоровую панель по кругу.
  *
  * Живую панель НЕ трогает: если порт отвечает уже на старте, сторож просто
  * берёт её под наблюдение — иначе он подрался бы за порт с запущенным `pnpm dev`.
@@ -30,14 +30,18 @@
  *   pnpm keepalive:off       снять автозапуск
  *   pnpm keepalive:status    что сейчас живо
  *
- * Автозапуск трёхслойный и весь пользовательский, без UAC: задача планировщика
- * на вход ЭТОГО пользователя поднимает сторож сразу после входа, ярлык в
- * «Автозагрузке» — запасной путь, если задачу не дала завести политика, задача
- * раз в 5 минут поднимает его же, если он умер. Окна не будет — все точки идут
- * через `keepalive-hidden.vbs`. Дублей не будет: pid-файл в
+ * Автозапуск — запись ОС на вход ЭТОГО пользователя, тем же модулем, что ставит автозапуск
+ * ядра (`apps/core/src/platform/keepalive.ts`, P57): задача Планировщика (Windows), юнит
+ * systemd (Linux), LaunchAgent (macOS); своего построителя XML у сторожа больше нет. На Windows
+ * сверху ещё два слоя без UAC: ярлык в «Автозагрузке» — запасной путь, если задачу не дала
+ * завести политика, и задача раз в 5 минут, поднимающая сторож, если он умер. Окна не будет —
+ * все точки Windows идут через `keepalive-hidden.vbs`. Дублей не будет: pid-файл в
  * %LOCALAPPDATA%\agentdeck\ заставляет лишний экземпляр молча выйти.
+ *
+ * Ядро задач сторож не трогает: его поднимает и перезапускает сама панель (надзор, этап 10),
+ * а при входе без панели — автозапуск ядра (переключатель в разделе «Задачи ядра»).
  */
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   existsSync,
@@ -112,6 +116,8 @@ const LOG_MAX_BYTES = 2 * 1024 * 1024;
 const TASK_MAIN = 'AgentDeckKeepalive';
 const TASK_WATCH = 'AgentDeckKeepaliveWatch';
 const TASK_LOGON = 'AgentDeckKeepaliveLogon';
+/** Имя записи автозапуска вне Windows (юнит systemd, метка LaunchAgent). */
+const UNIT_NAME = `${BRAND_SLUG}-keepalive`;
 /** Задачи и ярлык под прежним именем продукта: снимаются и при установке, и при снятии. */
 const LEGACY_TASKS = [`${LEGACY_BRAND_PASCAL}Keepalive`, `${LEGACY_BRAND_PASCAL}KeepaliveWatch`];
 const LEGACY_STARTUP_NAME = `${LEGACY_BRAND_SLUG}-keepalive.vbs`;
@@ -396,16 +402,10 @@ function openAppOnce() {
 }
 
 async function tick() {
-  const gateway = gatewayPort();
-
   for (const unit of UNITS) {
-    // Шлюз поднимает серверная половина: его молчание лечится её перезапуском.
-    const extra = unit.id === 'server' && gateway ? gateway : 0;
-    // Какой порт молчит — в журнал: 19.10 перезапуск записан как «порт 5178 молчит»,
-    // а молчать мог и шлюз, — по журналу причину было не различить.
+    // Какой порт молчит — в журнал (19.10 причину перезапуска по журналу было не различить).
     let silent = 0;
     if (!(await probe(unit.port))) silent = unit.port;
-    else if (extra && !(await probe(extra))) silent = extra;
     const alive = silent === 0;
     unit.silentPort = silent;
     if (alive) {
@@ -448,65 +448,48 @@ function taskAction() {
 }
 
 /**
- * Задача на вход в систему текущего пользователя. `schtasks /sc ONLOGON` без
- * пользователя — это «любой вход», его планировщик отдаёт только
- * администратору; триггер со своим UserId заводится без UAC, но только через
- * XML. Нужна потому, что «Автозагрузку» Проводник запускает последней, после
- * всех ключей Run, и ждёт каждый до 30 секунд: 23.10.2026 сторож поднялся
- * через 2 мин 44 с после входа, и открытая раньше панель отвечала отказом.
+ * Модуль автозапуска ядра (`platform/keepalive.ts`) — TypeScript. Node до 22.18 сам типы не
+ * снимает: тогда команда перезапускается с `--experimental-strip-types` (режим сторожа модуль
+ * не грузит, поэтому `keepalive-hidden.vbs` и юнит запускают его без флага).
  */
-function logonTaskXml(user) {
-  const xml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<?xml version="1.0" encoding="UTF-16"?>
-<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <Triggers>
-    <LogonTrigger>
-      <Enabled>true</Enabled>
-      <UserId>${xml(user)}</UserId>
-    </LogonTrigger>
-  </Triggers>
-  <Principals>
-    <Principal id="Author">
-      <UserId>${xml(user)}</UserId>
-      <LogonType>InteractiveToken</LogonType>
-      <RunLevel>LeastPrivilege</RunLevel>
-    </Principal>
-  </Principals>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
-    <Enabled>true</Enabled>
-  </Settings>
-  <Actions Context="Author">
-    <Exec>
-      <Command>${xml(WSCRIPT)}</Command>
-      <Arguments>${xml(taskArguments())}</Arguments>
-    </Exec>
-  </Actions>
-</Task>
-`;
+async function coreKeepalive() {
+  try {
+    return await import('../apps/core/src/platform/keepalive.ts');
+  } catch (error) {
+    if (process.execArgv.includes('--experimental-strip-types')) throw error;
+    const again = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', '--no-warnings', ...process.argv.slice(1)],
+      { stdio: 'inherit', windowsHide: true },
+    );
+    process.exit(again.status ?? 1);
+  }
 }
 
-/** `true` — задача на вход заведена; `false` — не дали, остаётся «Автозагрузка». */
-function installLogonTask() {
-  const user = process.env.USERDOMAIN
-    ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
-    : (process.env.USERNAME ?? '');
-  if (!user) return false;
-  const file = join(STATE_DIR, 'keepalive-logon.xml');
-  try {
-    mkdirSync(STATE_DIR, { recursive: true });
-    // schtasks читает XML задачи только в UTF-16 с меткой порядка байт.
-    writeFileSync(file, `\uFEFF${logonTaskXml(user)}`, 'utf16le');
-    schtasks(['/create', '/tn', TASK_LOGON, '/xml', file, '/f']);
-    return true;
-  } catch {
-    return false;
-  } finally {
-    rmSync(file, { force: true });
-  }
+/**
+ * Запись автозапуска сторожа. Windows: задача на вход ЭТОГО пользователя — `schtasks /sc ONLOGON`
+ * без пользователя это «любой вход», его планировщик отдаёт только администратору; триггер со
+ * своим UserId заводится без UAC, но только через XML. Нужна потому, что «Автозагрузку» Проводник
+ * запускает последней и ждёт каждый ключ Run до 30 секунд: 23.10.2026 сторож поднялся через
+ * 2 мин 44 с после входа. Вне Windows — юнит systemd / LaunchAgent, `node tools/keepalive.mjs`.
+ */
+function keepaliveSpec() {
+  const script = join(ROOT, 'tools', 'keepalive.mjs');
+  return WIN
+    ? {
+        name: TASK_LOGON,
+        description: 'agentdeck keepalive: panel watchdog, started at logon',
+        command: WSCRIPT,
+        args: [join(ROOT, 'tools', 'keepalive-hidden.vbs'), process.execPath, script],
+        cwd: ROOT,
+      }
+    : {
+        name: UNIT_NAME,
+        description: 'agentdeck keepalive: panel watchdog, started at logon',
+        command: process.execPath,
+        args: [script],
+        cwd: ROOT,
+      };
 }
 
 /** Ярлык в «Автозагрузке» текущего пользователя. */
@@ -531,17 +514,33 @@ function removeLegacyAutostart() {
   }
 }
 
-function install({ app = false } = {}) {
+async function install({ app = false, dry = false } = {}) {
+  const { installKeepalive, renderKeepalive } = await coreKeepalive();
+  if (dry) {
+    // Что будет заведено, без записи в ОС: путь записи и её текст.
+    const os = { win32: 'win32', darwin: 'darwin' }[platform()] ?? 'linux';
+    const user = process.env.USERDOMAIN
+      ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}`
+      : (process.env.USER ?? process.env.USERNAME ?? '');
+    const file = renderKeepalive(keepaliveSpec(), os, { home: homedir(), user });
+    console.log(`${file.path}\n${file.text}`);
+    return;
+  }
+  const got = await installKeepalive(keepaliveSpec());
   if (!WIN) {
-    console.error(
-      'Автозапуск сделан под Windows. На других системах: pnpm keepalive под supervisor/systemd.',
+    for (const note of got.notes) console.log(`  примечание: ${note}`);
+    if (!got.ok) {
+      console.error(`\n✕ Автозапуск сторожа не заведён: ${got.reason}\n`);
+      process.exit(1);
+    }
+    console.log(
+      `\n✓ Сторож установлен: ${got.path}\n\n  Журнал:  ${LOG_PATH}\n  Снять:   pnpm keepalive:off\n`,
     );
-    process.exit(1);
+    return;
   }
   const action = taskAction();
   removeLegacyAutostart();
-
-  const logon = installLogonTask();
+  const logon = got.ok;
 
   // «Автозагрузка» — запасной вход: поздно, но без планировщика.
   const startup = startupFile();
@@ -577,10 +576,15 @@ function install({ app = false } = {}) {
 `);
 }
 
-function uninstall() {
-  removeLegacyAutostart();
-  setOpenApp(STATE_DIR, false);
-  for (const name of [TASK_MAIN, TASK_WATCH, TASK_LOGON]) {
+async function uninstall() {
+  const { removeKeepalive } = await coreKeepalive();
+  const removed = await removeKeepalive(WIN ? TASK_LOGON : UNIT_NAME);
+  if (!removed.ok && !WIN) console.error(`  автозапуск не снят: ${removed.reason}`);
+  if (WIN) {
+    removeLegacyAutostart();
+    setOpenApp(STATE_DIR, false);
+  }
+  for (const name of WIN ? [TASK_MAIN, TASK_WATCH] : []) {
     try {
       schtasks(['/delete', '/tn', name, '/f']);
     } catch {
@@ -588,7 +592,7 @@ function uninstall() {
     }
   }
   try {
-    rmSync(startupFile(), { force: true });
+    if (WIN) rmSync(startupFile(), { force: true });
   } catch {
     // Ярлыка нет — тоже нормально.
   }
@@ -616,7 +620,7 @@ async function status() {
     );
   }
   // Шлюз показывается только включённым: строка «✕ молчит» о выключенном шлюзе
-  // читалась бы как поломка.
+  // читалась бы как поломка. Держит его ядро — молчит он, смотреть надо ядро, не панель.
   const gateway = gatewayPort();
   if (gateway) {
     const alive = await probe(gateway);
@@ -640,14 +644,14 @@ async function status() {
 
 const mode = process.argv[2] ?? '';
 if (mode === '--install') {
-  install({ app: process.argv.includes('--app') });
+  await install({ app: process.argv.includes('--app'), dry: process.argv.includes('--dry') });
 } else if (mode === '--app-off') {
   setOpenApp(STATE_DIR, false);
   console.log(
     '\n✓ Окно панели при старте Windows больше не открывается. Сторож работает как прежде.\n',
   );
 } else if (mode === '--uninstall' || mode === '--off') {
-  uninstall();
+  await uninstall();
 } else if (mode === '--status') {
   await status();
 } else {

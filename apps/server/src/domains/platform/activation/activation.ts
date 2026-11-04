@@ -16,7 +16,7 @@ import { findPlatform, readPlatforms, requirePlatform, writePlatforms } from '..
 import { catalogDefaultModel } from '@agentdeck/contracts/platform-models';
 import { PLATFORM_TERMINAL_CONSUMER } from '@agentdeck/contracts/platform-consumers';
 import { modelRulesFor } from '../models/models.ts';
-import { withoutThink } from '../gateway/think-tail/think-tail.ts';
+import { withoutThink } from '../think-tail/think-tail.ts';
 import { shimFromProbe, smokeTools } from '../smoke-tools.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 

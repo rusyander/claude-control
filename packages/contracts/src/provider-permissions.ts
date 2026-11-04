@@ -7,9 +7,15 @@ import {
   discriminatedUnion,
   enum as zodEnum,
   boolean,
+  number,
+  record,
   type infer as Infer,
 } from 'zod';
 import {
+  CODEX_APPROVAL_POLICIES,
+  CODEX_SANDBOX_MODES,
+  CURSOR_RULE_KINDS,
+  GEMINI_APPROVAL_MODES,
   GOOSE_MODES,
   KIMI_DECISIONS,
   KIMI_MODES,
@@ -58,12 +64,18 @@ import {
  * Провайдеры без реализованного адаптера сюда не попадают (fail-closed).
  */
 
+/**
+ * Наборы Codex, Gemini, Cursor, Goose, Kimi и OpenCode живут в `./vocabulary`: их же
+ * значениями разбирает черновик `@agentdeck/contracts/permissions` (сервер и ядро),
+ * а бочку контрактов рантайм сервера импортировать не может.
+ */
+
 /** Политика аппрувов Codex: когда запрашивать подтверждение. */
-export const codexApprovalPolicies = ['untrusted', 'on-request', 'never'] as const;
+export const codexApprovalPolicies = CODEX_APPROVAL_POLICIES;
 export type CodexApprovalPolicy = (typeof codexApprovalPolicies)[number];
 
 /** Режим песочницы Codex: границы файловой системы и сети. */
-export const codexSandboxModes = ['read-only', 'workspace-write', 'danger-full-access'] as const;
+export const codexSandboxModes = CODEX_SANDBOX_MODES;
 export type CodexSandboxMode = (typeof codexSandboxModes)[number];
 
 /**
@@ -78,7 +90,7 @@ export type CodexSandboxMode = (typeof codexSandboxModes)[number];
  * только для флага командной строки, а записанный в `settings.json` он вызывает
  * ошибку enum при старте CLI. Панель его не пишет никогда (сервер отвечает 400).
  */
-export const geminiApprovalModes = ['default', 'auto_edit', 'plan'] as const;
+export const geminiApprovalModes = GEMINI_APPROVAL_MODES;
 export type GeminiApprovalMode = (typeof geminiApprovalModes)[number];
 
 /**
@@ -152,6 +164,9 @@ const permissionInfoBase = {
   readOnly: boolean().default(false),
   /** Текст ошибки, если формат не распознан. */
   error: string().optional(),
+  /** Код причины для перевода на клиенте (`error` — запасной русский текст), если он есть. */
+  messageCode: string().optional(),
+  params: record(string(), union([string(), number()])).optional(),
 };
 
 /** Права Codex: два скалярных ключа корня `config.toml`. */
@@ -252,7 +267,7 @@ export type ContinuePermissionInfo = Infer<typeof continuePermissionInfoSchema>;
  * для подсказок в интерфейсе — панель правила НЕ толкует и хранит их как есть
  * (иначе она бы молча резала то, чего не поняла).
  */
-export const cursorPermissionKinds = ['Shell', 'Read', 'Write', 'WebFetch', 'Mcp'] as const;
+export const cursorPermissionKinds = CURSOR_RULE_KINDS;
 export type CursorPermissionKind = (typeof cursorPermissionKinds)[number];
 
 /** Права Cursor: два списка правил в `permissions`, без режима и без `ask`. */

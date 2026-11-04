@@ -6,18 +6,16 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { builtinKitDir } from './service.ts';
 
 /**
- * Самопроверки скиллов наблюдения, запущенные из КОПИИ набора вне репозитория панели — так, как их получит
- * машина без личной копии в ~/.claude: рядом со скиллами лежит `hooks/lib/kit-paths.mjs` (по нему скрипты
- * узнают, что они в наборе), репозитория с group-watch/en.ts нет (тексты правил — из снимка), состояние
- * набора — во временном каталоге. Каждая самопроверка поднимает свою заглушку панели на 127.0.0.1:0 и
+ * Самопроверки скилла наблюдения, запущенные из КОПИИ набора вне репозитория панели — так, как их получит
+ * машина без личной копии в ~/.claude: рядом со скиллом лежит `hooks/lib/kit-paths.mjs` (по нему скрипты
+ * узнают, что они в наборе), состояние набора — во временном каталоге. Каждая самопроверка поднимает свою заглушку панели на 127.0.0.1:0 и
  * генерирует поддельный токен сама; код выхода 1 — хоть одна проверка красная.
  */
 
 const KIT = process.env.AGENTDECK_KIT_UNDER_TEST || builtinKitDir();
 const dir = mkdtempSync(join(tmpdir(), 'kit-watch-selftests-'));
 const root = join(dir, 'kit');
-for (const skill of ['watchdog', 'agentdeck-watchdog'])
-  cpSync(join(KIT, 'skills', skill), join(root, 'skills', skill), { recursive: true });
+cpSync(join(KIT, 'skills', 'watchdog'), join(root, 'skills', 'watchdog'), { recursive: true });
 mkdirSync(join(root, 'hooks', 'lib'), { recursive: true });
 cpSync(join(KIT, 'hooks', 'lib', 'kit-paths.mjs'), join(root, 'hooks', 'lib', 'kit-paths.mjs'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -45,8 +43,6 @@ const passed = (out: string) => Number(/(\d+) passed, (\d+) failed/.exec(out)?.[
 describe('самопроверки скиллов наблюдения из копии набора без репозитория', () => {
   // Нижняя граница — число проверок сейчас: самопроверка, у которой молча пропала часть, тоже красная.
   it.each([
-    ['agentdeck-watchdog/scripts/selftest-groups.mjs', 147],
-    ['agentdeck-watchdog/scripts/selftest-stage-audit.mjs', 86],
     ['watchdog/scripts/selftest.mjs', 141],
     ['watchdog/scripts/selftest-foreign.mjs', 86],
   ])(

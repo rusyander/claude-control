@@ -47,7 +47,7 @@ acceptance criterion:
 
 Verdicts: **met** · **partly** · **not met** · **uncheckable** (why) · **out of frame** (which MR
 carries it). "Met" needs evidence at the rung the criterion's claim needs — a permission, time or
-failure promise is proved by action (SKILL §4), and a handler that reads right is "uncheckable" until
+failure promise is proved by action (SKILL §5), and a handler that reads right is "uncheckable" until
 it runs. A criterion that spans read and write, UI and API, or several roles gets a verdict for each
 side; one side checked is "partly". Every "partly" and "not met" is also a finding under (a).
 
@@ -55,9 +55,9 @@ The report counts the matrix on one line — `**Acceptance:** 14 criteria — me
 1 · uncheckable 1 · out of frame 1` — and carries the table in "What was checked". No frame at all →
 `**Acceptance:** no frame — <what was searched: description, linked tickets, epic, README>`.
 
-A real case: PROJ-1023's criterion covered reading content; only enabling storage was checked, and the
-pass wrote "RBAC — checked". The epic's ~50 child tickets were never opened. Both were 🔴 findings
-colleagues raised from the ticket text alone.
+A criterion spanning two operations (enable and read, write and delete) is checked on each; an epic's
+child tickets are opened one by one — both kinds of miss are found by colleagues from the ticket text
+alone.
 
 ## (h) The contract entry — the second way in
 
@@ -77,7 +77,7 @@ because the diff looked right. Mandatory at every tier; it needs no ticket.
    status/body line beside the doc's. Reading the code gives no verdict: without a request the row is
    "uncheckable — <why no stand>", never "met".
 4. **Both directions**: doc says X, service does Y → finding; behaviour changed and the doc still
-   describes the old → finding, the doc now lies. A broken public contract is 🔴 (SKILL §5).
+   describes the old → finding, the doc now lies. A broken public contract is 🔴 (SKILL §6).
 5. **Product-docs sweep**: the diff's docs are not the only docs. Grep the feature's user-visible name
    and its identifier (route, flag, setting key) across every docs tree (site content, in-app help,
    README) in all locales; each hit OUTSIDE the diff gets a row: still true · now lies · not checkable.

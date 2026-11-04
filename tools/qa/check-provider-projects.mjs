@@ -5,12 +5,14 @@
  * список знал только собственные разговоры — проекты, начатые с Claude, из вида
  * пропадали. Здесь проверяется вкладка «Проекты»: каталоги всех провайдеров с
  * бейджами тех, кто в них работал, и новый разговор АКТИВНОГО провайдера в
- * каталоге проекта (уходит его путь). Каталог, которого больше нет, не исчезает
- * молча: кнопка погашена, причина написана рядом.
+ * каталоге проекта. Разговор панель больше не заводит (этап 10, F2c): кнопка
+ * открывает чат ядра `/core/chat?cli=<активный>&project=<каталог>`, а
+ * `POST /api/provider-chat/chats` не уходит вовсе. Каталог, которого больше нет,
+ * не исчезает молча: кнопка погашена, причина написана рядом.
  *
  * Настоящий CLI не запускается и настройки панели НЕ переключаются: активный
- * провайдер и весь `/api/provider-chat/*` подменяются на лету, разговор «создаёт»
- * подмена — на диске ничего не появляется.
+ * провайдер и весь `/api/provider-chat/*` подменяются на лету; создание разговора
+ * подмена отвергает 410, как настоящий сервер, — на диске ничего не появляется.
  *
  * Запуск: `node tools/qa/check-provider-projects.mjs` при поднятом `pnpm dev`.
  * `SHOTS=<каталог>` — снимки вкладки в светлой и тёмной теме.
@@ -63,8 +65,7 @@ for (const scheme of ['light', 'dark']) {
   const page = await context.newPage();
   await bypassOnboarding(page, { provider: PROVIDER.providerId });
 
-  /** Разговоры «сервера»: растут от POST, как на настоящем. */
-  const chats = [];
+  /** Попытки завести разговор панели — после переезда на ядро их быть не должно. */
   const posted = [];
 
   // Общая подмена первой: Playwright отдаёт запрос ПОСЛЕДНЕМУ подходящему
@@ -74,29 +75,9 @@ for (const scheme of ['light', 'dark']) {
   await page.route('**/api/provider-runner', (route) => json(route, PROVIDER));
   await page.route('**/api/provider-chat/projects', (route) => json(route, [CLAUDE_ONLY, GONE]));
   await page.route('**/api/provider-chat/chats', async (route) => {
-    if (route.request().method() !== 'POST') return json(route, chats);
-    const body = JSON.parse(route.request().postData() ?? '{}');
-    posted.push(body);
-    const chat = {
-      id: `qa${chats.length + 1}`,
-      providerId: PROVIDER.providerId,
-      title: 'Новый разговор',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      messageCount: 0,
-      ...(body.workdir ? { workdir: body.workdir } : {}),
-    };
-    chats.unshift(chat);
-    return json(route, chat);
-  });
-  await page.route(/\/api\/provider-chat\/chats\/qa\d+$/, (route) => {
-    const id = new URL(route.request().url()).pathname.split('/').pop();
-    const chat = chats.find((item) => item.id === id);
-    return chat ? json(route, { ...chat, messages: [] }) : json(route, { message: 'нет' }, 404);
-  });
-  await page.route(/\/api\/provider-chat\/chats\/qa\d+\/status$/, (route) => {
-    const id = new URL(route.request().url()).pathname.split('/').at(-2);
-    return json(route, { chatId: id, isRunning: false, partial: '' });
+    if (route.request().method() !== 'POST') return json(route, []);
+    posted.push(JSON.parse(route.request().postData() ?? '{}'));
+    return json(route, { message: 'чат идёт через ядро', messageCode: 'provider-chat-core' }, 410);
   });
 
   const errors = [];
@@ -147,27 +128,28 @@ for (const scheme of ['light', 'dark']) {
     name: `Новый разговор Kimi Code в проекте ${CLAUDE_ONLY.name}`,
   });
   check(await start.isEnabled(), `${tag} в существующем каталоге кнопка активна`);
+  // Ошибки консоли — до ухода на экран ядра: его запросы идут на стенд и к этой проверке не относятся.
+  const errorsBefore = [...errors];
   await start.click();
-  await page.waitForTimeout(800);
-
-  check(posted.length === 1, `${tag} заведён ровно один разговор`);
+  const moved = await page
+    .waitForURL(/\/core\/chat/, { timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  const url = new URL(page.url());
   check(
-    posted[0]?.workdir === CLAUDE_ONLY.path,
-    `${tag} новый разговор активного провайдера получил каталог проекта (${posted[0]?.workdir})`,
+    moved &&
+      url.searchParams.get('cli') === PROVIDER.providerId &&
+      url.searchParams.get('project') === CLAUDE_ONLY.path,
+    `${tag} открыт чат ядра активного провайдера в каталоге проекта (${url.pathname}${decodeURIComponent(url.search)})`,
   );
-  const body = (await page.textContent('body')) ?? '';
-  check(
-    body.includes(`каталог: ${CLAUDE_ONLY.path}`),
-    `${tag} открыт новый разговор, в шапке его каталог`,
-  );
-  check(
-    (await page.locator('[data-provider-projects]').count()) === 0,
-    `${tag} после старта колонка вернулась к разговорам`,
-  );
+  check(posted.length === 0, `${tag} разговор панели не заводился (POST: ${posted.length})`);
 
   if (SHOTS) await page.screenshot({ path: join(SHOTS, `started-${scheme}.png`) });
 
-  check(errors.length === 0, `${tag} ошибок в консоли нет${errors.length ? `: ${errors[0]}` : ''}`);
+  check(
+    errorsBefore.length === 0,
+    `${tag} ошибок в консоли нет${errorsBefore.length ? `: ${errorsBefore[0]}` : ''}`,
+  );
   await context.close();
 }
 

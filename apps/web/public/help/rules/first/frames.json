@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-09-28T14:30:18.663Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены».",
+      "shotAt": "2026-11-03T16:50:05.457Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены».",
       "en": {
         "file": "01-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:34:11.418Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it."
+        "shotAt": "2026-11-03T16:52:13.490Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it.",
+        "seal": {
+          "png": "961a0409ff996e03",
+          "text": "f28e77b1f594644e"
+        }
       },
       "dark": {
         "file": "01-empty.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:31:48.254Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены»."
+        "shotAt": "2026-11-03T16:54:04.284Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Правил пока нет Панель считает правилом только раздел с заголовком «## ПРАВИЛО: …» в CLAUDE.md — остальной текст файла она не трогает и в список не берёт. Добавьте первое правило кнопкой выше — с ним появятся вкладки «Включены» и «Выключены».",
+        "seal": {
+          "png": "718b12477b33d000",
+          "text": "ceec941a33dcb71a"
+        }
       },
       "darkEn": {
         "file": "01-empty.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:33:00.478Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it."
+        "shotAt": "2026-11-03T16:55:57.294Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is No rules yet The panel counts a section as a rule only when its heading reads «## ПРАВИЛО: …» in CLAUDE.md — the rest of the file is left alone and never listed. Add the first rule with the button above — the «On» and «Off» tabs appear with it.",
+        "seal": {
+          "png": "d3a76b18dffce44e",
+          "text": "f28e77b1f594644e"
+        }
+      },
+      "seal": {
+        "png": "96f67775d3922e52",
+        "text": "ceec941a33dcb71a"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1428,
       "height": 884,
-      "shotAt": "2026-09-28T14:30:20.660Z",
+      "shotAt": "2026-11-03T16:50:10.863Z",
       "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "02-form.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:34:13.420Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:52:18.927Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "69d8ac36aa802310",
+          "text": "69557cc850dcbbd5"
+        }
       },
       "dark": {
         "file": "02-form.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:31:50.255Z",
-        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+        "shotAt": "2026-11-03T16:54:09.725Z",
+        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+        "seal": {
+          "png": "1676e06138be1666",
+          "text": "59244f95e0e6ead1"
+        }
       },
       "darkEn": {
         "file": "02-form.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:33:02.509Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:56:02.751Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "83c07029879f6d64",
+          "text": "69557cc850dcbbd5"
+        }
+      },
+      "seal": {
+        "png": "af09a686fe417ee1",
+        "text": "59244f95e0e6ead1"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1428,
       "height": 884,
-      "shotAt": "2026-09-28T14:30:22.229Z",
+      "shotAt": "2026-11-03T16:50:15.864Z",
       "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Блоки правила Соберите правило из блоков — можно, нельзя, с осторожностью. Текст сложится сам. Что можно — Пункт Что нельзя — Пункт Добавить блок: Что можно Что нельзя С осторожностью Свой раздел Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "03-builder.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:34:15.010Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule blocks Assemble the rule from blocks — allowed, forbidden, with care. The text builds itself. Allowed — Item Forbidden — Item Add block: Allowed Forbidden With care Custom section Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:52:23.927Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule blocks Assemble the rule from blocks — allowed, forbidden, with care. The text builds itself. Allowed — Item Forbidden — Item Add block: Allowed Forbidden With care Custom section Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "339a5e5f5ff65d42",
+          "text": "67fcb0fbbee36196"
+        }
       },
       "dark": {
         "file": "03-builder.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:31:51.808Z",
-        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Блоки правила Соберите правило из блоков — можно, нельзя, с осторожностью. Текст сложится сам. Что можно — Пункт Что нельзя — Пункт Добавить блок: Что можно Что нельзя С осторожностью Свой раздел Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+        "shotAt": "2026-11-03T16:54:14.720Z",
+        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Блоки правила Соберите правило из блоков — можно, нельзя, с осторожностью. Текст сложится сам. Что можно — Пункт Что нельзя — Пункт Добавить блок: Что можно Что нельзя С осторожностью Свой раздел Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+        "seal": {
+          "png": "ecb5e80eb9a1a850",
+          "text": "6f5b1a3faa383f5a"
+        }
       },
       "darkEn": {
         "file": "03-builder.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:33:04.090Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule blocks Assemble the rule from blocks — allowed, forbidden, with care. The text builds itself. Allowed — Item Forbidden — Item Add block: Allowed Forbidden With care Custom section Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:56:07.733Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule blocks Assemble the rule from blocks — allowed, forbidden, with care. The text builds itself. Allowed — Item Forbidden — Item Add block: Allowed Forbidden With care Custom section Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "955de04302def504",
+          "text": "67fcb0fbbee36196"
+        }
+      },
+      "seal": {
+        "png": "0c44e1767aa6647e",
+        "text": "6f5b1a3faa383f5a"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1428,
       "height": 884,
-      "shotAt": "2026-09-28T14:30:25.477Z",
+      "shotAt": "2026-11-03T16:50:19.110Z",
       "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Отмена Сохранить",
       "en": {
         "file": "04-assistant.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:34:18.263Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Cancel Save"
+        "shotAt": "2026-11-03T16:52:27.177Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Cancel Save",
+        "seal": {
+          "png": "a2c46362eafe8333",
+          "text": "66850cdf4a710bb7"
+        }
       },
       "dark": {
         "file": "04-assistant.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:31:55.066Z",
-        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Отмена Сохранить"
+        "shotAt": "2026-11-03T16:54:17.975Z",
+        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Заголовок Текст правила CLAUDE.md читается при старте каждой сессии. Всё, что здесь написано, Claude учитывает как постоянные инструкции: язык общения, запреты, порядок работы. Помощник Опишите словами, что нужно — поля заполнятся сами всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Отмена Сохранить",
+        "seal": {
+          "png": "8069c438403d34c2",
+          "text": "d377e79819d73bb3"
+        }
       },
       "darkEn": {
         "file": "04-assistant.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:33:07.337Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Cancel Save"
+        "shotAt": "2026-11-03T16:56:11.018Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Title Rule text CLAUDE.md is read at the start of every session. Everything here acts as standing instructions for Claude: language, restrictions, workflow. Assistant Describe what you need — the fields fill themselves всегда отвечай по-русски, включая варианты выбора Собрал правило про язык. Формулировка проверяемая: язык ответа видно сразу, спорить не о чем. title body Cancel Save",
+        "seal": {
+          "png": "f9d402d2fd272fdb",
+          "text": "66850cdf4a710bb7"
+        }
+      },
+      "seal": {
+        "png": "254180c9de8fd145",
+        "text": "d377e79819d73bb3"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-09-28T14:30:28.072Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Создано · копия: CLAUDE.md.2026-09-28T14-30-25-526Z.bak",
+      "shotAt": "2026-11-03T16:50:21.708Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Создано · копия: CLAUDE.md.2026-11-03T16-50-19-156Z.bak",
       "en": {
         "file": "05-card.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:34:20.873Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Created · backup: CLAUDE.md.2026-09-28T14-34-18-303Z.bak"
+        "shotAt": "2026-11-03T16:52:29.769Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Created · backup: CLAUDE.md.2026-11-03T16-52-27-218Z.bak",
+        "seal": {
+          "png": "7c0e258806d7d155",
+          "text": "5878defe36dc7905"
+        }
       },
       "dark": {
         "file": "05-card.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:31:57.664Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Создано · копия: CLAUDE.md.2026-09-28T14-31-55-106Z.bak"
+        "shotAt": "2026-11-03T16:54:20.587Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Правила Личные правила из CLAUDE.md — действуют во всех проектах Добавить правило Что это Все 1 Включены 1 Выключены 0 Все правила формата панели из CLAUDE.md. Поиск ищет по заголовку и тексту внутри открытой вкладки. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Создано · копия: CLAUDE.md.2026-11-03T16-54-18-015Z.bak",
+        "seal": {
+          "png": "4e9fcf44f019f41b",
+          "text": "6c1c2c2e4245a558"
+        }
       },
       "darkEn": {
         "file": "05-card.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-09-28T14:33:09.921Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Created · backup: CLAUDE.md.2026-09-28T14-33-07-382Z.bak"
+        "shotAt": "2026-11-03T16:56:13.616Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Rules Personal rules from CLAUDE.md — active in every project Add rule What this is All 1 On 1 Off 0 Every rule in the panel format from CLAUDE.md. Search looks at titles and text within the open tab. Язык общения Отвечать по-русски: и текстом, и в вариантах выбора. Имена файлов, команды и названия функций оставлять как есть — переводить их вредно. Created · backup: CLAUDE.md.2026-11-03T16-56-11-059Z.bak",
+        "seal": {
+          "png": "2236dd3c115c83c9",
+          "text": "3bd6ece27061894b"
+        }
+      },
+      "seal": {
+        "png": "cfd1dfd1769e6d47",
+        "text": "85e76af5b53e833c"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 0,
       "width": 1428,
       "height": 884,
-      "shotAt": "2026-09-28T14:30:31.042Z",
+      "shotAt": "2026-11-03T16:50:24.751Z",
       "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Правила: по одной записи на строку Каждая строка — отдельная запись. Пустые строки пропускаются. 2 распознано Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Создать все (2) Закрыть",
       "en": {
         "file": "06-bulk.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:34:23.902Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Rules: one entry per line Each line is a separate entry. Empty lines are skipped. 2 recognised Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Create all (2) Close"
+        "shotAt": "2026-11-03T16:52:32.788Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Rules: one entry per line Each line is a separate entry. Empty lines are skipped. 2 recognised Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Create all (2) Close",
+        "seal": {
+          "png": "e28770571e3cac55",
+          "text": "6136f2ace140d754"
+        }
       },
       "dark": {
         "file": "06-bulk.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:32:00.726Z",
-        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Правила: по одной записи на строку Каждая строка — отдельная запись. Пустые строки пропускаются. 2 распознано Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Создать все (2) Закрыть"
+        "shotAt": "2026-11-03T16:54:23.645Z",
+        "text": "Добавить правило Изменения применятся после перезапуска Claude Code Простой Конструктор Несколько сразу Правила: по одной записи на строку Каждая строка — отдельная запись. Пустые строки пропускаются. 2 распознано Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Создать все (2) Закрыть",
+        "seal": {
+          "png": "7d2bf7bdb71dcf4f",
+          "text": "ef8dae8dd656b4d4"
+        }
       },
       "darkEn": {
         "file": "06-bulk.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:33:12.947Z",
-        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Rules: one entry per line Each line is a separate entry. Empty lines are skipped. 2 recognised Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Create all (2) Close"
+        "shotAt": "2026-11-03T16:56:16.646Z",
+        "text": "Add rule Changes apply after restarting Claude Code Simple Builder Several at once Rules: one entry per line Each line is a separate entry. Empty lines are skipped. 2 recognised Проверять запуском «Готово» значит «запущено»: тесты, сборка, живой прогон. Коммиты только по просьбе Никаких commit, push и веток по своей инициативе. Create all (2) Close",
+        "seal": {
+          "png": "3f05bcd6f526c0c1",
+          "text": "6136f2ace140d754"
+        }
+      },
+      "seal": {
+        "png": "12bdc6609f73c694",
+        "text": "ef8dae8dd656b4d4"
       }
     },
     {
@@ -213,31 +309,47 @@
       "masked": 0,
       "width": 1428,
       "height": 884,
-      "shotAt": "2026-09-28T14:30:40.007Z",
-      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу $0.004 Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+      "shotAt": "2026-11-03T16:50:34.836Z",
+      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
       "en": {
         "file": "07-sandbox.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:34:33.128Z",
-        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Спровоцировать правило Знает ли о правиле Обычная задача Prompt Send to the sandbox $0.004 Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close"
+        "shotAt": "2026-11-03T16:52:42.892Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "c18e55a7a805e7a4",
+          "text": "32a83fcf342a28d8"
+        }
       },
       "dark": {
         "file": "07-sandbox.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:32:10.153Z",
-        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу $0.004 Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть"
+        "shotAt": "2026-11-03T16:54:33.841Z",
+        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+        "seal": {
+          "png": "7d9c066d62b0b7df",
+          "text": "7e284b093f03d75c"
+        }
       },
       "darkEn": {
         "file": "07-sandbox.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 884,
-        "shotAt": "2026-09-28T14:33:22.069Z",
-        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Спровоцировать правило Знает ли о правиле Обычная задача Prompt Send to the sandbox $0.004 Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close"
+        "shotAt": "2026-11-03T16:56:26.730Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Чем помочь с проектом? What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "ede1f00ebaea0767",
+          "text": "32a83fcf342a28d8"
+        }
+      },
+      "seal": {
+        "png": "680dd4cb226288d7",
+        "text": "7e284b093f03d75c"
       }
     }
   ]

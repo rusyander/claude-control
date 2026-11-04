@@ -79,9 +79,6 @@ export const localModelsEn: typeof localModelsRu = {
     measuredOn: 'Measured on the {{where}}: {{value}}\u00a0tok/\u2060s',
     measuredWhere: { gpu: 'video card', cpu: 'processor' },
     download: 'Download',
-    import: 'Take from Ollama',
-    importHint:
-      'Already downloaded in your Ollama: llama.cpp opens its file without downloading again and without a second copy on disk; Ollama itself is not started',
     use: 'Hand to agents',
     inUse: 'Used by agents',
     bench: 'Measure',
@@ -258,17 +255,6 @@ export const localModelsEn: typeof localModelsRu = {
     on: 'While a run on the local model is going, the computer does not go to sleep: an overnight task does not freeze halfway. The screen may still turn off. With no runs the block is released.',
     off: 'The sleep block is off: if the computer sleeps in the middle of a run, the run breaks off.',
     holding: 'A run is going now — the sleep block is on.',
-  },
-  layer: {
-    tooBig:
-      'The run layer — system prompt and tools — is ≈ {{tokens}} tokens, and the server window is {{context}} ({{limit}} for the prompt): no room is left for the conversation, and every turn will be refused with “Prompt is too long”.',
-    fixContext: 'Raise the window to {{context}} in the “Local models” section.',
-    fixQuant:
-      'In the “Local models” section pick quantization {{quant}} and window {{context}}: with the current quantization that window does not fit on the card whole.',
-    fixNone:
-      'This model has no window that holds the layer: pick another model or the lean layer on the contour card.',
-    frozen:
-      'This conversation started before tools were loaded on demand: MCP server descriptions (≈ {{tokens}} tokens) go out with every request, and Claude Code does not change the tool set of a conversation already under way. In a new chat they load only when needed — the first request is much shorter and faster.',
   },
   serverNotice: {
     restarted:

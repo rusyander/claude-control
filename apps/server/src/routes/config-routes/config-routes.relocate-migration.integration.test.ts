@@ -5,19 +5,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ServerContext } from '../../context.ts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
-import type { GroupAsk } from '../../domains/groups/model.ts';
+import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 import { registerConfigRoutes } from './config-routes.ts';
-import { registerGroupPathRoutes } from '../group-path-routes/group-path-routes.ts';
 
 /**
- * Ревью 28.09 (F-119): перенос старого «Порядка работы» в «Путь» шёл только
- * на `onReady`. Смена каталога на лету (POST /api/location, PATCH /api/settings)
- * переключала хранилище без переноса: группа из нового каталога показывала
- * пустой путь, а первая же правка пути навсегда отрезала старые шаги.
+ * Разовая отмена недоведённых прежних групп (этап 10, F1) нужна и каталогу, на который
+ * переключились на лету (POST /api/location, PATCH /api/settings): у него свой state.json,
+ * а сборка отменяла только план каталога, с которым панель стартовала.
  *
  * Контекст настоящий (`ServerContext.relocate`), оба каталога — временные.
  */
-describe('F-119: перенос «Порядка работы» после смены каталога на лету', () => {
+describe('смена каталога на лету отменяет недоведённые прежние группы нового каталога', () => {
   let root: string;
   let bootDir: string;
   let otherDir: string;
@@ -25,46 +23,33 @@ describe('F-119: перенос «Порядка работы» после см�
   let ctx: ServerContext;
   const previousEnv = process.env.CLAUDE_CONFIG_DIR;
 
-  const legacyGroup = (dir: string): void => {
+  const halfRunPlan = (dir: string): void => {
     mkdirSync(join(dir, 'agentdeck'), { recursive: true });
     mkdirSync(join(dir, 'skills'), { recursive: true });
     writeFileSync(join(dir, 'settings.json'), '{}', 'utf8');
-    new AppStore(join(dir, 'agentdeck')).saveGroup({
-      id: 'g1',
-      name: 'Задача из трекера',
-      description: '',
-      color: 'accent',
-      icon: 'folder',
-      members: [],
-      env: {},
-      projectPaths: [],
-      isEnabled: true,
-      order: 0,
-      scenario: {
-        when: 'когда прилетел тикет',
-        trigger: 'PRJ-\\d+',
-        steps: [
-          { title: 'Забрать тикет', body: 'assign', gate: '' },
-          { title: 'Ветка', body: '', gate: '' },
-        ],
-      },
-    });
+    new AppStore(join(dir, 'agentdeck')).setSplitPlan({
+      parentChatId: 'half',
+      projectPath: join(dir, 'repo'),
+      createdAt: '2026-10-01T00:00:00.000Z',
+      order: [0],
+      request: {},
+      proposal: { groups: [] },
+      groups: [{ index: 0, title: 'g', branch: 'b', after: [], status: 'started' }],
+    } as unknown as SplitPlanRecord);
   };
 
-  const stepsOf = (): number => ctx.store.getGroups()[0]?.path?.steps.length ?? 0;
+  const cancelledAt = (): string | undefined => ctx.store.getSplitPlans().half?.cancelledAt;
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-relocate-migration-'));
     bootDir = join(root, 'boot');
     otherDir = join(root, 'other');
     mkdirSync(bootDir, { recursive: true });
-    legacyGroup(otherDir);
+    halfRunPlan(otherDir);
     process.env.CLAUDE_CONFIG_DIR = bootDir;
     ctx = new ServerContext();
-    const ask: GroupAsk = async () => '';
     app = Fastify();
     registerConfigRoutes(app, ctx);
-    registerGroupPathRoutes(app, ctx, () => ask);
     await app.ready();
   });
 
@@ -75,16 +60,17 @@ describe('F-119: перенос «Порядка работы» после см�
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  it('POST /api/location переносит шаги группы нового каталога', async () => {
+  it('POST /api/location — план нового каталога отменён, повторное переключение его не трогает', async () => {
     const moved = await app.inject({
       method: 'POST',
       url: '/api/location',
       payload: { path: otherDir },
     });
     expect(moved.json<{ isValid: boolean }>().isValid).toBe(true);
-    expect(stepsOf()).toBe(2);
-    const view = await app.inject({ method: 'GET', url: '/api/groups/g1/path' });
-    expect(view.body).toContain('Забрать тикет');
+    const first = cancelledAt();
+    expect(first).toBeTruthy();
+    await app.inject({ method: 'POST', url: '/api/location', payload: { path: otherDir } });
+    expect(cancelledAt()).toBe(first);
   });
 
   it('PATCH /api/settings с новым каталогом — то же', async () => {
@@ -94,6 +80,6 @@ describe('F-119: перенос «Порядка работы» после см�
       payload: { claudeDirOverride: otherDir },
     });
     expect(moved.statusCode).toBe(200);
-    expect(stepsOf()).toBe(2);
+    expect(cancelledAt()).toBeTruthy();
   });
 });

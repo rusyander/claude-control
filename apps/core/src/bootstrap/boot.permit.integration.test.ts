@@ -27,6 +27,16 @@ import { bootCore, type BootedCore } from './boot.ts';
 
 const A = '11111111-1111-4111-8111-111111111111';
 
+/**
+ * Маршруты входа CLI, которые ядро обязано построить: по одному на переходник, у которого вход
+ * есть, — не заготовка (`built: false`) и не «только по адресу модели» (`cliLogin: false`).
+ */
+const loginRoutes = (core: BootedCore): string[] =>
+  core.adapters
+    .all()
+    .filter((a) => a.built !== false && a.cliLogin !== false)
+    .map((a) => `cli-login:${a.id}`);
+
 const cores: BootedCore[] = [];
 const stops: (() => Promise<unknown>)[] = [];
 afterAll(async () => {
@@ -83,12 +93,14 @@ const permitDecisions = (task: LiveTask, sessionId: string) =>
     .map((l) => (l.data as unknown as { output: { allow: boolean } }).output);
 
 describe('core boot: the permission road of a live session', () => {
-  it('the default registry carries a CLI-login route per adapter; the permit tool question of an attached session is decided, not 503', async () => {
+  it('the default registry carries a CLI-login route per adapter with a login; the permit tool question of an attached session is decided, not 503', async () => {
     const s = await stand(claudeRunFacts.binary.command);
     const { core } = s;
-    expect(core.routes.list().map((r) => r.id)).toEqual(
-      core.adapters.ids().map((id) => `cli-login:${id}`),
-    );
+    const ids = core.routes.list().map((r) => r.id);
+    expect(ids).toEqual(loginRoutes(core));
+    // Claude и Qwen идут своим входом; Codex — только по адресу модели (его вход в доме человека).
+    expect(ids).toEqual(expect.arrayContaining(['cli-login:claude', 'cli-login:qwen']));
+    expect(ids).not.toContain('cli-login:codex');
     // Запись живого CLI до ответа инструмента: модель запросила Bash и ждёт — вопрос законен.
     const full = readFileSync(fixturePath(claudeRunFacts.id, 'permit'), 'utf8').split('\n');
     const cut = full.findIndex((l) => l.includes('"tool_result"'));
@@ -251,13 +263,7 @@ describe('core boot: the permission road of a live session', () => {
     const core = await bootCore({ home, build: 'permit-test' });
     cores.push(core);
     const ids = core.routes.list().map((r) => r.id);
-    expect(ids).toEqual(
-      expect.arrayContaining([
-        'stub:e2e',
-        'local:own',
-        ...core.adapters.ids().map((id) => `cli-login:${id}`),
-      ]),
-    );
-    expect(ids).toHaveLength(core.adapters.ids().length + 2);
+    expect(ids).toEqual(expect.arrayContaining(['stub:e2e', 'local:own', ...loginRoutes(core)]));
+    expect(ids).toHaveLength(loginRoutes(core).length + 2);
   });
 });

@@ -1,26 +1,17 @@
 /**
  * Сценарий `deferred`: вызовы, которые решает только человек, — список D-n.
  *
- * Три кадра одного разделения: плашка «Ждёт решения (N)» над разделом,
- * раскрытая до списка; раздел «Ждёт решения у групп» в сводке родителя и
- * карточка прав в ленте группы, ставшая записью D-n, когда её никто не решил.
- * Отдельный сценарий, потому что вход свой: человек, вернувшийся к работе через
- * часы, начинает с плашки, а не с разделения.
+ * Один кадр прежнего пути (до ядра новых записей не бывает): плашка «Ждёт
+ * решения (N)» над разделом, раскрытая до списка. Раздела D-n в сводке родителя
+ * больше нет — кадр 02 снят; карточки прав, ставшей D-n, тоже (кадр 03 снят
+ * вместе с её кодом, этап 10).
  *
- * Ответы сервера подменены, экраны — настоящие: та же разметка, которую на
- * живом стенде проверяет `tools/qa/deferred-asks-ui.mjs`
- * (`[data-deferred-banner]`, `[data-hub-deferred]`, `[data-permission-deferred]`).
+ * Ответы сервера подменены, экраны — настоящие: та же разметка
+ * (`[data-deferred-banner]`). Живой проверки
+ * пути больше нет: панель вызовы в D-n не откладывает (этап 10), её скрипт
+ * снят в архив вместе с кейсами chat-187/188.
  */
-import {
-  PROJECT,
-  chat,
-  frame,
-  sse,
-  settings,
-  projectShell,
-  openProject,
-  openChat,
-} from './chat-stubs.mjs';
+import { PROJECT, chat, sse, settings, projectShell, openProject } from './chat-stubs.mjs';
 import { shotLanguage } from './kit.mjs';
 
 const EN = shotLanguage() === 'en';
@@ -137,27 +128,6 @@ const DEFERRED = {
   ],
 };
 
-/**
- * Поток группы B: карточка прав, а следом — она же, не дождавшаяся ответа и
- * ставшая D-4 (`permissionResolved` с `deferredId`), ровно как его шлёт сервер.
- */
-const STREAM_B =
-  frame(
-    {
-      kind: 'permission',
-      toolName: 'Bash',
-      input: { command: 'npm publish --access public' },
-      toolUseId: 'perm-d4',
-    },
-    1,
-  ) +
-  frame(
-    { kind: 'permissionResolved', toolUseId: 'perm-d4', behavior: 'deny', deferredId: 'D-4' },
-    2,
-  );
-
-const idOf = (url) => decodeURIComponent(new URL(url).pathname.split('/')[3] ?? '');
-
 export async function shootDeferred(browser, web, scenario) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // Знакомство с маскотом уже было: приветствие ложилось поверх раздела хаба.
@@ -224,17 +194,6 @@ export async function shootDeferred(browser, web, scenario) {
         },
       }),
     );
-    // Поток отдаётся ОДИН раз, дальше запрос висит: тело кончилось бы сразу, и
-    // страница переподключалась бы, сбрасывая карточку.
-    let hits = 0;
-    await page.route(`**/api/chat/${B_WORK}/stream*`, (route) => {
-      hits += 1;
-      if (hits > 1) return;
-      return route.fulfill(sse(STREAM_B));
-    });
-    await page.route('**/api/chat/*/stream*', (route) => {
-      if (idOf(route.request().url()) === B_WORK) return route.fallback();
-    });
     await page.route('**/api/chat/send', (route) => route.fulfill(sse('')));
 
     await openProject(page, web);
@@ -247,28 +206,8 @@ export async function shootDeferred(browser, web, scenario) {
     await page.mouse.move(5, 5);
     await page.waitForTimeout(600);
     await scenario.shot(page, '01-banner', { clip: '[data-deferred-banner]', padding: 12 });
-    // Плашка свёрнута обратно: раскрытая она сдвигает ленту и закрывает хаб.
-    await banner.getByRole('button', { expanded: true }).first().click();
 
-    // ── 02. Раздел D-n в сводке групп родителя ───────────────────────────────
-    await openChat(page, PARENT_TITLE);
-    const hub = page.locator('[data-hub-deferred]');
-    await hub.waitFor({ timeout: 20_000 });
-    // Окно выше обычного: раздел в две записи выше 300 px, и при 900 px его верх
-    // уходил под липкую полосу git, а низ — под реплику маскота.
-    await page.setViewportSize({ width: 1440, height: 1300 });
-    await hub.evaluate((node) => node.scrollIntoView({ block: 'center' }));
-    await page.waitForTimeout(800);
-    await scenario.shot(page, '02-hub', { clip: '[data-hub-deferred]', padding: 4 });
-
-    // ── 03. Карточка прав, ставшая D-4 ──────────────────────────────────────
-    await openChat(page, `${B.title} · work`);
-    const card = page.locator('[data-permission-deferred]');
-    await card.waitFor({ timeout: 20_000 });
-    await card.evaluate((node) => node.scrollIntoView({ block: 'center' }));
-    await page.waitForTimeout(800);
-    await scenario.shot(page, '03-card', { clip: '[data-permission-deferred]', padding: 16 });
-    console.log(`  проект ${PROJECT.name}: 3 кадра`);
+    console.log(`  проект ${PROJECT.name}: 1 кадр`);
   } finally {
     await page.close();
   }

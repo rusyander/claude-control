@@ -1,9 +1,18 @@
+import type { CorePermitAsk } from '@agentdeck/contracts/chat-handoff';
 import type { Submission } from './queue.types';
 
 export interface SubmitDeps {
   post: (path: string, body: unknown) => Promise<unknown>;
   /** Сообщение в разговор. Ложь — не принято (текст причины рядом). */
   sendMessage: (text: string) => Promise<{ ok: boolean; message?: string }>;
+  /**
+   * Ответ на вопрос права задачи ядра — командами ядра с подписью ключа телефона
+   * (`entities/core-task` `decideCorePermit`). Ложь — не ушло (нет ключа, отказ ядра).
+   */
+  sendCore: (
+    card: CorePermitAsk,
+    behavior: 'allow' | 'deny',
+  ) => Promise<{ ok: boolean; message?: string }>;
 }
 
 export interface SubmitOutcome {
@@ -24,16 +33,14 @@ export async function submitAll(
   const sentKeys: string[] = [];
   for (const item of submissions) {
     try {
-      if (item.kind === 'permission') {
+      if (item.kind === 'corePermit') {
+        const outcome = await deps.sendCore(item.card, item.behavior);
+        if (!outcome.ok) return { sentKeys, error: outcome.message ?? '' };
+      } else if (item.kind === 'permission') {
         // `ok: false` — запрос уже снят (решили за компьютером): ответ не нужен.
         await deps.post(`/chat/${encodeURIComponent(item.runKey)}/permission-decision`, {
           toolUseId: item.toolUseId,
           behavior: item.behavior,
-        });
-      } else if (item.kind === 'branchGate') {
-        await deps.post(`/chat/${encodeURIComponent(item.runKey)}/branch-decision`, {
-          toolUseId: item.toolUseId,
-          choice: item.choice,
         });
       } else {
         const outcome = await deps.sendMessage(item.text);

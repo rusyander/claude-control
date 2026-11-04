@@ -1,8 +1,6 @@
 export interface TileFactsProps {
-  /** Первые шаги на языке интерфейса; undefined — шаги ещё читаются. */
-  steps?: string[];
-  /** Путь не прочитался: сбой словами, а не вечное «читаю…» и не «шагов нет». */
-  stepsFailed?: boolean;
+  /** Первые шаги на языке интерфейса — из записи группы, читать нечего. */
+  steps: string[];
   /** Сколько шагов не поместилось в превью. */
   moreSteps?: number;
   /** Текст, когда шагов нет: у конвейера и у сценария он разный. */
@@ -16,8 +14,7 @@ export interface TileFactsProps {
 }
 
 export interface StepsPreviewProps {
-  steps: string[] | undefined;
-  failed: boolean;
+  steps: string[];
   more: number;
   emptyText: string;
 }

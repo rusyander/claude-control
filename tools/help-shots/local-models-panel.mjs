@@ -15,7 +15,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { shootFirst, shootChoice } from './local-models-scenes.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5227);
@@ -48,12 +49,15 @@ writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
 writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-local-models' },
+  );
 
   started.push(
     spawn(
@@ -95,6 +99,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех четырёх.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -111,5 +116,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true });
 }

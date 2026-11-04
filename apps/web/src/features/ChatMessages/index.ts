@@ -13,7 +13,7 @@ export { recallFeedLimit, rememberFeedLimit } from './lib/feedPosition';
  * разошлась бы с первой на первой же правке формата.
  */
 export { TaskSplitCard } from './ui/TaskSplitCard/TaskSplitCard';
-export type { ChildBranch, TaskSplitCardProps } from './ui/TaskSplitCard.types';
+export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
 /**
  * Карточка просьбы о разрешении — по той же причине: у чужого CLI просьбы идут
  * из его серверного режима, а решает их человек той же карточкой, что у Claude.
@@ -45,34 +45,5 @@ export { ChildStages } from './ui/ChildStages/ChildStages';
  * настоящей отрисовкой, а не с копией разметки.
  */
 export { ChildBlocks } from './ui/ChildBlocks/ChildBlocks';
-/**
- * Остров сторожа над лентой одиночного чата — та же отрисовка сигналов, что в
- * карточке группы хаба; ставит его страница чата рядом с заметками критичного.
- */
-export { ChatWatchIsland } from './ui/ChatWatchIsland/ChatWatchIsland';
 export type { ChildStageGroup, ChildStagesProps } from './ui/ChildStages.types';
-/**
- * Склейка строк хаба с записью конвейера уровней. Наружу — по той же причине:
- * группу, у которой чата ещё нет, показывают обе ленты, а собрать её можно
- * только из записи конвейера, и второй копии этого счёта быть не должно.
- */
-export { mergeSplitGroups } from './lib/mergeSplitGroups';
 export { splitGroupKey } from './lib/splitGroupKey';
-/**
- * Карточка решения по ревью чужого MR (Т7) и её сбор по дереву. Наружу — по той
- * же причине, что и хаб: лент ДВЕ, у Claude карточку ставит `ChatMessages`, у
- * чужого провайдера — страница его чата, а состояние у обеих одно, узел дерева.
- * Вторая копия сбора решала бы, кому какую карточку показывать, по-своему —
- * это либо чужое решение под рукой человека, либо своё, потерянное молча.
- */
-export { ReviewDecisionCard } from './ui/ReviewDecisionCard/ReviewDecisionCard';
-export type { ReviewDecisionCardProps } from './ui/ReviewDecisionCard.types';
-export type { ReviewDecisionItem } from './ui/ReviewDecisionCard.types';
-export { collectReviews } from './lib/reviewItems';
-export { reviewTreeOf } from './lib/reviewTreeOf';
-export { waitsDecision } from './lib/reviewWaiting';
-/**
- * «Продолжить» оборванные группы (WP1c) — хабу обеих лент, по той же причине.
- */
-export { useResumeInterruptedGroups } from './model/useResumeInterruptedGroups';
-export type { ResumeInterruptedGroups } from './model/useResumeInterruptedGroups';

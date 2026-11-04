@@ -124,10 +124,6 @@ export function describeProviders(store: SettingsSource): ProvidersResponse {
       // Переключатель «Разрешить правки» показывается лишь там, где CLI его видит.
       editsControl: provider.assistant?.editsControl ?? 'none',
       ...(providerEditsWhenOff(provider) ? { editsWhenOff: providerEditsWhenOff(provider) } : {}),
-      // Группы — тоже МОДЕЛЬЮ: Claude читает свои каталоги, CLI со слоем
-      // получает группу на каждый прогон, у остальных она не действует.
-      groupsModel:
-        provider.id === 'claude' ? 'claude-files' : provider.groupLayer ? 'run-layer' : 'none',
       // Рычаги экономии групп — только отметки: канал прогона клиенту не нужен.
       ...(provider.groupEconomy ? { groupEconomy: { ...provider.groupEconomy.support } } : {}),
     })),

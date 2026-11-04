@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { AGENT_MIN_CONTEXT } from '@agentdeck/contracts/local-models';
-import { createLocalModels, templateHashOf } from './service.ts';
+import { createLocalModels } from './service.ts';
 import { localPaths } from './paths.ts';
 
 /**
- * Окно, которое сервис моделей отдаёт прогонам и шлюзу: окно ЗАПУЩЕННОГО
+ * Окно, которое сервис моделей отдаёт прогонам: окно ЗАПУЩЕННОГО
  * сервера из его записи, а не константа. Настоящие сервис и запись на диске в
  * временной папке; сети и процессов здесь нет.
  */
@@ -71,87 +71,5 @@ describe('окружение прогона из записи о сервере'
     expect(service().runEnv('gateway').ENABLE_TOOL_SEARCH).toBe('true');
     expect(service().runEnv('direct')).not.toHaveProperty('ENABLE_TOOL_SEARCH');
     expect(service().runEnv()).not.toHaveProperty('ENABLE_TOOL_SEARCH');
-  });
-});
-
-describe('пометка отложенных инструментов', () => {
-  const paths = (): ReturnType<typeof localPaths> =>
-    localPaths(root, { AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm') });
-  function withTemplate(hash: (file: string) => string | undefined): void {
-    writeRecord(65_536);
-    const file = join(root, 'tpl.jinja');
-    writeFileSync(file, '{{ messages }}');
-    const record = JSON.parse(readFileSync(paths().pidFile, 'utf8')) as Record<string, unknown>;
-    writeFileSync(
-      paths().pidFile,
-      JSON.stringify({ ...record, templateFile: file, templateHash: hash(file) }),
-    );
-  }
-
-  it('сервер поднят с нынешним шаблоном — шлюз ставит пометку', () => {
-    withTemplate((file) => templateHashOf(file));
-    expect(service().upstream('qwen3.6:27b-coding')?.deferredInline).toBe(true);
-  });
-
-  it('шаблон на диске сменился после подъёма — пометки нет: сервер показал бы её модели', () => {
-    withTemplate(() => 'stale');
-    expect(service().upstream('qwen3.6:27b-coding')?.deferredInline).toBe(false);
-  });
-});
-
-describe('окно для шлюза', () => {
-  it('есть запись — окно; замера скорости нет — поля скорости тоже', () => {
-    writeRecord(65_536);
-    expect(service().upstream('qwen3.6:27b-coding')).toEqual({
-      context: 65_536,
-      prepare: expect.any(Function),
-      revive: expect.any(Function),
-      notice: expect.any(Function),
-      watch: expect.any(Function),
-      layer: expect.any(Function),
-      deferredInline: false,
-    });
-  });
-
-  it('замер скорости обработки промпта этой модели едет шлюзу — по нему считается срок первого байта', () => {
-    writeRecord(65_536);
-    const paths = localPaths(root, { AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm') });
-    writeFileSync(
-      paths.state,
-      JSON.stringify({
-        bench: {
-          'qwen3.6:27b-coding': {
-            tokensPerSec: 103.2,
-            promptTokensPerSec: 364,
-            measuredAt: '2026-10-12',
-            gpu: 'RTX 4090',
-          },
-        },
-      }),
-    );
-    expect(service().upstream('qwen3.6:27b-coding')).toEqual({
-      context: 65_536,
-      promptTokensPerSecond: 364,
-      prepare: expect.any(Function),
-      revive: expect.any(Function),
-      notice: expect.any(Function),
-      watch: expect.any(Function),
-      layer: expect.any(Function),
-      deferredInline: false,
-    });
-    // Замер другой модели этой не принадлежит.
-    expect(service().upstream('other:1b')).toEqual({
-      context: 65_536,
-      prepare: expect.any(Function),
-      revive: expect.any(Function),
-      notice: expect.any(Function),
-      watch: expect.any(Function),
-      layer: expect.any(Function),
-      deferredInline: false,
-    });
-  });
-
-  it('записи нет — шлюзу нечем отказывать: пусто', () => {
-    expect(service().upstream('qwen3.6:27b-coding')).toBeUndefined();
   });
 });

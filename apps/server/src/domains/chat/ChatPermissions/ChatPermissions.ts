@@ -1,3 +1,5 @@
+import type { CorePermitAsk } from '@agentdeck/contracts/chat-handoff';
+
 /**
  * Брокер интерактивных прав. Мини-MCP-сервер (permission-prompt-server.mjs) по
  * запросу агента дёргает `/api/chat/permission-request`; тот держит ответ здесь,
@@ -14,11 +16,10 @@ export interface PermissionRequest {
   input: unknown;
   toolUseId: string;
   /**
-   * Чем ответят: обычная карточка прав или ворота ветки (первая правка в
-   * основной копии). Сводке ожиданий (`chat-inbox.ts`) нужно различать: у ворот
-   * другие ответы и другой маршрут.
+   * Вопрос права задачи ядра (`toolName` = `CORE_PERMIT_TOOL`): поля, из которых телефон собирает
+   * грант и ответ ядру — сводка ожиданий отдаёт их «Вопросам» (`chat-inbox.ts`).
    */
-  kind?: 'permission' | 'branchGate';
+  core?: CorePermitAsk;
 }
 
 /** Висящий запрос глазами сводки: что спрошено и когда. */
@@ -75,20 +76,7 @@ export const EARLY_ANSWER_MS = 10 * 60_000;
 interface Pending {
   resolve: (decision: ChatPermissionReply) => void;
   timer: LongTimer;
-  /** Срок «отложить» карточки одиночного чата (решение 1, D-n). */
-  deferTimer?: ReturnType<typeof setTimeout>;
   info: PendingPermissionInfo;
-}
-
-/**
- * Карточка одиночного чата, на которую не ответили за `afterMs`, сама
- * становится отложенным вопросом D-n (`deferred-asks.ts`): человек мог уйти, а
- * прогон стоял бы сутки. `reply` заводит запись в момент срока и отдаёт отказ
- * агенту; кнопки той же карточки потом отвечают записи `id`.
- */
-export interface DeferOptions {
-  afterMs: number;
-  reply: () => { reply: ChatPermissionReply; id?: string } | undefined;
 }
 
 /**
@@ -156,10 +144,9 @@ function clearLongTimer(timer: LongTimer): void {
   if (timer.handle) clearTimeout(timer.handle);
 }
 
-/** Оба срока запроса: брокера и «отложить» — снятый запрос не должен сработать ни одним. */
+/** Срок снятого запроса гасится: сработав, он стёр бы под тем же ключом уже новый запрос. */
 function clearPendingTimers(pending: Pending): void {
   clearLongTimer(pending.timer);
-  if (pending.deferTimer) clearTimeout(pending.deferTimer);
 }
 
 export class PermissionBroker {
@@ -174,9 +161,6 @@ export class PermissionBroker {
   /** Ответы, пришедшие раньше вопроса (ключ → решение и когда): их ждёт повтор моста. */
   private early = new Map<string, { decision: ChatPermissionReply; at: number }>();
 
-  /** Карточки, ставшие D-n по сроку (ключ → номер): их кнопки отвечают записи. */
-  private deferredIds = new Map<string, string>();
-
   private key(runId: string, toolUseId: string): string {
     return `${runId}::${toolUseId}`;
   }
@@ -189,7 +173,6 @@ export class PermissionBroker {
   request(
     request: PermissionRequest,
     timeoutMs = permissionWaitMs(),
-    defer?: DeferOptions,
   ): Promise<ChatPermissionReply> {
     return new Promise((resolve) => {
       const key = this.key(request.runId, request.toolUseId);
@@ -200,7 +183,6 @@ export class PermissionBroker {
       const replaced = this.pending.get(key);
       if (replaced) {
         clearLongTimer(replaced.timer);
-        if (replaced.deferTimer) clearTimeout(replaced.deferTimer);
         replaced.resolve({ behavior: 'deny', message: 'Replaced by a newer request.' });
       }
       this.expired.delete(key);
@@ -216,51 +198,17 @@ export class PermissionBroker {
       }
 
       const timer = startLongTimer(timeoutMs, () => {
-        const entry = this.pending.get(key);
-        if (entry?.deferTimer) clearTimeout(entry.deferTimer);
         this.pending.delete(key);
         this.markExpired(key);
         resolve({ behavior: 'deny', message: EXPIRED_WAIT, expired: true });
       });
 
-      const entry: Pending = {
+      this.pending.set(key, {
         resolve,
         timer,
         info: { ...request, askedAt: new Date().toISOString() },
-      };
-      if (defer && Number.isFinite(defer.afterMs) && defer.afterMs > 0) {
-        entry.deferTimer = setTimeout(() => this.deferNow(key, defer), defer.afterMs);
-        entry.deferTimer.unref?.();
-      }
-      this.pending.set(key, entry);
+      });
     });
-  }
-
-  /** Срок карточки вышел: запрос становится D-n, агент получает отказ «поставлено человеку». */
-  private deferNow(key: string, defer: DeferOptions): void {
-    const pending = this.pending.get(key);
-    if (!pending) return;
-    let outcome: ReturnType<DeferOptions['reply']>;
-    try {
-      outcome = defer.reply();
-    } catch {
-      outcome = undefined;
-    }
-    // Записать не вышло — карточка остаётся ждать человека, как без срока.
-    if (!outcome) return;
-    clearPendingTimers(pending);
-    this.pending.delete(key);
-    this.remember(this.answered, key);
-    if (outcome.id) {
-      this.deferredIds.set(key, outcome.id);
-      this.trim(this.deferredIds);
-    }
-    pending.resolve(outcome.reply);
-  }
-
-  /** Номер D-n, которым стала карточка этого вызова по сроку. */
-  deferredIdOf(runId: string, toolUseId: string): string | undefined {
-    return this.deferredIds.get(this.key(runId, toolUseId));
   }
 
   /** Ответить на запрос (клик пользователя). false — если запрос уже снят. */

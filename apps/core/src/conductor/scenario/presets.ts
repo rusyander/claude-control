@@ -8,9 +8,11 @@ import {
   type StepDef,
   type StepKind,
 } from '@agentdeck/contracts/core/scenario';
+import { REVIEW_DECIDE_STEP, REVIEW_LINK_ASKS, REVIEW_PUSH_STEP } from './review-link-asks.ts';
 
 /**
- * Шесть готовых сценариев (02 §Scenario; шестой — ответы ревьюерам, его открывает опрос форжа) — в коде и с версией: правка пресета — новая версия
+ * Семь готовых сценариев (02 §Scenario; шестой — ответы ревьюерам, его открывает опрос форжа,
+ * седьмой — чат панели, этап 10) — в коде и с версией: правка пресета — новая версия
  * здесь же, а не перезапись старой, иначе задача, начатая на `bug-fix@1`, после выпуска ядра
  * читала бы другой сценарий под той же ссылкой. Библиотека человека (`<дом ядра>/scenarios/`)
  * id пресетов не занимает: они зарезервированы за кодом.
@@ -136,6 +138,38 @@ export const PRESETS: readonly Scenario[] = [
     presetStep('final-gate', 'final-gate', 'Финальная проверка', ['intake']),
     presetStep('publish', 'publish', 'Публикация', ['final-gate']),
     presetStep('answer-reviewers', 'answer-reviewers', 'Ответы ревьюерам', ['publish']),
+  ]),
+  // Чат панели (этап 10): один открытый шаг — ход человека = сообщение шагу, конец — `end-chat`
+  // или отмена. Хвоста доставки нет: публикация из чата — только через вопрос человеку. Срок
+  // пустой (`budgetMs` 0): чат ждёт человека сколько угодно, срок шага его бы обрывал.
+  v1('chat', 'Чат', [presetStep('chat', 'chat', 'Чат', [])]),
+  // Лёгкая сессия панели (этап 10, F2, `POST /v1/ask`): тот же шаг чата, но его закрывает ядро на
+  // конце первого хода (`next/active.ts`), а не `end-chat`; место — временный каталог ядра.
+  v1('ask', 'Вопрос модели', [presetStep('ask', 'chat', 'Ответ', [])]),
+  // Ревью MR по ссылке (этап 10, F8 — перенос карточки ревью старой панели). Единица 0 — копия на
+  // ветке MR (`POST /v1/review-link`), дифф ревью — от общего предка с целевой веткой. После
+  // ревью человек решает (точка 8); «правки» идут только по «починить»/«оба», пуш — отдельным
+  // вопросом после правок, публикация несёт итог в MR (заметкой) и/или пуш. Какие шаги
+  // пропускаются — правила `next/review-link.ts`, не порядок шагов. Правка зависит от решения,
+  // а не от ревью: правка, сданная после ревью, не делает его устаревшим (второго ревью нет).
+  v1('review-link', 'Ревью MR по ссылке', [
+    intake(
+      'Read the merge request named in the request: its description and the open threads (section threads). List what it changes. Do not change files.',
+    ),
+    presetStep('review', 'review', 'Ревью', ['intake'], {
+      text: 'Review only the merge request changes: git diff <review base>...HEAD in the copy. Report every finding in step_done findings (file, line, severity, text). Do not change files.',
+    }),
+    {
+      ...presetStep(REVIEW_DECIDE_STEP, 'ask-human', 'Решение по замечаниям', ['review']),
+      ask: REVIEW_LINK_ASKS[REVIEW_DECIDE_STEP]!.ru,
+    },
+    presetStep('fix', 'fix', 'Правки по ревью', [REVIEW_DECIDE_STEP]),
+    {
+      ...presetStep(REVIEW_PUSH_STEP, 'ask-human', 'Отправка в MR', ['fix']),
+      ask: REVIEW_LINK_ASKS[REVIEW_PUSH_STEP]!.ru,
+    },
+    presetStep('final-gate', 'final-gate', 'Финальная проверка', [REVIEW_PUSH_STEP]),
+    presetStep('publish', 'publish', 'Публикация', ['final-gate']),
   ]),
 ];
 

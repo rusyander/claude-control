@@ -12,11 +12,8 @@ import {
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
-import {
-  translate,
-  type ChatEvent,
-  type RawEvent,
-} from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { ChatEvent, RawEvent } from '../../../domains/chat/chat-events.ts';
+import { cliEvents } from '../../../domains/chat/__fixtures__/cli-line.ts';
 import { registerChatInboxRoutes } from './inbox-routes.ts';
 
 /**
@@ -45,7 +42,7 @@ describe('GET /api/chat/inbox — вопрос сменённой сессии',
   const liveRun = (): RunLike => ({
     start: (_options: unknown, onEvent: (event: ChatEvent) => void) => {
       cliLine = (raw) => {
-        for (const event of translate(raw)) onEvent(event);
+        for (const event of cliEvents(raw)) onEvent(event);
       };
       return new Promise<void>((done) => {
         finish = done;

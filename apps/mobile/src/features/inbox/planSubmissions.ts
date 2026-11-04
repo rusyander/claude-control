@@ -22,6 +22,17 @@ export function planSubmissions(
       questions.push(ask);
       continue;
     }
+    // Вопрос права задачи ядра отвечает сам телефон подписанными командами ядра: маршрут
+    // прогона его отвергает, и ключ прогона для него не нужен.
+    if (ask.kind === 'permission' && ask.core && answer.kind === 'permission') {
+      out.push({
+        kind: 'corePermit',
+        card: ask.core,
+        behavior: answer.behavior,
+        keys: [ask.key],
+      });
+      continue;
+    }
     if (!chat.runKey) continue;
     if (ask.kind === 'permission' && answer.kind === 'permission') {
       out.push({
@@ -29,15 +40,6 @@ export function planSubmissions(
         runKey: chat.runKey,
         toolUseId: ask.toolUseId,
         behavior: answer.behavior,
-        keys: [ask.key],
-      });
-    }
-    if (ask.kind === 'branchGate' && answer.kind === 'branchGate') {
-      out.push({
-        kind: 'branchGate',
-        runKey: chat.runKey,
-        toolUseId: ask.toolUseId,
-        choice: answer.choice,
         keys: [ask.key],
       });
     }

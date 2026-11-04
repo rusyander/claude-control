@@ -2,16 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { SplitDefaultsView } from '@agentdeck/contracts/split-groups';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import { resetCliLookupCache } from '../../../providers/detect/detect.ts';
 import { resetCliInfoCache } from '../../../providers/cli-install/cli-install.ts';
-import { BackgroundWatcher } from '../../../domains/watcher/watcher.ts';
 import { ModelCatalogStore } from '../../../domains/models/model-store.ts';
 import { FormatCheckStore } from '../../../domains/format-check/format-check.ts';
-import { registerSplitDefaultsRoutes } from '../../split-defaults-routes/split-defaults-routes.ts';
-import { registerWatcherRoutes } from '../../watcher-routes/watcher-routes.ts';
 import { registerModelRoutes } from '../../model-routes/model-routes.ts';
 import { registerFormatCheckRoutes } from '../../format-check-routes/format-check-routes.ts';
 import { registerConfigRoutes } from '../../config-routes/config-routes.ts';
@@ -19,8 +15,8 @@ import { registerChatCliRoutes } from '../../chat/cli-routes/cli-routes.ts';
 import { manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 
 /**
- * Действия настроек сверх общих — на настоящих маршрутах вкладок: общие правила
- * групп, наблюдатель, каталог моделей, сверка форматов, учётная запись и CLI.
+ * Действия настроек сверх общих — на настоящих маршрутах вкладок: каталог
+ * моделей, сверка форматов, учётная запись и CLI.
  * CLI — ФАЛЬШИВЫЙ `claude` на PATH (настоящий процесс, свой файл версии);
  * сеть каталога и схем — подменённый `fetch` (внешняя граница). Доказательство
  * записи — состояние на диске, прочитанное новым хранилищем, а не ответ действия.
@@ -73,7 +69,6 @@ describe('panel-agent actions: settings extra', () => {
   let bin: string;
   let cliState: string;
   let store: AppStore;
-  let watcher: BackgroundWatcher;
   let h: ManageHarness;
   const savedPath = process.env.PATH;
 
@@ -133,15 +128,6 @@ describe('panel-agent actions: settings extra', () => {
     );
 
     store = new AppStore(appData);
-    watcher = new BackgroundWatcher({
-      appDataDir: () => appData,
-      reportPath: () => join(appData, 'WATCH-REPORT.md'),
-      cwd: appData,
-      resolveCommand: () => undefined,
-      model: () => undefined,
-      pricing: () => ({}),
-      debounceMs: 10_000,
-    });
     const ctx = {
       store,
       location: {
@@ -160,8 +146,6 @@ describe('panel-agent actions: settings extra', () => {
     } as unknown as ServerContext;
     h = await manageHarness(ctx, (app) => {
       registerConfigRoutes(app, ctx);
-      registerSplitDefaultsRoutes(app, ctx);
-      registerWatcherRoutes(app, ctx, watcher);
       registerModelRoutes(app, ctx);
       registerFormatCheckRoutes(app, ctx);
       registerChatCliRoutes(app);
@@ -170,7 +154,6 @@ describe('panel-agent actions: settings extra', () => {
 
   afterEach(async () => {
     await h.close();
-    watcher.shutdown();
     vi.unstubAllGlobals();
     process.env.PATH = savedPath;
     delete process.env.CC_FAKE_CLI_STATE;
@@ -185,84 +168,6 @@ describe('panel-agent actions: settings extra', () => {
   const call = (name: string, input: unknown) => h.call(name, input);
   const decided = (name: string, input: unknown, decision?: 'approve' | 'reject') =>
     h.decided(name, input, decision);
-  /** Правила групп с диска — новым хранилищем, мимо памяти маршрута. */
-  const splitOnDisk = () => new AppStore(appData).getSplitDefaults();
-
-  it('общие правила групп: читает числа, правит только названные, права групп не трогает', async () => {
-    // Человек поставил своё право группы — агент не должен его сбросить.
-    const human = await h.app.inject({
-      method: 'PUT',
-      url: '/api/split-defaults',
-      headers: { origin: 'http://localhost:8888' },
-      payload: {
-        ...splitOnDisk(),
-        permissions: { ...splitOnDisk().permissions, gitWrite: 'human' },
-        groupQuestions: 'human',
-      },
-    });
-    expect(human.statusCode).toBe(200);
-
-    const read = await call('read_split_defaults', {});
-    expect(read.outcome).toBe('done');
-    const view = read.result as { current: { parallelLight: number }; humanOnly: unknown };
-    expect(view.humanOnly).toMatchObject({
-      permissions: { gitWrite: 'human' },
-      groupQuestions: 'human',
-    });
-
-    const next = view.current.parallelLight === 2 ? 3 : 2;
-    const { card, result } = await decided('save_split_defaults', {
-      parallelLight: next,
-      heavySteps: 7,
-    });
-    expect(result.outcome).toBe('done');
-    expect(card.risk).toBe('change');
-    expect(card.preview.diff).toContain(`"parallelLight": ${next}`);
-    const disk = splitOnDisk();
-    expect(disk.parallelLight).toBe(next);
-    expect(disk.heavy.steps).toBe(7);
-    expect(disk.permissions.gitWrite).toBe('human');
-    expect(disk.groupQuestions).toBe('human');
-
-    // Неназванное число тяжёлой группы остаётся тем, что на диске.
-    const chains = disk.heavy.chains === 2 ? 3 : 2;
-    await decided('save_split_defaults', { heavyChains: chains });
-    expect(splitOnDisk().heavy).toEqual({ chains, steps: 7 });
-  });
-
-  it('общие правила групп: отказ человека ничего не пишет; пустой вход и право группы — не принимаются', async () => {
-    const before = splitOnDisk();
-    const { result } = await decided('save_split_defaults', { parallelHeavy: 1 }, 'reject');
-    expect(result.outcome).toBe('rejected');
-    expect(splitOnDisk()).toEqual(before);
-
-    const empty = await call('save_split_defaults', {});
-    expect(empty.outcome).toBe('invalid');
-    // Поле прав во входе не существует: схема его отбрасывает, запись без чисел — отказ.
-    const permissions = await call('save_split_defaults', { permissions: { gitWrite: 'auto' } });
-    expect(permissions.outcome).toBe('invalid');
-    expect(splitOnDisk()).toEqual(before);
-    expect(await h.pendingCards()).toEqual([]);
-  });
-
-  it('наблюдатель: статус, включение карточкой, повтор того же состояния — отказ до карточки', async () => {
-    const status = await call('watcher_status', {});
-    expect(status.outcome).toBe('done');
-    expect((status.result as { enabled: boolean }).enabled).toBe(false);
-
-    const { card, result } = await decided('set_watcher', { enabled: true });
-    expect(result.outcome).toBe('done');
-    expect(card.preview.summaryCode).toBe('summary-watcher-on');
-    expect(watcher.status().enabled).toBe(true);
-
-    const again = await call('set_watcher', { enabled: true });
-    expect(again.outcome).toBe('failed');
-    expect(again.message).toContain('already on');
-    expect(await h.pendingCards()).toEqual([]);
-
-    await decided('set_watcher', { enabled: false });
-    expect(watcher.status().enabled).toBe(false);
-  });
 
   it('каталог моделей: страницы с продолжением; предел страницы вне схемы — отказ', async () => {
     const first = await call('list_models', { limit: 1 });
@@ -348,17 +253,5 @@ describe('panel-agent actions: settings extra', () => {
     expect(missing.outcome).toBe('failed');
     expect(missing.message).toContain('not found');
     expect(await h.pendingCards()).toEqual([]);
-  });
-
-  it('чтения правил групп отвечают тем же, что вкладка', async () => {
-    const view = (
-      await h.app.inject({ method: 'GET', url: '/api/split-defaults' })
-    ).json<SplitDefaultsView>();
-    const read = (await call('read_split_defaults', {})).result as { builtIn: unknown };
-    expect(read.builtIn).toEqual({
-      parallelLight: view.builtIn.parallelLight,
-      parallelHeavy: view.builtIn.parallelHeavy,
-      heavy: view.builtIn.heavy,
-    });
   });
 });

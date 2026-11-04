@@ -48,6 +48,8 @@ const json = (subject: SignalSubject) => ({ subject, detail: 'json' as const });
 export const SIGNAL_VIEW = {
   preflight: json('phase'),
   'ask-reminder': prose('ask'),
+  'ask-refused': prose('ask'),
+  'mcp-human': prose('kind'),
   'estimate-refused': json('phase'),
   'base-pin': prose('repo'),
   'user-layer-report': json('phase'),
@@ -66,6 +68,8 @@ export const SIGNAL_VIEW = {
   'hook-loop': prose('hook'),
   'keep-warm': json('session'),
   'session-refused': prose('step'),
+  'resume-refused': prose('session'),
+  'chat-in-place': prose('repo'),
   'read-allow-unread': prose('config'),
   'read-scope-refused': prose('entry'),
   'permit-sources-unread': prose('entry'),

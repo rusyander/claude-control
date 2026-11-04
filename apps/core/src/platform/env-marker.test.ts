@@ -212,6 +212,80 @@ describe('P53 env-marker — win32 sweep glue (helper substituted)', () => {
     );
     expect(cut).toEqual({ unknown: 'env-marker sweep: helper output is incomplete' });
   });
+
+  /** Время создания FILETIME (строкой, как его пишет помощник) для мс Unix. */
+  const ft = (ms: number): string => String((BigInt(ms) + 11_644_473_600_000n) * 10_000n);
+  const ROOT_MS = 1_780_000_000_000;
+
+  it('scope: an unread own process born before the root is no suspect; younger and unnamed start stay', () => {
+    const older = { pid: 81, start: ft(ROOT_MS - 5_000) };
+    const younger = { pid: 82, start: ft(ROOT_MS + 5_000) };
+    const scope = { bornAfterMs: ROOT_MS };
+    expect(judgeWinEnviron(scan({ unread: [older] }), scope)).toEqual({ value: [] });
+    expect(
+      judgeWinEnviron(scan({ hidden: [{ ...older, il: 8192, protection: 0 }] }), scope),
+    ).toEqual({ value: [] });
+    expect(judgeWinEnviron(scan({ unread: [older, younger] }), scope)).toEqual({
+      unknown: expect.stringMatching(/1 process\(es\).*\(pid 82\)$/),
+    });
+    expect(judgeWinEnviron(scan({ unread: [{ pid: 83, start: 'x' }] }), scope)).toEqual({
+      unknown: expect.stringMatching(/\(pid 83\)$/),
+    });
+  });
+
+  /** Помощник по очереди отдаёт заданные выводы; число вызовов — в `calls`. */
+  function scripted(...outputs: (string | null)[]) {
+    const calls: string[] = [];
+    const helper = async (_op: HelperOp, plan: string): Promise<ToolRun> => {
+      calls.push(plan);
+      const out = outputs[Math.min(calls.length - 1, outputs.length - 1)];
+      return out === null ? { ok: false, reason: 'exit 5', timedOut: false } : ok(out ?? '');
+    };
+    return { calls, helper };
+  }
+  const sweepWin = (helper: (op: HelperOp, plan: string) => Promise<ToolRun>) =>
+    sweepMarker('M', 'v', noTable, 'win32', '/proc', helper, undefined, {
+      bornAfterMs: ROOT_MS,
+    });
+  const young = ft(ROOT_MS + 1_000);
+
+  it('settle: an unread own process gone or readable on the second look → nothing found, two helper calls', async () => {
+    const s = scripted(
+      `reader 8192\nunread 61 ${young}\ndone 5 0 0 0\n`,
+      'reader 8192\ndone 5 0 0 0\n',
+    );
+    expect(await sweepWin(s.helper)).toEqual({ value: [] });
+    expect(s.calls).toEqual(['M=v', 'M=v']);
+    // Тот же номер, но другое время создания — другой процесс: прежний ушёл.
+    const reused = scripted(
+      `reader 8192\nunread 61 ${young}\ndone 5 0 0 0\n`,
+      `reader 8192\nunread 61 ${ft(ROOT_MS + 9_000)}\ndone 5 0 0 0\n`,
+    );
+    expect(await sweepWin(reused.helper)).toEqual({ value: [] });
+  });
+
+  it('settle: the same process unread twice stays unknown; a hit on the second look proves itself; a failed second look keeps the first doubt', async () => {
+    const twice = `reader 8192\nunread 61 ${young}\ndone 5 0 0 0\n`;
+    expect(await sweepWin(scripted(twice, twice).helper)).toEqual({
+      unknown:
+        'env-marker sweep: 1 process(es) of this user at or below our integrity level are unreadable (pid 61)',
+    });
+    expect(await sweepWin(scripted(twice, 'reader 8192\nhit 62 7\ndone 5 0 0 0\n').helper)).toEqual(
+      { value: [{ pid: 62, start: '7' }] },
+    );
+    expect(await sweepWin(scripted(twice, null).helper)).toEqual({
+      unknown: expect.stringMatching(/\(pid 61\)$/),
+    });
+    // Без сомнения второго взгляда нет: один вызов.
+    const clean = scripted('reader 8192\ndone 5 0 0 0\n');
+    expect(await sweepWin(clean.helper)).toEqual({ value: [] });
+    expect(clean.calls).toHaveLength(1);
+  });
+
+  it('sweep scope reaches the win32 judge: an older unread process twice over is no suspect', async () => {
+    const older = `reader 8192\nunread 71 ${ft(ROOT_MS - 5_000)}\ndone 5 0 0 0\n`;
+    expect(await sweepWin(scripted(older, older).helper)).toEqual({ value: [] });
+  });
 });
 
 describe('P53 env-marker — Linux /proc sweep unchanged (fake /proc)', () => {

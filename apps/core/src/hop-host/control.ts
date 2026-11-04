@@ -3,16 +3,27 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   hopControlRequestSchema,
   hopTranslates,
+  type HopControlMessage,
   type HopControlReply,
   type HopControlRequest,
   type HopRegistration,
 } from '@agentdeck/contracts/core/hops';
 import { rulesHashOf } from '@agentdeck/dlp/rules-hash';
+import type { PlatformGatewayEvent } from '@agentdeck/contracts';
+import { contourIdOf, contourRouteId } from './contour-book/record.ts';
 import { rulesOf, type HopContext } from './context.ts';
+import {
+  noteSummarized,
+  summarizedInRun,
+  summarizedMessageIds,
+  summarizedReport,
+} from './gateway/summarized-ledger/summarized-ledger.ts';
 import { driverProblem, hopKindOf, unknownFeatures } from './features.ts';
 import type { HopPorts, PortSubstitution } from './host.types.ts';
 import { readBody, respondJson } from './http.ts';
 import { answerProbe } from './probe.ts';
+import type { DlpProxy } from './dlp-proxy/dlp-proxy.ts';
+import type { UserGateway } from './user-gateway/user-gateway.ts';
 
 /**
  * Управление хостом (протокол `@agentdeck/contracts/core/hops`): ядро регистрирует метку сеанса,
@@ -30,6 +41,10 @@ export interface ControlDeps {
   pid: number;
   /** Каталог данных панели, с которым запущен хост (статус называет его ядру). */
   panelAppData?: string | null;
+  /** Шлюз человека (этап 10); нет — op `user-gateway` отказывает. */
+  userGateway?: UserGateway;
+  /** Прокси защиты данных человека (C3c); нет — op `dlp-proxy` отказывает. */
+  dlpProxy?: DlpProxy;
 }
 
 type Failure = Extract<HopControlReply, { ok: false }>;
@@ -42,6 +57,11 @@ const OPS: readonly Op[] = [
   'clear-exhausted',
   'spend-of',
   'probe',
+  'user-gateway',
+  'dlp-proxy',
+  'contours',
+  'contour-spend',
+  'contour-record',
 ];
 
 function fail(op: Op, code: string, detail: string): Failure {
@@ -127,19 +147,146 @@ export async function answerControl(deps: ControlDeps, message: unknown): Promis
           exhausted: ctx.spend.exhausted(),
           ...(deps.substitutions.length > 0 ? { substitutions: [...deps.substitutions] } : {}),
           panelAppData: deps.panelAppData ?? null,
+          userGateway: deps.userGateway?.state() ?? null,
+          dlpProxy: deps.dlpProxy?.state() ?? null,
         },
       };
-    case 'clear-exhausted':
-      return {
-        op: 'clear-exhausted',
-        ok: true,
-        cleared: ctx.spend.clearExhausted(request.routeId),
-      };
+    case 'clear-exhausted': {
+      // Маршрут контура держит две отметки: отказ маршрута звена (G11) и отметку на карточке
+      // контура. Человек продлил бюджет — гаснут обе, иначе одна из них соврала бы.
+      const route = ctx.spend.clearExhausted(request.routeId);
+      const platformId = contourIdOf(request.routeId);
+      const contour = platformId !== undefined && ctx.contours.clearExhausted(platformId);
+      return { op: 'clear-exhausted', ok: true, cleared: route || contour };
+    }
     case 'spend-of':
       return { op: 'spend-of', ok: true, spend: ctx.spend.spendOf(request.tag) };
     case 'probe':
       return answerProbe(ctx, request);
+    case 'user-gateway':
+      return configureUserGateway(deps, request);
+    case 'dlp-proxy':
+      return configureDlpProxy(deps, request.config);
+    case 'contours':
+      return {
+        op: 'contours',
+        ok: true,
+        contours: { ...ctx.contours.snapshot(), summarized: summarizedReport(ctx.stateDir) },
+      };
+    case 'contour-spend':
+      return { op: 'contour-spend', ok: true, records: ctx.contours.records() };
+    case 'contour-record':
+      return recordContour(ctx, request);
+    case 'contour-run': {
+      const toolCalls = toolCallsSince(ctx.contours.snapshot().events, request.since);
+      return {
+        op: 'contour-run',
+        ok: true,
+        summarized: summarizedInRun(ctx.stateDir, request.runTag),
+        ...(toolCalls === undefined ? {} : { toolCalls }),
+      };
+    }
+    case 'contour-summarized':
+      return {
+        op: 'contour-summarized',
+        ok: true,
+        messageIds: [...summarizedMessageIds(ctx.stateDir)],
+      };
   }
+}
+
+/**
+ * Вызовы инструментов агента (прослойкой и родным полем) в запросах контура с `sinceMs` — ответу
+ * чата чужого CLI, у которого своего транскрипта вызовов нет. `undefined` — запросов за это
+ * время не было. Счёт по следу, а не по прогону: два чата через один контур в одно время
+ * сложатся — цена пропущенная подсказка, не ложная.
+ */
+function toolCallsSince(
+  events: readonly PlatformGatewayEvent[],
+  sinceMs: number,
+): number | undefined {
+  let requests = 0;
+  let calls = 0;
+  for (const event of events) {
+    if (Date.parse(event.at) < sinceMs) continue;
+    requests += 1;
+    calls += (event.toolCalls ?? 0) + (event.nativeCalls ?? 0);
+  }
+  return requests > 0 ? calls : undefined;
+}
+
+/**
+ * Запись снаружи (проверки чтения; шлюз панели, славший её, снят) — в тот же учёт, что и запросы звена. Отказ по бюджету
+ * держит и маршрут звена: сеанс ядра на том же контуре не пойдёт в исчерпанный ключ.
+ */
+function recordContour(
+  ctx: HopContext,
+  request: Extract<HopControlMessage, { op: 'contour-record' }>,
+): HopControlReply {
+  const { platformId } = request;
+  if (request.event) ctx.contours.event(request.event as unknown as PlatformGatewayEvent);
+  if (request.usage) ctx.contours.usage(platformId, request.usage, new Date(ctx.now()));
+  if (request.exhausted) {
+    const at = new Date(request.exhausted.at);
+    const { scope, level } = request.exhausted;
+    ctx.contours.exhausted(
+      platformId,
+      at,
+      scope ? { scope, ...(level ? { level } : {}) } : undefined,
+    );
+    ctx.spend.markExhausted(contourRouteId(platformId), at.getTime());
+  }
+  if (request.summarized) noteSummarized(ctx.stateDir, { platformId, ...request.summarized });
+  return { op: 'contour-record', ok: true };
+}
+
+/**
+ * Шлюз человека: маршрут с переводом, которого мост не умеет, или с незнакомой возможностью —
+ * отказ всей настройки (как у регистрации метки): частично настроенный шлюз молча терял бы контур.
+ */
+async function configureUserGateway(
+  deps: ControlDeps,
+  request: Extract<HopControlMessage, { op: 'user-gateway' }>,
+): Promise<HopControlReply> {
+  if (!deps.userGateway)
+    return fail('user-gateway', 'unsupported', 'this hop host has no user gateway');
+  for (const route of request.routes) {
+    const unknown = unknownFeatures(route.spec.features);
+    if (unknown.length > 0)
+      return fail(
+        'user-gateway',
+        'unknown_feature',
+        `${route.platformId}: hop does not know: ${unknown.join(', ')}`,
+      );
+    const driver = driverProblem(route.spec);
+    if (driver) return fail('user-gateway', driver.code, `${route.platformId}: ${driver.detail}`);
+  }
+  try {
+    const state = await deps.userGateway.configure(request.port, request.routes);
+    return { op: 'user-gateway', ok: true, state };
+  } catch (error) {
+    return fail('user-gateway', 'bad_port', error instanceof Error ? error.message : String(error));
+  }
+}
+
+/**
+ * Прокси защиты данных человека: порт шлюза человека или порт самого хоста — отказ, а не прокси,
+ * который вечно ждал бы порта, занятого самим хостом. Порт по умолчанию у раздела — 5179 (внутри
+ * 5170–5180): это порт продукта, выбранный человеком, поэтому запретный диапазон здесь не судит;
+ * прокси настраивает только настоящее ядро (`bootCore({ dlpProxy })`), тестовые загрузки — нет.
+ */
+async function configureDlpProxy(
+  deps: ControlDeps,
+  config: Extract<HopControlMessage, { op: 'dlp-proxy' }>['config'],
+): Promise<HopControlReply> {
+  if (!deps.dlpProxy) return fail('dlp-proxy', 'unsupported', 'this hop host has no dlp proxy');
+  if (config) {
+    if (deps.userGateway?.state()?.port === config.port)
+      return fail('dlp-proxy', 'port_taken', `port ${config.port} is the user gateway port`);
+    if (Object.values(deps.ports).includes(config.port))
+      return fail('dlp-proxy', 'bad_port', `port ${config.port} is a hop host port`);
+  }
+  return { op: 'dlp-proxy', ok: true, state: await deps.dlpProxy.configure(config) };
 }
 
 export async function handleControlRequest(

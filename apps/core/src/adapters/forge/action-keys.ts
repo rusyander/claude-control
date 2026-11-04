@@ -22,7 +22,9 @@ export type ForgeActionKey =
       bodyHash: string;
       /** Разрешение едет в том же действии (G15): «случилось» — только ответ И разрешение. */
       resolve: boolean;
-    };
+    }
+  /** Итог ревью по ссылке (этап 10, F8): одна заметка в MR, повтор находится по хешу тела. */
+  | { kind: 'mr-comment'; url: string; iid: number; bodyHash: string };
 
 const SHA = /^[0-9a-f]{40,64}$/;
 const HASH = /^[0-9a-f]{64}$/;
@@ -61,6 +63,8 @@ export function forgeActionKey(key: ForgeActionKey): { target: string; idempoten
         target: `${key.url} !${key.iid} ${key.threadId}`,
         idempotencyHint: `${key.bodyHash} ${key.resolve ? 'resolve' : 'reply'}`,
       };
+    case 'mr-comment':
+      return { target: `${key.url} !${key.iid}`, idempotencyHint: key.bodyHash };
   }
 }
 
@@ -87,7 +91,8 @@ export function parseForgeActionKey(
     case 'mr-create':
       if (third !== undefined || h2 !== undefined || !HASH.test(h1)) return null;
       return { kind, url, sourceBranch: second, bodyHash: h1 };
-    case 'mr-update': {
+    case 'mr-update':
+    case 'mr-comment': {
       const iid = iidOf(second);
       if (iid === null || third !== undefined || h2 !== undefined || !HASH.test(h1)) return null;
       return { kind, url, iid, bodyHash: h1 };

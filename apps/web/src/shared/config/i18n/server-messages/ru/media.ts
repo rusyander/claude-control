@@ -37,4 +37,15 @@ export const mediaRu: Record<MediaMessageCode, string> = {
   'media-agent-images-too-many': 'в одном сообщении не больше {{limit}} картинок',
   'media-agent-image-too-large': '{{name}} — {{size}} МБ, а картинка агенту уходит до {{limit}} МБ',
   'media-agent-image-not-image': '{{name}} — не картинка PNG, JPEG, GIF или WebP',
+  'media-image-blocked-no-route': 'Рисовать некому: ни активного контура, ни своего эндпоинта.',
+  'media-image-blocked-driver-none': 'У этого контура генерации картинок нет.',
+  'media-image-blocked-no-model': 'Ни одна модель ключа не объявила рисование.',
+  'media-image-blocked-endpoint-no-url': 'У профиля эндпоинта не задан адрес генерации картинок.',
+  'media-image-blocked-endpoint-api-kind': 'Картинки умеет только эндпоинт OpenAI-вида.',
+  'media-image-blocked-no-agent':
+    'Рисовать некому: нет ни растровой дороги, ни разговора с агентом.',
+  'media-upstream-timeout-image': 'Картинка не пришла за {{seconds}} с — панель не ждёт дольше',
+  'media-upstream-timeout-deck': 'Колода не пришла за {{seconds}} с — панель не ждёт дольше',
+  'media-core-not-connected': 'Запрос в контур идёт через звено ядра, а ядро панели не подключено.',
+  'media-contour-link-failed': 'Звено ядра не дало адрес контура «{{contour}}»: {{reason}}',
 };

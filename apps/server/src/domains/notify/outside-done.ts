@@ -1,5 +1,5 @@
 import { statSync } from 'node:fs';
-import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from './run-notice.types.ts';
 import type { Record } from '../chat/ChatRecords/ChatRecords.ts';
 import { readHeadRecords, readTailRecords } from '../chat/ChatTranscriptFile/ChatTranscriptFile.ts';
 import { turnFactsOf, type TranscriptTurn } from './turn-end/transcript-facts.ts';

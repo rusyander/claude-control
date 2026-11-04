@@ -8,6 +8,4 @@ export interface ProviderChatProjectsProps {
   providerName: string;
   /** Начать новый разговор активного провайдера в каталоге проекта. */
   onStart: (path: string) => void;
-  /** Разговор уже заводится — кнопки ждут. */
-  isStarting: boolean;
 }

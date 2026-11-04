@@ -8,24 +8,11 @@ type ManageTexts = { [C in PanelTextCode]?: string };
  * backup and plugin-scaffold actions, merged into `panelTextsEn` by one spread.
  */
 export const panelTextsManageEn = {
-  'journal-read-split-defaults': 'Shared split group rules',
-  'journal-save-split-defaults': 'Editing shared split group rules',
-  'summary-save-split-defaults': 'Change the shared split group rules',
-  'label-split-human-only': 'Stays with you',
-  'value-split-human-only':
-    'Group permissions and group forks are not changed by the agent — you set them',
   'journal-read-sieves': 'Pre-MR sieves: learned ones and the blocker tally',
   'journal-delete-learned-sieve': 'Remove a learned sieve',
   'summary-delete-learned-sieve':
     'Remove the learned «{{class}}» sieve — group tasks stop carrying it',
   'label-sieve-sources': 'Learned from threads',
-  'journal-watcher-status': 'Background watcher status',
-  'journal-set-watcher': 'Turning the watcher on or off',
-  'summary-watcher-on': 'Turn the background watcher on',
-  'summary-watcher-off': 'Turn the background watcher off',
-  'label-watcher-cost': 'Cost',
-  'value-watcher-cost': 'A model analyses page failures in the background — this spends quota',
-  'value-watcher-off': 'Analysis stops at once',
   'journal-list-models': 'Model catalog',
   'journal-format-check': 'CLI format check',
   'journal-read-account': 'Account and system',
@@ -61,10 +48,12 @@ export const panelTextsManageEn = {
   'journal-start-gateway': 'Starting the contour gateway',
   'summary-start-gateway': 'Start the contour gateway',
   'label-port': 'Port',
-  'value-start-gateway-effect': 'The gateway is turned on in settings and starts on this port',
+  'value-start-gateway-effect':
+    'The gateway is turned on in settings; the core runs it and the panel checks that it listens',
   'journal-restart-gateway': 'Restarting the contour gateway',
   'summary-restart-gateway': 'Restart the contour gateway',
-  'value-restart-gateway-effect': 'Requests going through the gateway right now are cut off',
+  'value-restart-gateway-effect':
+    'The panel asks the core afresh whether the gateway listens; requests in flight are not cut',
   'journal-contour-spend': 'Contour spend',
   'journal-clear-contour-exhausted': 'Clearing the “budget exhausted” mark',
   'summary-clear-contour-exhausted': 'Clear the “budget exhausted” mark of contour “{{title}}”',

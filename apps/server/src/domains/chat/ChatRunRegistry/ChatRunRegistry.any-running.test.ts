@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ChatRunRegistry, type RunLike } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * «Идёт ли прогон на локальной модели» (L4b): по этому ответу панель держит ОС

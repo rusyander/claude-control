@@ -15,17 +15,7 @@ export interface HubSummary {
  * иначе остановленное разделение «шло» бы вечно.
  */
 export function summarizeHub(groups: ChildStageGroup[], now: number): HubSummary {
-  const counts: Record<HubBucket, number> = {
-    accepted: 0,
-    done: 0,
-    running: 0,
-    ask: 0,
-    deferred: 0,
-    queued: 0,
-    failed: 0,
-    cancelled: 0,
-    idle: 0,
-  };
+  const counts: Record<HubBucket, number> = { running: 0, ask: 0, idle: 0 };
   for (const group of countedGroups(groups)) counts[hubBucket(group)] += 1;
 
   const live = groups.filter((group) => !group.retired);

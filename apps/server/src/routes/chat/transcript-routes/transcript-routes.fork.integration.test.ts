@@ -10,7 +10,8 @@ import {
   ChatRunRegistry,
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../../../domains/chat/run-options/run-options.ts';
+import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { registerChatRoutes } from '../../chat-routes/chat-routes.ts';
 

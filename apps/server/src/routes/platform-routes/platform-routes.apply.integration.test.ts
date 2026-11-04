@@ -8,7 +8,15 @@ import type { Platform, PlatformApplyPlan, PlatformApplyResult } from '@agentdec
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { writePlatform, writeToken } from '../../domains/platform/store/store.ts';
-import { PlatformGateway } from '../../domains/platform/gateway/listener/listener.ts';
+import {
+  adoptUserGatewayPort,
+  createCoreGatewayView,
+  type CoreGatewayView,
+} from '../../domains/platform/gateway-view/gateway-view.ts';
+import {
+  listeningGateway,
+  memoryContours,
+} from '../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { registerPlatformRoutes } from './platform-routes.ts';
 import { savePermission } from '../../domains/permissions/permissions.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
@@ -57,7 +65,9 @@ let appData: string;
 let settingsPath: string;
 let app: FastifyInstance;
 let store: AppStore;
-let gateway: PlatformGateway;
+let gateway: CoreGatewayView;
+/** Шлюз человека у ядра (этап 10, C3d) «слушает» здесь; слушатель — тест ядра `user-gateway.integration`. */
+const GATEWAY_PORT = 5_179;
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'cc-contour-apply-routes-'));
@@ -72,8 +82,11 @@ beforeEach(async () => {
   writeToken(appData, PLATFORM.id, SECRET);
   store.updateSettings({ platformGateway: { enabled: true, port: 0, forceStream: true } });
 
-  gateway = new PlatformGateway();
-  await gateway.start({ store, appDataDir: appData, port: 0 });
+  const contours = memoryContours();
+  contours.setUserGateway(listeningGateway(GATEWAY_PORT));
+  // Порт ядра уезжает в состояние панели с первым опросом (`onUserGatewayPort` в сборке) — так же здесь.
+  adoptUserGatewayPort(store, GATEWAY_PORT);
+  gateway = createCoreGatewayView({ store, appDataDir: appData, contours });
 
   app = Fastify();
   registerPlatformRoutes(
@@ -90,7 +103,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app.close();
-  await gateway.stop();
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -179,7 +191,7 @@ describe('POST /api/platforms/:id/disable', () => {
       url: '/api/platforms/company-dev/apply',
       payload: { targets: ['claude'] },
     });
-    expect(envOf().ANTHROPIC_BASE_URL).toContain('127.0.0.1');
+    expect(envOf().ANTHROPIC_BASE_URL).toContain(`127.0.0.1:${GATEWAY_PORT}/`);
     savePermission(settingsPath, null, {
       decision: 'allow',
       pattern: 'Bash(git status)',

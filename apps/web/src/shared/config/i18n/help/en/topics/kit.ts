@@ -20,7 +20,7 @@ export const kitEn: typeof kitRu = {
 
     whyOne: 'One kit for every run',
     whyOneText:
-      'Chat, groups and test runs all receive the same thing — whatever the mode selects. The kit ' +
+      'The mode is picked once per CLI, not for every conversation or run. The kit ' +
       'updates with the panel instead of being rewritten by hand on every machine.',
     whyClean: 'No traces in your folder',
     whyCleanText:
@@ -41,17 +41,16 @@ export const kitEn: typeof kitRu = {
       'Before a launch the panel looks up the kit mode for that CLI. «Yours only» adds only the ' +
       'kit guards missing from your `~/.claude/hooks/lib`: consent to git writes, the ban on ' +
       'merging MRs and PRs, destructive commands, secrets, `nvm use` (on Windows it takes Node ' +
-      'away from the whole machine), pipeline waiting and picking the ' +
-      'recommended option in an autonomous run with full access. A guard whose namesake twin ' +
+      'away from the whole machine), pipeline waiting. A guard whose namesake twin ' +
       'is in your layer yields to it, so no call is answered twice. Otherwise the panel assembles the run folder: the built-in kit, your copies on top, ' +
       'disabled items left out. Claude Code receives it through `--plugin-dir`; in «Panel kit ' +
       'only» also without your personal settings layer. Qwen Code on a local model receives an ' +
-      'assembled home directory for that launch. Codex receives the rules through a launch key, ' +
-      'after your own instructions, and the skills as the kit folder; its folder and ' +
+      'assembled home directory for that launch. Codex receives the rules and the skill list ' +
+      'as text in the session instructions, after the core brief; its folder and ' +
       '`config.toml` stay unchanged. If the folder fails to build, the run does not ' +
-      'start and says why, instead of silently running on your global layer. For Codex the ' +
-      'command line holds 24,000 characters: when the skill list does not fit next to the rules ' +
-      'and your own instructions, it shrinks — descriptions cut to 240 characters, then names ' +
+      'start and says why, instead of silently running on your global layer. For Codex the kit ' +
+      'gets 28,000 characters of the instructions field (the rest is kept for the tests line): ' +
+      'when the skill list does not fit next to the rules, it shrinks — descriptions cut to 240 characters, then names ' +
       'only; a kit whose rules exceed the limit even then is refused the same way, ' +
       'because the panel will not trim the rules silently; ' +
       'that refusal names the limit and the kit size. The way out is the «Yours only» mode; for ' +
@@ -76,7 +75,7 @@ export const kitEn: typeof kitRu = {
     modeOursText:
       'Only the kit: personal settings, rules and hooks are not loaded. The account login stays — it does not live in settings. ' +
       'The kit sets the window caps itself: a command answer in the conversation is up to 8000 characters (longer — the ' +
-      'head and a path to the file with the full output), one file read is up to 10,000 tokens. A split-group stage ' +
+      'head and a path to the file with the full output), one file read is up to 10,000 tokens. A group task step ' +
       'gets the kit rules as a short card with the path to the full text — after every compaction too.',
 
     cliTitle: 'Which CLI supports what',
@@ -105,11 +104,10 @@ export const kitEn: typeof kitRu = {
       'of Qwen Code tool names; background work is refused here too.',
     cliCodex: 'Codex',
     cliCodexText:
-      '«Yours only» and «Yours and the panel kit». Rules and skills get through: the rules via ' +
-      'the `developer_instructions` key for that launch, after your own from `config.toml`; the ' +
-      'skills as the kit folder: in the chat (codex app-server) Codex sees them as its own ' +
-      'skills, and in a one-off launch (codex exec) it gets them as a «name — description» list ' +
-      'in the same instructions; the path to SKILL.md stands once in the list heading — a folder ' +
+      '«Yours only» and «Yours and the panel kit». Rules and skills get through: a Codex ' +
+      'conversation is a core task, and the kit rides as text in the session instructions after ' +
+      'the core brief — the rules, then the skills as a «name — description» list; Codex reads ' +
+      'the skills themselves from the kit folder, the path to SKILL.md stands once in the list heading — a folder ' +
       'template with an example, so no skill spends a hundred characters of the limit on it. On a local model, or when the list does not fit the limit, its descriptions are cut to 240 characters, and if it still does not fit only names remain. Pipelines and subagents do ' +
       'not: Codex cannot take them for one launch. Hooks neither: Codex runs a hook only after ' +
       'it is approved in Codex itself, so they cannot be attached for a launch — the hooks variant is ' +
@@ -150,24 +148,28 @@ export const kitEn: typeof kitRu = {
       'Continue — `cn` has a hook format, but release 1.5.47 never calls it (checked by a run); ' +
       'Cursor — the panel does not launch it; Aider — it has no tool calls, nothing to intercept.',
 
-    watchTitle: 'Group watching ships with the kit',
+    watchTitle: 'Live watching ships with the kit',
     watchCaption:
-      'The watchdog and agentdeck-watchdog skills are part of the kit: split groups can be watched on ' +
-      'any machine with the panel, with no personal copy of these skills in `~/.claude`.',
+      'The watchdog skill is part of the kit: running agent work can be watched, and every ' +
+      'deviation fixed at once, on any machine with the panel, with no personal copy of the skill ' +
+      'in `~/.claude`. A core task step is a Claude Code session like any other, watched through ' +
+      'its transcript.',
     watchStartTitle: 'How to start a watch on another machine',
     watchStartText:
       'Open a Claude Code chat in the «Yours and the panel kit» or «Panel kit only» mode (in «Yours ' +
-      'only» the kit skills do not arrive) and ask it to watch the groups. The agent starts ' +
-      '`watch-groups.mjs` from the kit with the group numbers. The script finds the panel itself — ' +
-      '`AGENTDECK_URL`, else `http://127.0.0.1:5178` — and the access token in ' +
-      '`~/.agentdeck/api-token`, and takes the rule texts from the snapshot in the kit when the ' +
-      'panel repo is not at hand. Watch state lives in the kit state folder (`AGENTDECK_KIT_STATE`, ' +
-      'else the system temp folder), not in `~/.claude`.',
+      'only» the kit skills do not arrive) and ask it to watch the work. The agent creates a watch ' +
+      'folder in the project (`.agent/tmp/watchdog/<name>`) and names what to watch: a session by ' +
+      'id, the folder the agent works in, a transcript folder or file, a plain log. From then on one ' +
+      'and the same `watch.mjs` call from the kit waits until something moves and wakes the agent on ' +
+      'a deviation; while nothing happens, no tokens are spent. The watch folder lives in the ' +
+      'project, so a resumed conversation and a compacted one both find it. The record for the turn ' +
+      'hook (below) lives in the kit state folder (`AGENTDECK_KIT_STATE`, else the system temp ' +
+      'folder), not in `~/.claude`.',
     watchHoldTitle: 'The turn does not end while the watch runs',
     watchHoldText:
       'At turn end a kit hook sends the agent back to the next watch call. The turn is released by ' +
       'your stop command, a `hold.json` file in the project’s `.agent/live-watch`, or the end of ' +
-      'every group; after three refusals in a row with no new watch call it is released on its own. ' +
+      'everything watched; after three refusals in a row with no new watch call it is released on its own. ' +
       'With no call for 10 minutes while the agent is busy elsewhere, one line reminds it of the ' +
       'watch — at most once per 10 minutes. Subagents and other sessions are not held. When the same ' +
       'hook sits in your personal layer and holds this turn, the kit hook stays silent — one turn is ' +
@@ -224,6 +226,28 @@ export const kitEn: typeof kitRu = {
     limitEnglishText:
       'The model reads the kit’s skills, rules and pipelines in English: shorter and more precise. ' +
       'The page and its hints follow the panel language.',
+    limitCoreTitle: 'How the kit reaches a turn through the core',
+    limitCoreText:
+      'A chat turn runs as a core task, and the panel hands the kit to it as ' +
+      'session fields: the kit and guard folders as plugins, the narrowed setting sources in ' +
+      '«Kit only», the kit variables and its addition. The core attaches the plugin in a ' +
+      'project without a trust mark too: the kit lives in the panel’s folder, not the ' +
+      'repository’s (the repository’s own files still do not reach such a session). If the ' +
+      'step’s layer hooks are narrowed by the scenario or a contour rule, the kit folder ' +
+      'declares MCP servers or is missing, the chat does not start and names the reason and ' +
+      'what to fix. Qwen Code «Ours» on a local model gets its own QWEN_HOME, Codex «both ' +
+      'kits» gets the rules and the skill list after the core brief. The project local layer ' +
+      '(«Projects» page) rides its own session field next to the kit: the setting sources ' +
+      'drop «project», the layer’s instructions follow the core brief, its skills come as a ' +
+      'plugin, its hooks and permissions go into the core settings; the approved .mcp.json ' +
+      'servers are connected by the core itself. A conversation started from ' +
+      'the core chat form (and «New ' +
+      'conversation here» of another CLI) gets the kit the same way a chat turn does: the panel ' +
+      'composes it. The Tests section agent on Claude Code gets the kit plugin, its variables ' +
+      'and our layers, without the kit addition; an agent of another CLI runs without the kit. ' +
+      'The form and resource-structure helper of another CLI gets the kit variables and rules ' +
+      'text, Claude’s goes without the kit; a kit that needs more (plugins, narrowing) makes ' +
+      'the helper refuse with the reason.',
   },
 
   shots: {

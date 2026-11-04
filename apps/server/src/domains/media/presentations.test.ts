@@ -112,6 +112,14 @@ function deps(extra: Partial<MediaDeps> = {}): MediaDeps {
   return { appDataDir: appData, store, env: {}, ...extra };
 }
 
+/** Звено ядра (C3b): адрес ручки и заглушка ключа — то, что отдаёт `ContourLinker.link`. */
+function linked(asked: Array<{ id: string; fresh: boolean }> = []): MediaDeps['contourLink'] {
+  return (id, fresh) => {
+    asked.push({ id, fresh: fresh === true });
+    return Promise.resolve({ baseUrl: 'http://127.0.0.1:5100', key: 'adk-hop-x' });
+  };
+}
+
 /**
  * Настоящий PNG — крошечный, но с подписью и IHDR: панель читает у картинки
  * размеры сама, и подделка из случайных байтов не дошла бы до файла колоды.
@@ -162,7 +170,7 @@ describe('planDeck: кто соберёт колоду', () => {
   it('дорога агента сильнее контура: за уже оплаченное подпиской ключ не тратится', () => {
     useContour(contour({ defaultModel: 'company-chat' }));
 
-    const plan = planDeck(deps({ gatewayPort: () => 5100 }), { agent: true });
+    const plan = planDeck(deps(), { agent: true });
 
     expect(plan.source).toBe('agent');
   });
@@ -174,7 +182,7 @@ describe('planDeck: кто соберёт колоду', () => {
       { id: 'company-chat', imageGeneration: false } as PlatformModelInfo,
     ]);
 
-    const plan = planDeck(deps({ gatewayPort: () => 5100 }));
+    const plan = planDeck(deps());
 
     expect(plan).toMatchObject({
       available: true,
@@ -187,7 +195,7 @@ describe('planDeck: кто соберёт колоду', () => {
   it('модель контура не выбрана — берётся первая из каталога ключа', () => {
     useContour(contour(), [{ id: 'company-8b' } as PlatformModelInfo]);
 
-    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('company-8b');
+    expect(planDeck(deps()).model).toBe('company-8b');
   });
 
   it('модель по умолчанию — тем же правилом, что у прогонов: не эмбеддинг и не рисование', () => {
@@ -199,25 +207,25 @@ describe('planDeck: кто соберёт колоду', () => {
       { id: 'company-8b', kind: 'chat' } as PlatformModelInfo,
     ]);
 
-    expect(planDeck(deps({ gatewayPort: () => 5100 })).model).toBe('company-8b');
+    expect(planDeck(deps()).model).toBe('company-8b');
   });
 
   it('ни выбранной модели, ни каталога — причина про модель, а не «некому»', () => {
     useContour(contour());
 
-    const plan = planDeck(deps({ gatewayPort: () => 5100 }));
+    const plan = planDeck(deps());
 
     expect(plan.available).toBe(false);
     expect(plan.reason).toBe('no-model');
   });
 
-  it('шлюз не поднят — причина названа его тумблером', () => {
+  it('шлюз панели выключен — контур всё равно собирает: запрос идёт через звено ядра (C3b)', () => {
     useContour(contour({ defaultModel: 'company-chat' }));
+    store.updateSettings({ platformGateway: { enabled: false, port: 5179, forceStream: true } });
 
-    const plan = planDeck(deps({ gatewayPort: () => 0 }));
+    const plan = planDeck(deps());
 
-    expect(plan.available).toBe(false);
-    expect(plan.reason).toBe('gateway-off');
+    expect(plan).toMatchObject({ available: true, source: 'contour', model: 'company-chat' });
   });
 
   it('свой эндпоинт OpenAI-вида годится, другого вида — нет, и это разные причины', () => {
@@ -251,21 +259,28 @@ describe('planDeck: кто соберёт колоду', () => {
   });
 });
 
-describe('generateDeck: свой запрос через шлюз', () => {
-  it('уходит на свой шлюз в диалекте OpenAI, без потока и с промптом каталога', async () => {
+describe('generateDeck: свой запрос через звено ядра', () => {
+  it('уходит на звено ядра в диалекте OpenAI, без потока и с промптом каталога', async () => {
     useContour(contour({ defaultModel: 'company-chat' }));
-    const seen: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const seen: Array<{ url: string; body: Record<string, unknown>; headers: unknown }> = [];
+    const links: Array<{ id: string; fresh: boolean }> = [];
     const fetchImpl: PlatformFetch = (url, init) => {
-      seen.push({ url, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+      seen.push({
+        url,
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+        headers: init?.headers,
+      });
       return Promise.resolve(answer(JSON.stringify(DECK)));
     };
 
-    const deck = await generateDeck(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const deck = await generateDeck(deps({ contourLink: linked(links), fetchImpl }), {
       chatId: 'chat-1',
       prompt: 'итоги квартала',
     });
 
-    expect(seen[0]?.url).toBe('http://127.0.0.1:5100/gor/v1/chat/completions');
+    expect(links).toEqual([{ id: 'gor', fresh: false }]);
+    expect(seen[0]?.url).toBe('http://127.0.0.1:5100/v1/chat/completions');
+    expect(seen[0]?.headers).toMatchObject({ authorization: 'Bearer adk-hop-x' });
     expect(seen[0]?.body).toMatchObject({
       model: 'company-chat',
       // Не потоком: колода нужна целиком, кусками её не разобрать.
@@ -294,7 +309,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
     useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () => Promise.resolve(answer(JSON.stringify(DECK)));
 
-    const deck = await generateDeck(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const deck = await generateDeck(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'итоги',
     });
@@ -314,10 +329,10 @@ describe('generateDeck: свой запрос через шлюз', () => {
     useContour(contour({ defaultModel: 'company-chat' }));
     const fetchImpl: PlatformFetch = () => Promise.resolve(answer(JSON.stringify(DECK)));
 
-    const deck = await generateDeck(
-      deps({ gatewayPort: () => 5100, fetchImpl, env: WITH_BROWSER }),
-      { chatId: '', prompt: 'итоги' },
-    );
+    const deck = await generateDeck(deps({ contourLink: linked(), fetchImpl, env: WITH_BROWSER }), {
+      chatId: '',
+      prompt: 'итоги',
+    });
 
     expect(deck.formats).toContain('pdf');
     expect(existsSync(deckFilePath(appData, deck.id, 'pdf'))).toBe(false);
@@ -337,7 +352,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
         ),
       );
 
-    const deck = await generateDeck(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const deck = await generateDeck(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'итоги',
     });
@@ -350,7 +365,7 @@ describe('generateDeck: свой запрос через шлюз', () => {
     const fetchImpl: PlatformFetch = () =>
       Promise.resolve(answer('Конечно! Вот план вашей презентации: сначала титул…'));
 
-    const error = await generateDeck(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const error = await generateDeck(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'итоги',
     }).catch((thrown: unknown) => thrown as MediaError);

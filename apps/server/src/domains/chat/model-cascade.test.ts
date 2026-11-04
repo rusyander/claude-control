@@ -6,32 +6,18 @@ import {
   assignableModelsUpTo,
   ceilingModelRank,
   clampAssignment,
-  fixStagePrompt,
   loweredWorkPrompt,
   manualAssignment,
   modelAlias,
-  namesProjectChecks,
-  parseAssignments,
   parseReviewDepth,
   parseReviewFindings,
-  reviewDepthGaps,
-  plannedRunCount,
-  deliverStagePrompt,
-  reviewSkipReason,
-  reviewStagePrompt,
   scanReviewBlocks,
-  REVIEW_BLOCK_LANG,
   EFFORT_RANK,
   KIND_PLAN,
   MODEL_RANK,
   planAssignment,
   TASK_KINDS,
 } from '@agentdeck/contracts/model-cascade';
-import {
-  buildGroupPrompt,
-  deliveryPreamble,
-  SPLIT_MAX_GROUPS,
-} from '@agentdeck/contracts/task-split';
 
 /**
  * Контракт каскада лежит в `packages/contracts`, а тесты — здесь: пакет
@@ -335,42 +321,6 @@ describe('семейство модели', () => {
   });
 });
 
-/** Разбор ручных замен с карточки: сюда приезжает JSON из браузера. */
-describe('разбор ручных замен', () => {
-  it('берёт только понятные значения', () => {
-    const parsed = parseAssignments({
-      0: { model: 'haiku', effort: 'low' },
-      1: { model: 'gpt-5', effort: 'max' },
-      2: { effort: 'high' },
-    });
-
-    expect(parsed.get(0)).toEqual({ model: 'haiku', effort: 'low' });
-    // `max` не назначается никому, чужая модель не назначается вовсе — от
-    // группы не остаётся ничего, и она идёт обычным подбором.
-    expect(parsed.has(1)).toBe(false);
-    expect(parsed.get(2)).toEqual({ effort: 'high' });
-  });
-
-  it('мусор не роняет разбор и ничего не назначает', () => {
-    expect(parseAssignments(undefined).size).toBe(0);
-    expect(parseAssignments('нет').size).toBe(0);
-    expect(parseAssignments({ '-1': { model: 'opus' }, '99': { model: 'opus' } }).size).toBe(0);
-    expect(parseAssignments({ 0: null, 1: 'opus', 2: {} }).size).toBe(0);
-  });
-
-  // G4 (12.10.2026): групп в разделении до 30, а замены читались только у
-  // первых восьми — выбор человека для девятой и дальше пропадал молча.
-  it('замена доходит до каждой группы разделения, не только до первых восьми', () => {
-    const last = SPLIT_MAX_GROUPS - 1;
-    const parsed = parseAssignments({
-      8: { model: 'haiku' },
-      [last]: { model: 'haiku' },
-      [SPLIT_MAX_GROUPS]: { model: 'haiku' },
-    });
-    expect([...parsed.keys()]).toEqual([8, last]);
-  });
-});
-
 describe('scanReviewBlocks', () => {
   const block = (body: string): string =>
     ['Разобрал дифф, вот что нашёл.', '', '```agentdeck:review', body, '```'].join('\n');
@@ -447,37 +397,6 @@ describe('отчёт ревью о глубине (U4)', () => {
       parseReviewDepth({ tier: 'T9', coverage: 'most', entries: ['a', 3, ' '], uncovered: 'x' }),
     ).toEqual({ entries: ['a'], uncovered: [] });
   });
-
-  it('судит панель: без тира или покрытия отчёта нет', () => {
-    expect(reviewDepthGaps(undefined)).toEqual(['unreported']);
-    expect(reviewDepthGaps({ tier: 'T1', entries: ['diff-first'], uncovered: [] })).toEqual([
-      'unreported',
-    ]);
-    expect(reviewDepthGaps({ coverage: 'full', entries: ['diff-first'], uncovered: [] })).toEqual([
-      'unreported',
-    ]);
-  });
-
-  it('названное непрочитанное делает отчёт частичным, даже при «full»', () => {
-    const full = { tier: 'T1' as const, entries: ['diff-first'], coverage: 'full' as const };
-    expect(reviewDepthGaps({ ...full, uncovered: [] })).toEqual([]);
-    expect(reviewDepthGaps({ ...full, uncovered: ['docs'] })).toEqual(['partial']);
-    expect(reviewDepthGaps({ ...full, coverage: 'partial', uncovered: [] })).toEqual(['partial']);
-  });
-
-  it('T2 требует двух РАЗНЫХ входов; T1 хватает одного', () => {
-    const t2 = { tier: 'T2' as const, coverage: 'full' as const, uncovered: [] };
-    expect(reviewDepthGaps({ ...t2, entries: ['diff-first'] })).toEqual(['entries']);
-    expect(reviewDepthGaps({ ...t2, entries: ['Diff-First', 'diff-first'] })).toEqual(['entries']);
-    expect(reviewDepthGaps({ ...t2, entries: ['diff-first', 'frame-first'] })).toEqual([]);
-    expect(
-      reviewDepthGaps({ tier: 'T1', coverage: 'full', uncovered: [], entries: ['diff-first'] }),
-    ).toEqual([]);
-  });
-
-  it('задание ревью просит отчёт о глубине в том же блоке', () => {
-    expect(reviewStagePrompt({ task: 'Сделай вход' })).toContain('"depth"');
-  });
 });
 
 describe('parseReviewFindings', () => {
@@ -515,68 +434,7 @@ describe('parseReviewFindings', () => {
   });
 });
 
-describe('plannedRunCount', () => {
-  /**
-   * Цена согласия: до четырёх прогонов на группу — работа, ревью, правки и
-   * проход проверки (U6: ревью после каждой работы, на потолке тоже). Число
-   * показывается ДО кнопки.
-   */
-  it('каждой группе считает до четырёх прогонов, понижена она или нет', () => {
-    expect(plannedRunCount([{ lowered: false }, { lowered: false }])).toBe(8);
-    expect(plannedRunCount([{ lowered: true }, { lowered: false }])).toBe(8);
-    expect(plannedRunCount([{ lowered: true }], { planned: true })).toBe(6);
-    expect(plannedRunCount([])).toBe(0);
-  });
-});
-
 describe('тексты звеньев', () => {
-  it('ревью запрещает правки и требует блок вердикта', () => {
-    const prompt = reviewStagePrompt({ task: 'Переименуй foo в bar', model: 'sonnet' });
-
-    expect(prompt).toContain('EDIT NOTHING');
-    expect(prompt).toContain(REVIEW_BLOCK_LANG);
-    expect(prompt).toContain('Переименуй foo в bar');
-  });
-
-  it('ревью сверяет и с критериями плана, когда план есть; без плана строки нет (U13)', () => {
-    const withPlan = reviewStagePrompt({
-      task: 'Сделай вход',
-      context: { plan: '5. Критерии: вход по паролю' },
-    });
-    const without = reviewStagePrompt({ task: 'Сделай вход' });
-
-    expect(withPlan).toContain('an acceptance criterion not met, or a check of its verification');
-    expect(withPlan).toContain('5. Критерии: вход по паролю');
-    expect(without).not.toContain('acceptance criterion');
-  });
-
-  it('правки перечисляют замечания по номерам и не зовут на второй заход', () => {
-    const prompt = fixStagePrompt(['первое', 'второе'], { branch: 'split/rename' });
-
-    expect(prompt).toContain('1. первое');
-    expect(prompt).toContain('2. второе');
-    expect(prompt).toContain('split/rename');
-    expect(prompt).toContain('a stronger model');
-  });
-
-  /**
-   * У чужого CLI потолка нет: ревьюером работает его собственная настройка, и
-   * чем она сильнее подобранной ступени — панель не знает. Обещать «сильнее»
-   * значит подписаться за то, чего не проверяли.
-   */
-  it('правки у чужого CLI не зовут к инструменту вопросов, которого у него нет (F8)', () => {
-    expect(fixStagePrompt(['первое'], { reviewer: 'cli' })).not.toContain('AskUserQuestion');
-    expect(fixStagePrompt(['первое'], { reviewer: 'cli' })).toContain('last line of your answer');
-    expect(fixStagePrompt(['первое'])).toContain('AskUserQuestion');
-  });
-
-  it('правки у чужого CLI не называют ревьюера сильнейшим', () => {
-    const prompt = fixStagePrompt(['первое'], { reviewer: 'cli' });
-
-    expect(prompt).toContain('another model');
-    expect(prompt).not.toContain('a stronger model');
-  });
-
   /**
    * Этап 2 сдан — значит про ревью можно и НУЖНО говорить прямо: агент, знающий
    * о проверке, оставляет незаконченное незаконченным.
@@ -620,47 +478,25 @@ describe('тексты звеньев', () => {
    * TQ-10 (12.10.2026): задание с доставкой уже определяет проверки проекта —
    * понижённая планка того же прогона ссылается на него, а не повторяет.
    */
-  it('задание с доставкой называет проверки — планка сдачи ссылается, а не повторяет', () => {
-    const group = { title: 'Форма входа', branch: 'fix/login', tasks: ['Поправь валидацию'] };
-    const delivered = `${deliveryPreamble({ branch: 'fix/login' })}\n\n${buildGroupPrompt(group)}`;
-
-    expect(namesProjectChecks(delivered)).toBe(true);
-    expect(namesProjectChecks(buildGroupPrompt(group))).toBe(false);
-    expect(namesProjectChecks(fixStagePrompt(['x']))).toBe(true);
-
+  it('планка сдачи с проверками в задании ссылается на них, а не повторяет', () => {
     const short = loweredWorkPrompt('mechanical', { checksInTask: true });
     expect(short).toContain('run the checks your task names, at the scope and moment it names');
     expect(short).not.toContain('run the project checks its rules name');
     expect(loweredWorkPrompt('mechanical')).toContain('run the project checks its rules name');
   });
 
-  // Владелец 20.10: замер 19.10 — работа, правки и доставка гнали полный гейт
-  // каждое, три прогона на один MR. Правки перед доставкой — только узкие.
-  it('правки перед доставкой — узкие проверки, полный гейт остаётся доставке', () => {
-    const before = fixStagePrompt(['x'], { deliver: true });
-    expect(before).toContain("The project's full checks run ONCE, in the delivery stage");
-    expect(before).not.toContain('run the project checks its rules name');
-    expect(namesProjectChecks(before)).toBe(true);
-    expect(fixStagePrompt(['x'])).toContain('run the project checks its rules name');
-  });
-
   it('источники правил названы и для чужих CLI', () => {
     expect(loweredWorkPrompt('mechanical')).toContain("the CLI's own instruction files");
-    expect(deliveryPreamble({ branch: 'fix/login' })).toContain("the CLI's own instruction files");
   });
 });
 
 /**
- * Охват ревью группы от её коммита начала (владелец 26.10, замечание 4): задание ревью
- * называет охват командами git, найденное вне охвата идёт отдельным списком и правкам
- * не уходит, доставка называет его в MR и причину пропуска ревью.
+ * Охват ревью группы от её коммита начала (владелец 26.10, замечание 4): найденное вне
+ * охвата идёт отдельным списком. Задания ревью, правок и доставки, называвшие охват,
+ * уехали в ядро вместе с планировщиком звеньев (этап 10); разбор блока остался.
  */
 describe('охват ревью группы (startSha)', () => {
   const block = (body: string): string => ['Итог.', '```agentdeck:review', body, '```'].join('\n');
-  const scope = (
-    commits: { sha: string; subject: string; type: 'commit' | 'merge' | 'clean-merge' }[],
-    dirty = false,
-  ) => ({ kind: 'commits' as const, from: 'abcdef123456', commits, dirty });
 
   it('«preExisting» блока — отдельным списком, «findings» его не содержат', () => {
     const scan = scanReviewBlocks(
@@ -672,69 +508,6 @@ describe('охват ревью группы (startSha)', () => {
     // Мусор в списке не становится карточкой.
     expect(scanReviewBlocks(block('{"findings":[],"preExisting":[1,""]}'))).not.toHaveProperty(
       'preExisting',
-    );
-  });
-
-  it('коммиты без слияний — `git diff <start>..HEAD`; слияние — `--remerge-diff`, не diff', () => {
-    const plain = reviewStagePrompt({
-      task: 't',
-      delta: scope([{ sha: 'aaa111aaa111', subject: 'group: fix', type: 'commit' }]),
-    });
-    expect(plain).toContain('This group started at commit abcdef123456');
-    expect(plain).toContain('together they are `git diff abcdef123456..HEAD`');
-    expect(plain).toContain('- aaa111aaa111 group: fix');
-    expect(plain).not.toContain('once and in full');
-    expect(plain).toContain('"preExisting"');
-    expect(plain).not.toContain('Uncommitted changes');
-
-    const merge = reviewStagePrompt({
-      task: 't',
-      delta: scope([
-        { sha: 'bbb222bbb222', subject: 'Merge main', type: 'merge' },
-        { sha: 'ccc333ccc333', subject: 'Merge again', type: 'clean-merge' },
-      ]),
-    });
-    expect(merge).toContain('git show --remerge-diff <sha>');
-    expect(merge).toContain('do not use it');
-    expect(merge).not.toContain('together they are');
-    expect(merge).toContain(
-      '- bbb222bbb222 Merge main (merge: review its conflict resolutions only)',
-    );
-    expect(merge).toContain('(merge without conflict resolutions: nothing of the group to review)');
-
-    const dirty = reviewStagePrompt({ task: 't', delta: scope([], true) });
-    expect(dirty).toContain('`git diff HEAD`');
-    expect(dirty).not.toContain('Commits of this group:');
-  });
-
-  it('правки — только сделанное с начала; доставка — «было до группы» и причина пропуска', () => {
-    const fix = fixStagePrompt(['x'], { startSha: 'abcdef1234567890' });
-    expect(fix).toContain('This group started at commit abcdef123456: fix only what the group');
-    expect(fixStagePrompt(['x'])).not.toContain('This group started at commit');
-
-    const deliver = deliverStagePrompt({
-      after: 'work',
-      context: {},
-      reviewSkipped: reviewSkipReason({
-        kind: 'none',
-        from: 'abcdef123456',
-        published: false,
-        group: true,
-      }),
-      preExisting: ['🟡 1. давнее b.ts:3-4'],
-      startSha: 'abcdef1234567890',
-    });
-    expect(deliver).toContain(
-      'the panel skipped its review: this group made no changes of its own since its start commit abcdef123456',
-    );
-    expect(deliver).toContain('pre-existing, NOT fixed by this group');
-    expect(deliver).toContain('1. 🟡 1. давнее b.ts:3-4');
-    expect(deliver).toContain('`git log --first-parent abcdef123456..HEAD`');
-    const plain = deliverStagePrompt({ after: 'work', context: {} });
-    expect(plain).toContain('it has no separate review');
-    expect(plain).not.toContain('pre-existing');
-    expect(reviewSkipReason({ kind: 'none', from: 'abcdef123456', published: false })).toContain(
-      'already published at abcdef123456',
     );
   });
 });

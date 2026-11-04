@@ -33,8 +33,6 @@ export interface CatalogRow {
   /** Подбор под карту без выбора человека: по нему «Рекомендуем» и годность агенту по умолчанию. */
   fit: ModelFit;
   installed?: InstalledModel;
-  /** Есть в хранилище Ollama — можно забрать без скачивания. */
-  importable: boolean;
   recommended: boolean;
   job?: LocalJob;
   /** Замер снят не там, где модель считает сейчас, — где именно. */
@@ -77,7 +75,6 @@ export function catalogRows(info: LocalModelsInfo): CatalogRow[] {
   const gpu = deviceGpu(info.hardware, info.device);
   const ram = info.hardware.ramGb;
   const best = recommendModel(info.catalog.models, gpu, ram);
-  const importable = new Set(info.importable.map((item) => item.tag));
   const server = info.server?.running ? info.server : undefined;
   const rows = info.catalog.models.map((source): CatalogRow => {
     const installed = info.installed.find((item) => item.tag === source.tag);
@@ -94,7 +91,6 @@ export function catalogRows(info: LocalModelsInfo): CatalogRow[] {
       model,
       fit: fitModel(model, gpu, ram),
       ...(installed ? { installed } : {}),
-      importable: importable.has(model.tag),
       recommended: best?.model.tag === model.tag,
       ...(job ? { job } : {}),
       ...(benchOn ? { benchOn } : {}),

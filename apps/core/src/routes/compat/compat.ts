@@ -93,15 +93,29 @@ function canTranslate(pairs: CompatPolicy['translations'], from: Dialect, to: Di
   return pairs.some((pair) => pair.from === from && pair.to === to);
 }
 
-/** Диалект, который увидит DLP-звено: тело на участке CLI → звено. */
+/**
+ * Диалект тела, которое судит DLP. Напрямую — тело участка CLI → звено. Через шлюз — уже
+ * переведённое тело верха (план Q7): мост переводит первым и маскирует то, что уйдёт, поэтому
+ * Responses и Gemini, которых пакет DLP не разбирает, маскируются в форме OpenAI chat.
+ */
 function dlpDialect(verdict: Exclude<Verdict, Refusal>): Dialect | undefined {
+  if (verdict.kind === 'via-gateway') return verdict.to;
   return verdict.channel.via === 'login' ? undefined : verdict.channel.dialect;
 }
 
 function judge(c: CompatAdapterTriple, policy: CompatPolicy): Verdict {
   const { adapter, route, model } = c;
+  // Заготовка не запускается ни по какому маршруту: отказ раньше разрешений и фактов маршрута.
+  if (adapter.built === false) return { code: 'adapter_not_built' };
+  // Ни хука до вызова, ни оверлея запретов (03:60, P81): судье ядра встать некуда — по фактам
+  // возможностей, никогда по имени CLI. Чинит это только переходник, поэтому раньше набора.
+  if (!adapter.caps.preToolHooks && !adapter.caps.denyOverlay) return { code: 'no_core_hook' };
   if (!allowedBy(policy.allowed, c)) return { code: 'not_allowed' };
-  if (unavailable(route)) return { code: 'route_unavailable' };
+  // Сервер человека лежит — его поднимает только человек: свой код, а не «маршрут недоступен».
+  if (unavailable(route)) {
+    const humanDown = route.availability.state === 'absent' && route.availability.downReason;
+    return { code: humanDown ? 'user_server_down' : 'route_unavailable' };
+  }
   if (route.credential === 'absent') return { code: 'credential_absent' };
   if (model.served === 'absent') return { code: 'model_absent' };
   const binding = route.caps.binding;

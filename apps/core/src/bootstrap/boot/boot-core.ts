@@ -1,8 +1,14 @@
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { createAdapterRegistry } from '../../adapters/index.ts';
+import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import { createSessionTokens } from '../../policy/session-tokens/session-tokens.ts';
-import type { PublisherCommandPort } from '../../conductor/commands/commands.types.ts';
+import type {
+  PublisherCommandPort,
+  SetRoutePorts,
+} from '../../conductor/commands/commands.types.ts';
+import { createAskBridgeBook, createAskTask, replayAsk } from '../../conductor/ask/index.ts';
+import { createTaskEnvBook } from '../../conductor/task-env/index.ts';
 import { failHalfMadeAnswers, type SplitEnv } from '../../conductor/estimate/index.ts';
 import { createTaskRegistry } from '../../conductor/tasks.ts';
 import { WindowBook } from '../../economy/window/index.ts';
@@ -17,10 +23,17 @@ import { hopControl } from '../../routes/hops/hops.ts';
 import type { RouteRegistry } from '../../routes/registry.ts';
 import { actionReaders } from '../action-readers.ts';
 import { buildCoreApi } from '../boot-api.ts';
+import { createContoursPort } from '../contours-port.ts';
 import { cliPathOf } from '../cli-paths.ts';
 import { startConductor } from '../conductor-wiring/index.ts';
+import type { ReviewLinkWiring } from '../review-link-wiring/index.ts';
 import { createBootReconcile, RECONCILE_EVERY_MS } from '../boot-reconcile.ts';
-import { buildCoreRoutes, readRouteConfig } from '../core-routes.ts';
+import {
+  buildLiveCoreRoutes,
+  readRouteConfig,
+  refreshRoutesNoted,
+  type LiveCoreRoutes,
+} from '../core-routes.ts';
 import { panelWiring } from '../panel-wiring.ts';
 import { shutdownRoutes } from '../route-shutdown.ts';
 import { dlpSecretMask } from '../secret-mask.ts';
@@ -43,11 +56,23 @@ import { createSessionKeyBook } from '../session-keys.ts';
 import { buildVerifierWiring } from '../verifier-wiring/index.ts';
 import type { BootedCore, BootOptions } from './boot.types.ts';
 import { openCoreLog, routeJournalOf } from './core-log.ts';
+import { startLocalFront, type LocalFront } from '../../routes/local/own/front.ts';
+import { createLocalHold } from '../../routes/local/own/hold.ts';
+import { createSlotCache } from '../../platform/slot-cache.ts';
+import { takeHomeLock, type HomeLock } from './home-lock.ts';
 import { reasonOf, releaseAll } from './release.ts';
 import { startBackups, startClockJumps } from './timers.ts';
 import { supervisorWiring } from '../supervisor-wiring.ts';
 import { checkOpenFiles } from './open-files.ts';
 import { openFilesLimit } from '../../platform/limits.ts';
+import { startDlpProxyWiring, type DlpProxyWiring } from '../dlp-proxy-wiring.ts';
+import { readPanelListenerSettings } from '../panel-profiles.ts';
+import { forgeHostsOfPanel, forgeOfPanel } from '../panel-forge.ts';
+import {
+  panelGatewayPort,
+  startUserGatewayWiring,
+  type UserGatewayWiring,
+} from '../user-gateway-wiring.ts';
 
 /**
  * Загрузка ядра (00 §Processes, 07 фаза 2): дом → токен → своя личность (pid + старт от ОС) →
@@ -73,24 +98,54 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
   // тиков создаются позже, перед самими тиками (ревью F-50); до них журнал штампует теми же
   // часами без базы — штамп от базы не зависит.
   const bootId = newId();
+  const probe = createLivenessProbe();
+  const build = options.build ?? process.env.AGENTDECK_CORE_BUILD ?? 'dev';
+  // Одно ядро на дом — до маршрутов, профилей панели и хоста звеньев: второе ядро уходит, не
+  // тронув ничего общего (журнал ядра пишет только строку отказа).
+  let homeLock: HomeLock;
+  try {
+    homeLock = await takeHomeLock(
+      layout.lock,
+      layout.root,
+      {
+        leaseId: newId(),
+        pid: process.pid,
+        pidStart: self.value.start,
+        bootId,
+        build,
+        acquiredAt: Date.now(),
+      },
+      (id) => probe.isAlive(id),
+    );
+  } catch (error) {
+    note('boot.refused', { reason: reasonOf(error) });
+    log.close();
+    throw error;
+  }
   const stamps = createClock(REAL_CLOCK, bootId);
   const routeJournal = routeJournalOf(note);
   // Профили панели и хост звеньев (W2b): маршруты ключа API и контуров, звено дороги сессии.
   const panel = panelWiring(layout, { panelAppData: options.panelAppData, bootId }, note);
   let routes: RouteRegistry;
+  // Пересборка маршрутов панели (s10 G7): есть только у собранного здесь реестра, не у подставленного.
+  let refreshPanelRoutes: LiveCoreRoutes['refreshPanel'] | undefined;
   try {
-    routes =
-      options.routes ??
-      buildCoreRoutes(
+    if (options.routes) routes = options.routes;
+    else {
+      const live = buildLiveCoreRoutes(
         adapters,
         layout,
         options.routeConfig ?? readRouteConfig(layout),
         { bootId, journal: routeJournal },
         panel.sources,
       );
+      routes = live.registry;
+      refreshPanelRoutes = live.refreshPanel;
+    }
   } catch (error) {
     // Настройка маршрутов не той формы — отказ до аренды задач, порта и строки в procs.json.
     note('boot.refused', { reason: reasonOf(error) });
+    homeLock.release();
     log.close();
     throw error;
   }
@@ -135,8 +190,6 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     observer: observer.tap,
   });
   cells.sessions = sessions;
-  const probe = createLivenessProbe();
-  const build = options.build ?? process.env.AGENTDECK_CORE_BUILD ?? 'dev';
   const me = { build, pid: process.pid, pidStart: self.value.start, bootId };
   const startedAt = Date.now();
   const registry = createTaskRegistry(
@@ -180,8 +233,19 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
   let splitEnv: SplitEnv | undefined;
   // Порт публикатора для `publish-now` / `clean-remote` — та же ячейка, тот же срок жизни.
   let publisher: PublisherCommandPort | undefined;
+  // Проводка ревью MR по ссылке (этап 10, F8) — та же ячейка, тот же срок жизни.
+  let reviewLink: ReviewLinkWiring | undefined;
+  // Токены моста панели вопросов «ask» (этап 10, F2): только память, одна книга на загрузку.
+  const askBridges = createAskBridgeBook();
+  // Значения окружения задач (этап 10, F6): каталог песочницы, секреты стенда — только память.
+  const taskEnv = createTaskEnvBook();
   // Порт настройки ядра (этап 7): один на загрузку, снимает подписку на дрейф при остановке.
   let configWiring: CoreConfigWiring | undefined;
+  // Постоянный адрес своей модели (этап 10): порт уходит с ядром, удержание — нет.
+  let localFront: LocalFront | undefined;
+  // Шлюз человека (этап 10): настройку держит ядро, сам шлюз живёт на хосте звеньев.
+  let userGateway: UserGatewayWiring | undefined;
+  let dlpProxy: DlpProxyWiring | undefined;
   try {
     note('routes', { ids: routes.list().map((route) => route.id) });
     const token = ensureTokenFile(layout.token);
@@ -193,7 +257,9 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
 
     const reconcile = createBootReconcile({
       registry,
-      readers: options.readers ?? actionReaders(),
+      readers:
+        options.readers ??
+        actionReaders({ forgeFor: (url) => forgeOfPanel(panel.appData)(url).port }),
       isAlive: (id) => probe.isAlive(id),
       note,
       now: Date.now,
@@ -211,12 +277,34 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     const loopPin = options.loop ? options.loop.pin : undefined;
     // Ключи маршрута, прочитанные дорогой (P61): дорога пишет, маска `known` читает (W2b).
     const sessionKeys = createSessionKeyBook(join(layout.root, 'session-state'));
-    // Активный контур панели (уровень 1, только чтение её файла): один на загрузку — его судят
-    // и `set-route` (обязательный контур), и `tier` каждого шага. Шлюз без маршрута — `down`.
-    const contour = panel.contour((id) => routes.get(id) !== undefined);
-    if (contour) note('contour.policy', { ...contour });
+    // Активный контур панели (уровень 1, только чтение её файла): его судят и `set-route`
+    // (обязательный контур), и `tier` каждого шага. Читается на каждый суд (s10 G7): режим или
+    // активный контур, переключённые человеком, доходят до следующей команды без перезапуска ядра.
+    // Шлюз без маршрута в реестре — `down`. Журнал слышит смену политики, а не каждое чтение.
+    let notedPolicy: string | undefined;
+    const contourNow = (): ContourPolicy | undefined => {
+      const policy = panel.contour((id) => routes.get(id) !== undefined);
+      const key = JSON.stringify(policy ?? null);
+      if (key !== notedPolicy) {
+        if (notedPolicy !== undefined || policy) note('contour.policy', { ...(policy ?? {}) });
+        notedPolicy = key;
+      }
+      return policy;
+    };
+    contourNow();
+    // Суд выбранных человеком маршрутов (`set-route` и маршруты вопроса «ask»): один реестр, один контур.
+    const routePortsNow = (): SetRoutePorts => {
+      const contour = contourNow();
+      return {
+        routeOf: (id) => {
+          const route = routes.get(id);
+          return route ? { kind: route.kind } : undefined;
+        },
+        ...(contour ? { contour } : {}),
+      };
+    };
     const economy = bootEconomy({
-      ...(contour ? { contour } : {}),
+      contour: contourNow,
       tasksDir: layout.tasks,
       windows,
       context,
@@ -239,7 +327,76 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       windows,
       known: economy.known,
     });
+    // Удержание своей модели панелью (этап 10, зона C): прошлое удержание возвращается до API —
+    // слот карты занят его живым сервером раньше, чем задача ядра попросит свою модель.
+    const localHold = createLocalHold({
+      workRoot: join(layout.root, 'routes', 'local-hold'),
+      journal: routeJournal,
+      core: { bootId },
+    });
+    await localHold.restore().catch((error: unknown) => {
+      note('local.hold', { state: 'restore-failed', reason: reasonOf(error) });
+    });
+    localFront = options.localFront
+      ? startLocalFront({
+          port: options.localFront.port,
+          target: (stale) => localHold.target(stale),
+          // Кеш слота по разговорам — то, что делал `prepare(session)` шлюза панели.
+          slots: createSlotCache({ note }),
+          ...(options.localFront.retryMs ? { retryMs: options.localFront.retryMs } : {}),
+          note,
+        })
+      : undefined;
+    const front = localFront;
+    if (options.userGateway) {
+      const wanted = options.userGateway.port;
+      const appData = panel.appData;
+      userGateway = startUserGatewayWiring({
+        port:
+          wanted === 'panel'
+            ? () => panelGatewayPort(appData ? readPanelListenerSettings(appData) : undefined)
+            : () => wanted,
+        hops: panel.hops,
+        profiles: () => panel.profilesNow(),
+        ...(options.localFront ? { localFront: options.localFront.port } : {}),
+        ...(options.userGateway.intervalMs ? { intervalMs: options.userGateway.intervalMs } : {}),
+        note,
+      });
+      // Первый такт — без ожидания: хост поднимается за секунды, загрузка ядра его не ждёт.
+      void userGateway.tick();
+    }
+    if (options.dlpProxy && panel.appData) {
+      dlpProxy = startDlpProxyWiring({
+        hops: panel.hops,
+        appData: panel.appData,
+        ...(options.dlpProxy.intervalMs ? { intervalMs: options.dlpProxy.intervalMs } : {}),
+        note,
+      });
+      void dlpProxy.tick();
+    }
+    const dlpPort = dlpProxy;
+    const gatewayWiring = userGateway;
+    const refreshRoutes = refreshPanelRoutes;
+    const contoursPort = createContoursPort(panel.hops, {
+      profiles: () => panel.profilesNow(),
+      ...(options.localFront ? { localFront: options.localFront.port } : {}),
+      // Правка контура в панели — такт шлюза сейчас (s10 G7), а не через 5 с.
+      ...(gatewayWiring ? { applyUserGateway: () => gatewayWiring.apply() } : {}),
+      // Контур, заведённый после загрузки, — маршрут реестра с этой же правки (s10 G7).
+      ...(refreshRoutes
+        ? { refreshRoutes: () => refreshRoutesNoted(refreshRoutes, panel.profilesNow(), note) }
+        : {}),
+    });
     const api = buildCoreApi({
+      // Учёт контуров (C3b): карточка шлюза, расход и бюджет панели читаются у звена.
+      contours: () => contoursPort,
+      // Прокси защиты данных человека (C3c): состояние и такт по просьбе панели.
+      dlpProxy: () => dlpPort,
+      localHold: () => ({
+        hold: localHold,
+        front: () =>
+          front ? { port: front.port, url: front.url, listening: front.listening() } : null,
+      }),
       registry,
       layout,
       coreToken: token.token,
@@ -253,15 +410,29 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       known: economy.known,
       // Команды человека над маршрутами: `set-route` судит набор по реестру этой загрузки,
       // `clear-exhausted` идёт к тому же хосту звеньев, что и дорога сессии.
-      routes: () => ({
-        routeOf: (id) => {
-          const route = routes.get(id);
-          return route ? { kind: route.kind } : undefined;
-        },
-        ...(contour ? { contour } : {}),
-      }),
+      routes: routePortsNow,
       hops: () => async (request) => hopControl(await panel.hops.handle(), request),
       publisher: () => publisher,
+      // Ответ «повторить сверку» (точка 4) ставит действие в ближайший проход таймера сверки.
+      reconcile: () => reconcile,
+      // Вопрос панели: та же среда, что у оценки (набор маршрутов, библиотека), пока дирижёр жив.
+      // Отказ суда пишется в журнал ядра и без дирижёра: попытка подделки видна всегда.
+      ask: () => ({
+        replay: (cmdId) => replayAsk(registry, cmdId),
+        create: (body) => {
+          const env = splitEnv;
+          return env
+            ? createAskTask(body, registry, env, askBridges, routePortsNow)
+            : Promise.resolve({ status: 501 as const });
+        },
+        refused: (cmdId, code, reason) => note('ask.refused', { cmdId, code, reason }),
+      }),
+      // Ревью по ссылке: та же среда деления, что у оценки, пока дирижёр жив; нет — 501.
+      reviewLink: () => {
+        const wiring = reviewLink;
+        const env = splitEnv;
+        return wiring && env ? { open: (body) => wiring.open(body, env) } : undefined;
+      },
       config: () => configPort,
       sessionState: createSessionStatePort(stateDeps),
       // Ранг модели правки человека — те же лестницы, что судит `tier` шага (один источник).
@@ -273,6 +444,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       },
       routeList: () => routes.list(),
       trustedHops: supervisor.hops,
+      // Вид сеанса чата читает поток нормализатором того переходника, что запускал сеанс.
+      adapters,
     });
     app = api;
     const decision: PortDecision = await listenOnAllocatedPort(async (port) => {
@@ -284,6 +457,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     const cliVersion = createCliVersionReader();
     const road = createSessionRoad({
       url,
+      windowOf: (routeId, model) => routeWindows.windowOf(routeId, model),
       layout,
       sessionTokens,
       routes,
@@ -292,10 +466,14 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       loginPath: memoLoginPath(options.loginPath, note),
       note,
       liveCopies: () => liveCopiesOf(registry),
+      // Сервер MCP человека с хостом форжа панели — только чтение (`forge-mcp-read-only`).
+      forgeHosts: () => forgeHostsOfPanel(panel.appData),
       stands: verifier.services.stands,
       // Хост звеньев один на дом ядра, поднимается первым сеансом через звено (W2b).
       hops: { handle: panel.hops.handle, forget: panel.hops.forget, factsOf: panel.hopFactsOf },
       keys: sessionKeys,
+      askBridges,
+      ...(options.panelBridgeScript ? { panelBridgeScript: options.panelBridgeScript } : {}),
       cliVersion,
       sessionState: launchSnapshot(stateDeps),
       ...(options.resourceReaders ? { readers: options.resourceReaders } : {}),
@@ -314,10 +492,16 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       economy: economy.run,
       history: economy.history,
       measureBase,
+      askBridges,
+      taskEnv,
+      // Форж проводок — из каталога, решённого здесь один раз: ядро в процессе теста с
+      // `panelAppData` не читает настоящие настройки форжа человека.
+      panelAppData: panel.appData,
       ...(options.loop === undefined ? {} : { loop: options.loop }),
     });
     splitEnv = conductor.split;
     publisher = conductor.publisher;
+    reviewLink = conductor.reviewLink;
     // Опрос форжа после публикации (05:77): выключен, пока человек не внёс репозиторий в
     // `forgePoll` конфига ядра; новую задачу ответов открывает через того же дирижёра.
     const forgePoll = createPollWiring({
@@ -325,6 +509,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       split: () => splitEnv,
       layout,
       note,
+      forgeFor: (url) => forgeOfPanel(panel.appData)(url).port,
       ...options.forgePoll,
     });
     stopConductor = async () => {
@@ -332,6 +517,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       await forgePoll.stop();
       splitEnv = undefined;
       publisher = undefined;
+      reviewLink = undefined;
       try {
         await conductor.stop();
       } finally {
@@ -383,6 +569,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       adapters,
       sessions,
       road,
+      askBridges: { get: askBridges.get, size: askBridges.size },
       windows,
       economy: economy.run,
       measureBase,
@@ -399,6 +586,9 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
             () => stopConductor?.(),
             () => stopReconcile?.(),
             () => api.close(),
+            () => localFront?.stop(),
+            () => userGateway?.stop(),
+            () => dlpProxy?.stop(),
             () => supervisor.close(),
             async () => {
               // Чистая остановка — серверы маршрутов уходят вместе с ядром; при крахе сюда не
@@ -417,6 +607,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
           note,
         );
         note('stop', failures.length ? { failures: failures.map(reasonOf) } : {});
+        // Замок дома — последним: следующее ядро встаёт, когда это уже ничего не держит.
+        homeLock.release();
         log.close();
         if (failures.length === 1) throw failures[0];
         if (failures.length > 1) throw new AggregateError(failures, 'core stop failed');
@@ -429,6 +621,9 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
         () => stopConductor?.(),
         () => stopReconcile?.(),
         () => app?.close(),
+        () => localFront?.stop(),
+        () => userGateway?.stop(),
+        () => dlpProxy?.stop(),
         () => supervisor.close(),
         () => shutdownRoutes(routes, note),
         () => observer.stop(),
@@ -438,6 +633,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       ],
       note,
     );
+    homeLock.release();
     log.close();
     throw error;
   }

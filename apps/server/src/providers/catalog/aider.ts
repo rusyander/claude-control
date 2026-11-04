@@ -76,10 +76,6 @@ export const aiderProvider: ConfigProvider = {
       // срока, пинги `--cache-keepalive-pings` — только в интерактивном режиме).
       cacheTtl: { support: 'impossible', note: 'economy-note-no-key' },
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      // Доставка — коммит, пуш, MR: без оболочки aider её не сделает ни на какой модели.
-      sonnetDeliver: { support: 'meaningless', note: 'economy-note-no-tool-loop' },
-      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
-      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
       // Строка привычек — о чтении и правках инструментами, которых у aider нет; группе
       // aider её и не дописывают (`foreignHabits` в `group-run-lines.ts` смотрит сюда).
       workHabits: { support: 'meaningless', note: 'economy-note-no-tool-loop' },

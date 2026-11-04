@@ -37,7 +37,7 @@ import { phoneEn } from './en/topics/phone';
 import { localModelsEn } from './en/topics/localModels';
 import { kitEn } from './en/topics/kit';
 import { coreEn } from './en/topics/core';
-import { watcherEn } from './en/topics/watcher';
+import { sandboxEn } from './en/topics/sandbox';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const helpEn: HelpSchema = {
@@ -154,7 +154,7 @@ export const helpEn: HelpSchema = {
     localModels: localModelsEn.shots,
     kit: kitEn.shots,
     core: coreEn.shots,
-    watcher: watcherEn.shots,
+    sandbox: sandboxEn.shots,
   },
 
   diagrams: {
@@ -166,7 +166,6 @@ export const helpEn: HelpSchema = {
     rules: rulesEn.diagrams,
     claudeMd: claudeMdEn.diagrams,
     projects: projectsEn.diagrams,
-    groups: groupsEn.diagrams,
     permissions: permissionsEn.diagrams,
     mcp: mcpEn.diagrams,
     env: envEn.diagrams,
@@ -220,7 +219,7 @@ export const helpEn: HelpSchema = {
     localModels: localModelsEn.topic,
     kit: kitEn.topic,
     core: coreEn.topic,
-    watcher: watcherEn.topic,
+    sandbox: sandboxEn.topic,
     platform: platformEn.topic,
     endpoints: endpointsEn.topic,
     providers: providersEn.topic,

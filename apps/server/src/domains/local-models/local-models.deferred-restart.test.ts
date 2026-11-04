@@ -8,6 +8,7 @@ import { localPaths, updateState } from './paths.ts';
 import { IDLE_SLEEP_SECONDS, readRecord, type ServerShape } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
+import { fakeCoreHold, refuse } from './__fixtures__/fake-core-hold.ts';
 
 /**
  * Настройки, которым нужен перезапуск сервера, не обрывают идущий прогон (L4b, п.9): пока
@@ -55,7 +56,8 @@ const ENV = (): NodeJS.ProcessEnv => ({
   USERPROFILE: root,
 });
 
-function service() {
+/** `intervalMs` — такт присмотра: задан — присмотр ходит настоящим таймером после `resume()`. */
+function service(intervalMs?: number) {
   return createLocalModels({
     appRoot: root,
     env: ENV(),
@@ -65,19 +67,21 @@ function service() {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, _args: string[]) => {
-      if (spawnFails) throw new Error('не хватило видеопамяти');
-      spawned += 1;
-      const pid = nextPid++;
-      up = true;
-      alive.add(pid);
-      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      alive.delete(pid);
-      up = false;
-    },
-    supervise: { pidAlive: (pid) => alive.has(pid) },
+    hold: fakeCoreHold({
+      hold: () => {
+        if (spawnFails) throw refuse('local_no_room', 'не хватило видеопамяти');
+        spawned += 1;
+        const pid = nextPid++;
+        up = true;
+        alive.add(pid);
+        return pid;
+      },
+      release: (pid) => {
+        alive.delete(pid);
+        up = false;
+      },
+    }),
+    supervise: { pidAlive: (pid) => alive.has(pid), ...(intervalMs ? { intervalMs } : {}) },
     runActive: () => running,
     awakeHeld: () => awake,
   });
@@ -232,7 +236,8 @@ describe('ожидание и другие пути запуска сервер�
   });
 
   it('сервер упал, пока ждёт настройка, — присмотр поднимает его уже с ней', async () => {
-    const local = service();
+    const local = service(20);
+    await local.resume();
     await local.startServer({ tag: TAG });
     running = true;
     await local.setKeepLoaded(true);
@@ -240,8 +245,15 @@ describe('ожидание и другие пути запуска сервер�
     const dead = record()?.pid ?? 0;
     up = false;
     alive.delete(dead);
-    expect(await local.upstream(TAG)?.revive()).toBe('restarted');
+    // Ждём конца подъёма целиком: новая запись появляется раньше, чем снимается ожидание, и под
+    // нагрузкой проверка между ними видела бы ещё не снятое ожидание.
+    const settled = async (): Promise<boolean> =>
+      up && record()?.pid !== dead && (await local.describe()).server.restartPending === undefined;
+    for (let waited = 0; waited < 5_000 && !(await settled()); waited += 20)
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(record()?.pid).not.toBe(dead);
     expect(record()?.idleSeconds).toBe(0);
+    local.shutdown();
     expect((await local.describe()).server.restartPending).toBeUndefined();
   });
 });

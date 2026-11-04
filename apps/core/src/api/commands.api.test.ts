@@ -51,6 +51,7 @@ const VALID_FIELDS: Record<CommandKind, unknown> = {
   'publish-now': { unitId: newId() },
   'move-build': { build: 'b' },
   'message-to-step': { stepId: newId(), text: 't' },
+  'end-chat': { stepId: newId() },
   'release-resource': { rid: newId() },
   grant: { project: 'p', globs: ['**'], ops: ['edit'] },
   'clean-remote': { branches: ['b'] },

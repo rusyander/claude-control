@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DiscoveredGroup } from '@agentdeck/contracts';
 import type { GroupListItem } from '@entities/Group';
 import { buildSections } from './sections';
-import { projectPathOf } from './projectPathOf';
-import { foundInOf } from './foundInOf';
-import { sourceLabel } from './sourceLabel';
 import { cardOf } from './cardOf';
 
 function group(id: string, patch: Partial<GroupListItem> = {}): GroupListItem {
@@ -24,24 +20,9 @@ function group(id: string, patch: Partial<GroupListItem> = {}): GroupListItem {
 
 const PROJECT = { kind: 'project' as const, path: 'c:/work/shop', provider: 'claude' };
 
-function found(key: string, status: DiscoveredGroup['status']): DiscoveredGroup {
-  return {
-    key,
-    name: key,
-    when: '',
-    why: '',
-    foundIn: 'c:/work/shop',
-    usedIn: [],
-    members: [],
-    steps: [],
-    inventoryHash: 'h',
-    status,
-  };
-}
-
 describe('buildSections', () => {
   it('группа без области — глобальная (записи до областей)', () => {
-    const sections = buildSections([group('old')], undefined);
+    const sections = buildSections([group('old')]);
     expect(sections.global.map((card) => card.group.id)).toEqual(['old']);
     expect(sections.project).toEqual([]);
   });
@@ -52,7 +33,7 @@ describe('buildSections', () => {
       order: 0,
       origin: { scope: PROJECT, groupId: 'shop', hash: 'x', copiedAt: 'now' },
     });
-    const sections = buildSections([origin, copy, group('solo', { scope: PROJECT })], undefined);
+    const sections = buildSections([origin, copy, group('solo', { scope: PROJECT })]);
     expect(sections.global).toEqual([{ group: copy, pair: origin }]);
     expect(sections.project.map((card) => card.group.id)).toEqual(['solo']);
   });
@@ -64,7 +45,7 @@ describe('buildSections', () => {
       scope: { kind: 'global', provider: 'qwen' },
       origin: { scope: PROJECT, groupId: 'shop', hash: 'x', copiedAt: 'now' },
     });
-    const sections = buildSections([origin, qwen], undefined);
+    const sections = buildSections([origin, qwen]);
     expect(sections.global).toEqual([{ group: qwen }]);
     expect(sections.project.map((card) => card.group.id)).toEqual(['shop']);
   });
@@ -73,41 +54,17 @@ describe('buildSections', () => {
     const copy = group('copy', {
       origin: { scope: PROJECT, groupId: 'gone', hash: 'x', copiedAt: 'now' },
     });
-    expect(buildSections([copy], undefined).global).toEqual([{ group: copy }]);
+    expect(buildSections([copy]).global).toEqual([{ group: copy }]);
   });
 
   it('копия удалена — оригинал снова простая проектная карточка', () => {
     const origin = group('shop', { scope: PROJECT });
-    expect(buildSections([origin], undefined).project).toEqual([{ group: origin }]);
+    expect(buildSections([origin]).project).toEqual([{ group: origin }]);
   });
 
   it('порядок карточек — по order, а не по порядку ответа', () => {
-    const sections = buildSections([group('b', { order: 2 }), group('a', { order: 1 })], undefined);
+    const sections = buildSections([group('b', { order: 2 }), group('a', { order: 1 })]);
     expect(sections.global.map((card) => card.group.id)).toEqual(['a', 'b']);
-  });
-
-  it('в «Найдено» только ещё не импортированное', () => {
-    const discovery = {
-      groups: [found('a', 'new'), found('b', 'imported'), found('c', 'copied')],
-      sources: [],
-      running: false,
-    };
-    expect(buildSections([], discovery).discovered.map((item) => item.key)).toEqual(['a']);
-  });
-});
-
-describe('foundInOf / projectPathOf / sourceLabel', () => {
-  it('у копии «Найдено в» — проект оригинала, у ручной группы — ничего', () => {
-    const copy = group('c', { origin: { scope: PROJECT, groupId: 'o', hash: 'x', copiedAt: 'n' } });
-    expect(foundInOf(copy)).toBe('c:/work/shop');
-    expect(projectPathOf(copy)).toBeUndefined();
-    expect(foundInOf(group('manual'))).toBeUndefined();
-    expect(foundInOf(group('p', { scope: PROJECT }))).toBe('c:/work/shop');
-  });
-
-  it('источник провайдера и проекта различаются', () => {
-    expect(sourceLabel('provider:claude')).toEqual({ kind: 'provider', name: 'claude' });
-    expect(sourceLabel('c:/work/shop')).toEqual({ kind: 'project', name: 'c:/work/shop' });
   });
 });
 
@@ -120,7 +77,7 @@ describe('cardOf — где на странице карточка группы'
   });
   const solo = group('solo', { scope: PROJECT });
   const plain = group('plain');
-  const sections = buildSections([origin, copy, solo, plain], undefined);
+  const sections = buildSections([origin, copy, solo, plain]);
 
   it('проектная без пары — вкладка проектных, карточка её же', () => {
     expect(cardOf(sections, 'solo')).toEqual({ tab: 'project', cardId: 'solo' });

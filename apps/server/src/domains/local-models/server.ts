@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from 'node:child_process';
 import { freemem } from 'node:os';
 import {
   closeSync,
@@ -7,38 +6,34 @@ import {
   openSync,
   readFileSync,
   readSync,
-  renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { createServer } from 'node:net';
 import { dirname } from 'node:path';
 import {
   LOCAL_IDLE_MINUTES_DEFAULT,
   type KvCacheType,
   type LocalDevice,
 } from '@agentdeck/contracts/local-models';
-import { killChildProcessTree, killProcessTree } from '../../lib/kill-tree.mjs';
+import { killProcessTree } from '../../lib/kill-tree.mjs';
+import type { CoreHold } from './core-hold.ts';
 import type { FetchLike } from './download.ts';
 import { localError } from './errors.ts';
-import { launchHidden, pidAlive } from './hidden-launch.ts';
 import { llamaClient, type Health } from './llama-client.ts';
 import type { LocalPaths } from './paths.ts';
 
 /**
- * Жизнь нашего `llama-server`.
+ * Жизнь нашего `llama-server` — через удержание в ядре.
  *
- * Сервер запускается ОТДЕЛЬНО от панели (detached) и записывает себя в
- * `run/llama.json`. Панель в разработке перезапускается `node --watch`, который
- * на Windows убивает её без обработчиков: дочерний процесс без такой записи стал
- * бы сиротой, державшей порт и видеопамять, а новая панель подняла бы второй.
- * С записью новая панель ПОДХВАТЫВАЕТ живой сервер по номеру и порту.
+ * Процесс сервера запускает и держит ядро (`/v1/local/hold`): слот карты, сверка памяти,
+ * переживание перезапуска панели — его забота. Панель описывает запуск (флаги → строки
+ * пресета), ждёт ответа постоянного адреса ядра (`LOCAL_FRONT_PORT`) и пишет зеркало
+ * `run/llama.json` — по нему экран, присмотр и подбор узнают, что и как запущено.
  *
  * У llama-server модель, окно, тип кеша и устройство — аргументы запуска, а не
- * поля запроса: любое изменение — перезапуск (`sameShape`). Остановка — снятие
- * дерева процессов и ожидание закрытия порта; отдельной «выгрузки» нет, модель
- * живёт ровно столько, сколько процесс, и вместе с ним уходит из видеопамяти.
+ * поля запроса: любое изменение — новое удержание (`sameShape`). Остановка — освобождение
+ * удержания: ядро снимает сервер и сверяет, что память карты вернулась.
  */
 
 /**
@@ -141,9 +136,10 @@ export const CONTEXT_CHECKPOINTS = 8;
 export const CACHE_REUSE_MIN_CHUNK = 256;
 /**
  * Простой по умолчанию, после которого модель выгружается из видеопамяти и оперативной
- * (`--sleep-idle-seconds`); человек выбирает 5, 15 или 60 минут. Пять минут, а не десять: запись кеша слота на диск перед сном (L8, `slot-store.ts`) сервер
- * считает работой и отсчитывает простой заново (замер 15.10: сон через 10 мин после записи), так
- * что с записью модель уходит примерно на девятой минуте, без неё — на пятой.
+ * (`--sleep-idle-seconds`); человек выбирает 5, 15 или 60 минут. Пять минут, а не десять: так
+ * выбрано, пока панель писала кеш слота на диск перед сном (L8, замер 15.10: запись сервер считал
+ * работой и отсчитывал простой заново). Записи перед сном больше нет — кеш пишет ядро при смене
+ * разговора (`apps/core/src/platform/slot-cache.ts`), — а пять минут остались выбором по умолчанию.
  */
 export const IDLE_SLEEP_SECONDS = LOCAL_IDLE_MINUTES_DEFAULT * 60;
 /** Сколько токенов предсказывает слой MTP за шаг; по умолчанию сервера 3, замер 13.10 — 162 предсказано, 87 принято. */
@@ -218,19 +214,12 @@ export const CPU_ONLY_ENV: Record<string, string> = {
 };
 
 /**
- * Окружение сервера. Переменные `LLAMA_ARG_*` человека снимаются: любая из них
- * молча подменила бы флаг запуска (у llama.cpp для каждого флага есть своя), и
- * сервер поднялся бы не с тем, что записано в `run/llama.json`.
+ * Окружение, которое запуск задаёт сам поверх окружения ядра: на процессоре — спрятанные карты.
+ * Переменные `LLAMA_ARG_*` человека до сервера не доходят: ядро передаёт ему только свой список
+ * служебных переменных (`helperEnv`), а не всё окружение.
  */
-export function serverEnv(
-  device: LocalDevice,
-  base: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
-  for (const [key, value] of Object.entries(base)) {
-    if (!key.startsWith('LLAMA_ARG_')) env[key] = value;
-  }
-  return device === 'cpu' ? { ...env, ...CPU_ONLY_ENV } : env;
+export function serverEnv(device: LocalDevice): Record<string, string> {
+  return device === 'cpu' ? { ...CPU_ONLY_ENV } : {};
 }
 
 export function readRecord(paths: LocalPaths): ServerRecord | undefined {
@@ -261,40 +250,57 @@ export function probe(port: number, fetchImpl: FetchLike = fetch): Promise<Healt
 }
 
 /**
- * Сколько ждать готовности. Модель на 17 ГБ с диска грузится 15–60 с, а на
- * медленном диске или после перезагрузки (холодный кеш файлов) — минуты.
+ * Сколько ждать готовности постоянного адреса после удержания. Ядро возвращает удержание, когда
+ * модель уже загружена; ожидание — запас на первую пробу через его порт.
  */
 export const START_TIMEOUT_MS = 300_000;
 
-export interface StartInput {
-  paths: LocalPaths;
-  binary: string;
-  port: number;
-  shape: ServerShape;
-  fetchImpl?: FetchLike;
-  /** Подменяемый запуск — проверки поднимают заглушку вместо настоящего llama-server. */
-  spawnImpl?: typeof spawn;
-  timeoutMs?: number;
-  /** Подменяемое снятие процесса — проверки не трогают чужие номера. */
-  kill?: (pid: number, startedAt: number) => void;
-  /** Свободная оперативная память, байт, — под неё считается `--cache-ram`; проверки подставляют своё. */
-  freeBytes?: () => number;
-}
+/**
+ * Флаги экземпляра, которые в пресет маршрутизатора не идут: файл и имя модели — сама секция
+ * пресета, адрес и порт — у маршрутизатора ядра, веб-интерфейс он выключает сам, а Jinja и так
+ * включён по умолчанию, `/metrics` разделу не нужен.
+ */
+const ROUTER_OWNED = new Set([
+  '-m',
+  '--alias',
+  '--host',
+  '--port',
+  '--no-webui',
+  '--jinja',
+  '--metrics',
+]);
+
+/** Длинное имя флага `llama-server --help` — ключ строки пресета (`ctx-size = 65536`). */
+export const PRESET_KEY_OF: Readonly<Record<string, string>> = {
+  '-c': 'ctx-size',
+  '-ngl': 'n-gpu-layers',
+  '-fa': 'flash-attn',
+  '-ctk': 'cache-type-k',
+  '-ctv': 'cache-type-v',
+  '-np': 'parallel',
+};
 
 /**
- * Журнал прошлого запуска переезжает в `<имя>.prev.log` до нового запуска. Скрытый
- * запуск на Windows пишет журнал заново, и подъём после зависания стирал ровно то,
- * что объясняло зависание (L6, 14.10: 20 минут тишины чата, журнал того часа
- * перезаписан следующим запуском). Хранится один прошлый — не архив, а улика.
- * Не вышло (файл держит чужой процесс) — запуск идёт как раньше.
+ * Аргументы экземпляра модели строками пресета маршрутизатора ядра: те же флаги, что
+ * `serverArgs` (их проверки остаются в силе), длинными именами без дефисов. Флаг без значения
+ * в нашем наборе не остаётся: все такие — дело маршрутизатора (`ROUTER_OWNED`).
  */
-export function keepPreviousLog(path: string): void {
-  try {
-    if (!existsSync(path) || statSync(path).size === 0) return;
-    renameSync(path, path.replace(/\.log$/, '.prev.log'));
-  } catch {
-    // Журнал занят живым процессом — новый запуск допишет в него же.
+export function presetArgsOf(flags: readonly string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (let at = 0; at < flags.length; at += 1) {
+    const flag = flags[at] ?? '';
+    if (ROUTER_OWNED.has(flag)) {
+      // У `-m`, `--alias`, `--host`, `--port` есть значение — оно уходит вместе с флагом.
+      if (!['--no-webui', '--jinja', '--metrics'].includes(flag)) at += 1;
+      continue;
+    }
+    const value = flags[at + 1];
+    if (value === undefined || value.startsWith('--'))
+      throw new Error(`flag ${flag} has no value — a preset line needs one`);
+    out[PRESET_KEY_OF[flag] ?? flag.replace(/^-+/, '')] = value;
+    at += 1;
   }
+  return out;
 }
 
 /** Строка журнала, похожая на причину падения: ошибка CUDA, нехватка памяти, отказ открыть файл. */
@@ -304,8 +310,8 @@ const LOG_TAIL_BYTES = 64 * 1024;
 
 /**
  * Последняя строка, похожая на ошибку, из первого журнала, где она есть: её называет отказ,
- * когда сервер не поднимается раз за разом (L6), вместо «код 1» и пути к журналу. Нет такой
- * строки или журнала — `undefined`.
+ * когда сервер не поднимается раз за разом (L6), вместо «код 1». Нет такой строки или
+ * журнала — `undefined`.
  */
 export function lastErrorLine(logPaths: string[]): string | undefined {
   for (const path of logPaths) {
@@ -334,235 +340,180 @@ export function lastErrorLine(logPaths: string[]): string | undefined {
   return undefined;
 }
 
-interface Launched {
-  pid: number;
-  /** Код выхода, если процесс уже завершился; жив — null. */
-  exited: () => number | null;
+/** Отказ ядра плюс строка журнала сервера: человек видит нехватку памяти, а не «загрузка упала». */
+function withLogCause(error: unknown, line: string | undefined): unknown {
+  if (!line || !(error instanceof Error)) return error;
+  const coded = error as Error & { messageCode?: string; params?: Record<string, unknown> };
+  if (coded.messageCode !== 'local-hold-refused') return error;
+  const code = String(coded.params?.code ?? '');
+  const reason = `${String(coded.params?.reason ?? '')} — ${line}`;
+  return localError('local-hold-refused', `ядро отказало (${code}): ${reason}`, { code, reason });
+}
+
+export interface HoldInput {
+  paths: LocalPaths;
+  binary: string;
+  /** Постоянный порт ядра: на него смотрят проба здоровья, клиент и CLI человека. */
+  port: number;
+  shape: ServerShape;
+  /** Размер файла модели, байт: ядро судит по нему память карты, если раскладки нет. */
+  sizeBytes: number;
+  /**
+   * Сколько памяти карты требует запуск по раскладке панели, байт; 0 — сервер раскладывает
+   * слои сам (`--fit on`) или считает на процессоре.
+   */
+  needBytes: number;
+  hold: CoreHold;
+  fetchImpl?: FetchLike;
+  timeoutMs?: number;
+  /** Свободная оперативная память, байт, — под неё считается `--cache-ram`; проверки подставляют своё. */
+  freeBytes?: () => number;
+  /** Снятие прежнего сервера панели (`retireLegacyServer`); проверки подставляют своё. */
+  kill?: KillServer;
+  /** Замер скорости разбора промпта, ток/с: ядро считает по нему срок первого байта. */
+  promptTokensPerSecond?: number;
 }
 
 /**
- * Запустить `llama-server` отдельно от панели. Windows без подменённого запуска —
- * через скрытую консоль (`hidden-launch.ts`); остальное — detached, вывод
- * дописывается в журнал.
+ * Поднять модель удержанием в ядре и дождаться ответа постоянного адреса. Тот же запуск ядро не
+ * перезагружает; другой — освобождает прежний (память карты сверяется) и грузит новый. Запись
+ * `run/llama.json` — зеркало удержания для страницы и присмотра: порт постоянный, номер процесса —
+ * сервера ядра. Прежний сервер панели (до перехода на ядро) снимается до удержания: он держит и
+ * порт, и память карты.
  */
-async function launch(
-  input: StartInput,
-  args: string[],
-  env: NodeJS.ProcessEnv,
-): Promise<Launched> {
-  const fail = (): never => {
-    throw localError('local-start-failed', `не удалось запустить ${input.binary}`, {
-      binary: input.binary,
-    });
-  };
-  if (!input.spawnImpl && process.platform === 'win32') {
-    const pid = await launchHidden(input.binary, args, env, {
-      out: input.paths.serverLog.replace(/\.log$/, '.out.log'),
-      err: input.paths.serverLog,
-    }).catch(fail);
-    return { pid, exited: () => (pidAlive(pid) ? null : -1) };
-  }
-  const log = openSync(input.paths.serverLog, 'a');
-  const child = (input.spawnImpl ?? spawn)(input.binary, args, {
-    env,
-    detached: true,
-    stdio: ['ignore', log, log],
-    windowsHide: true,
-    // Рядом с исполняемым файлом лежат его библиотеки (`libggml-*.so`, `*.dylib`).
-    cwd: dirname(input.binary),
-  });
-  closeSync(log);
-  // Файл не запускается (нет файла, нет права на исполнение, noexec-том): ENOENT/EACCES
-  // приходит событием 'error', и без слушателя он ронял бы сервер панели.
-  child.on('error', () => {});
-  if (!child.pid) return fail();
-  child.unref();
-  let code: number | null = null;
-  child.once('exit', (exitCode) => {
-    code = exitCode ?? -1;
-  });
-  return { pid: child.pid, exited: () => code };
-}
-
-/** Поднять сервер и дождаться готовности. Уже идущий с тем же запуском подхватывается. */
-export async function startServer(input: StartInput): Promise<{ record: ServerRecord }> {
+export async function holdServer(input: HoldInput): Promise<{ record: ServerRecord }> {
   const fetchImpl = input.fetchImpl ?? fetch;
-  const already = await probe(input.port, fetchImpl);
-  const known = readRecord(input.paths);
-  if (already !== undefined) {
-    if (known?.port === input.port && sameShape(known, input.shape)) return { record: known };
-    throw localError(
-      'local-port-busy',
-      `порт ${input.port} занят другим сервером — остановите его или освободите порт`,
-      { port: input.port },
-    );
+  await retireLegacyServer(input.paths, input.hold, input.kill);
+  mkdirSync(input.paths.slotsDir, { recursive: true });
+  const flags = serverArgs(input.shape, input.port, {
+    cacheRamMib: promptCacheMib((input.freeBytes ?? freemem)()),
+    slotSavePath: input.paths.slotsDir,
+  });
+  const env = serverEnv(input.shape.device);
+  // Журнал этого запуска — свежий: строка прошлого запуска не выдаётся за причину нового.
+  // Занят (Windows держит открытый файл) — останется прежний, его перепишет сам сервер.
+  try {
+    rmSync(input.paths.serverLog, { force: true });
+  } catch {
+    /* журнал держит живой сервер */
   }
   mkdirSync(dirname(input.paths.serverLog), { recursive: true });
-  mkdirSync(input.paths.slotsDir, { recursive: true });
-  keepPreviousLog(input.paths.serverLog);
-  keepPreviousLog(input.paths.serverLog.replace(/\.log$/, '.out.log'));
-  const launched = await launch(
-    input,
-    serverArgs(input.shape, input.port, {
-      cacheRamMib: promptCacheMib((input.freeBytes ?? freemem)()),
-      slotSavePath: input.paths.slotsDir,
-    }),
-    serverEnv(input.shape.device),
-  );
+  let view: Awaited<ReturnType<CoreHold['hold']>>;
+  try {
+    view = await input.hold.hold({
+      server: { command: input.binary, ...(Object.keys(env).length > 0 ? { env } : {}) },
+      model: {
+        id: input.shape.tag,
+        path: input.shape.file,
+        sizeBytes: Math.max(1, input.sizeBytes),
+        contextTokens: input.shape.context,
+        needBytes: input.needBytes,
+        // Ядро вывод сервера не хранит; журнал модели пишет сам сервер — из него отказ берёт
+        // причину (нехватка памяти CUDA), а не «код 1».
+        args: { ...presetArgsOf(flags), 'log-file': input.paths.serverLog },
+      },
+      meta: {
+        quant: input.shape.quant,
+        ...(input.promptTokensPerSecond
+          ? { promptTokensPerSecond: input.promptTokensPerSecond }
+          : {}),
+      },
+    });
+  } catch (error) {
+    // Новое удержание сначала освобождает прежнее: ядро ничего не держит — зеркало прежнего
+    // сервера стирается, иначе экран и удаление считали бы мёртвый сервер живым (ревью m4).
+    // Ядро недоступно — судить нечем, зеркало остаётся.
+    const after = await input.hold.view().catch(() => undefined);
+    if (after && !after.held) rmSync(input.paths.pidFile, { force: true });
+    throw withLogCause(error, lastErrorLine([input.paths.serverLog]));
+  }
   const record: ServerRecord = {
     ...input.shape,
-    pid: launched.pid,
+    pid: view.held?.pid ?? 0,
     port: input.port,
     binary: input.binary,
-    startedAt: Date.now(),
+    startedAt: view.held ? Date.parse(view.held.since) : Date.now(),
   };
   writeRecord(input.paths, record);
-
   const timeoutMs = input.timeoutMs ?? START_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
-  let exited: number | null = null;
   while (Date.now() < deadline) {
-    if ((await probe(input.port, fetchImpl)) === 'ok') return { record };
-    exited = launched.exited();
-    if (exited !== null) break;
+    if ((await probe(input.port, fetchImpl)) === 'ok' && (await frontIsCore(input))) {
+      return { record };
+    }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
-  // Не ответил — снять: иначе процесс без записи держит порт и видеопамять, а
-  // следующий запуск натыкается на «порт занят» сиротой, которую панель уже не видит.
-  if (exited === null)
-    (input.kill ?? ((pid, startedAt) => killProcessTree(pid, { spawnedAt: startedAt })))(
-      launched.pid,
-      record.startedAt,
-    );
+  // Ядро удержало, а постоянный адрес молчит (ядро без адреса, порт держит чужой): удержание
+  // снимается — иначе модель держала бы карту, до которой никто не дойдёт.
+  await input.hold.release().catch(() => undefined);
   rmSync(input.paths.pidFile, { force: true });
-  const logPath = input.paths.serverLog;
-  if (exited !== null) {
-    throw localError(
-      'local-exited',
-      `сервер моделей завершился сразу после запуска (код ${exited}) — журнал: ${logPath}`,
-      { code: exited, log: logPath },
-    );
-  }
   const seconds = Math.round(timeoutMs / 1000);
   throw localError(
     'local-timeout',
-    `сервер моделей не ответил за ${seconds} с — журнал: ${logPath}`,
-    { seconds, log: logPath },
+    `модель удержана, но порт ${input.port} не ответил за ${seconds} с`,
+    { seconds, log: `port ${input.port}` },
   );
 }
 
-/** Снять процесс и дождаться, пока порт закроется. Возвращает модель, которая стояла в памяти. */
-export async function stopServer(
+/**
+ * Порт отвечает голосом ядра, а не чужого сервера: проба здоровья одна не отличит адрес ядра от
+ * прежнего llama-server, который порт ещё держит, — кнопка сказала бы «запущено», а CLI говорил
+ * бы со старой моделью. Вид ядра без адреса (`front: null`) — судить нечем, решает проба.
+ */
+async function frontIsCore(input: HoldInput): Promise<boolean> {
+  const view = await input.hold.view().catch(() => undefined);
+  if (!view?.front) return view !== undefined;
+  return view.front.listening && view.front.port === input.port;
+}
+
+/** Снять дерево процесса, только если это тот самый процесс (время запуска сходится). */
+export type KillServer = (pid: number, startedAt: number) => void;
+const killServerTree: KillServer = (pid, startedAt) => {
+  killProcessTree(pid, { spawnedAt: startedAt });
+};
+
+/**
+ * Сервер, поднятый ещё панелью до перехода на ядро: запись `run/llama.json` есть, а ядро держит
+ * не его (другой номер процесса или ничего). Он держит постоянный порт — адрес ядра его ждёт и не
+ * поднимется — и память карты — ядро откажет новой модели. Снимается деревом с проверкой времени
+ * запуска (номер, доставшийся чужому процессу, не трогается) перед удержанием и перед остановкой.
+ * Ядро недоступно — судить нечем, ничего не снимается.
+ */
+export async function retireLegacyServer(
+  paths: LocalPaths,
+  hold: CoreHold,
+  kill: KillServer = killServerTree,
+): Promise<boolean> {
+  const record = readRecord(paths);
+  if (!record) return false;
+  const view = await hold.view().catch(() => undefined);
+  if (!view || view.held?.pid === record.pid) return false;
+  kill(record.pid, record.startedAt);
+  // Ядро ничего не держит — запись принадлежала только прежнему серверу.
+  if (!view.held) rmSync(paths.pidFile, { force: true });
+  return true;
+}
+
+/**
+ * Освободить удержание в ядре: сервер снят, память карты сверена. Утечка (память не вернулась)
+ * — отказ: модель в карте осталась, и кнопка не говорит «остановлено».
+ */
+export async function releaseServer(
   paths: LocalPaths,
   port: number,
-  fetchImpl: FetchLike = fetch,
-  kill: (pid: number, startedAt: number) => void = (pid, startedAt) => {
-    killProcessTree(pid, { spawnedAt: startedAt });
-  },
+  hold: CoreHold,
+  kill: KillServer = killServerTree,
 ): Promise<{ unloaded: string[] }> {
   const record = readRecord(paths);
-  if (record) kill(record.pid, record.startedAt);
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline && (await probe(port, fetchImpl)) !== undefined) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  if ((await probe(port, fetchImpl)) !== undefined) {
-    throw localError('local-stop-failed', `сервер на порту ${port} не остановился`, { port });
+  await retireLegacyServer(paths, hold, kill);
+  const reply = await hold.release();
+  if (reply.leaks.length > 0) {
+    throw localError(
+      'local-stop-failed',
+      `сервер на порту ${port} не остановился: ${reply.leaks.map((leak) => leak.reason).join('; ')}`,
+      { port },
+    );
   }
   rmSync(paths.pidFile, { force: true });
   return { unloaded: record ? [record.tag] : [] };
-}
-
-/** Свободный порт на loopback — для пробной загрузки, чтобы не задеть рабочий сервер. */
-export function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      server.close(() => resolve(port));
-    });
-  });
-}
-
-/** Сколько ждать пробной загрузки: холодный диск, 17 ГБ через mmap. */
-export const TEST_LOAD_TIMEOUT_MS = 240_000;
-
-/**
- * Пробная загрузка: открывает ли llama.cpp этот GGUF. Только на процессоре
- * (`-ngl 0`, карты спрятаны), с окном 512: проверяется разбор файла и тензоров,
- * а видеопамять не занимается, и рабочий сервер рядом не задевается. Ответил
- * `/health` — файл открылся; процесс вышел раньше — открыть не удалось, и причина
- * берётся из последних строк его журнала.
- */
-export async function testLoadModel(input: {
-  binary: string;
-  file: string;
-  timeoutMs?: number;
-  fetchImpl?: FetchLike;
-  spawnImpl?: typeof spawn;
-  kill?: (child: ChildProcess) => void;
-}): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const fetchImpl = input.fetchImpl ?? fetch;
-  const port = await freePort();
-  const args = [
-    '-m',
-    input.file,
-    '--host',
-    '127.0.0.1',
-    '--port',
-    String(port),
-    '-c',
-    '512',
-    '-ngl',
-    '0',
-    '--fit',
-    'off',
-    '-np',
-    '1',
-    '--no-warmup',
-    '--no-webui',
-  ];
-  const child = (input.spawnImpl ?? spawn)(input.binary, args, {
-    env: serverEnv('cpu'),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-    cwd: dirname(input.binary),
-  });
-  let tail = '';
-  const collect = (chunk: Buffer): void => {
-    tail = (tail + String(chunk)).slice(-4000);
-  };
-  child.stdout?.on('data', collect);
-  child.stderr?.on('data', collect);
-  let code: number | null = null;
-  child.once('exit', (exitCode) => {
-    code = exitCode ?? -1;
-  });
-  // Процесс не запустился: 'exit' не придёт, причина — текст ошибки запуска.
-  child.once('error', (error) => {
-    tail += `\n${error.message}`;
-    code ??= -1;
-  });
-  const client = llamaClient(baseUrlOf(port), fetchImpl);
-  const deadline = Date.now() + (input.timeoutMs ?? TEST_LOAD_TIMEOUT_MS);
-  try {
-    while (Date.now() < deadline) {
-      if ((await client.health()) === 'ok') return { ok: true };
-      if (code !== null) break;
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    }
-    const lines = tail
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-    const reason =
-      lines.filter((line) => /error|failed|unknown|unsupported/i.test(line)).pop() ??
-      lines.pop() ??
-      (code === null ? 'timeout' : `exit code ${code}`);
-    return { ok: false, reason: reason.slice(0, 300) };
-  } finally {
-    if (code === null) (input.kill ?? killChildProcessTree)(child);
-  }
 }

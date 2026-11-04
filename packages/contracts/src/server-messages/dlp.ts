@@ -10,4 +10,12 @@ export const dlpMessageParams = {
   'dlp-upstream-unparsed': ['value'],
   'dlp-upstream-scheme': [],
   'dlp-no-rules': [],
+  'dlp-core-missing': ['reason'],
+  'dlp-core-unverified': ['reason'],
+  'dlp-core-unverified-bare': [],
+  'dlp-core-http': ['status', 'path'],
+  'dlp-core-down': ['reason'],
+  'dlp-core-port-waiting': [],
+  'dlp-core-port-busy': ['port', 'reason'],
+  'dlp-core-listener-silent': [],
 } as const satisfies Record<string, readonly string[]>;

@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -116,19 +116,34 @@ describe('printDeckPdf', () => {
   it.skipIf(!canPrintPdf())(
     'живая печать: лист на слайд, и панель узнаёт PDF по подписи',
     async () => {
-      const before = new Set(printDirs());
-      const bytes = await printDeckPdf(renderDeckHtml(deck));
+      // Свой temp на эту печать: песочница temp общая у всех файлов прогона, и живая печать
+      // presentations.test в соседнем процессе оставляла бы здесь свой ещё не снесённый каталог.
+      const shared = { TEMP: process.env.TEMP, TMP: process.env.TMP, TMPDIR: process.env.TMPDIR };
+      const own = mkdtempSync(join(tmpdir(), 'pdf-test-'));
+      Object.assign(process.env, { TEMP: own, TMP: own, TMPDIR: own });
+      try {
+        expect(tmpdir()).toBe(own);
+        const bytes = await printDeckPdf(renderDeckHtml(deck));
 
-      expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
-      // Титул плюс два слайда: `page-break-after` в странице обязан дать три
-      // листа. Разошлось — значит PDF разошёлся с предпросмотром.
-      expect(pageCount(bytes)).toBe(3);
+        expect(bytes.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+        // Титул плюс два слайда: `page-break-after` в странице обязан дать три
+        // листа. Разошлось — значит PDF разошёлся с предпросмотром.
+        expect(pageCount(bytes)).toBe(3);
 
-      // Отделившийся браузер держит профиль после печати — каталог печати всё
-      // равно уходит из temp, пусть и не сразу (фоновые повторы уборки).
-      const left = (): string[] => printDirs().filter((name) => !before.has(name));
-      for (let waited = 0; left().length > 0 && waited < 20_000; waited += 500) await sleep(500);
-      expect(left()).toEqual([]);
+        // Отделившийся браузер держит профиль после печати — каталог печати всё
+        // равно уходит из temp, пусть и не сразу (фоновые повторы уборки). Ждём весь график
+        // повторов (`LATE_DROP_MS`: 2 + 10 + 60 с): под нагрузкой Edge держит профиль дольше 12 с,
+        // и окно в 20 с краснело на каталоге, который третий повтор ещё снёс бы (04.11).
+        for (let waited = 0; printDirs().length > 0 && waited < 75_000; waited += 500)
+          await sleep(500);
+        expect(printDirs()).toEqual([]);
+      } finally {
+        for (const [name, value] of Object.entries(shared)) {
+          if (value === undefined) delete process.env[name];
+          else process.env[name] = value;
+        }
+        rmSync(own, { recursive: true, force: true });
+      }
     },
     120_000,
   );

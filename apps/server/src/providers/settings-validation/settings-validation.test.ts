@@ -192,100 +192,40 @@ describe('importStateSchema — ничего не теряется при пер
   });
 });
 
-describe('settingsPatchSchema — экономия групп', () => {
-  const economy = {
-    compactWindow: 160_000,
-    bashOutputChars: 8_000,
-    readOutputTokens: 10_000,
-    cacheTtl: '',
-    detachIde: true,
-    sonnetDeliver: true,
-    freshOnColdResume: true,
-    workHabits: true,
-  };
-
-  it('блок доезжает целиком: без ключа в схеме тумблер отскакивал бы назад', () => {
-    const parsed = settingsPatchSchema.safeParse({ groupEconomy: { ...economy, cacheTtl: '5m' } });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.groupEconomy).toEqual({ ...economy, cacheTtl: '5m' });
-  });
-
-  it('ноль — «решает CLI», в границах — да, за границами CLI — нет', () => {
-    const ok = (patch: Partial<typeof economy>) =>
-      settingsPatchSchema.safeParse({ groupEconomy: { ...economy, ...patch } }).success;
-    expect(ok({ compactWindow: 0, bashOutputChars: 0, readOutputTokens: 0 })).toBe(true);
-    expect(ok({ compactWindow: 100_000, bashOutputChars: 128_000 })).toBe(true);
-    expect(ok({ compactWindow: 99_999 })).toBe(false);
-    expect(ok({ bashOutputChars: 3_999 })).toBe(false);
-    expect(ok({ bashOutputChars: 128_001 })).toBe(false);
-    expect(ok({ readOutputTokens: 100_001 })).toBe(false);
-    expect(ok({ cacheTtl: '10m' as never })).toBe(false);
-  });
-
-  it('правка одного ключа проходит без остальных: целый блок со снимка страницы затирал соседнюю', () => {
-    const parsed = settingsPatchSchema.safeParse({ groupEconomy: { sonnetDeliver: false } });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.groupEconomy).toEqual({ sonnetDeliver: false });
-    // Границы держатся и у одиночного ключа.
-    expect(
-      settingsPatchSchema.safeParse({ groupEconomy: { bashOutputChars: 3_999 } }).success,
-    ).toBe(false);
-  });
-});
-
-describe('settingsPatchSchema — сторож групп', () => {
-  it('один порог проходит без остальных и без подстановки умолчаний', () => {
-    // zod 4 подставляет умолчание и под `.partial()`: правка одного порога
-    // молча вернула бы остальные к заводским поверх сохранённых.
-    const parsed = settingsPatchSchema.safeParse({ groupWatch: { stallMinutes: 30 } });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.groupWatch).toEqual({ stallMinutes: 30 });
-  });
-
-  it('границы порогов держатся', () => {
-    const ok = (groupWatch: Record<string, unknown>) =>
-      settingsPatchSchema.safeParse({ groupWatch }).success;
-    expect(ok({ enabled: false })).toBe(true);
-    expect(ok({ stallMinutes: 0 })).toBe(false);
-    expect(ok({ checkRepeats: 1 })).toBe(false);
-    expect(ok({ coldContextTokens: 9_999 })).toBe(false);
-    expect(ok({ projectionPercent: 101 })).toBe(false);
-    expect(ok({ askMinutes: 2.5 })).toBe(false);
-    // Крайние допустимые — проходят: сдвиг границы внутрь виден.
-    expect(ok({ stallMinutes: 1, checkRepeats: 2, rereadRepeats: 2 })).toBe(true);
-    expect(ok({ coldContextTokens: 10_000, projectionPercent: 100, cooldownMinutes: 1_440 })).toBe(
-      true,
-    );
-  });
-
-  it('снимок с отличиями сторожа импортируется', () => {
-    const parsed = importStateSchema.safeParse({ settings: { groupWatch: { askMinutes: 40 } } });
-    expect(parsed.success).toBe(true);
-  });
-
-  // F-55: снимок другой версии с порогом вне нынешних границ не отвергается целиком.
-  it('битый порог и старый ключ сторожа в снимке отбрасываются поштучно, остальное принимается', () => {
-    const parsed = importStateSchema.safeParse({
-      settings: {
-        backupKeep: 3,
-        groupWatch: { stallMinutes: 0, askMinutes: 40, telegram: false, checkRepeats: 'x' },
-      },
+/**
+ * Блоки экономии и сторожа групп сняты (этап 10, G15). Их ключи в PATCH и в снимке
+ * прежней версии — не ошибка: схема молча снимает их, остальное принимается. Отказ
+ * всего снимка из-за снятого блока потерял бы перенос всех остальных настроек.
+ */
+describe('снятые блоки групп в PATCH и снимке', () => {
+  it('PATCH со снятыми блоками проходит, блоков в разборе нет', () => {
+    const parsed = settingsPatchSchema.safeParse({
+      theme: 'dark',
+      groupEconomy: { sonnetDeliver: false },
+      groupWatch: { stallMinutes: 30 },
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.settings?.groupWatch).toEqual({ askMinutes: 40 });
-      expect(parsed.data.settings?.backupKeep).toBe(3);
+      expect(parsed.data).toEqual({ theme: 'dark' });
     }
-    // Не объект — структурный мусор: снимок отвергается, как с любым кривым блоком.
-    expect(importStateSchema.safeParse({ settings: { groupWatch: 'off' } }).success).toBe(false);
   });
 
-  // F-57: контрактная схема импорта state.json проверяет блок сторожа тем же объявлением.
-  it('контрактный importStateSchema разбирает сторожа той же схемой снимка', () => {
-    const parsed = contractImportStateSchema.safeParse({
-      settings: { groupWatch: { stallMinutes: 0, askMinutes: 40 } },
-    });
-    expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.settings?.groupWatch).toEqual({ askMinutes: 40 });
+  it('снимок сервера и контрактов принимает старые блоки и снимает их — даже битые', () => {
+    const old = {
+      settings: {
+        backupKeep: 3,
+        groupEconomy: { bashOutputChars: 3_999 },
+        groupWatch: 'off',
+      },
+    };
+    for (const schema of [importStateSchema, contractImportStateSchema]) {
+      const parsed = schema.safeParse(old);
+      expect(parsed.success).toBe(true);
+      if (parsed.success) {
+        expect(parsed.data.settings?.backupKeep).toBe(3);
+        expect(parsed.data.settings).not.toHaveProperty('groupEconomy');
+        expect(parsed.data.settings).not.toHaveProperty('groupWatch');
+      }
+    }
   });
 });

@@ -12,6 +12,7 @@ import {
 import { createLocalModels, loadCatalog } from './service.ts';
 import { localPaths, defaultState, readState, writeState } from './paths.ts';
 import { createLocalMcp } from './mcp-service.ts';
+import { fakeCoreHold } from './__fixtures__/fake-core-hold.ts';
 import {
   ERROR_RETRY_MS,
   ESTIMATE_CHARS_PER_TOKEN,
@@ -411,7 +412,6 @@ const BINARY = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server
 
 let root: string;
 let stub: StubServer | undefined;
-let starting: Promise<void>[];
 
 const ENV = (): NodeJS.ProcessEnv => ({
   AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm'),
@@ -433,26 +433,24 @@ function service(source: LocalMcpSource) {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: (() => {
-      starting.push(
-        stubs.startStubLlama({ port: PORT, countTools: true }).then((started) => {
-          stub = started;
-        }),
-      );
-      return { pid: 4343, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: () => {
-      const old = stub;
-      stub = undefined;
-      starting.push(old ? old.close() : Promise.resolve());
-    },
+    // «Ядро» грузит модель: заглушка встаёт на постоянный порт, удержание — когда слушает.
+    hold: fakeCoreHold({
+      hold: async () => {
+        stub = await stubs.startStubLlama({ port: PORT, countTools: true });
+        return 4343;
+      },
+      release: async () => {
+        const old = stub;
+        stub = undefined;
+        await old?.close();
+      },
+    }),
   });
 }
 
 describe('сервис: цена с настоящего сервера моделей и выбор поверх состояния', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'cc-local-mcp-'));
-    starting = [];
     stub = undefined;
     const paths = localPaths(root, ENV());
     const runtimeDir = join(paths.runtime, 'llama-b11583');
@@ -464,7 +462,6 @@ describe('сервис: цена с настоящего сервера моде
     stubs.writeGguf(modelFilePath(paths, model.repo, quant.file), { nextn: 1 });
   });
   afterEach(async () => {
-    await Promise.all(starting);
     await stub?.close();
     rmSync(root, { recursive: true, force: true });
   });

@@ -31,13 +31,13 @@ function repo(name: string, file?: string): { repoKey: string; path: string } {
 }
 
 describe('scenario presets and library', () => {
-  it('six presets, every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
+  it('nine presets (chat, ask and review-link included), every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
     expect(PRESETS.map((p) => p.id).sort()).toEqual([...PRESET_IDS].sort());
     for (const p of PRESETS) {
       expect(scenarioSchema.safeParse(p).success).toBe(true);
       expect({ id: p.id, problems: scenarioProblems(p) }).toEqual({ id: p.id, problems: [] });
     }
-    expect(latestPresets()).toHaveLength(6);
+    expect(latestPresets()).toHaveLength(9);
   });
 
   it('library versions are write-once: same text again is "same", another text is version-taken, preset id refused', async () => {

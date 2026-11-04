@@ -1,89 +1,22 @@
-import { blockLang } from '@agentdeck/contracts/brand';
-import {
-  ANSWER_LANGUAGE_LINE,
-  ESCALATE_LINE,
-  type CascadeStage,
-} from '@agentdeck/contracts/model-cascade';
+import type { CascadeStage } from '@agentdeck/contracts/model-cascade';
 import type { GroupFlow } from '@agentdeck/contracts';
 import type { PathStep } from '@agentdeck/contracts/group-path';
-import { labelledCut, OWNER_TEXT_MAX } from '@agentdeck/contracts/quality-floor';
 import { groupKeyOf, type GroupScope } from '@agentdeck/contracts/group-sources';
-import type { ChatLink, PathRun } from '../../../lib/app-store/app-store.types.ts';
-import { readJsonBlock } from '../../groups/answer-block.ts';
 import { buildPath } from '../../groups/path/path.ts';
 
 /**
- * Свои шаги «Пути» группы в конвейере: после встроенной стадии идут шаги
- * человека, привязанные к ней, — ходами в ТОМ ЖЕ чате стадии, продолжением его
- * сессии. Отдельный чат на шаг потерял бы то, ради чего шаг ставят после
- * стадии: её контекст (что спланировано, что сделано, что найдено ревью).
+ * Свои шаги «Пути» группы в строках дописки чата: шаги внутри порядка скиллов,
+ * сценарий целиком и шаги, привязанные к стадии.
  *
- * Модуль ЧИСТЫЙ, как и `ChatCascadeStages.ts`: отвечает, что делать с концом
- * хода, а запуск и запись связи делает планировщик (`handoff-routes.ts`).
- *
- * Три вещи, которые легко потерять при правке:
- *
- * 1. ШАГ ЗАВОДИТСЯ ОДИН РАЗ на чат (`pathRun.done`). Иначе каждый ход человека в
- *    законченный чат стадии заводил бы шаги заново.
- * 2. ОТВЕТ СТАДИИ ОТКЛАДЫВАЕТСЯ (`pathRun.held`). Следующее звено решается по
- *    ответу стадии — блоку плана, вердикту ревью; ответ шага их не несёт, и без
- *    отложенного текста ревью с замечаниями кончалось бы ничем.
- * 3. ПРОВАЛ ПРОВЕРКИ ОСТАНАВЛИВАЕТ ЦЕПОЧКУ. Шаг с проверкой, не закрытый моделью,
- *    — это вопрос человеку, а не повод идти в ревью или доставку. Забытый блок —
- *    не провал: шаг один раз просят отчитаться (`pathRun.nudged`, F10), и только
- *    без блока и после этого цепочка ждёт человека.
+ * Ходы шагов после стадии в том же чате вёл планировщик звеньев панели; он уехал
+ * в ядро (этап 10 ядра, 02.11.2026), и с ним — задание хода шага, блок проверки и
+ * напоминание отчитаться. Отметки старых связей (`pathRun` в state.json) читаются
+ * как были, но новых панель не пишет.
  */
-
-const GATE_BLOCK_KIND = 'gate';
-
-/**
- * Отложенный ответ стадии и её задание. Раньше хвост 24k и 16k: длинный план
- * терял открывающую строку блока и не находился вовсе, а задание шага шло без
- * хвоста. Теперь целиком; потолок — защита от мусора, задание режется с меткой.
- */
-const HELD_TEXT_MAX = OWNER_TEXT_MAX;
-const HELD_TASK_MAX = OWNER_TEXT_MAX;
-
-/** Итог проверки шага из блока ответа. */
-export interface PathGate {
-  passed: boolean;
-  note: string;
-}
-
-/** Последний закрытый блок проверки; нет блока или он без `passed` — `undefined`. */
-export function scanGateBlock(text: string): PathGate | undefined {
-  const raw = readJsonBlock(text, GATE_BLOCK_KIND);
-  if (!raw || typeof raw !== 'object') return undefined;
-  const { passed, note } = raw as { passed?: unknown; note?: unknown };
-  if (typeof passed !== 'boolean') return undefined;
-  return { passed, note: typeof note === 'string' ? note.trim() : '' };
-}
 
 /** Английская сторона, а пустая — русская: непереведённый шаг лучше пропущенного. */
 function enOf(text: { ru: string; en: string } | undefined): string {
   return (text?.en.trim() || text?.ru.trim()) ?? '';
-}
-
-/**
- * Текст шага, который модель исполняет: слова владельца как он их написал.
- * Раньше уезжал только перевод (`enOf`), и перевод тихо подменял задание —
- * терялись оттенки, оговорки, термины проекта. Теперь оригинал (сторона,
- * которую владелец правил последней, `source`) идёт всегда, а перевод — только
- * подсказкой после него, когда он есть и отличается.
- */
-function ownerTextOf(
-  text: { ru: string; en: string } | undefined,
-  source: PathStep['source'],
-): string {
-  const ru = text?.ru.trim() ?? '';
-  const en = text?.en.trim() ?? '';
-  const original = source === 'en' ? en || ru : ru || en;
-  const other = original === ru ? en : ru;
-  if (!other || other === original) return original;
-  return (
-    `${original}\n(A rendering of the owner's words above in the other language, for reference ` +
-    `only — where they differ, the owner's original above wins: ${other})`
-  );
 }
 
 function resourceLine(step: PathStep): string | undefined {
@@ -100,169 +33,12 @@ function resourceLine(step: PathStep): string | undefined {
   return `The ${type} \`${id}\` is active for this step; follow it.`;
 }
 
-/** Сколько символов строки человека цитируется как образец его языка. */
-const LANGUAGE_SAMPLE_MAX = 160;
-
-/**
- * Строка о языке ответа хода шага. Задание шага — английское (`prompt.en`),
- * и общая строка «на языке задания» сама по себе вела бы к английскому отчёту
- * русскому владельцу: заданием этого хода был английский шаг. Поэтому модели
- * показывается строка человека из задания стадии: инструкции панели только
- * английские, значит строка с буквами не латиницы — его. Такой строки нет —
- * человек, видимо, пишет по-английски, и хватает общей строки.
- */
-function stepAnswerLanguageLine(task: string): string {
-  const human = task
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => /[^\p{Script=Latin}\P{L}]/u.test(line))
-    .sort((a, b) => b.length - a.length)[0];
-  if (!human) return ANSWER_LANGUAGE_LINE;
-  return (
-    'Write your answer in the language the human uses in this task, not in the language of this ' +
-    `step or of these instructions. The human wrote, for example: "${human.slice(0, LANGUAGE_SAMPLE_MAX)}"`
-  );
-}
-
-/**
- * Задание хода шага. Модели — по-английски (`prompt.en`), ответ человеку — на
- * языке человека из задания стадии (`task`, см. `stepAnswerLanguageLine`);
- * проверка просит блок, иначе конец хода нечем сверить.
- */
-export function pathStepPrompt(step: PathStep, anchor: CascadeStage, task = ''): string {
-  const title = enOf(step.title);
-  const gate = ownerTextOf(step.gate, step.source);
-  return [
-    `Next step of this task's path, after the ${anchor} stage${title ? `: ${title}` : ''}.`,
-    ownerTextOf(step.prompt, step.source),
-    resourceLine(step),
-    gate ? gateReportLines(gate) : undefined,
-    stepAnswerLanguageLine(task),
-    ESCALATE_LINE,
-  ]
-    .filter((part): part is string => Boolean(part?.trim()))
-    .join('\n\n');
-}
-
-/** Условие проверки шага и просьба закончить ответ её блоком. */
-function gateReportLines(gate: string): string {
-  return [
-    `This step is closed only when: ${gate}`,
-    'Check it yourself. If it fails and you can fix it, fix it and check again. End your ' +
-      `answer with a code block in the language ${blockLang(GATE_BLOCK_KIND)} with JSON ` +
-      '{"passed": true or false, "note": "what you checked, or what is still ' +
-      'missing"}. Report passed false only when you cannot close it without the owner.',
-  ].join('\n');
-}
-
-/**
- * Напоминание шагу, закончившему ход без блока проверки (F10, 12.10.2026):
- * панель не знает, закрыт ли шаг, а человека рядом может не быть. Одно — и
- * той же сессией: шаг помнит, что сделал, и ему остаётся только отчитаться.
- */
-function gateNudgePrompt(step: PathStep, task = ''): string {
-  const title = enOf(step.title);
-  return [
-    `Your answer to the path step${title ? ` "${title}"` : ''} ended without the gate block, so ` +
-      'the panel cannot tell whether the step is closed.',
-    gateReportLines(ownerTextOf(step.gate, step.source)),
-    stepAnswerLanguageLine(task),
-  ].join('\n\n');
-}
-
-export interface PathTurnInput {
-  link: ChatLink;
-  stage: CascadeStage;
-  /** Свои шаги группы чата, привязанные к `stage`, в порядке пути. */
-  steps: readonly PathStep[];
-  ok: boolean;
-  /** Ход кончился вопросом или ждёт фон (Д3). */
-  paused: boolean;
-  text: string;
-  /** Задание закончившегося хода. */
-  task: string;
-}
-
-export type PathDecision =
-  /**
-   * Завести ход шага; `link` — связь с отметками, записать ДО запуска.
-   * `nudge` — это не новый шаг, а напоминание прежнему отчитаться (F10).
-   */
-  | { kind: 'step'; step: PathStep; prompt: string; link: ChatLink; nudge?: true }
-  /** Проверка шага не закрыта: цепочка ждёт человека. */
-  | { kind: 'gate-failed'; step: PathStep; note: string }
-  /** Ход шага не кончился итогом (сбой, вопрос, фон) — ничего не заводим. */
-  | { kind: 'wait' }
-  /**
-   * Шагов больше нет: конвейер идёт дальше по ответу СТАДИИ. `link` — только
-   * когда отметки изменились и их надо записать.
-   */
-  | { kind: 'continue'; text: string; task: string; link?: ChatLink };
-
-function withRun(link: ChatLink, run: PathRun | undefined): ChatLink {
-  const next = { ...link };
-  if (run) next.pathRun = run;
-  else delete next.pathRun;
-  return next;
-}
-
-/** Что делать с концом хода в чате стадии, у группы которого есть свои шаги. */
-export function planPathTurn(input: PathTurnInput): PathDecision {
-  const { link, stage, steps } = input;
-  const run = link.pathRun;
-  let done = run?.done ?? [];
-
-  if (run?.pending) {
-    // Ход шага кончился сбоем или паузой — ни следующего шага, ни звена: ответ
-    // человека в этот чат доведёт шаг, и его конец сверится снова.
-    if (!input.ok || input.paused) return { kind: 'wait' };
-    const step = steps.find((item) => item.id === run.pending);
-    // Шаг с проверкой обязан отчитаться блоком. Нет блока — не «прошёл»:
-    // иначе забытый блок молча пропускал бы проверку. Но и не провал: один раз
-    // шаг просят отчитаться, и только потом цепочка ждёт человека.
-    if (step && enOf(step.gate)) {
-      const gate = scanGateBlock(input.text);
-      if (!gate && !run.nudged) {
-        return {
-          kind: 'step',
-          step,
-          prompt: gateNudgePrompt(step, run.held?.task ?? input.task),
-          link: withRun(link, { ...run, nudged: true }),
-          nudge: true,
-        };
-      }
-      if (!gate?.passed) {
-        return { kind: 'gate-failed', step, note: gate?.note ?? '' };
-      }
-    }
-  } else if (!input.ok || input.paused) {
-    // Сама стадия не кончилась итогом — шаги после неё рано; решает конвейер.
-    return { kind: 'continue', text: input.text, task: input.task };
-  }
-
-  const held = run?.held ?? {
-    text: input.text.slice(-HELD_TEXT_MAX),
-    task: labelledCut(input.task, HELD_TASK_MAX),
-  };
-  const next = steps.find((step) => !done.includes(step.id));
-  if (next) {
-    done = [...done, next.id];
-    return {
-      kind: 'step',
-      step: next,
-      prompt: pathStepPrompt(next, stage, held.task),
-      link: withRun(link, { done, pending: next.id, held }),
-    };
-  }
-
-  // Шаги кончились (или их не было): стадия продолжается своим ответом.
-  if (!run) return { kind: 'continue', text: input.text, task: input.task };
-  return {
-    kind: 'continue',
-    text: run.held?.text ?? input.text,
-    task: run.held?.task ?? input.task,
-    link: withRun(link, { done }),
-  };
+/** Тело шага для строки дописки: текст, ресурс, условие закрытия — по-английски. */
+function stepBody(step: PathStep): string {
+  const gate = enOf(step.gate);
+  return [enOf(step.prompt), resourceLine(step), gate ? `Closed when: ${gate}.` : undefined]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /**
@@ -292,46 +68,6 @@ export function chatPathSteps(
 }
 
 /**
- * Путь группы обычному чату — подсказкой в системной дописке. Звеньев у такого
- * чата нет, и ходом после стадии шаги идти не могут: каждый ход человека — это
- * «работа». Раньше эту роль играл скомпилированный скилл сценария с хуком;
- * он снят (`groups/path-migration.ts`), и без подсказки шаги обычного чата
- * пропали бы совсем. Чат конвейера подсказки не получает — там шаги идут сами.
- */
-export function chatPathHint(
-  groups: readonly {
-    id: string;
-    name: string;
-    scope?: GroupScope;
-    flow?: GroupFlow;
-    path?: { steps: PathStep[] };
-  }[],
-  choice: string,
-): string | undefined {
-  if (choice === 'auto') return undefined;
-  const group = groups.find((item) => groupKeyOf(item) === choice);
-  if (!group || group.flow === 'scenario') return undefined;
-  const lines = buildPath(group, []).entries.flatMap((entry) => {
-    // Шаг внутри скилла едет строкой скиллов группы (`skillInsertsLine`).
-    if (entry.kind !== 'custom' || entry.step.within) return [];
-    const { step } = entry;
-    const title = enOf(step.title);
-    const gate = enOf(step.gate);
-    const body = [enOf(step.prompt), resourceLine(step), gate ? `Closed when: ${gate}.` : undefined]
-      .filter(Boolean)
-      .join(' ');
-    return [`- After ${step.anchor}${title ? ` — ${title}` : ''}: ${body}`];
-  });
-  if (lines.length === 0) return undefined;
-  return [
-    `This chat works under the group "${group.name}". Its owner added these steps to the usual ` +
-      'flow (plan, work, review, fix, deliver); do each at its point, and when a step has a ' +
-      '"closed when" condition, check it and say whether it holds:',
-    ...lines,
-  ].join('\n');
-}
-
-/**
  * Свои шаги ВНУТРИ порядка скиллов группы — строкой дописки: скилл идёт одним
  * ходом, отдельного хода «после шага 4 скилла» не бывает, и место шага модель
  * узнаёт только отсюда. Едет вместе с «числами» группы (`chatKnobsLine`) —
@@ -346,12 +82,10 @@ export function skillInsertsLine(group: {
     const { step } = entry;
     const within = step.within!;
     const title = enOf(step.title);
-    const gate = enOf(step.gate);
     const place = within.after ? `right after its step "${within.after}"` : 'before its first step';
-    const body = [enOf(step.prompt), resourceLine(step), gate ? `Closed when: ${gate}.` : undefined]
-      .filter(Boolean)
-      .join(' ');
-    return [`- Skill \`${within.skillId}\`, ${place}${title ? ` — ${title}` : ''}: ${body}`];
+    return [
+      `- Skill \`${within.skillId}\`, ${place}${title ? ` — ${title}` : ''}: ${stepBody(step)}`,
+    ];
   });
   if (lines.length === 0) return undefined;
   return [
@@ -360,14 +94,6 @@ export function skillInsertsLine(group: {
       'has a "closed when" condition, check it before the next skill step:',
     ...lines,
   ].join('\n');
-}
-
-/** Тело шага для строки дописки: текст, ресурс, условие закрытия — по-английски. */
-function stepBody(step: PathStep): string {
-  const gate = enOf(step.gate);
-  return [enOf(step.prompt), resourceLine(step), gate ? `Closed when: ${gate}.` : undefined]
-    .filter(Boolean)
-    .join(' ');
 }
 
 /**

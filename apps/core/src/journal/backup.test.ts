@@ -43,6 +43,25 @@ describe('daily backup', () => {
     ).toBe('{"seq":1}\n');
   });
 
+  it('s10 G11: chat attachment copies of an active task (outside the core home) ride the day beside its journal; a task without them is no failure', () => {
+    const dirs = layout();
+    const attachmentsDir = join(dirs.tasksDir, '..', 'agentdeck-attachments');
+    mkdirSync(join(attachmentsDir, 't1', 'c1'), { recursive: true });
+    writeFileSync(join(attachmentsDir, 't1', 'c1', 'shot.png'), 'png-bytes');
+    mkdirSync(join(attachmentsDir, 'gone', 'c1'), { recursive: true });
+    writeFileSync(join(attachmentsDir, 'gone', 'c1', 'old.png'), 'x');
+    const at = new Date(2026, 9, 23, 9).getTime();
+    const out = runDailyBackup({ ...dirs, attachmentsDir, activeTaskIds: ['t1', 'no-files'], at });
+    expect(out.failures).toEqual([]);
+    expect(out.copied).toBe(3);
+    const day = join(dirs.backupsDir, '2026-10-23');
+    expect(readFileSync(join(day, 'attachments', 't1', 'c1', 'shot.png'), 'utf8')).toBe(
+      'png-bytes',
+    );
+    // Неактивная задача в копию дня не едет — как и её журнал.
+    expect(existsSync(join(day, 'attachments', 'gone'))).toBe(false);
+  });
+
   it('a day already backed up is skipped; a crashed .partial day is rebuilt', () => {
     const dirs = layout();
     const at = new Date(2026, 9, 20, 9).getTime();

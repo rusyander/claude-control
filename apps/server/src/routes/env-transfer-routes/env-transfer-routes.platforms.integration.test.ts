@@ -286,19 +286,8 @@ describe('перенос окружения: контуры', () => {
       notes: [],
       compromises: [],
     });
-    otherCtx.store.savePlatformSpend({
-      platformId: 'company-dev',
-      days: [
-        {
-          day: '2026-09-10',
-          requests: 4,
-          promptTokens: 100,
-          completionTokens: 40,
-          totalTokens: 140,
-          money: { usd: 0.7, pricedTokens: 140, unpricedTokens: 0, unpricedModels: [] },
-        },
-      ],
-    });
+    // Расход контура здесь не засевается: его ведёт звено ядра в доме ядра (C3b), а перенос
+    // окружения дом ядра не трогает вовсе — стирать там нечего.
 
     const otherApp = Fastify();
     registerEnvTransferRoutes(otherApp, otherCtx);
@@ -327,8 +316,6 @@ describe('перенос окружения: контуры', () => {
       // След пробы принадлежал прежнему адресу: оставить его значило бы показать
       // зелёную галку про адрес, по которому панель не ходила ни разу.
       expect(otherCtx.store.getPlatformHealth()['company-dev']).toBeUndefined();
-      // А расход — настоящие траты этой машины, и стирать их за человека нельзя.
-      expect(otherCtx.store.getPlatformSpend()['company-dev']?.days?.length).toBe(1);
     } finally {
       await otherApp.close();
       rmSync(other, { recursive: true, force: true });

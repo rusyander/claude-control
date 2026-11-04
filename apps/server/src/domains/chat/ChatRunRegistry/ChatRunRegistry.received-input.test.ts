@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
 import { ChatRunRegistry, type RunLike } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * Реестр пишет «что получил агент» (U8) из ТЕХ ЖЕ параметров, с которыми
- * стартует процесс: после маршрута контура и сводки детей. Фейковый прогон
+ * стартует процесс: после маршрута контура. Фейковый прогон
  * запоминает свои параметры — запись сверяется с ними, а не с ожиданием.
  */
 class CapturingRun implements RunLike {
@@ -20,10 +21,9 @@ class CapturingRun implements RunLike {
 }
 
 describe('ChatRunRegistry: «что получил агент»', () => {
-  it('запись — из параметров запуска: сводка детей и модель контура в ней есть', () => {
+  it('запись — из параметров запуска: модель и промпт контура в ней есть', () => {
     const run = new CapturingRun();
     const registry = new ChatRunRegistry(() => run);
-    registry.setChildrenBriefResolver(() => 'Сводка детей: группа 1 на ревью.');
     registry.setPlatformRouting(() => ({
       env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:1' },
       model: { model: 'contour-model', asked: 'opus', source: 'asked', replaced: true },
@@ -43,7 +43,6 @@ describe('ChatRunRegistry: «что получил агент»', () => {
     expect(written).toHaveLength(1);
     expect(written[0]?.keys).toEqual(['c1', 'sess-1']);
     expect(written[0]?.record.prompt).toBe(run.options?.prompt);
-    expect(written[0]?.record.prompt).toContain('Сводка детей: группа 1 на ревью.');
     expect(written[0]?.record.prompt).toContain('Слова человека');
     expect(written[0]?.record.model).toBe('contour-model');
     expect(written[0]?.record.systemPrompt).toBe('Промпт контура');

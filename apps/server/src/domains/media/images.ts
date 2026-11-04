@@ -11,9 +11,9 @@ import { MediaError } from './errors.ts';
 import { extensionFor, saveImage } from './store.ts';
 import {
   activeContour,
+  askContour,
   askUpstream,
   EXCERPT,
-  gatewayUrl,
   isRecord,
   ownProfiles,
   readCapped,
@@ -21,6 +21,7 @@ import {
   type MediaDeps,
 } from './upstream.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
 
 /**
  * Картинка по просьбе человека из чата.
@@ -29,18 +30,18 @@ import { coded } from '../../lib/server-text/server-text.ts';
  *
  * Три дороги, и выбирает их СЕРВЕР, один раз, до нажатия (`planImage`):
  *   1. активный контур, который рисует моделью (`driver.images = 'chat-part'`) —
- *      обычный `chat/completions` ЧЕРЕЗ СВОЙ ШЛЮЗ, той же дорогой, которой идёт
- *      пробный запрос (`platform/activation.ts`). Через шлюз, а не напрямую,
+ *      обычный `chat/completions` ЧЕРЕЗ ЗВЕНО ЯДРА (метка `panelHopTag`, C3b), той
+ *      же дорогой, что запросы CLI этого контура. Через звено, а не напрямую,
  *      ради трёх вещей, которые иначе пришлось бы писать заново: след запроса,
  *      учёт расхода ключа и перевод отказов контура (451 проверок содержимого) в
  *      понятный ответ. Диалект спрашивается OpenAI-вида намеренно: в своём
  *      диалекте кадр уходит клиенту байт в байт вместе с картинкой, а мост в
- *      Anthropic её не переносит (`gateway/frames.ts → #contentText`);
+ *      Anthropic её не переносит;
  *   2. отдельная ручка картинок OpenAI-вида у контура (`images: { api }`) —
  *      адрес складывается из адреса контура и пути, ОБЪЯВЛЕННОГО манифестом, как
  *      и адрес списка моделей. Модель — только объявившая рисование в каталоге
  *      ключа; нет такой — поле не шлётся, и выбирает сама ручка. С 17.09.2026 и
- *      эта дорога идёт ЧЕРЕЗ СВОЙ ШЛЮЗ (`gateway/images.ts`): до того она шла
+ *      эта дорога идёт через шлюз (с C3b — звена ядра, `hop-host/gateway/images.ts`): до того она шла
  *      напрямую ключом контура, и рисунок корпоративным ключом не оставлял ни
  *      следа, ни расхода, ни защиты данных (решение владельца). Ни один
  *      встроенный драйвер её не объявляет — включает её только путь ручки,
@@ -79,7 +80,6 @@ function blocked(
   title: string,
   model = '',
   promptSent = false,
-  detail = '',
 ): MediaImagePlan {
   return {
     available: false,
@@ -87,7 +87,6 @@ function blocked(
     model,
     promptSent,
     reason,
-    ...(detail ? { reasonDetail: detail } : {}),
     compromise: 'media-by-capability',
   };
 }
@@ -114,33 +113,6 @@ export interface ImagePlanContext {
  * агент есть всюду, и именно он снял прежнюю неправду «рисовать некому» —
  * рисовать было чем и без контура (дописано владельцем 13.09.2026).
  */
-/**
- * План, но СНАЧАЛА подняв свой шлюз, если его тумблер включён, а слушателя нет.
- *
- * Отдельной обёрткой над чистым `planImage`, а не веткой внутри него: расчёт
- * плана обязан оставаться синхронным и без побочных действий — его зовут и
- * презентации, и внутренние места, которым поднимать ничего не нужно. Подъём
- * ждём: следующий за ним расчёт — единственный способ ответить «доступно» вместо
- * «замок» тому, кто уже открыл меню, а второй заход (опрос телефона) приехал бы
- * через минуты.
- *
- * Защёлка и потолок попыток — в `raiseGateway` (`gateway/auto-start.ts`).
- */
-export async function planImageReady(
-  deps: MediaDeps,
-  context: ImagePlanContext = {},
-): Promise<MediaImagePlan> {
-  if (!deps.raiseGateway) return planImage(deps, context);
-  const first = planImage(deps, context);
-  // Поднимаем только когда мешает ИМЕННО шлюз: у плана с рабочей дорогой (и у
-  // запертого по другой причине) поднимать нечего и незачем.
-  const blocker = first.reason === 'no-agent' ? first.rasterReason : first.reason;
-  if (blocker !== 'gateway-off' && blocker !== 'gateway-failed') return first;
-  if (!deps.store.getSettings().platformGateway.enabled) return first;
-  await deps.raiseGateway();
-  return planImage(deps, context);
-}
-
 export function planImage(deps: MediaDeps, context: ImagePlanContext = {}): MediaImagePlan {
   const contour = activeContour(deps.store);
   const viaContour = contour ? contourPlan(deps, contour) : undefined;
@@ -193,18 +165,14 @@ function rasterBlocker(
 }
 
 /**
- * Запертый режим: называем ту причину, которую человек может снять. Шлюз
- * выключен — это его тумблер, и он ближе всего к делу; иначе про контур сказать
- * нечего (каталог ключа и драйвер не его), а вот адрес в профиле — его поле.
+ * Запертый режим: называем ту причину, которую человек может снять. Про контур
+ * сказать нечего (каталог ключа и драйвер не его), а вот адрес в профиле — его поле.
  */
 function blockedPlan(
   deps: MediaDeps,
   viaContour: MediaImagePlan | undefined,
   viaEndpoint: MediaImagePlan,
 ): MediaImagePlan {
-  if (viaContour?.reason === 'gateway-off' || viaContour?.reason === 'gateway-failed') {
-    return viaContour;
-  }
   if (ownProfiles(deps.store).length > 0) return viaEndpoint;
   return viaContour ?? viaEndpoint;
 }
@@ -221,8 +189,8 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     // Флаг рисования читается из каталога ключа и только оттуда: имя модели
     // объявлением не является (`drivers/driver.ts → FLAG_FIELDS`).
     if (!drawing) return blocked('no-model', contour.title);
-    const port = deps.gatewayPort?.() ?? 0;
-    if (port <= 0) return gatewayBlocked(deps, contour.title, drawing.id, true);
+    // Шлюз панели здесь больше не нужен: запрос идёт через звено ядра (C3b), и его
+    // недоступность — отказ при отправке, а не замок плана.
     return {
       available: true,
       source: 'contour-chat',
@@ -233,11 +201,7 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     };
   }
 
-  // Ручка контура — тоже через свой шлюз: погашенный шлюз запирает её той же
-  // причиной, что и дорогу «частью ответа».
-  const imagesPort = deps.gatewayPort?.() ?? 0;
-  if (imagesPort <= 0) return gatewayBlocked(deps, contour.title, drawing?.id ?? '', false);
-
+  // Ручка контура — тоже через звено ядра.
   return {
     available: true,
     source: 'contour-images',
@@ -252,26 +216,6 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     promptSent: false,
     compromise: 'media-by-capability',
   };
-}
-
-/**
- * Шлюза нет — но причин этому две, и человеку от них требуется разное (A-1).
- *
- * Тумблер выключен: это его выбор, и снимает его он же — прежние замок и
- * подпись. Тумблер включён, а слушателя нет: поднять обязана панель, и она уже
- * попробовала (`raiseGateway` до расчёта); значит, дело в отказе слушателя, и
- * называется ОН — «включите шлюз», который включён, послало бы чинить не то.
- */
-function gatewayBlocked(
-  deps: MediaDeps,
-  title: string,
-  model: string,
-  promptSent: boolean,
-): MediaImagePlan {
-  if (!deps.store.getSettings().platformGateway.enabled) {
-    return blocked('gateway-off', title, model, promptSent);
-  }
-  return blocked('gateway-failed', title, model, promptSent, deps.gatewayFailure?.() ?? '');
 }
 
 function endpointPlan(deps: MediaDeps): MediaImagePlan {
@@ -297,17 +241,23 @@ function endpointPlan(deps: MediaDeps): MediaImagePlan {
   };
 }
 
-/** Отказ словами для тех, у кого нет нашего экрана (телефон, `curl`). */
-const REFUSAL: Record<MediaImageBlocker, string> = {
-  'no-route': 'Рисовать некому: ни активного контура, ни своего эндпоинта.',
-  'driver-none': 'У этого контура генерации картинок нет.',
-  'no-model': 'Ни одна модель ключа не объявила рисование.',
-  'endpoint-no-url': 'У профиля эндпоинта не задан адрес генерации картинок.',
-  'endpoint-api-kind': 'Картинки умеет только эндпоинт OpenAI-вида.',
-  'gateway-off': 'Шлюз панели не поднят: запрос в контур идёт через него.',
-  'gateway-failed': 'Шлюз панели включён, но не поднялся: запрос в контур идёт через него.',
-  'no-agent': 'Рисовать некому: нет ни растровой дороги, ни разговора с агентом.',
-};
+/**
+ * Отказ словами для тех, у кого нет нашего экрана (телефон, `curl`), и для гонки, когда план
+ * устарел между показом и нажатием: текст по коду, код едет рядом — клиент переводит его сам.
+ */
+const REFUSAL = {
+  'no-route': 'media-image-blocked-no-route',
+  'driver-none': 'media-image-blocked-driver-none',
+  'no-model': 'media-image-blocked-no-model',
+  'endpoint-no-url': 'media-image-blocked-endpoint-no-url',
+  'endpoint-api-kind': 'media-image-blocked-endpoint-api-kind',
+  'no-agent': 'media-image-blocked-no-agent',
+} as const satisfies Record<MediaImageBlocker, string>;
+
+/** Режим недоступен: 409 с машинной причиной и кодом текста. */
+function blockedError(reason: MediaImageBlocker): MediaError {
+  return new MediaError(409, serverText(REFUSAL[reason]), reason, { code: REFUSAL[reason] });
+}
 
 /** Отказ рисунка из блока — своими словами, потому что причина другая. */
 const PICTURE_REFUSAL: Record<string, string> = {
@@ -401,7 +351,7 @@ async function drawNow(
     // или `curl`, не говорит ничего, а «у профиля не задан адрес генерации» он
     // чинит сам.
     const reason = plan.rasterReason ?? plan.reason ?? 'no-route';
-    throw new MediaError(409, REFUSAL[reason], reason);
+    throw blockedError(reason);
   }
 
   // Дорога агента сюда не приходит: там панель не рисует, а ПРИНИМАЕТ блок
@@ -418,7 +368,7 @@ async function drawNow(
   const prompt = request.prompt.trim();
   const drawn =
     plan.source === 'contour-chat'
-      ? await viaGateway(deps, plan.model, prompt)
+      ? await viaContourChat(deps, plan.model, prompt)
       : await viaImagesApi(deps, plan.source, plan.model, prompt);
 
   const id = randomBytes(10).toString('hex');
@@ -446,27 +396,25 @@ function ask(
   headers: Record<string, string>,
   body: unknown,
 ): Promise<Response> {
-  return askUpstream(fetchImpl, url, headers, body, IMAGE_TIMEOUT_MS, 'Картинки');
+  return askUpstream(fetchImpl, url, headers, body, IMAGE_TIMEOUT_MS, 'image');
 }
 
 /**
- * Контур, который рисует моделью: обычный `chat/completions` через свой шлюз,
+ * Контур, который рисует моделью: обычный `chat/completions` через звено ядра,
  * потоком и в диалекте OpenAI (см. шапку файла — в мосте Anthropic картинки нет).
  */
-async function viaGateway(
+async function viaContourChat(
   deps: MediaDeps,
   model: string,
   prompt: string,
 ): Promise<ReturnType<typeof decodeDataUrl>> {
   const contour = activeContour(deps.store);
-  const port = deps.gatewayPort?.() ?? 0;
-  if (!contour || port <= 0) throw new MediaError(409, REFUSAL['gateway-off'], 'gateway-off');
+  if (!contour) throw blockedError('no-route');
 
-  const fetchImpl = deps.fetchImpl ?? (globalThis.fetch as PlatformFetch);
-  const response = await ask(
-    fetchImpl,
-    `http://127.0.0.1:${port}/${contour.id}/v1/chat/completions`,
-    {},
+  const response = await askContour(
+    deps,
+    contour,
+    'v1/chat/completions',
     {
       model,
       stream: true,
@@ -475,6 +423,8 @@ async function viaGateway(
         { role: 'user', content: prompt },
       ],
     },
+    IMAGE_TIMEOUT_MS,
+    'image',
   );
 
   const body = await readCapped(response, MAX_READ_BYTES);
@@ -501,24 +451,36 @@ async function viaImagesApi(
   model: string,
   prompt: string,
 ): Promise<ReturnType<typeof decodeBase64Image>> {
-  const target =
-    source === 'contour-images' ? contourImagesTarget(deps) : endpointImagesTarget(deps);
-
-  // До своего шлюза корневой сертификат компании отношения не имеет: его знает
-  // шлюз, который и ходит в контур.
-  const fetchImpl =
-    deps.fetchImpl ??
-    (source === 'contour-images'
-      ? (globalThis.fetch as PlatformFetch)
-      : createCaFetch(target.caCertPath));
-  const response = await ask(fetchImpl, target.url, target.headers, {
+  const request = {
     ...(model ? { model } : {}),
     prompt,
     n: 1,
     // Просим САМИ БАЙТЫ. Ссылку панель не скачивает (`decode.ts`), и без этого
     // поля половина серверов отвечает именно ссылкой.
     response_format: 'b64_json',
-  });
+  };
+  // До звена корневой сертификат компании отношения не имеет: его знает звено,
+  // которое и ходит в контур. Ключа здесь нет и не будет: его подставляет звено, и там
+  // же след, расход, защита данных и перевод отказов.
+  let response: Response;
+  if (source === 'contour-images') {
+    response = await askContour(
+      deps,
+      contourWithImages(deps),
+      'v1/images/generations',
+      request,
+      IMAGE_TIMEOUT_MS,
+      'image',
+    );
+  } else {
+    const target = endpointImagesTarget(deps);
+    response = await ask(
+      deps.fetchImpl ?? createCaFetch(target.caCertPath),
+      target.url,
+      target.headers,
+      request,
+    );
+  }
 
   const body = await readCapped(response, MAX_READ_BYTES);
   if (!response.ok) throw new MediaError(502, refusalOf(body, response.status));
@@ -532,20 +494,12 @@ async function viaImagesApi(
   );
 }
 
-function contourImagesTarget(deps: MediaDeps): {
-  url: string;
-  headers: Record<string, string>;
-  caCertPath: string;
-} {
+function contourWithImages(deps: MediaDeps): Platform {
   const contour = activeContour(deps.store);
-  if (!contour) throw new MediaError(409, REFUSAL['no-route'], 'no-route');
+  if (!contour) throw blockedError('no-route');
   const { images } = driverOf(contour);
-  if (typeof images !== 'object') throw new MediaError(409, REFUSAL['driver-none'], 'driver-none');
-  // Ключа здесь нет и не будет: адрес — свой шлюз, ключ контура подставляет он
-  // (`gateway/images.ts`), и там же след, расход, защита данных и перевод отказов.
-  const url = gatewayUrl(deps, contour, 'v1/images/generations');
-  if (!url) throw new MediaError(409, REFUSAL['gateway-off'], 'gateway-off');
-  return { url, headers: {}, caCertPath: '' };
+  if (typeof images !== 'object') throw blockedError('driver-none');
+  return contour;
 }
 
 function endpointImagesTarget(deps: MediaDeps): {
@@ -556,7 +510,7 @@ function endpointImagesTarget(deps: MediaDeps): {
   const profile = ownProfiles(deps.store).find(
     (item) => item.apiKind === 'openai-compat' && item.imagesUrl.trim(),
   );
-  if (!profile) throw new MediaError(409, REFUSAL['endpoint-no-url'], 'endpoint-no-url');
+  if (!profile) throw blockedError('endpoint-no-url');
   const token = readEndpointToken(deps.appDataDir, profile.id) ?? '';
   return {
     url: profile.imagesUrl.trim(),

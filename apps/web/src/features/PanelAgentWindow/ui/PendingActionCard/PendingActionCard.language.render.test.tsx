@@ -5,20 +5,20 @@ import { i18n } from '@shared/config/i18n';
 import { PendingActionCard } from './PendingActionCard';
 
 /**
- * Двуязычные данные карточки (заголовки шагов группы и сценария) — стороной
- * языка окна. Кадр справки 27.09: английская карточка сценария показывала
- * русские заголовки шагов, потому что сервер клал в `value` только ru.
+ * Двуязычные данные карточки (параметры сводки, поле, дифф) — стороной
+ * языка окна. Кадр справки 27.09: английская карточка показывала
+ * русские данные, потому что сервер клал в `value` только ru.
  */
 
 const bilingual: PanelActionPreview = {
-  summary: 'Добавить шаг «Скриншоты» в путь группы «Путь»',
-  summaryCode: 'summary-group-step-add',
-  summaryParams: { name: 'Путь', title: 'Скриншоты' },
-  summaryParamsEn: { name: 'Путь', title: 'Screenshots' },
+  summary: 'Изменить настройки разделения проекта «Скриншоты»',
+  summaryCode: 'summary-project-split-settings',
+  summaryParams: { project: 'Скриншоты' },
+  summaryParamsEn: { project: 'Screenshots' },
   fields: [
     {
-      label: 'Шаги сценария',
-      labelCode: 'label-scenario-steps',
+      label: 'Сообщение',
+      labelCode: 'label-message',
       value: '1. Скриншоты',
       valueEn: '1. Screenshots',
     },
@@ -38,7 +38,7 @@ const legacy: PanelActionPreview = {
 
 const pending = (preview: PanelActionPreview): PanelPendingAction => ({
   id: 'p-1',
-  name: 'add_group_step',
+  name: 'save_project_split_settings',
   risk: 'change',
   preview,
   createdAt: '2026-09-27T10:00:00.000Z',
@@ -65,7 +65,7 @@ describe('карточка подтверждения — двуязычные �
   it('английское окно: сводка, поле и дифф — английской стороной', async () => {
     const html = await render('en', bilingual);
 
-    expect(html).toContain('Add step “Screenshots” to the path of group “Путь”');
+    expect(html).toContain('Change the split settings of project “Screenshots”');
     expect(html).toContain('1. Screenshots');
     expect(html).toContain('review #1: Screenshots');
     expect(html).not.toContain('Скриншоты');
@@ -74,7 +74,7 @@ describe('карточка подтверждения — двуязычные �
   it('русское окно: все три — русской стороной', async () => {
     const html = await render('ru', bilingual);
 
-    expect(html).toContain('Добавить шаг «Скриншоты» в путь группы «Путь»');
+    expect(html).toContain('Изменить настройки разделения проекта «Скриншоты»');
     expect(html).toContain('1. Скриншоты');
     expect(html).toContain('review #1: Скриншоты');
     expect(html).not.toContain('Screenshots');
@@ -83,7 +83,7 @@ describe('карточка подтверждения — двуязычные �
   it('старая запись без английской стороны — английское окно показывает её как есть', async () => {
     const html = await render('en', legacy);
 
-    expect(html).toContain('Add step “Скриншоты” to the path of group “Путь”');
+    expect(html).toContain('Change the split settings of project “Скриншоты”');
     expect(html).toContain('1. Скриншоты');
     expect(html).toContain('review #1: Скриншоты');
   });

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ChatLink } from '../../../lib/app-store/app-store.types.ts';
-import { awaitsAnswer } from '../group-questions/group-wait.ts';
-import { chainOutcomeOf } from './chain-outcome.ts';
+import { awaitsAnswer, chainOutcomeOf } from './chain-outcome.ts';
 
 /**
  * Конец хода, где остались только D-n (решение 6): законное ожидание решения

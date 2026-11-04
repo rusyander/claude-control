@@ -106,11 +106,6 @@
 }
 
 // Кнопка не раздувает строку узла: высота строки — по тексту.
-.stop {
-  flex-shrink: 0;
-  margin: -4px 0 -4px auto;
-}
-
 .metrics {
   margin-left: var(--agent-indent);
   font-variant-numeric: tabular-nums;
@@ -141,11 +136,6 @@
   font-size: var(--font-size-caption);
   color: var(--color-warning);
   background: var(--color-warning-subtle);
-}
-
-.stopNote {
-  margin-left: var(--agent-indent);
-  color: var(--color-fg-muted);
 }
 
 .result {

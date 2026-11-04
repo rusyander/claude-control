@@ -4,6 +4,7 @@ import { useLanguage, useT } from '../../../../shared/config/i18n';
 import { launchLines } from '../../../../entities/inbox/askSource';
 import { useState } from 'react';
 import { toolSummary } from '../../../../entities/inbox/toolSummary';
+import { corePermitQuestion } from '../../../../entities/core-task';
 import { View, Text, Pressable } from 'react-native';
 import { styles } from '../AskBody.styles';
 import { Mono, Row, Button } from '../../../../shared/ui';
@@ -14,7 +15,7 @@ export function ToolAsk({
   disabled,
   onAnswer,
 }: {
-  ask: Extract<InboxAsk, { kind: 'permission' | 'branchGate' }>;
+  ask: Extract<InboxAsk, { kind: 'permission' }>;
   disabled: boolean;
   onAnswer: (answer: AskAnswer) => void;
 }) {
@@ -22,13 +23,37 @@ export function ToolAsk({
   const [open, setOpen] = useState(false);
   const lang = useLanguage();
   const summary = toolSummary(ask.input);
-  const gate = ask.kind === 'branchGate';
   // Запуск агента: решают по тому, что поручено и чем, а не по сырому вызову.
-  const launch = ask.kind === 'permission' ? launchLines(ask.launch, lang) : undefined;
+  const launch = launchLines(ask.launch, lang);
+  if (ask.core) {
+    // Вопрос права задачи ядра: подпись значка — как у окна панели, вопрос — простым текстом.
+    return (
+      <View style={styles.body}>
+        <Text style={styles.kind}>{t.coreTask.permitBadge}</Text>
+        <Text style={styles.question}>{corePermitQuestion(ask.input)}</Text>
+        <Text style={styles.hint}>{t.coreTask.permitHint}</Text>
+        <Row gap={space.sm}>
+          <Button
+            title={t.home.allow}
+            tone="accent"
+            disabled={disabled}
+            style={styles.grow}
+            onPress={() => onAnswer({ kind: 'permission', behavior: 'allow' })}
+          />
+          <Button
+            title={t.home.deny}
+            tone="danger"
+            disabled={disabled}
+            style={styles.grow}
+            onPress={() => onAnswer({ kind: 'permission', behavior: 'deny' })}
+          />
+        </Row>
+      </View>
+    );
+  }
   return (
     <View style={styles.body}>
-      <Text style={styles.kind}>{gate ? t.home.branchGate : t.home.permission}</Text>
-      {gate ? <Text style={styles.hint}>{t.home.branchGateHint}</Text> : null}
+      <Text style={styles.kind}>{t.home.permission}</Text>
       <Mono style={styles.tool}>{ask.toolName}</Mono>
       {launch ? (
         <View style={styles.body}>
@@ -48,30 +73,18 @@ export function ToolAsk({
       {open ? <Mono numberOfLines={24}>{JSON.stringify(ask.input, null, 2)}</Mono> : null}
       <Row gap={space.sm}>
         <Button
-          title={gate ? t.home.writeHere : t.home.allow}
+          title={t.home.allow}
           tone="accent"
           disabled={disabled}
           style={styles.grow}
-          onPress={() =>
-            onAnswer(
-              gate
-                ? { kind: 'branchGate', choice: 'here' }
-                : { kind: 'permission', behavior: 'allow' },
-            )
-          }
+          onPress={() => onAnswer({ kind: 'permission', behavior: 'allow' })}
         />
         <Button
-          title={gate ? t.home.dontWrite : t.home.deny}
+          title={t.home.deny}
           tone="danger"
           disabled={disabled}
           style={styles.grow}
-          onPress={() =>
-            onAnswer(
-              gate
-                ? { kind: 'branchGate', choice: 'stop' }
-                : { kind: 'permission', behavior: 'deny' },
-            )
-          }
+          onPress={() => onAnswer({ kind: 'permission', behavior: 'deny' })}
         />
       </Row>
     </View>

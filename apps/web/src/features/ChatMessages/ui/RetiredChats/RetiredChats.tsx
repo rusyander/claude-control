@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
 import { Stack } from '@shared/ui/stack';
-import { GroupCopyCleanup } from '../GroupCopyCleanup/GroupCopyCleanup';
 import { HubFold } from '../HubFold/HubFold';
 import type { RetiredChatsProps } from './RetiredChats.types';
 import styles from './RetiredChats.module.scss';
@@ -66,9 +65,6 @@ export function RetiredChats({ chats, onOpen, defaultExpanded = false }: Retired
                 </Typography>
               </Stack>
             </button>
-            {chat.retiredCopy && (
-              <GroupCopyCleanup parentChatId={chat.retiredCopy.parentChatId} chatId={chat.chatId} />
-            )}
           </Fragment>
         ))}
       </HubFold>

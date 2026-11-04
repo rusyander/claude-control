@@ -120,7 +120,10 @@ export function buildManagedProfile(
 ): EndpointProfile {
   return {
     id: managedProfileId(platform.id),
-    name: `Контур · ${platform.title}`,
+    // Имя — название контура, данное человеком. Приставку «Контур ·» дописывает
+    // экран кодом `contour-profile-name` на своём языке: русская приставка в
+    // хранимом имени показывалась бы и под английским интерфейсом.
+    name: platform.title,
     // Отметка ассистента: профиль — дорога ассистента панели, и шлюз закрывает
     // её, как только раздел снят на карточке, даже если адрес ещё где-то выбран.
     baseUrl: gatewayUrlFor(gateway.port, platform.id, 'openai-compat', {

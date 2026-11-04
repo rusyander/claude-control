@@ -17,6 +17,12 @@ import { isSecretEnvKey } from '@agentdeck/contracts/env-secret';
 
 export const SECRET_MASK = '••••••';
 
+/**
+ * Метка маски DLP (`AliasVault`): `[КЛЮЧ_1]`, `[ТОКЕН_2.3]`, запасная `[КЛЮЧ]`. Ярлык — заглавные
+ * буквы, цифры и `_`; строчная буква в скобках — уже не метка, а значение (пароль в скобках).
+ */
+const MASK_LABEL = /^\[\p{Lu}[\p{Lu}\d_]*_\d+(?:\.\d+)?\]$|^\[КЛЮЧ\]$/u;
+
 /** Промежуток значения секрета в исходной строке, `end` не включительно. */
 export interface SecretSpan {
   start: number;
@@ -84,9 +90,14 @@ export function isSecretName(name: string): boolean {
  * нёс «••••••», и грант запуска нельзя было подтвердить (s9, 01.11). Снимаются только правила
  * пары «имя — значение» и только при точном имени и форме; ключ вендора, пёстрый хвост и base64
  * в том же значении ловят остальные детекторы, как везде.
+ * `key` с ИМЕНЕМ переменной окружения (`{"key": "QA_DB_PASSWORD"}` — форма переменных помощника):
+ * журнал ядра прятал имя, и помощник не видел, какую переменную заполнять (02.11). Форма — слова
+ * заглавными через `_`, у слова до 3 цифр в конце: `AKIA…7EXAMPLE`, пёстрое и сплошное длиннее 16
+ * букв остаются секретом.
  */
 const IDENTIFIER_FIELDS = new Map<string, RegExp>([
   ['repoKey', /^[^"'`\\/\s][^"'`\\/\r\n\t]{0,254}-[0-9a-f]{8}$/],
+  ['key', /^[A-Z]{1,16}\d{0,3}(?:_[A-Z]{1,16}\d{0,3}){0,7}$/],
 ]);
 
 /** Секретна ли пара «имя — значение»: секретное имя, кроме поля-имени со значением своей формы. */
@@ -212,7 +223,9 @@ export function knownKeySpans(text: string): SecretSpan[] {
  * длиннее 8: ключ с префиксом-словом и хвостом 16–23 знака (`live_Hf3Jg0Rs5Yu2…`)
  * или из двух половин остаётся ключом (ревью A и ревью сит, 28.09). Кусок из
  * букв вперемешку (`iiCllLmnfDlEQPPPQEQJ`) — не слово: так ключ base64url с
- * `-`/`_` внутри сходил за имя папки.
+ * `-`/`_` внутри сходил за имя папки. Слово с цифрами на конце (`t3`, `v2`, `x64`) —
+ * тоже слово имени: без этого `cc-t3-codex-project-gl9Kjc` шло за ключ, и журнал ядра
+ * терял путь задачи (02.11).
  */
 function isWordsWithTail(value: string): boolean {
   const pieces = value.split(/[-_]+/);
@@ -222,7 +235,7 @@ function isWordsWithTail(value: string): boolean {
     tail.length <= 8 &&
     pieces
       .slice(0, -1)
-      .every((piece) => piece.length >= 2 && /^(?:[A-Z]?[a-z]+|[A-Z]+)$/.test(piece))
+      .every((piece) => piece.length >= 2 && /^(?:[A-Z]?[a-z]+|[A-Z]+)\d{0,3}$/.test(piece))
   );
 }
 
@@ -480,7 +493,12 @@ const DETECTORS: Detector[] = [
 /** Все промежутки секретов в строке, слитые и по порядку. */
 export function findSecretSpans(text: string, options: MaskOptions = {}): SecretSpan[] {
   const found: SecretSpan[] = [];
-  for (const detect of DETECTORS) detect(text, (start, end) => found.push({ start, end }), options);
+  const push = (start: number, end: number): void => {
+    // Значение — уже метка маски: перемаскировать нечего, а «••••••» вместо метки отнимал
+    // у модели единственное, что ей сказали о ключе (кадр помощи «ключ доходит меткой»).
+    if (!MASK_LABEL.test(text.slice(start, end))) found.push({ start, end });
+  };
+  for (const detect of DETECTORS) detect(text, push, options);
   found.sort((a, b) => a.start - b.start || b.end - a.end);
   const merged: SecretSpan[] = [];
   for (const span of found) {

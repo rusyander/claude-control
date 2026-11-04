@@ -48,7 +48,21 @@ export function validateData(kind: string, data: unknown, v: number = JOURNAL_VE
   if (!schema) return [`unknown kind ${kind} in v${v}`];
   const parsed = schema.safeParse(data);
   if (parsed.success) return [];
-  return parsed.error.issues.map(
-    (issue) => `${issue.path.join('.') || '(data)'}: ${issue.message}`,
-  );
+  return parsed.error.issues.map((issue) => issueText(issue, '(data)'));
+}
+
+/**
+ * Проблема схемы строкой. Лишний ключ zod называет `Unrecognized key: "losses"` — маска секретов
+ * читает это как присваивание `key: "<значение>"` и прячет имя поля, а с ним и причину отказа
+ * (cli-x7-001: отказ сеанса дошёл до панели как `key: "••••••"`). Поэтому лишние поля — своими словами.
+ */
+export function issueText(
+  issue: { path: PropertyKey[]; message: string; code?: string; keys?: string[] },
+  root: string,
+): string {
+  const where = issue.path.map(String).join('.') || root;
+  if (issue.code === 'unrecognized_keys' && issue.keys?.length) {
+    return `${where}: unrecognized field ${issue.keys.join(', ')}`;
+  }
+  return `${where}: ${issue.message}`;
 }

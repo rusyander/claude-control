@@ -26,7 +26,7 @@ export type GatewayProfile = Pick<
    * Манифест карточки и прослойка инструментов — вход выбора «родная ручка Anthropic или мост»
    * (`contourUpstreamDialect`) и переопределений драйвера звена. Нет — как у пресета, без прослойки.
    */
-  Partial<Pick<Platform, 'manifest' | 'toolShim' | 'rules'>>;
+  Partial<Pick<Platform, 'manifest' | 'toolShim' | 'rules' | 'consumers'>>;
 
 export interface GatewayRouteOptions {
   profile: GatewayProfile;

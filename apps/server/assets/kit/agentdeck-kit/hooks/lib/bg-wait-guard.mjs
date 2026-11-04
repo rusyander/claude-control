@@ -10,10 +10,6 @@
 // Subagents are covered too (measured week: 93 sleeps / 206 min in lanes): a lane is not reliably woken by
 // its own background command, so its denial says the other way — run the long check in the FOREGROUND with
 // a timeout and read the output once.
-// A split-group run (AGENTDECK_SPLIT_CHILD, set by agentdeck) has no repeat escape at all: the panel holds the
-// next stage while a background task lives and wakes the run with its result. Measured: 2.3 h of
-// `for i in $(seq 1 115); do grep -q "^EXIT" .agent/tmp/gate2.log && break; sleep 5; done` across split
-// trees — a log of its own background gate, which the repeat escape let through.
 // Kit hook item: run by the event dispatcher (lib/run.mjs) or on its own; see lib/items.mjs.
 import {
   deny,
@@ -87,23 +83,6 @@ export function ownTaskPolled(command, transcriptText) {
   return [...command.matchAll(TASK_ID)].some(([, id]) => transcriptText.includes(`ID: ${id}`));
 }
 
-const LOG_NAME = /[\w.-]+\.log\b(?!\s*\()/g;
-
-/**
- * The command polls a log a background command of THIS session writes: the log's file name stands in a
- * tool call of this transcript launched with `run_in_background` (`pnpm gate > .agent/tmp/gate2.log`).
- * One transcript record is one line, so the launch and its command share a line.
- */
-export function ownBackgroundLog(command, transcriptText) {
-  const names = [...new Set(command.match(LOG_NAME) ?? [])];
-  if (!names.length) return false;
-  return transcriptText
-    .split('\n')
-    .some(
-      (line) => line.includes('"run_in_background":true') && names.some((n) => line.includes(n)),
-    );
-}
-
 // Waiting on a spawned agent's deliverable: a review sat 9× `sleep 240…295; ls|wc .agent/tmp/…/lane-B.md`
 // (16.10) while its lane ran — no task output named, so the checks above never saw it.
 const AGENT_TMP =
@@ -122,8 +101,8 @@ export function runningAgents(transcriptText) {
 // break; sleep 10; done`. A 10 s sleep is under the 60 s branch below, the path sits in a variable,
 // and a file test is neither a task output nor a check log, so nothing saw it. A presence loop (≥ 20 s
 // in total) over agent files — `.agent/tmp/`, `subagents/`, `tasks/` — while an agent this session
-// launched in the background still runs is refused in a split child with no repeat escape: the
-// agent's completion notification wakes the run. No running agent → not judged here.
+// launched in the background still runs counts as a wait on that agent. No running agent → not
+// judged here.
 // Split group 1 (#g1:345, #g1:354): the same wait spelled `stat -c %Y $D/lane-A.md` plus mtime
 // arithmetic held 698 + 722 s and passed — only `[ -f` / `test -f` counted as a wait. What the loop
 // tests is no signal (stat, ls|wc, grep -q, node -e existsSync…): a sleeping loop over agent files
@@ -153,20 +132,6 @@ export default function bgWaitGuard(input) {
   const command = String(input.tool_input?.command ?? '');
   const slept = Number(SLEEP.exec(bareCommand(command))?.[1] ?? 0);
   const loopWait = AGENT_FILES.test(command) ? loopWaitTotal(command) : 0;
-  if (process.env.AGENTDECK_SPLIT_CHILD === '1' && !inSubagent(input) && loopWait >= 20) {
-    try {
-      if (runningAgents(readTailText(ownTranscript(input), OWN_TASK_BYTES)).length) {
-        return deny(
-          `bg-wait-guard: a ${span(loopWait)} sleep loop waiting for files of an agent this split-group run ` +
-            'launched is blind polling, and repeating the call does not lift it. Do the work that does not ' +
-            'need the agent, then END THE TURN with one line naming the running agents: the panel holds the ' +
-            "group while they run, and each agent's handback wakes this session with its result.",
-        );
-      }
-    } catch {
-      /* no transcript → nothing known of agents */
-    }
-  }
   const agentWait = Math.max(
     slept >= 60 && AGENT_TMP.test(command) ? slept : 0,
     loopWait >= 60 ? loopWait : 0,
@@ -194,22 +159,6 @@ export default function bgWaitGuard(input) {
   try {
     const transcript = ownTranscript(input);
     const text = subagent ? '' : readTailText(transcript, OWN_TASK_BYTES);
-    // A split group's wait on its OWN background command: the panel holds the next stage while that
-    // command lives and wakes the run with its result, so the refusal has no escape. A wait on anything
-    // else (a file another process writes, a log no background command of this run writes) keeps the
-    // repeat escape — nothing would wake the run, and the group would be judged finished.
-    if (
-      !subagent &&
-      process.env.AGENTDECK_SPLIT_CHILD === '1' &&
-      (ownTaskPolled(command, text) || ownBackgroundLog(command, text))
-    ) {
-      return deny(
-        `bg-wait-guard: sleeping ${wait} on the output of a background command this split-group run started ` +
-          'is blind polling, and repeating the call does not lift it. End the turn saying what is running: ' +
-          'the panel holds the next stage while that command lives and wakes this session with its result. ' +
-          `Waiting for a server to come up → \`${WAIT_FOR} <port|url> --timeout 60\`.`,
-      );
-    }
     // Polling this session's own background command has no excuse to repeat: a group repeated the
     // refused 575 s loop five seconds later (18.10.2026). A subagent keeps the escape — it is not
     // reliably woken by its own command.

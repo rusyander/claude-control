@@ -76,7 +76,8 @@ export default function verifyHardHint(input, prompt) {
       'Review or live run asked for — decide the depth before starting, do not feel it: ' +
         '`node <kit>/tools/risk-tier.mjs` prints T0/T1/T2 with the markers that produced it, and the blast radius under it — ' +
         'one review verdict per printed consumer, one positive walk per printed entry point, anything over the cap named as not covered. T2 also owes ' +
-        '`node <kit>/tools/mustfail.mjs --cmd "<tests>"` (a file whose revert leaves the suite green is untested), ' +
+        '`node <kit>/tools/mustfail.mjs --cmd "<package test script>"` (every critical changed file, judged only by its ' +
+        'own @covers/sibling/folder tests, 10-min budget per package; a file whose revert leaves them green is untested), ' +
         'two review entry points rather than two copies of one pass, and two live variations — delay one of N ' +
         'requests · a role without the right · empty state · bad input. Procedures: skill agentdeck-kit:situational-rules → review-depth, live-check.',
     );

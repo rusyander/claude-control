@@ -39,7 +39,7 @@ describe('imageModeView', () => {
   });
 
   // Причины заводит сервер, и новая доезжает до телефона только словарём: пока
-  // `gateway-failed` в нём не было, подпись у запертого пункта просто не
+  // одной из них в нём не было, подпись у запертого пункта просто не
   // находилась — экран молчал о том, чего человеку ждать. Поэтому проверяется
   // ВЕСЬ список кодов, а не тот, что вспомнили.
   it('переводит каждую причину сервера — и запертый пункт, и отсутствие растра', () => {
@@ -53,34 +53,14 @@ describe('imageModeView', () => {
   });
 
   it('называет причину сервера словами, а без кода — общим «рисовать нечем»', () => {
-    const blocked = { ...raster, available: false, reason: 'gateway-off' as const };
+    const blocked = { ...raster, available: false, reason: 'no-model' as const };
     expect(imageModeView(blocked, words)).toEqual({
       available: false,
-      reasonText: 'Шлюз панели выключен, а запрос в контур идёт через него',
+      reasonText: 'В каталоге ключа нет модели с генерацией картинок',
       byAgent: false,
     });
     const { reason: _reason, ...noCode } = blocked;
     expect(imageModeView(noCode, words).reasonText).toBe('Рисовать нечем');
-  });
-
-  it('дописывает отказ слушателя к нашей причине — и запертым пунктом, и без растра', () => {
-    // Ревью Т13: панель дописывает `reasonDetail` (`withDetail`), телефон терял
-    // его целиком. «Шлюз панели не поднялся» без слова о том, ЧЕМ именно, не
-    // даёт человеку ни одного следующего шага.
-    const blocked = {
-      ...raster,
-      available: false,
-      reason: 'gateway-failed' as const,
-      reasonDetail: 'порт 5199 занят',
-    };
-    expect(imageModeView(blocked, words).reasonText).toContain('порт 5199 занят');
-
-    const noRaster = {
-      ...raster,
-      rasterReason: 'gateway-failed' as const,
-      reasonDetail: 'порт 5199 занят',
-    };
-    expect(imageModeView(noRaster, words).sourceText).toContain('порт 5199 занят');
   });
 
   it('на растровой дороге говорит кто, какой моделью и что промпт не уезжает', () => {

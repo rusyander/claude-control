@@ -87,6 +87,18 @@ export function splitAttachments(text: string): AttachmentsSplit {
   return { text: text.slice(0, at).trimEnd(), files };
 }
 
+/**
+ * Обратное `splitAttachments`: текст человека и блок путей под маркером. Один писатель формы на
+ * сервер (папка чата) и ядро (копия вложений задачи) — лента режет оба одинаково.
+ */
+export function joinAttachments(text: string, files: readonly string[]): string {
+  if (files.length === 0) return text;
+  return `${text}\n\n${ATTACHMENTS_MARKER}\n${files.map((file) => `- ${file}`).join('\n')}`;
+}
+
+/** Предел одного вложения чата — тот же, что у поля вложения панели (`ATTACH_MAX_BYTES`). */
+export const CHAT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+
 /** Имя файла из пути вложения — для подписи чипа; путь бывает и Windows, и POSIX. */
 export function attachmentBasename(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean);

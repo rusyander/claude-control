@@ -14,6 +14,8 @@ import { Empty, Loading, Mono, Row, StatusDot } from '../src/shared/ui';
 import { colors, font, space } from '../src/shared/config/theme';
 import { useT } from '../src/shared/config/i18n';
 import { useConnection, isConfigured } from '../src/shared/api/connection';
+import { serverMessage } from '../src/shared/api/server-message';
+import { runErrorText } from '../src/shared/lib/runs/error-text';
 import { useWorkspace, newChatId, openChat } from '../src/shared/lib/workspace';
 import {
   cancelQueued,
@@ -25,7 +27,6 @@ import {
   useRunKey,
   visibleStatus,
 } from '../src/shared/lib/runs';
-import { ChatGroupNotes } from '../src/features/chat/ChatGroupNotes/ChatGroupNotes';
 import { useCostUnit } from '../src/entities/settings/api';
 import { Composer } from '../src/features/chat/Composer/Composer';
 import { OutsideComposer } from '../src/features/chat/OutsideComposer/OutsideComposer';
@@ -369,12 +370,6 @@ export default function ChatScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {messages.isLoading ? <Loading /> : null}
-          {isDraft(transcriptId) ? null : (
-            <ChatGroupNotes
-              chatId={transcriptId}
-              {...(run.sessionId ? { sessionId: run.sessionId } : {})}
-            />
-          )}
           <Transcript messages={history} costUnit={costUnit} isRunning={isRunning} />
 
           {sent ? (
@@ -412,7 +407,7 @@ export default function ChatScreen() {
             <AskCard chat={inboxRow} asks={cardAsks} now={Date.now()} />
           ) : null}
 
-          {run.error ? <Text style={styles.error}>{run.error}</Text> : null}
+          {run.error ? <Text style={styles.error}>{runErrorText(run, serverMessage)}</Text> : null}
           {/* Мёртвый сокет неотличим от думающего агента — говорим словами. */}
           {run.stalled ? <Text style={styles.thinking}>{t.run.reconnecting}</Text> : null}
           {failed ? <Text style={styles.error}>{failed}</Text> : null}

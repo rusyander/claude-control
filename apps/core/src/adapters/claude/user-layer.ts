@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CLAUDE_HOOK_EVENTS } from '@agentdeck/contracts/vocabulary';
-import { homeDir } from '../../platform/os-kind.ts';
+import { currentOs, homeDir, type OsKind } from '../../platform/os-kind.ts';
+import { pathFlavour } from '../../platform/paths.ts';
 import type { LayerMode } from '../adapter.types.ts';
 import { anchorClaudeRule } from './repo-deny.ts';
 
@@ -55,8 +56,9 @@ const PROJECT_DIR = '.claude';
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 
-export function claudeConfigDir(pin: Record<string, string>): string {
-  return pin[CONFIG_DIR_VAR] || join(homeDir(pin), PROJECT_DIR);
+/** `os` — для расчёта путей чужой ОС (исключения личной памяти, их тесты на любой машине). */
+export function claudeConfigDir(pin: Record<string, string>, os: OsKind = currentOs()): string {
+  return pin[CONFIG_DIR_VAR] || pathFlavour(os).join(homeDir(pin, os), PROJECT_DIR);
 }
 
 /**

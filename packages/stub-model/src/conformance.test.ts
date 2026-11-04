@@ -14,6 +14,7 @@ import {
 } from './index.mjs';
 import { EXTENDED_CAPS, casesFor, type Case, type Harness } from './conformance.cases.ts';
 import { call } from './clients/call.ts';
+import { CLIENTS } from './clients/index.ts';
 
 let harness: Harness;
 let next: Step = { text: 'unset' };
@@ -42,7 +43,15 @@ const run = (dialect: DialectId, cases: Case[]) =>
     c.check(outcome, dialect, harness);
   });
 
-describe.each(DIALECT_IDS)('conformance %s', (dialect) => {
+/**
+ * Протоколы набора — объединение реестра пакета и клиентов-оракулов: клиент, написанный раньше
+ * модуля протокола, гоняет свои случаи по заглушке и краснеет, пока модуля нет.
+ */
+const UNDER_TEST = [
+  ...new Set<DialectId>([...DIALECT_IDS, ...(Object.keys(CLIENTS) as DialectId[])]),
+];
+
+describe.each(UNDER_TEST)('conformance %s', (dialect) => {
   run(
     dialect,
     casesFor(dialect).filter((c) => !EXTENDED_CAPS.has(c.cap)),
@@ -50,7 +59,7 @@ describe.each(DIALECT_IDS)('conformance %s', (dialect) => {
 });
 
 describe('extended caps', () => {
-  describe.each(DIALECT_IDS)('%s', (dialect) => {
+  describe.each(UNDER_TEST)('%s', (dialect) => {
     run(
       dialect,
       casesFor(dialect).filter((c) => EXTENDED_CAPS.has(c.cap)),

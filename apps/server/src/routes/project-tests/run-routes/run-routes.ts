@@ -30,8 +30,7 @@ import {
 } from '../shared/shared.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 import { getActiveProvider } from '../../../providers/registry.ts';
-import { providerCliCandidates } from '../../../providers/cli/cli.ts';
-import { detectCliOnPath, findCliOnPath } from '../../../providers/detect/detect.ts';
+import { coreContourRoutes } from '../../../domains/platform/routing/core-contour.ts';
 import {
   testsAgentDialectOf,
   type TestsAgentProvider,
@@ -82,12 +81,9 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
   }>('/api/project-tests/run', async (request, reply) => {
     const root = requireRoot(request.body?.path, reply);
     if (!root) return reply;
-    // Агент тестов идёт CLI выбранного провайдера, и каждый вызов инструмента
-    // сверяется с границами режима: у Claude — брокером прав, у Qwen Code —
-    // хуком к тому же приёмнику, у Codex — ответами на его просьбы
-    // (`domains/project-tests/agent/`). У прочих CLI такой проверки нет — отказ с
-    // именем CLI, а не прогон через Claude молчком (выбор провайдера один на всю
-    // панель).
+    // Агент тестов идёт задачей ядра переходником выбранного провайдера (хук ядра, судья права,
+    // журнал — `domains/project-tests/agent/core-run.ts`). Прочим CLI — отказ с именем CLI, а не
+    // прогон через Claude молчком (выбор провайдера один на всю панель).
     const active = getActiveProvider(deps.ctx.store);
     const dialect = testsAgentDialectOf(active.id);
     if (!dialect) {
@@ -98,29 +94,9 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         params: { provider: active.name },
       });
     }
-    let provider: TestsAgentProvider = { id: 'claude' };
-    if (dialect !== 'claude') {
-      const command = findCliOnPath(providerCliCandidates(active), detectCliOnPath);
-      if (command === undefined) {
-        return reply.code(409).send({
-          error: 'cli_not_found',
-          message: `${active.name} не найден в PATH процесса панели — прогону нечем работать.`,
-          messageCode: 'tests-agent-cli-not-found',
-          params: { provider: active.name },
-        });
-      }
-      // Маршрут контура у агента тестов собран под Claude: чужой CLI через него
-      // не ходит, и прогон молча ушёл бы в облако вендора мимо выбранного контура.
-      if (deps.runs.routesThroughContour()) {
-        return reply.code(409).send({
-          error: 'contour_foreign',
-          message: `Через контур агент блока «Тесты» ходит только с Claude Code, а активный CLI — ${active.name}. Прогон не запущен.`,
-          messageCode: 'tests-agent-contour-foreign',
-          params: { provider: active.name },
-        });
-      }
-      provider = { id: dialect, name: active.name, command };
-    }
+    // Бинарь CLI, вход и контур судит ядро (переходник задачи, маршрут ядра): его отказ
+    // приходит в итог прогона кодом `tests-agent-core-refused` с причиной ядра дословно.
+    const provider: TestsAgentProvider = { id: dialect, name: active.name };
     const asked = request.body?.mode;
     const mode = asked && MODES.includes(asked) ? asked : 'run';
     const source = request.body?.source;
@@ -201,6 +177,9 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         {
           appData: deps.ctx.location.paths.appData,
           provider,
+          // Галочка «tests» активного контура — маршрут задачи ядра (шлюз, ключ, обязательный
+          // контур судит ядро); галочки нет — набор ядра по умолчанию.
+          routes: coreContourRoutes(deps.ctx.store, 'tests', provider.id),
           ensureE2e: () =>
             createE2eFolder(deps.ctx.location.paths.appData, root, new Date().toISOString()),
         },

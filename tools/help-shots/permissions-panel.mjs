@@ -41,7 +41,8 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { CONFIG_DIR, HOME_DIR, makeStand, dropStand } from './access-fixture.mjs';
 import { shootSetup, shootAudit } from './access-permissions.mjs';
 import { shootConnect, shootTrouble } from './access-mcp.mjs';
@@ -71,16 +72,19 @@ const started = [];
 makeStand();
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: CONFIG_DIR,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-    // Домашний каталог виден в карточке системы раздела «Права»: настоящий
-    // начинается с имени владельца машины, а кадры уезжают в git.
-    HOME: HOME_DIR,
-    USERPROFILE: HOME_DIR,
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: CONFIG_DIR,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+      // Домашний каталог виден в карточке системы раздела «Права»: настоящий
+      // начинается с имени владельца машины, а кадры уезжают в git.
+      HOME: HOME_DIR,
+      USERPROFILE: HOME_DIR,
+    },
+    { label: 'help-permissions' },
+  );
 
   started.push(
     spawn(
@@ -133,6 +137,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех шести.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -158,5 +163,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   dropStand();
 }

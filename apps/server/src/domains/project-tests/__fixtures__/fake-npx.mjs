@@ -11,7 +11,6 @@
 // FAKE_E2E_JUNIT: report body. FAKE_E2E_ARGV: file to dump argv + cwd + stand env into.
 // Like the real Playwright junit reporter, retry children (<flakyFailure>, <flakyError>,
 // <rerunFailure>, <rerunError>) reach the report only with PLAYWRIGHT_JUNIT_INCLUDE_RETRIES.
-/* global process, setTimeout */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 

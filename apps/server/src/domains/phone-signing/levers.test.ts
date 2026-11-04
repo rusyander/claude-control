@@ -15,33 +15,15 @@ const strict = Object.fromEntries(
 ) as typeof builtIn;
 
 describe('settingsPatchLoosens', () => {
-  const off = { chatAutoMode: false, autoApproveRules: { a: false } };
+  const off = { chatAutoMode: false };
   it.each<[string, unknown, boolean]>([
     ['auto mode on', { chatAutoMode: true }, true],
     ['auto mode off', { chatAutoMode: false }, false],
     ['unrelated field', { theme: 'dark' }, false],
-    ['empty rules object', { autoApproveRules: {} }, false],
+    // Снятая настройка: сервер её не хранит, и ослаблять ей нечего.
+    ['retired rules field', { autoApproveRules: { filesDelete: true } }, false],
   ])('%s → %s', (_name, patch, expected) => {
     expect(settingsPatchLoosens(off, patch)).toBe(expected);
-  });
-
-  it('a rule that turns on loosens, a rule that turns off does not', () => {
-    const tight = {
-      chatAutoMode: false,
-      autoApproveRules: { externalWrite: false, gitWrite: false },
-    };
-    expect(settingsPatchLoosens(tight, { autoApproveRules: { filesDelete: true } })).toBe(true);
-    expect(
-      settingsPatchLoosens(tight, { autoApproveRules: { externalWrite: false, gitWrite: false } }),
-    ).toBe(false);
-    // Хранилище заменяет правила целиком: пропущенное правило вернётся к коробке (вкл.).
-    expect(settingsPatchLoosens(tight, { autoApproveRules: {} })).toBe(true);
-    expect(
-      settingsPatchLoosens(
-        { chatAutoMode: false, autoApproveRules: undefined },
-        { autoApproveRules: { externalWrite: false } },
-      ),
-    ).toBe(false);
   });
 
   it('auto mode already on is not a loosening', () => {

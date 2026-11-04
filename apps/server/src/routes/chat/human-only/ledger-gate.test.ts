@@ -219,7 +219,7 @@ describe('ledger gate against the live route table', () => {
       'POST /api/integrations/telegram/connect',
       'POST /api/integrations/telegram/connect/confirm',
       'POST /api/settings/import',
-      'POST /api/chat/split/:parent/review-decision',
+      'POST /api/core/review-link',
       'POST /api/core/commands',
     ]) {
       expect(human.some((entry) => entry.key === key)).toBe(true);
@@ -265,7 +265,10 @@ describe('ledger gate against the live route table', () => {
         await call('POST', '/api/integrations/telegram/connect', {}),
         await call('POST', '/api/integrations/telegram/connect/confirm', {}),
         await call('POST', '/api/settings/import', { settings: { chatAutoMode: true } }),
-        await call('POST', '/api/chat/split/p1/review-decision', { decision: 'approve' }),
+        // Ревью MR по ссылке открывает задачу ядра — тоже рукой человека.
+        await call('POST', '/api/core/review-link', {
+          url: 'https://forge.example.com/g/p/-/merge_requests/1',
+        }),
         // Куда уходят уведомления (бот и чат Telegram, адрес вебхука) — решает
         // человек: процесс модели не перенаправит их себе и не сотрёт ключ.
         await call('PUT', '/api/integrations/telegram', { settings: { chatId: '666' } }),
@@ -291,13 +294,21 @@ describe('ledger gate against the live route table', () => {
     expect(jira.code ?? '').not.toMatch(/^decision_/);
   }, 60_000);
 
-  it('«Продолжить» группу — действие агента (владелец 25.10): процесс вне браузера доходит до маршрута', async () => {
+  it('«Продолжить» сдавшуюся задачу — только рукой человека: маршрута группы нет, ответ ядру процесс вне браузера не шлёт', async () => {
     setPanelDirs(() => ({ config: process.cwd(), data: appData }));
     try {
-      const result = await call('POST', '/api/chat/split/p1/continue-group', { index: 0 });
-      // Плана p1 нет — ответ самого маршрута, а не отказ ворот человека.
-      expect(result.code ?? '').not.toMatch(/^decision_/);
-      expect(result.status).not.toBe(403);
+      // Групп разделения больше нет (этап 10): прежний маршрут «Продолжить» удалён, а не открыт.
+      const gone = await call('POST', '/api/chat/split/p1/continue-group', { index: 0 });
+      expect(gone.status).toBe(404);
+      // Его замена у ядра — ответ «continue» на вопрос потолка кругов (`round-cap`); ответ
+      // `answer` — класс human-strict, и процесс вне браузера отказан до прокладки к ядру.
+      const answer = await call('POST', '/api/core/commands', {
+        kind: 'answer',
+        target: { taskId: 't1' },
+        fields: { askId: 'a1', answer: 'continue' },
+      });
+      expect([403, 503]).toContain(answer.status);
+      expect(answer.code).toMatch(/^decision_(device_unverified|peer_unknown)$/);
     } finally {
       setPanelDirs(standDirs);
     }

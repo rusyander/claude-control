@@ -61,7 +61,7 @@ function pre(tool_name: string, tool_input: object, cwd: string, records: object
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: join(dir, 'state'),
     },
     timeout: 15_000,

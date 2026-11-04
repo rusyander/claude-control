@@ -76,16 +76,6 @@ describe('тела маршрутов чата проверяются на вх�
     expect(fields(res)).toEqual(['behavior']);
   });
 
-  it('запрос прав без runId — 400, а не подвисший ответ', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: { toolName: 'Bash', input: {}, toolUseId: 't' },
-    });
-    expect(res.statusCode).toBe(400);
-    expect(fields(res)).toEqual(['runId']);
-  });
-
   it('тумблер автоподтверждения: строка вместо boolean — 400, без тела — выключено', async () => {
     const bad = await app.inject({
       method: 'POST',

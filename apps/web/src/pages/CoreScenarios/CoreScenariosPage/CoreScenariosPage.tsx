@@ -1,9 +1,9 @@
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { CoreHopsNotice, coreRefusalOf } from '@entities/CoreTask';
+import { CoreFaultCard } from '@features/CoreFault';
 import { NewScenarioForm, parseRef, refText, useScenarioList } from '@features/ScenarioEditor';
 import { usePageTab } from '@shared/hooks/use-page-tab';
-import { EmptyState } from '@shared/ui/empty-state';
 import { LoadErrorCard } from '@shared/ui/load-error';
 import { PageHeader } from '@shared/ui/page-header';
 import { PageTabPanel, PageTabs } from '@shared/ui/page-tabs';
@@ -48,15 +48,7 @@ export function CoreScenariosPage() {
       />
       <CoreHopsNotice />
       {list.isLoading && <SkeletonList rows={4} />}
-      {refusal && (
-        <div data-core-refusal={refusal}>
-          <EmptyState
-            icon="warning"
-            title={t(`coreTimeline.refusal.${refusal}.title`)}
-            text={t(`coreTimeline.refusal.${refusal}.text`)}
-          />
-        </div>
-      )}
+      {refusal && <CoreFaultCard refusal={refusal} />}
       {list.isError && !refusal && (
         <LoadErrorCard title={t('coreScenario.loadError')} onRetry={() => void list.refetch()} />
       )}

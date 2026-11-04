@@ -97,6 +97,8 @@ export const decisionsRu: DecisionTexts = {
       'extend-tokens': 'Добавить токенов',
       answered: 'Ответ получен',
       'close-human-step': 'Закрыть шаг человека',
+      'close-chat': 'Закрыть чат',
+      'close-ask': 'Закрыть вопрос: ответ пришёл',
       raise: 'Спросить человека',
       'skip-step': 'Пропустить шаг',
       'end-unit': 'Завершить единицу',

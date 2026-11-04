@@ -6,17 +6,26 @@ import { pathToFileURL } from 'node:url';
 import type { PlatformGatewayInfo, PlatformsInfo } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
-import { PlatformGateway } from '../../../domains/platform/gateway/listener/listener.ts';
+import {
+  createCoreGatewayView,
+  type CoreGatewayView,
+} from '../../../domains/platform/gateway-view/gateway-view.ts';
+import {
+  listeningGateway,
+  memoryContours,
+  type MemoryContours,
+} from '../../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { registerPlatformRoutes } from '../../platform-routes/platform-routes.ts';
 import { HARNESS_ORIGIN, manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 
 /**
- * Контур сверх «составить и включить» — на настоящих маршрутах контура, живом
- * шлюзе (порт 0) и стабе платформы `tools/qa/stub-platform.mjs` как upstream.
- * Ключ вводит «человек» маршрутом мастера; ни один ответ действия его не несёт.
- * Доказательства — `state.json` новым хранилищем, файл конфигурации CLI и
- * состояние слушателя шлюза.
+ * Контур сверх «составить и включить» — на настоящих маршрутах контура и стабе платформы
+ * `tools/qa/stub-platform.mjs` как upstream пробы. Шлюз контуров держит ядро (этап 10, C3d):
+ * панель видит его учёт (`memoryContours`, шлюз человека слушает на `GATEWAY_PORT`). Ключ вводит
+ * «человек» маршрутом мастера; ни один ответ действия его не несёт. Доказательства —
+ * `state.json` новым хранилищем, файл конфигурации CLI и ответы маршрута шлюза.
  */
+const GATEWAY_PORT = 5_179;
 const KEY = 'HUMAN-TYPED-CONTOUR-KEY-Mg4T';
 const STUB = resolve(import.meta.dirname, '../../../../../../tools/qa/stub-platform.mjs');
 
@@ -31,7 +40,8 @@ describe('panel-agent actions: contour manage', () => {
   let appData: string;
   let mcpConfig: string;
   let store: AppStore;
-  let gateway: PlatformGateway;
+  let gateway: CoreGatewayView;
+  let contours: MemoryContours;
   let stub: Stub;
   let h: ManageHarness;
   const results: string[] = [];
@@ -43,13 +53,14 @@ describe('panel-agent actions: contour manage', () => {
     mcpConfig = join(root, '.claude.json');
     writeFileSync(mcpConfig, '{}\n');
     store = new AppStore(appData);
-    store.updateSettings({ platformGateway: { ...store.getSettings().platformGateway, port: 0 } });
     const module = (await import(pathToFileURL(STUB).href)) as {
       startStubPlatform: (options: { port: number }) => Promise<Stub>;
     };
     stub = await module.startStubPlatform({ port: 0 });
     results.length = 0;
-    gateway = new PlatformGateway();
+    contours = memoryContours();
+    contours.setUserGateway(listeningGateway(GATEWAY_PORT));
+    gateway = createCoreGatewayView({ store, appDataDir: appData, contours });
     const ctx = {
       store,
       backupDir: join(root, 'backups'),
@@ -62,7 +73,6 @@ describe('panel-agent actions: contour manage', () => {
 
   afterEach(async () => {
     await h.close();
-    await gateway.stop();
     await stub.close();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
@@ -104,10 +114,11 @@ describe('panel-agent actions: contour manage', () => {
     expect(disk().activePlatformId).toBe('dev');
   };
 
-  it('шлюз: состояние, подъём карточкой, повторный подъём — отказ, перезапуск — danger', async () => {
+  it('шлюз: состояние, включение карточкой, повторное — отказ, перепроверка — change', async () => {
+    // Шлюз человека у ядра слушает и при выключенной настройке: держит его ядро, не панель.
     const status = await call('gateway_status', {});
     expect(status.outcome).toBe('done');
-    expect(status.result).toMatchObject({ enabled: false, running: false });
+    expect(status.result).toMatchObject({ enabled: false, running: true, port: GATEWAY_PORT });
 
     const { card, result } = await decided('start_gateway', {});
     expect(card.risk).toBe('change');
@@ -120,14 +131,27 @@ describe('panel-agent actions: contour manage', () => {
     expect(again.message).toContain('already runs');
     expect(await h.pendingCards()).toEqual([]);
 
+    const refreshes = contours.refreshes;
     const restart = await decided('restart_gateway', {});
-    expect(restart.card.risk).toBe('danger');
+    expect(restart.card.risk).toBe('change');
+    expect(contours.refreshes).toBeGreaterThan(refreshes);
     expect(restart.result.outcome).toBe('done');
     expect(gateway.status().running).toBe(true);
     const live = (
       await h.app.inject({ method: 'GET', url: '/api/platforms/gateway' })
     ).json<PlatformGatewayInfo>();
     expect(restart.result.result).toMatchObject({ running: true, port: live.status.port });
+  });
+
+  it('шлюз ядра ждёт порт — включение карточкой кончается отказом, а не зелёным', async () => {
+    contours.setUserGateway({
+      ...listeningGateway(GATEWAY_PORT),
+      state: 'waiting',
+      lastError: 'EADDRINUSE',
+    });
+    const { result } = await decided('start_gateway', {});
+    // Слова ядра (порт занят) — в ответе маршрута, его проверяет `platform-routes.integration`.
+    expect(result).toMatchObject({ outcome: 'failed', status: 409 });
   });
 
   it('снять применение: карточка называет цель, откат снимает её; повтор — отказ до карточки', async () => {
@@ -181,7 +205,7 @@ describe('panel-agent actions: contour manage', () => {
     expect(missing.message).toContain('No contour');
   }, 30_000);
 
-  it('расход и «бюджет исчерпан»: отказ 402 контура через живой шлюз ставит отметку, агент снимает её карточкой', async () => {
+  it('расход и «бюджет исчерпан»: отметка в учёте ядра видна агенту, агент снимает её карточкой', async () => {
     await activeContour();
     const clean = await call('contour_spend', { id: 'dev' });
     expect(clean.outcome).toBe('done');
@@ -190,13 +214,10 @@ describe('panel-agent actions: contour manage', () => {
     expect(nothing.outcome).toBe('failed');
     expect(nothing.message).toContain('not marked exhausted');
 
-    // Запрос CLI через шлюз: стаб отвечает 402 — шлюз записывает отказ по бюджету.
-    const answer = await fetch(`${gateway.status().address}/dev/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'stub-402', messages: [{ role: 'user', content: 'hi' }] }),
-    });
-    expect(answer.status).toBe(402);
+    // Отказ 402 контура ставит отметку в учёте звена ядра — так её и записываем; сам путь
+    // «402 → отметка» — тест ядра `apps/core/src/hop-host/user-gateway.parity.integration.test.ts`
+    // («402 ставит отметку исчерпания маршрута») и `spend.integration.test.ts` (P122).
+    contours.record({ platformId: 'dev', exhausted: { at: new Date().toISOString() } });
     const marked = await call('contour_spend', { id: 'dev' });
     expect(marked.result).toMatchObject({ budget: { exhausted: true } });
 
@@ -204,7 +225,9 @@ describe('panel-agent actions: contour manage', () => {
     expect(card.preview.summaryCode).toBe('summary-clear-contour-exhausted');
     expect(result.outcome).toBe('done');
     expect(result.result).toMatchObject({ cleared: true, exhausted: false });
-    expect(new AppStore(appData).getPlatformSpend().dev?.exhaustedAt).toBeUndefined();
+    // Снимает звено ядра (C3b): панель передала нажатие, отметки в учёте больше нет.
+    expect(contours.cleared).toEqual(['dev']);
+    expect(contours.records().dev?.exhaustedAt).toBeUndefined();
 
     expect((await call('contour_spend', { id: 'nope' })).outcome).toBe('failed');
   }, 30_000);

@@ -176,14 +176,15 @@ export function buildInbox(sources: InboxSources): ChatInbox {
   for (const permission of sources.permissions) {
     const draft = byRun.get(permission.runId);
     if (!draft) continue;
-    const kind = permission.kind ?? 'permission';
     draft.asks.push({
-      kind,
-      key: `${kind === 'branchGate' ? 'g' : 'p'}:${permission.toolUseId}`,
+      kind: 'permission',
+      key: `p:${permission.toolUseId}`,
       toolUseId: permission.toolUseId,
       toolName: permission.toolName,
       input: permission.input,
       askedAt: permission.askedAt,
+      // Вопрос права задачи ядра: телефон отвечает ядру сам, подписью (G9) — ему нужны поля ядра.
+      ...(permission.core ? { core: permission.core } : {}),
     });
   }
 

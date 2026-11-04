@@ -66,6 +66,11 @@ export interface SplitEnv {
   userLayer?(repos: readonly { repoKey: string; path: string }[]): Promise<LaunchLayer>;
   /** Записи `grantRequired` конфига ядра (06:108-112); нет — грантов спрашивать не о чем. */
   grantRequired?(): readonly GrantRequiredRow[];
+  /**
+   * Книга окружения задачи (этап 10, F6): оценка с `session.env` кладёт сюда значения тела. Нет
+   * книги — такая оценка отказывается (значения некуда положить, сеанс пошёл бы без них).
+   */
+  taskEnv?: { put(taskId: string, values: Readonly<Record<string, string>>): void };
 }
 
 export type GrantRequiredRow = NonNullable<CoreConfig['grantRequired']>[number];
@@ -105,6 +110,11 @@ export interface CreateSeed {
    * (опрос форжа) повторит позже; провалившаяся задача на каждый круг копилась бы в списке.
    */
   refuseBeforeCreate?: boolean;
+  /**
+   * Поля `task.created` сверх оценки (ревью по ссылке, этап 10 F8): зовётся после `checkPinned`,
+   * поэтому может нести то, что предпроверка базы узнала (общий предок MR).
+   */
+  created?(): Pick<JournalDataV1['task.created'], 'review'>;
   /** Строки после `unit.created` единицы 0 (ключ единицы уже известен). */
   afterUnitZero?(task: LiveTask, zero: JournalDataV1['unit.created'], cmdId: string): void;
 }

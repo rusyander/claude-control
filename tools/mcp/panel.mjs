@@ -60,7 +60,16 @@ function conversationId() {
 }
 const CONVERSATION = conversationId();
 
+/**
+ * Токен моста сессии (вопрос ядра «ask», этап 10 F2): ядро кладёт его в окружение этого процесса,
+ * панель принимает его только пока жива её сессия. Есть он — файл токена панели не читается
+ * вовсе: процессу модели ключ от всей панели не нужен.
+ */
+const BRIDGE_TOKEN = brandEnv('BRIDGE_TOKEN');
+const BRIDGE_TOKEN_HEADER = 'x-agentdeck-bridge-token';
+
 function panelToken() {
+  if (BRIDGE_TOKEN) return '';
   try {
     return readFileSync(panelHomeFile('api-token'), 'utf8').trim();
   } catch {
@@ -101,6 +110,7 @@ async function call(method, path, body, timeout, cancel) {
         [PANEL_AGENT_HEADER]: '1',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(BRIDGE_TOKEN ? { [BRIDGE_TOKEN_HEADER]: BRIDGE_TOKEN } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: cancel

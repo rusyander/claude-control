@@ -1,0 +1,8 @@
+// Отказ открытия ревью — плашкой с рамкой, как отказ оценки: цвет не единственный носитель смысла.
+.refusal {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-subtle);
+  overflow-wrap: anywhere;
+}

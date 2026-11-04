@@ -33,7 +33,7 @@
 import { createServer } from 'node:http';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { REPO_ROOT, DEFAULT_MASKS } from './kit.mjs';
+import { REPO_ROOT, DEFAULT_MASKS, shotLanguage, shotTheme } from './kit.mjs';
 import { dropLinkedStand, makeLinkedStand } from './linked-stand.mjs';
 
 /**
@@ -75,8 +75,8 @@ export function makeStand(patch = {}) {
       projects: [],
       settings: {
         onboardingDone: true,
-        theme: 'light',
-        language: 'ru',
+        theme: shotTheme(),
+        language: shotLanguage(),
         ...patch,
       },
     }),
@@ -223,21 +223,13 @@ export const DOC_HOSTS = [
 export const EXTERNAL_URL = 'https?://[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}(?::\\d+)?[^\\s]*';
 
 /**
- * Путь к УСТАНОВКЕ самой панели на машине съёмки. Появляется там, где команда
- * запуска собрана панелью из собственного расположения: MCP-прокси Atlassian
- * стоит в списке серверов строкой `<node> <репозиторий>/tools/mcp/atlassian.mjs`.
- * Пути стенда (`C:\work\claude-demo-*`) закрывать не нужно и вредно — они и
- * есть предмет кадра; закрывается ровно то, что принадлежит машине владельца.
+ * Путь к установке панели (MCP-прокси Atlassian `<клон>\tools\mcp\atlassian.mjs`, хуки
+ * outside-relay в «Хуках», dlp/gate 03-hook) закрывается уже списком по умолчанию —
+ * `INSTALL_PATH` в `kit.mjs`, на каждом кадре любой пачки.
  */
-export const INSTALL_PATH = [
-  // Папка клона — нынешнее имя или прежнее (оно собрано задом наперёд: литерала
-  // в дереве нет, историю переписывают заменой слова).
-  `[A-Za-z]:\\\\[^\\s]*?(?:agentdeck|${[...'lortnoc-edualc'].reverse().join('')})\\\\tools\\\\[^\\s]+`,
-  '[A-Za-z]:\\\\[^\\s]*?node\\.exe',
-];
 
 /** Полный список замазываний для кадров этой пачки. */
-export const PACK_MASKS = [...DEFAULT_MASKS, EXTERNAL_URL, ...DOC_HOSTS, ...INSTALL_PATH];
+export const PACK_MASKS = [...DEFAULT_MASKS, EXTERNAL_URL, ...DOC_HOSTS];
 
 /**
  * Опись с общим для пачки списком замазываний. Правило кадра задаётся ОДИН раз

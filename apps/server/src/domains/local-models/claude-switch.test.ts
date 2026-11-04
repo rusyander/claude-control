@@ -6,11 +6,12 @@ import {
   CLAUDE_SWITCH_VARS,
   claudeSwitchEnv,
   claudeSwitchPicker,
+  coreFrontUrl,
   describeClaudeSwitch,
-  readSwitchEnv,
   switchClaudeOff,
   switchClaudeOn,
 } from './claude-switch.ts';
+import { LOCAL_FRONT_PORT } from '@agentdeck/contracts/core/local-hold';
 
 /**
  * Переключатель пишет НАСТОЯЩИЙ формат settings.json Claude во временный файл и
@@ -39,6 +40,24 @@ const VARS = claudeSwitchEnv({
 });
 
 describe('Claude Code на локальной модели', () => {
+  it('включение пишет в settings.json (временный дом) постоянный адрес ядра, а не порт сервера модели', () => {
+    const path = settingsFile({ env: { KEEP: '1' } });
+    const url = coreFrontUrl();
+    expect(url).toBe(`http://127.0.0.1:${LOCAL_FRONT_PORT}`);
+    switchClaudeOn({
+      settingsPath: path,
+      model: 'm',
+      vars: claudeSwitchEnv({ baseUrl: url, model: 'm', context: 65_536 }),
+      picker: claudeSwitchPicker({ model: 'm', title: 'M', baseUrl: url }),
+      current: undefined,
+    });
+    const env = read(path).env as Record<string, string>;
+    expect(env.ANTHROPIC_BASE_URL).toBe(`http://127.0.0.1:${LOCAL_FRONT_PORT}`);
+    expect(env.KEEP).toBe('1');
+    // Стенд с другим портом ядра — тот же путь, другой порт.
+    expect(coreFrontUrl(18_435)).toBe('http://127.0.0.1:18435');
+  });
+
   it('переменные: адрес без пути, все алиасы на модель, окно — окно сервера, ключ пуст', () => {
     expect(VARS).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:11435',
@@ -223,19 +242,5 @@ describe('Claude Code на локальной модели', () => {
       vars: [...CLAUDE_SWITCH_VARS],
       drift: [],
     });
-  });
-});
-
-describe('readSwitchEnv — переменные переключателя для окон без слоя user', () => {
-  it('берёт только переменные переключателя, прочее окружение человека — нет', () => {
-    const path = settingsFile({ env: { ...VARS, MY_SECRET: 'x', HTTP_PROXY: 'p' }, model: 'opus' });
-    expect(readSwitchEnv(path)).toEqual(VARS);
-  });
-
-  it('нет файла или он сломан — пусто, без исключения', () => {
-    expect(readSwitchEnv(settingsFile())).toEqual({});
-    const broken = settingsFile();
-    writeFileSync(broken, '{ не json');
-    expect(readSwitchEnv(broken)).toEqual({});
   });
 });

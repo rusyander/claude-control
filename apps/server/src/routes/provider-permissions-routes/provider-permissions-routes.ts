@@ -1,10 +1,10 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../context.ts';
+import { isCliOnlyGeminiApprovalMode } from '@agentdeck/contracts/permissions';
 import {
   resolveProviderPermissionsTarget,
   saveProviderPermissions,
   parseProviderPermissionsDraft,
-  isCliOnlyGeminiApprovalMode,
   buildProviderPermissionInfo,
   type ProviderPermissionsTarget,
 } from '../../domains/provider-permissions/provider-permissions.ts';

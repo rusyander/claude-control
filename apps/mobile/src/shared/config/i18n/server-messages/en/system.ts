@@ -22,4 +22,8 @@ export const systemEn: Record<SystemMessageCode, string> = {
   'core-absent': 'The task core is not running',
   'core-unverified': 'The task core did not prove its identity: the request was not sent',
   'core-unreachable': 'The task core does not answer',
+  'core-starting': 'The task core is starting',
+  'core-fault': 'The task core keeps failing to start: restart needed',
+  'core-link-missing': 'The core was not found: {{reason}}',
+  'core-link-unreachable': 'The core did not answer: {{reason}}',
 };

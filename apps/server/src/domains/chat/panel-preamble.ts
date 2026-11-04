@@ -1,18 +1,10 @@
-import { deliveryPreamble, environmentPreamble } from '@agentdeck/contracts/task-split';
-import {
-  deliverStagePrompt,
-  fixStagePrompt,
-  mergeRequestWorkPreamble,
-  reviewLinkPrompt,
-  reviewStagePrompt,
-  ANSWER_LANGUAGE_LINE,
-} from '@agentdeck/contracts/model-cascade';
+import { environmentPreamble } from '@agentdeck/contracts/task-split';
+import { ANSWER_LANGUAGE_LINE } from '@agentdeck/contracts/model-cascade';
 import {
   buildHandoffPrompt,
   HANDOFF_ROOT_TASK_LINE,
   type HandoffProposal,
 } from '@agentdeck/contracts/chat-handoff';
-import { planStagePrompt } from '@agentdeck/contracts/split-plan';
 import {
   isPrecedenceLine,
   OWNER_MESSAGE_OPENER,
@@ -23,38 +15,6 @@ import {
 } from '@agentdeck/contracts/quality-floor';
 import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
 import { coldResumeBrief, lostConversationBrief } from './split-continue.ts';
-
-/**
- * Первая строка каждого сообщения, которое панель сама шлёт в чат группы
- * (журнал 98): ветка и ключи задач. Сторож git пускает правку истории своей
- * ветки только по ключу задачи в словах пользователя текущего окна, а в
- * продолжении, заведённом панелью, ключа не было — агент упёрся в отказ и
- * встал с вопросом. Звено и продолжение без ветки к тому же не знают, где они.
- */
-export function groupIdentityLine(branch: string, tickets: readonly string[]): string {
-  const parts = [branch ? `Group branch: ${branch}.` : ''];
-  if (tickets.length > 0) parts.push(`Group tasks: ${tickets.join(', ')}.`);
-  return parts.filter(Boolean).join(' ');
-}
-
-/**
- * Сообщение панели без первой строки `groupIdentityLine`, когда вводная нового
- * разговора уже называет ту же ветку и каждый ключ задач (R3 ревью F-05): ключи
- * сторож git найдёт в ней же, повтор — лишние токены в начале окна. Вводная без
- * ветки (звено ревью) строку сохраняет — иначе разговор не знал бы, где он.
- */
-export function withoutGroupIdentity(prompt: string, brief: string): string {
-  const cut = prompt.indexOf('\n\n');
-  if (cut < 0) return prompt;
-  const line = /^(?:Group branch: (\S+)\.)? ?(?:Group tasks: ([^\n]+)\.)?$/.exec(
-    prompt.slice(0, cut),
-  );
-  const [, branch, tickets] = line ?? [];
-  if (!branch && !tickets) return prompt;
-  if (branch && !brief.includes(`Branch ${branch}`)) return prompt;
-  const named = tickets ? tickets.split(', ') : [];
-  return named.every((ticket) => brief.includes(ticket)) ? prompt.slice(cut + 2) : prompt;
-}
 
 /**
  * Что в первой реплике чата написала ПАНЕЛЬ, а не человек, — чтобы название
@@ -74,9 +34,10 @@ export function withoutGroupIdentity(prompt: string, brief: string): string {
  * - задание звена целиком (ревью, правки, доставка, ревью чужого MR) — вся
  *   реплика панельная, названия из неё нет.
  *
- * Строка ветки группы (`groupIdentityLine`) первой строкой — тоже признак
- * реплики панели целиком: её ставит только панель, в каждое своё сообщение чату
- * группы (работа после плана, напоминание, продолжение). Задание после неё
+ * Строка ветки группы («Group branch: …») первой строкой — тоже признак
+ * реплики панели целиком: её ставила только панель, в каждое своё сообщение чату
+ * группы (работа после плана, напоминание, продолжение); с уходом групп в ядро её
+ * больше никто не пишет, узнаётся она по `LEGACY_IDENTITY`. Задание после неё
  * собрано из предложения, а не написано человеком, — и чат называется именем
  * группы (живой прогон 25.09.2026: «Ветка группы: fix/capitalize. Панель
  * подготовила эту копию…» в списке и в карточке вопроса у родителя).
@@ -112,9 +73,13 @@ const LEADING = [
   ...openers([
     environmentPreamble({ mirror: MARK }),
     environmentPreamble({}),
-    deliveryPreamble({ branch: MARK }),
-    deliveryPreamble({ branch: MARK, deliverLater: true }),
-    mergeRequestWorkPreamble({ url: MARK }),
+    // Преамбула доставки группы (полная и для работы перед звеном доставки): её панель
+    // больше не пишет (группы ушли в ядро, этап 10), начала — для транскриптов на диске.
+    "Delivering a ready MR is this group's duty: the human enable",
+    "Delivering a ready MR is this group's duty, and the panel ru",
+    // Вводная работы в чужом MR: её панель больше не пишет (этап 10), начало —
+    // для транскриптов на диске.
+    'This session works in the merge request ',
     buildHandoffPrompt(HANDOFF),
     // Шапка блока слов владельца (U1) и его служебные строки — панельные; сами
     // слова владельца под ними и дают чату название.
@@ -128,19 +93,21 @@ const LEADING = [
 const WHOLE = [
   ...LEGACY_WHOLE,
   ...openers([
-    planStagePrompt({ title: MARK, task: MARK, branch: MARK }),
-    planStagePrompt({ title: MARK, task: MARK }),
-    reviewStagePrompt({ task: MARK, model: MARK, branch: MARK }),
-    reviewStagePrompt({ task: MARK, branch: MARK }),
-    reviewStagePrompt({ task: MARK }),
-    fixStagePrompt([MARK], { branch: MARK }),
-    fixStagePrompt([MARK]),
-    deliverStagePrompt({ branch: MARK, after: 'fix' }),
-    deliverStagePrompt({ branch: MARK, after: 'review' }),
-    deliverStagePrompt({ after: 'review' }),
-    deliverStagePrompt({ branch: MARK, after: 'work' }),
-    deliverStagePrompt({ after: 'work' }),
-    reviewLinkPrompt({ url: MARK }),
+    // Звено плана группы: задание его панель больше не шлёт (план перед работой
+    // уехал в ядро, 02.11.2026), а транскрипты старых чатов «· план» на диске
+    // начинаются этой строкой.
+    'Work plan for the group "',
+    // Звенья ревью, правок и доставки и ревью чужого MR — то же самое: их задания
+    // уехали в ядро вместе с планировщиком звеньев (этап 10), начала — как их
+    // писали построители панели, для транскриптов на диске.
+    'This is a new session: the work was done by the model ',
+    'This is a new session: the work was done by another model on',
+    'This is a new session: the work was done by another model in',
+    'This is a new session: a stronger model reviewed the work on',
+    'This is a new session: a stronger model reviewed the work in',
+    'This is a new session: the work of this group was reviewed a',
+    'This is a new session: the work of this group is finished; i',
+    'This is a new session: review the merge request ',
     // Продолжение группы в чистой сессии: задание группы в нём — цитата из
     // предложения, своих слов человека там нет.
     buildHandoffPrompt(HANDOFF, MARK, { group: true }),
@@ -157,10 +124,7 @@ const WHOLE = [
 const HANDOFF_OPENER = openers([buildHandoffPrompt(HANDOFF)]);
 
 /** Начала строки ветки группы: с веткой и без неё (одни ключи задач). */
-const IDENTITY = [
-  ...openers([groupIdentityLine(MARK, []), groupIdentityLine('', [MARK])]),
-  ...LEGACY_IDENTITY,
-];
+const IDENTITY = LEGACY_IDENTITY;
 
 const startsWithAny = (line: string, list: readonly string[]): boolean => {
   const bare = line.trimStart();

@@ -7,8 +7,6 @@ export interface ChatHeaderProps {
   projectName?: string;
   projectPath?: string;
   isProjectContext: boolean;
-  /** Чат группы разделения: её «До MR» из плана, а не настройка проекта. */
-  groupDeliver?: boolean;
   /** Есть ли что открывать/обновлять: id разговора или черновика. */
   chatId?: string;
   /** Настоящий ключ разговора — для настроек чата в меню. */

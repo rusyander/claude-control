@@ -124,7 +124,7 @@ const PLATFORM = {
  * Что унесёт прогон через этот контур — так, как это СЧИТАЕТ СЕРВЕР (Т8).
  *
  * Здесь это данные, а не расчёт: что флаги считаются правильно, доказывает
- * `layers.test.ts`, а что они делают с настоящим CLI — `check-run-layers.mjs`.
+ * `layers.test.ts`, а что они делают с настоящим CLI — `claude.carry.live.integration.test.ts` ядра.
  * Эта проверка про экран: показывает ли карточка ровно то, что ей прислали.
  */
 const LAYERS_FULL = { args: [], systemPrompt: true, dropped: [] };

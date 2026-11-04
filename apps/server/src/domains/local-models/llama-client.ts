@@ -25,23 +25,6 @@ interface ServerProps {
   sleeping: boolean;
 }
 
-/**
- * Слот за работой (`GET /slots`, сборка b11583): `filled` — сколько токенов промпта уже в кеше
- * слота (растёт на каждом пакете разбора), `decoded` — сколько токенов ответа выдано.
- */
-export interface SlotState {
-  processing: boolean;
-  filled: number;
-  decoded: number;
-}
-
-/**
- * Сколько ждать ответа на опрос слота. `/slots` проходит через очередь задач сервера и отвечается
- * между пакетами разбора: на видеокарте — сразу, на процессоре пакет идёт минуту. Не ответил —
- * присмотр считает это тишиной (`activity.ts`), а не пропускает шаг.
- */
-export const SLOT_TIMEOUT_MS = 1_500;
-
 interface BenchResult {
   evalCount: number;
   evalDurationNs: number;
@@ -77,24 +60,10 @@ async function failure(response: Response): Promise<LlamaError> {
 const BENCH_PROMPT =
   'Write a TypeScript function that merges two sorted arrays into one sorted array. Return only the code.';
 
-/** Сколько ждать сброса кеша слота. */
-const ERASE_TIMEOUT_MS = 3_000;
-
 export interface LlamaClient {
   health(): Promise<Health | undefined>;
   props(): Promise<ServerProps>;
   countTokens(body: unknown): Promise<number>;
-  /** Сбросить кеш слота (`POST /slots/N?action=erase`); сколько токенов стёрто. Спящий сервер этим будят — звать только бодрствующий. */
-  eraseSlot(slot?: number): Promise<number>;
-  /** Что делает слот. Спящий сервер этим будят — звать, только пока запрос в пути. */
-  slot(id?: number): Promise<SlotState | undefined>;
-  /**
-   * Кеш слота — в файл каталога `--slot-save-path` (`POST /slots/0?action=save`); сколько
-   * токенов записано. Спящий сервер этим будят.
-   */
-  saveSlot(filename: string, timeoutMs: number): Promise<number>;
-  /** Кеш слота — из файла (`action=restore`); сколько токенов восстановлено. Будит спящий. */
-  restoreSlot(filename: string, timeoutMs: number): Promise<number>;
   bench(model: string, signal?: AbortSignal): Promise<BenchResult>;
 }
 
@@ -133,55 +102,6 @@ export function llamaClient(baseUrl: string, fetchImpl: FetchLike = fetch): Llam
         nCtx: body.default_generation_settings?.n_ctx ?? 0,
         alias: body.model_alias ?? '',
         sleeping: body.is_sleeping === true,
-      };
-    },
-
-    async eraseSlot(slot = 0) {
-      // Не дольше трёх секунд: запрос человека ждёт этого сброса и из-за зависшего сервера стоять не должен.
-      const response = await get(`/slots/${slot}?action=erase`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(ERASE_TIMEOUT_MS),
-      });
-      return ((await response.json()) as { n_erased?: number }).n_erased ?? 0;
-    },
-
-    async saveSlot(filename, timeoutMs) {
-      const response = await get('/slots/0?action=save', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ filename }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      return ((await response.json()) as { n_saved?: number }).n_saved ?? 0;
-    },
-
-    async restoreSlot(filename, timeoutMs) {
-      const response = await get('/slots/0?action=restore', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ filename }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      return ((await response.json()) as { n_restored?: number }).n_restored ?? 0;
-    },
-
-    async slot(id = 0) {
-      const response = await fetchImpl(`${baseUrl}/slots`, {
-        signal: AbortSignal.timeout(SLOT_TIMEOUT_MS),
-      });
-      if (!response.ok) return undefined;
-      const slots = (await response.json()) as {
-        id?: number;
-        is_processing?: boolean;
-        n_prompt_tokens?: number;
-        next_token?: { n_decoded?: number }[];
-      }[];
-      const slot = Array.isArray(slots) ? slots.find((item) => item.id === id) : undefined;
-      if (!slot) return undefined;
-      return {
-        processing: slot.is_processing === true,
-        filled: slot.n_prompt_tokens ?? 0,
-        decoded: slot.next_token?.[0]?.n_decoded ?? 0,
       };
     },
 

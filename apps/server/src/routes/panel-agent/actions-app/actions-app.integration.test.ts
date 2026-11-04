@@ -14,11 +14,14 @@ import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../../lib/empty-body.ts';
 import { createEventHub } from '../../../lib/event-hub/event-hub.ts';
 import { allowedOrigins } from '../../../lib/origin-guard/origin-guard.ts';
-import { DlpProxy } from '../../../domains/dlp/DlpProxy.ts';
+import {
+  createMemoryDlpProxy,
+  type MemoryDlpProxy,
+} from '../../../domains/dlp/__fixtures__/memory-dlp.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
 import { registerConfigRoutes } from '../../config-routes/config-routes.ts';
 import { registerEntityRoutes } from '../../entity-routes/entity-routes.ts';
-import { registerGroupRoutes } from '../../group-routes/group-routes.ts';
+import { registerLegacyGroupsRoutes } from '../../legacy-groups-routes/legacy-groups-routes.ts';
 import { registerEndpointRoutes } from '../../endpoint-routes.ts';
 import { registerDlpRoutes } from '../../dlp-routes/dlp-routes.ts';
 import { registerIntegrationsRoutes } from '../../integrations-routes/integrations-routes.ts';
@@ -47,7 +50,7 @@ describe('panel-agent actions: panel state', () => {
   let root: string;
   let appData: string;
   let store: AppStore;
-  let proxy: DlpProxy;
+  let proxy: MemoryDlpProxy;
   let pending: PanelPendingActions;
   let app: FastifyInstance;
 
@@ -92,7 +95,7 @@ describe('panel-agent actions: panel state', () => {
     store.updateSettings({
       dlp: { ...store.getSettings().dlp, port, upstreamUrl: 'http://127.0.0.1:9' },
     });
-    proxy = new DlpProxy();
+    proxy = createMemoryDlpProxy(port);
     pending = new PanelPendingActions(10_000);
     const ctx = {
       store,
@@ -112,7 +115,7 @@ describe('panel-agent actions: panel state', () => {
     registerEmptyBodyGuard(app);
     registerConfigRoutes(app, ctx);
     registerEntityRoutes(app, ctx);
-    registerGroupRoutes(app, ctx);
+    registerLegacyGroupsRoutes(app, ctx);
     registerEndpointRoutes(app, ctx);
     registerDlpRoutes(app, ctx, proxy);
     registerIntegrationsRoutes(app, ctx, 'http://127.0.0.1:5242');
@@ -165,48 +168,34 @@ describe('panel-agent actions: panel state', () => {
     return { card, result: (await running).json<PanelActionResult>() };
   };
 
-  it('группы: создать с env, выключить (env ушёл из settings.json), удалить', async () => {
-    const created = await decided('save_group', {
-      name: 'Ревью',
-      members: ['skill:review'],
-      env: { REVIEW_MODE: 'strict' },
+  // Этап 10: группы — прежние, только чтение. Создать, выключить, удалить их агент
+  // больше не может (действий нет, см. registry-strict); список остаётся, секреты env — маской.
+  it('list_groups: прежняя группа видна только на чтение, секрет env — маской', async () => {
+    const token = ['Zx9kLm2Qp', '7Rt4Wv8Yb3Nc6'].join('');
+    store.saveGroup({
+      id: 'legacy-1',
+      name: 'Прежняя',
+      description: '',
+      color: 'accent',
+      icon: 'folder',
+      members: [{ kind: 'skill', id: 'review' }],
+      env: { AGENTDECK_PROBE_G1: 'one', AGENTDECK_PROBE_API_TOKEN: token },
+      projectPaths: [],
+      isEnabled: false,
+      order: 0,
     });
-    expect(created.card.preview.diff).toContain('REVIEW_MODE');
-    expect(created.result.outcome).toBe('done');
-    const group = disk()
-      .getGroups()
-      .find((item) => item.name === 'Ревью');
-    expect(group?.members).toEqual([{ kind: 'skill', id: 'review' }]);
-    expect(settingsJson().env?.REVIEW_MODE).toBe('strict');
-
     const listed = (await call('list_groups', {})).json<PanelActionResult>();
-    expect(JSON.stringify(listed.result)).toContain('skill:review');
-
-    const off = await decided('toggle_group', { id: group!.id, isEnabled: false });
-    expect(off.result.outcome).toBe('done');
-    expect(settingsJson().env?.REVIEW_MODE).toBeUndefined();
-    expect(
-      disk()
-        .getGroups()
-        .find((item) => item.id === group!.id)?.isEnabled,
-    ).toBe(false);
-
-    const removed = await decided('delete_group', { id: group!.id });
-    expect(removed.card.risk).toBe('danger');
-    expect(removed.result.outcome).toBe('done');
-    expect(disk().getGroups()).toEqual([]);
-  });
-
-  it('save_group с секретом в env — отказ без карточки', async () => {
-    const result = (
-      await call('save_group', {
-        name: 'Утечка',
-        env: { GH: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' },
-      })
-    ).json<PanelActionResult>();
-    expect(result.outcome).toBe('failed');
+    expect(listed.outcome).toBe('done');
+    const [group] = (
+      listed.result as { groups: { id: string; members: string[]; env: Record<string, string> }[] }
+    ).groups;
+    expect(group).toMatchObject({ id: 'legacy-1', members: ['skill:review'] });
+    expect(group!.env).toEqual({
+      AGENTDECK_PROBE_G1: 'one',
+      AGENTDECK_PROBE_API_TOKEN: SECRET_MASK,
+    });
+    expect(JSON.stringify(listed.result)).not.toContain(token);
     expect(await listPending()).toEqual([]);
-    expect(disk().getGroups()).toEqual([]);
   });
 
   it('настройки: читаемые ключи правятся, человеческие — отклоняются входом', async () => {
@@ -225,18 +214,19 @@ describe('panel-agent actions: panel state', () => {
     expect(await listPending()).toEqual([]);
   });
 
-  // F-60/F-66: сторож и экономия групп — рычаги человека; агент панели их не правит и знает почему.
-  it('сторож и экономия групп — только человеку: вход отклоняет, описание называет', async () => {
+  // Блоки сторожа и экономии групп сняты (этап 10, G15): вход их не знает, описание не называет.
+  it('снятые блоки групп: вход отклоняет, описание их не называет', async () => {
     for (const patch of [
       { groupWatch: { enabled: false } },
-      { groupEconomy: { warmOnly: false } },
+      { groupEconomy: { bashOutputChars: 4000 } },
     ]) {
       const result = (await call('update_settings', patch)).json<PanelActionResult>();
       expect(result.outcome).toBe('invalid');
     }
     expect(await listPending()).toEqual([]);
     const update = APP_STATE_ACTIONS.find((action) => action.name === 'update_settings');
-    expect(update?.description).toMatch(/Human-only[^]*groupWatch[^]*groupEconomy/);
+    expect(update?.description).toMatch(/Human-only/);
+    expect(update?.description).not.toMatch(/groupWatch|groupEconomy/);
   });
 
   it('switch_provider: неизвестный — отказ; известный — после «да» активен', async () => {
@@ -554,127 +544,6 @@ describe('panel-agent actions: panel state', () => {
     });
     expect(result.outcome).not.toBe('failed');
     expect(forge().baseUrl).toBe('https://gitlab.example.com/');
-  });
-
-  it('save_group: env, прочитанный маской (list_env), пишется значением с диска; маска в новой группе — отказ', async () => {
-    const dbUrl = `postgres://app:${opaque()}@db:5432/x`;
-    const made = await human('POST', '/api/groups', { name: 'База', env: { DB_URL: dbUrl } });
-    expect(made.statusCode).toBe(200);
-    const id = made.json<{ id: string }>().id;
-    const listed = (await call('list_env', {})).json<PanelActionResult>();
-    const shown = (listed.result as { variables: { key: string; value: string }[] }).variables.find(
-      (item) => item.key === 'DB_URL',
-    )!.value;
-    expect(shown).toContain(SECRET_MASK);
-
-    const { result } = await decided('save_group', {
-      id,
-      name: 'База',
-      env: { DB_URL: shown, MODE: 'on' },
-    });
-    expect(result.outcome).toBe('done');
-    expect(disk().getGroups()[0]?.env).toEqual({ DB_URL: dbUrl, MODE: 'on' });
-    expect(settingsJson().env?.DB_URL).toBe(dbUrl);
-
-    const fresh = await callWithoutCard('save_group', { name: 'Новая', env: { DB_URL: shown } });
-    expect(fresh.cards).toEqual([]);
-    expect(fresh.result.outcome).toBe('failed');
-    expect(disk().getGroups()).toHaveLength(1);
-  });
-
-  it('[P3] save_group: env выключенной группы с секретом правится — list_groups даёт значения маской, маска секрета возвращается с диска', async () => {
-    // Выключенная группа: её env не в settings.json, list_env его не видит. Раньше
-    // list_groups давал одни имена, а env правки — полная замена: добавить ключ
-    // значило стереть остальные. Секретное имя с маской отказывалось как «секрет».
-    const token = opaque();
-    const made = await human('POST', '/api/groups', {
-      name: 'Пробный',
-      env: { AGENTDECK_PROBE_P3_G1: 'one', AGENTDECK_PROBE_P3_API_TOKEN: token },
-    });
-    const id = made.json<{ id: string }>().id;
-    await app.inject({
-      method: 'POST',
-      url: `/api/groups/${id}/enabled`,
-      headers: { origin: ORIGIN },
-      payload: { isEnabled: false },
-    });
-    const listed = (await call('list_groups', {})).json<PanelActionResult>();
-    const env = (
-      listed.result as { groups: { id: string; env: Record<string, string> }[] }
-    ).groups.find((group) => group.id === id)!.env;
-    expect(env).toEqual({
-      AGENTDECK_PROBE_P3_G1: 'one',
-      AGENTDECK_PROBE_P3_API_TOKEN: SECRET_MASK,
-    });
-    expect(JSON.stringify(listed.result)).not.toContain(token);
-
-    const { result } = await decided('save_group', {
-      id,
-      name: 'Пробный',
-      env: { ...env, AGENTDECK_PROBE_P3_G4: 'four' },
-    });
-    expect(result.outcome).toBe('done');
-    expect(
-      disk()
-        .getGroups()
-        .find((group) => group.id === id)?.env,
-    ).toEqual({
-      AGENTDECK_PROBE_P3_G1: 'one',
-      AGENTDECK_PROBE_P3_API_TOKEN: token,
-      AGENTDECK_PROBE_P3_G4: 'four',
-    });
-  });
-
-  it('[P3] delete_group: карточка называет, что удаление сделает за пределами state.json', async () => {
-    // Живой прогон 26.09: карточка показывала только запись группы в state.json,
-    // а удаление снимало её переменные из settings.json и включало обратно
-    // участников, которых гасила выключенная группа.
-    const on = await decided('save_group', {
-      name: 'Вкл',
-      members: ['skill:review'],
-      env: { AGENTDECK_PROBE_P3_G1: 'one' },
-    });
-    expect(on.result.outcome).toBe('done');
-    const onId = disk().getGroups()[0]!.id;
-    const fieldsOf = async (id: string) => {
-      const running = call('delete_group', { id });
-      const card = await waitPending();
-      await app.inject({
-        method: 'POST',
-        url: `/api/agent/pending/${card.id}`,
-        headers: { origin: ORIGIN },
-        payload: { decision: 'reject' },
-      });
-      await running;
-      return Object.fromEntries((card.preview.fields ?? []).map((f) => [f.labelCode, f.value]));
-    };
-    const onFields = await fieldsOf(onId);
-    expect(onFields['label-group-delete-env']).toBe('AGENTDECK_PROBE_P3_G1');
-    expect(onFields['label-group-delete-back-on']).toBeUndefined();
-    expect(onFields['label-members']).toBe('skill:review');
-
-    await decided('toggle_group', { id: onId, isEnabled: false });
-    const offFields = await fieldsOf(onId);
-    expect(offFields['label-group-delete-env']).toBeUndefined();
-    expect(offFields['label-group-delete-back-on']).toBe('skill:review');
-
-    // Карточка не соврала: после удаления участник включён, переменной нет.
-    // И итог действия говорит это модели: иначе её ответ после удаления
-    // преуменьшал сделанное («группа удалена» — и только).
-    const removed = await decided('delete_group', { id: onId });
-    expect(removed.result.result).toMatchObject({
-      ok: true,
-      envRemoved: [],
-      membersBackOn: ['skill:review'],
-    });
-    expect(disk().isDisabled('skill', 'review')).toBe(false);
-    expect(settingsJson().env?.AGENTDECK_PROBE_P3_G1).toBeUndefined();
-  });
-
-  it('save_group: новая группа открывается на странице групп с фокусом на ней', async () => {
-    const { result } = await decided('save_group', { name: 'Фокус' });
-    const id = disk().getGroups()[0]!.id;
-    expect(result.page).toEqual({ route: '/groups', focus: id });
   });
 
   it('настройки открываются на вкладке своего раздела: модели, интеграции, провайдеры, ключ', async () => {

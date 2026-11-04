@@ -376,7 +376,8 @@ describe('request inspection per dialect', () => {
       await call(stub.baseUrl, dialect, { text: 'ask two', stream: true, toolResult: true });
       const [plain, withResult] = stub.requests;
       expect(plain).toMatchObject({ dialect, userTexts: ['ask one'], hasToolResult: false });
-      expect(plain!.tools[0]).toMatch(/^(Bash|shell)$/);
+      // Имя оболочки — как у CLI протокола: Claude `Bash`, OpenAI-CLI `shell`, Gemini `run_shell_command`.
+      expect(plain!.tools[0]).toMatch(/^(Bash|shell|run_shell_command)$/);
       expect(withResult!.hasToolResult).toBe(true);
       expect(withResult!.userTexts[0]).toBe('ask two');
     },

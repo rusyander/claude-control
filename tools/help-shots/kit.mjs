@@ -22,6 +22,14 @@
  * картинкой, в текст не попадёт — таких кадров у нас нет, и появиться они
  * должны осознанно.
  *
+ * ПЕЧАТЬ КАДРА (`seal`) связывает текст описи с байтами PNG: отпечаток картинки и отпечаток
+ * текста, снятые в одном вызове `shot`. Без неё правленый руками текст рядом со старой картинкой
+ * проходил все сканы чисто: сканы читают текст, пиксели не читает никто, OCR здесь нет — так
+ * platform/agent/01-chat-run нёс марку стенда и прежнее имя панели (03.11.2026). Сторож
+ * пересчитывает обе половины и краснеет, если одна сдвинулась без другой. Картинку,
+ * обработанную после снимка (заплатка пикселей), перештамповывает `restampFrame` — сам скрипт
+ * обработки, тем же проходом, которым пишет PNG; руками печать не ставится.
+ *
  * ЗАМАЗЫВАНИЕ настоящее, а не обещанное: `mask` подменяет текст узлов ДО
  * снимка, и в опись уходит уже подменённый текст. Если подмена не сработала,
  * секрет окажется в описи и проверка станет красной — то есть правило
@@ -45,6 +53,33 @@ import {
 import { createHash } from 'node:crypto';
 import { join, parse, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { brandPass, readBrandMask } from './brand-mask.mjs';
+
+// Панель с надзором ядра поднимает ядро, а то — хост переходов; оба переживают панель
+// (так задумано для живой машины). Съёмка гасит панель и уходит, и каждый прогон оставлял
+// хост переходов, держащий дом стенда, — снос падал EBUSY, следующий прогон не стартовал
+// (03.11.2026). Пачки съёмки наследуют окружение этого процесса; кому ядро нужно, задаёт
+// переменную явно (`throwaway-stand.mjs` с `core`, `panel-agent-panel.mjs`).
+process.env.AGENTDECK_CORE_SUPERVISE ??= '0';
+
+/**
+ * Запись описи с повтором. Windows отдаёт `UNKNOWN`/`EBUSY`/`EPERM` на открытие файла, который
+ * в этот миг держит антивирус или чтение соседней пачки: прогон 03.11.2026 снял все кадры
+ * сценария и упал на последней записи `frames.json` — опись осталась старой. Ждём до ~15 с:
+ * пяти не хватило прогону portability 03.11.2026 (UNKNOWN на transfer/frames.json).
+ */
+function writeFileRetry(path, text) {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      writeFileSync(path, text, 'utf8');
+      return;
+    } catch (error) {
+      const busy = ['UNKNOWN', 'EBUSY', 'EPERM'].includes(error?.code);
+      if (!busy || attempt >= 60) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+    }
+  }
+}
 
 /**
  * Корень репозитория. Считается от места этого файла, а не от рабочего
@@ -102,6 +137,82 @@ export function diagramPages(xml) {
 /** Отпечаток куска XML: коротко, лишь бы отличать «то же» от «уже не то». */
 export function fingerprint(text) {
   return createHash('sha1').update(text, 'utf8').digest('hex').slice(0, 16);
+}
+
+/** Опись кадров без печати — долг первого заполнения печатей; только убывает. */
+export const UNSEALED_LIST = 'unsealed.json';
+
+const sha = (data) => createHash('sha256').update(data).digest('hex').slice(0, 16);
+
+/**
+ * Печать кадра: отпечаток байтов PNG и отпечаток текста описи — по отдельности, чтобы сторож
+ * мог назвать, какая половина сдвинулась.
+ */
+export function frameSeal(png, text) {
+  return { png: sha(png), text: sha(Buffer.from(text ?? '', 'utf8')) };
+}
+
+/** Что сдвинулось против печати: `ok` | `png` | `text` | `both`. */
+export function sealDrift(seal, png, text) {
+  const now = frameSeal(png, text);
+  const pngMoved = now.png !== seal.png;
+  const textMoved = now.text !== seal.text;
+  if (pngMoved && textMoved) return 'both';
+  if (pngMoved) return 'png';
+  return textMoved ? 'text' : 'ok';
+}
+
+/** Ключ кадра в описи долга: `<раздел>/<сценарий>/<файл>`. */
+export const unsealedKey = (topic, scenario, file) => `${topic}/${scenario}/${file}`;
+
+/** Опись долга: `{ why, files: [ключ…] }`; нет файла — долга нет. */
+export function readUnsealed(root = SHOTS_ROOT) {
+  const path = join(root, UNSEALED_LIST);
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : { why: '', files: [] };
+}
+
+/** Снять с долга кадры, получившие печать. Дописывать в опись долга некому — она только убывает. */
+export function dropUnsealed(keys, root = SHOTS_ROOT) {
+  const path = join(root, UNSEALED_LIST);
+  if (!existsSync(path) || keys.length === 0) return;
+  const list = readUnsealed(root);
+  const gone = new Set(keys);
+  const files = list.files.filter((key) => !gone.has(key));
+  if (files.length === list.files.length) return;
+  writeFileRetry(path, `${JSON.stringify({ ...list, files }, null, 2)}\n`);
+}
+
+/** Запись варианта по имени файла: светлый русский — поля верхнего уровня, прочие — вложенные. */
+function variantByFile(frame, file) {
+  if (frame.file === file) return frame;
+  for (const field of ['en', 'dark', 'darkEn'])
+    if (frame[field]?.file === file) return frame[field];
+  return undefined;
+}
+
+/**
+ * Перештамповать кадр, чью картинку изменили ПОСЛЕ снимка (заплатка пикселей). Зовёт сам скрипт
+ * обработки сразу после записи PNG; `text` — текст, который теперь на картинке (подмена марки);
+ * без него текст описи остаётся прежним. `painted` — строки, которые обработка нарисовала: каждая
+ * обязана быть в тексте описи, иначе опись не про эту картинку и печати нет. Печать считается от
+ * байтов на диске.
+ */
+export function restampFrame(dir, file, { text, painted = [] } = {}) {
+  const manifestPath = join(dir, 'frames.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const entry = manifest.frames.map((frame) => variantByFile(frame, file)).find(Boolean);
+  if (!entry) throw new Error(`${manifestPath}: кадра ${file} в описи нет`);
+  if (text !== undefined) entry.text = text.replace(/\s+/g, ' ').trim();
+  const absent = painted.filter((line) => !entry.text.includes(line.replace(/\s+/g, ' ').trim()));
+  if (absent.length) {
+    throw new Error(
+      `${file}: на картинке нарисовано то, чего нет в тексте описи — ${absent.join(' | ')}`,
+    );
+  }
+  entry.seal = frameSeal(readFileSync(join(dir, file)), entry.text);
+  writeFileRetry(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  dropUnsealed([unsealedKey(manifest.topic, manifest.scenario, file)], resolve(dir, '..', '..'));
+  return entry;
 }
 
 /**
@@ -217,12 +328,54 @@ export const SECRET_PATTERNS = {
   bearer: 'Bearer\\s+[A-Za-z0-9_\\-.=]{10,}',
 };
 
+/** Папка клона: нынешнее имя или прежнее (собрано задом наперёд — литерала в дереве нет). */
+const CLONE_NAME = `(?:agentdeck|${[...'lortnoc-edualc'].reverse().join('')})`;
+
+/**
+ * Путь к УСТАНОВКЕ самой панели на машине съёмки. Панель собирает команды своих хуков из
+ * собственного расположения: `<node> <клон>\apps\server\…\outside-relay-hook.mjs` (хуки сессий в
+ * терминале), `<node> <клон>\tools\tests-hook.mjs` (блок «Тестирование»), MCP-прокси
+ * `<клон>\tools\mcp\…`. Такая строка видна в «Хуках», в слоях проекта, а в паспорте среды —
+ * ещё и ключом слоя, где разделители сплющены в дефис: `node-C-work-<клон>-apps-server-…`.
+ * Закрывается на КАЖДОМ кадре, а не списком пачки: в пачке без списка (claudeMd/layers,
+ * portability) путь уезжал в справку. Пути стендов (`C:\work\claude-demo-*`, `.agentdeck` дома
+ * стенда) правилу не подходят — за именем клона нет `tools`/`apps`, и они остаются предметом кадра.
+ */
+export const INSTALL_PATH = [
+  `[A-Za-z]:\\\\[^\\s"]*?${CLONE_NAME}\\\\(?:tools|apps)\\\\[^\\s"]+`,
+  `node-[A-Za-z]-[^\\s"]*?${CLONE_NAME}-(?:tools|apps)-[^\\s"]+`,
+  '[A-Za-z]:\\\\[^\\s"]*?node\\.exe',
+];
+
+/**
+ * Профиль пользователя машины съёмки: `C:\Users\<имя>\…` (в том числе `AppData\Local\Temp` — temp
+ * Windows лежит внутри профиля, и в форме 8.3 `RUSYAN~1` тоже), `/Users/<имя>`, `/home/<имя>` и
+ * тот же путь ключом слоя, где разделители сплющены в дефис (`node-C-Users-<имя>-…`). Имя
+ * учётной записи в публичной справке — утечка: 03.11.2026 в коммите лежали кадры
+ * platform/scripted с `C:/Users/<владелец>/AppData/Local/Temp/cc-guide-shim` и platform/activate
+ * с `C:\Users\<владелец>\.qwen\.env`. Закрывается сам профиль с именем; хвост пути остаётся.
+ * Имена-заглушки, которые панель показывает из сценарных данных (`C:\Users\user\.codex\…`,
+ * `C:\Users\you\…`), и общие профили Windows (`Public`, `Default`) — не чьё-то имя, они не
+ * закрываются. Одно выражение на маску и на сторожа (`check-help-shots.mjs`).
+ */
+const PROFILE_STUB = '(?:user|you|Public|Default|Shared)';
+export const USER_PROFILE_PATH = [
+  String.raw`[A-Za-z]:[\\/]+Users[\\/]+(?!${PROFILE_STUB}(?:[\\/"\s]|$))[^\\/\s"]+`,
+  String.raw`(?<![\w.~-])/(?:Users|home)/(?!${PROFILE_STUB}(?:[/"\s]|$))[^/\s"]+`,
+  String.raw`\b[A-Za-z]-Users-(?!${PROFILE_STUB}-)[^\s"-]+`,
+];
+
+/** Заголовок карточки падения раздела (`common.crashTitle` в ru.ts / en.ts). */
+const CRASH_TITLES = ['Раздел не смог отрисоваться', 'This section failed to render'];
+
 /** Выражения по умолчанию: закрываются на каждом кадре любой стороны. */
 export const DEFAULT_MASKS = [
   SECRET_PATTERNS.key,
   SECRET_PATTERNS.keyTail,
   SECRET_PATTERNS.email,
   SECRET_PATTERNS.bearer,
+  ...INSTALL_PATH,
+  ...USER_PROFILE_PATH,
 ];
 
 /**
@@ -360,7 +513,25 @@ export function renderVariantIndex(topic, scenarios) {
 /** Переписать опись вариантов раздела по его описям сценариев. */
 export function writeVariantIndex(topic, root = SHOTS_ROOT) {
   const text = renderVariantIndex(topic, readTopicManifests(topic, root));
-  writeFileSync(join(root, topic, VARIANT_INDEX), text, 'utf8');
+  writeFileRetry(join(root, topic, VARIANT_INDEX), text);
+}
+
+/**
+ * Прогреть фронт до первого сценария. `waitFor(WEB)` ждёт только ответа Vite на `/`, а
+ * граф модулей он собирает по первому настоящему заходу: под нагрузкой (соседние съёмки,
+ * пересборка зависимостей) этот заход шёл дольше 30 с, и первый `page.goto` сценария падал
+ * по тайм-ауту — 03.11.2026 так отказали settings/first-run (light-en, dark-ru) и
+ * config/skills (light-ru), хотя панель была исправна. Прогрев открывает страницу один раз с
+ * запасом по времени и закрывает её; кадров он не снимает.
+ */
+export async function warmFront(browser, web, timeoutMs = 180_000) {
+  const page = await browser.newPage();
+  try {
+    // `load` наступает после выполнения модульных скриптов — то есть после сборки графа.
+    await page.goto(web, { waitUntil: 'load', timeout: timeoutMs });
+  } finally {
+    await page.close();
+  }
 }
 
 /**
@@ -386,7 +557,20 @@ export async function applyShotLanguage(panel, lang = shotLanguage(), theme = sh
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ language: lang, theme }),
   });
-  if (!response.ok) throw new Error(`PATCH /api/settings language: ${response.status}`);
+  if (!response.ok) {
+    // Дом съёмки — нейтральный каталог у корня диска (`shotHome`), а не temp ОС: для ворот
+    // «решает только человек» это не одноразовый стенд, и правка настроек из процесса съёмки
+    // отклоняется (`decision-device-unverified`). Тогда язык и тема должны уже лежать в
+    // `state.json` дома (их кладёт фикстура пачки до подъёма панели) — сверяем по ответу панели.
+    const current = await fetch(`${panel}/api/settings`).then((res) => (res.ok ? res.json() : {}));
+    if (current.language !== lang || current.theme !== theme) {
+      throw new Error(
+        `PATCH /api/settings language: ${response.status}; в настройках дома язык ` +
+          `${current.language ?? '?'}, тема ${current.theme ?? '?'} — положите ${lang}/${theme} ` +
+          'в state.json дома до подъёма панели',
+      );
+    }
+  }
   console.log(`язык съёмки: ${lang}, тема: ${theme}`);
   return lang;
 }
@@ -444,43 +628,103 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => null);
       }
 
+      // Знакомство Деки («Привет! Я Дека…») всплывает на каждой СВЕЖЕЙ странице через 2,5 с:
+      // «уже знакомы» помнит localStorage браузера, а у съёмки контекст новый. Попадало ли облачко
+      // в кадр, решала скорость прогона (03.11: changelog/02-entry, kit/page/02-items, overview/tour
+      // то с ним, то без). Кадр не про Деку — облачко закрывается её же крестиком.
+      const greeting = page
+        .locator('[data-mascot-speech="greet"] [data-mascot-speech-dismiss]')
+        .first();
+      if (side === 'panel' && (await greeting.isVisible().catch(() => false))) {
+        await greeting.click({ timeout: 3000 }).catch(() => null);
+        await page.waitForTimeout(400);
+      }
+
       // Селекторы закрывают то, что известно по месту; выражения — то, что
       // известно по виду (ключ, почта). Второе надёжнее: разметка чужого
       // приложения меняется между версиями, а вид ключа — нет.
-      const maskedCount = await page.evaluate(
-        ([selectors, patterns, maskValue]) => {
-          let count = 0;
-          for (const selector of selectors) {
-            for (const node of document.querySelectorAll(selector)) {
-              if (node instanceof HTMLInputElement) node.value = maskValue;
-              else node.textContent = maskValue;
-              count += 1;
+      const applyMasks = () =>
+        page.evaluate(
+          ([selectors, patterns, maskValue]) => {
+            let count = 0;
+            for (const selector of selectors) {
+              for (const node of document.querySelectorAll(selector)) {
+                if (node instanceof HTMLInputElement) node.value = maskValue;
+                else node.textContent = maskValue;
+                count += 1;
+              }
             }
-          }
-          for (const source of patterns) {
-            const regex = new RegExp(source, 'g');
+            // Все выражения сверяются с ИСХОДНЫМ текстом, и закрывается объединение их
+            // совпадений. По очереди нельзя: узкое выражение умолчаний (профиль
+            // `C:\Users\<имя>`) закрывало начало пути, и широкое выражение пачки
+            // (`[A-Za-z]:\\…`) уже не находило диска — хвост `\AppData\Local\Temp\…`
+            // выходил в кадр открытым.
+            const regexes = patterns.map((source) => new RegExp(source, 'g'));
+            const closeAll = (text) => {
+              const spans = [];
+              for (const regex of regexes) {
+                regex.lastIndex = 0;
+                for (let hit = regex.exec(text); hit; hit = regex.exec(text)) {
+                  if (hit[0].length === 0) regex.lastIndex += 1;
+                  else spans.push([hit.index, hit.index + hit[0].length]);
+                }
+              }
+              if (spans.length === 0) return undefined;
+              spans.sort((a, b) => a[0] - b[0]);
+              let out = '';
+              let at = 0;
+              let end = -1;
+              for (const [from, to] of spans) {
+                if (from > end) {
+                  if (end >= 0) out += maskValue;
+                  out += text.slice(at, from);
+                  end = to;
+                } else end = Math.max(end, to);
+                at = end;
+              }
+              return `${out}${maskValue}${text.slice(at)}`;
+            };
             const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-            const hits = [];
-            while (walker.nextNode()) {
-              if (regex.test(walker.currentNode.textContent ?? '')) hits.push(walker.currentNode);
-              regex.lastIndex = 0;
-            }
-            for (const node of hits) {
-              node.textContent = (node.textContent ?? '').replace(regex, maskValue);
+            const nodes = [];
+            while (walker.nextNode()) nodes.push(walker.currentNode);
+            for (const node of nodes) {
+              const closed = closeAll(node.textContent ?? '');
+              if (closed === undefined) continue;
+              node.textContent = closed;
               count += 1;
             }
             for (const input of document.querySelectorAll('input')) {
-              if (regex.test(input.value)) {
-                input.value = input.value.replace(regex, maskValue);
-                count += 1;
-              }
-              regex.lastIndex = 0;
+              const closed = closeAll(input.value);
+              if (closed === undefined) continue;
+              input.value = closed;
+              count += 1;
             }
-          }
-          return count;
-        },
-        [mask, maskText, MASK],
-      );
+            return count;
+          },
+          [mask, maskText, MASK],
+        );
+      let maskedCount = await applyMasks();
+
+      // Марка платформы компании — в разметке, до снимка; осталась видна — кадра нет. Раздел
+      // «Контур» без списка марки не снимается вовсе: он снят на её стенде.
+      const brand = readBrandMask();
+      if (!brand && topic === 'platform') {
+        throw new Error(
+          `кадр ${id}: нет списка марки (GUIDE_BRAND_FILE, .agent/private/brand-mask.txt) — ` +
+            'раздел «Контур» снимается только с закрытой маркой',
+        );
+      }
+      if (brand) {
+        const pass = await brandPass(page, brand, {
+          mask: options.brandMask !== false,
+          anyLogo: side === 'platform',
+        });
+        if (pass.leaks.length) {
+          throw new Error(
+            `кадр ${id}: марка платформы видна после закрытия — ${pass.leaks.join(', ')}`,
+          );
+        }
+      }
 
       let area;
       if (clip) {
@@ -514,6 +758,18 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
         );
       }
       if (side === 'panel') {
+        // Тема и язык приезжают с настройками панели уже после первой отрисовки: кадр сразу за
+        // переходом ловил светлую заготовку до ответа /api/settings. Ждём совпадения до 5 с —
+        // не совпало и тогда, значит, настройка не дошла, и проверка ниже краснеет как раньше.
+        await page
+          .waitForFunction(
+            ([want, wantLang]) =>
+              document.documentElement.dataset.theme === want &&
+              (document.documentElement.lang || '').startsWith(wantLang),
+            [theme, lang],
+            { timeout: 5_000 },
+          )
+          .catch(() => {});
         const pageTheme = await page.evaluate(
           () => document.documentElement.dataset.theme || '(пусто)',
         );
@@ -532,13 +788,44 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
         }
       }
 
-      const file = fileOf(id);
-      await page.screenshot({ path: join(dir, file), clip: area });
+      // Экран ошибки вместо раздела — не кадр. 03.11.2026 overview/trouble/01-wrong-dir (подмена
+      // ответа без поля контракта) и history/trace/04-after (строка, вырезанная из DOM под React)
+      // лежали в справке карточкой «Раздел не смог отрисоваться» во всех четырёх вариантах, а в
+      // коммите — второй из них. Кадр, который правда показывает падение, просит `allowCrash`.
+      if (side === 'panel' && !options.allowCrash) {
+        const crashed = await page.evaluate(
+          (titles) => titles.find((title) => document.body.innerText.includes(title)) ?? null,
+          CRASH_TITLES,
+        );
+        if (crashed) {
+          throw new Error(`кадр ${id}: на странице экран ошибки «${crashed}» вместо раздела`);
+        }
+      }
 
-      // Текст снимаемой области — из той же разметки и после замазывания.
-      const text = clip
-        ? await page.locator(clip).first().innerText()
-        : await page.locator('body').innerText();
+      // Замазывание — ещё раз, вплотную к снимку. Между первым проходом и снимком страница
+      // ждёт тему и язык (до 5 с), и React за это время перерисовывает узлы заново: 03.11.2026
+      // providers/switch/05-keys [dark-en] ушёл с открытым хвостом ключа «sk-…a1d2» (masked 0),
+      // хотя три других варианта того же кадра вышли закрытыми.
+      const file = fileOf(id);
+      const readText = async () =>
+        clip ? page.locator(clip).first().innerText() : page.locator('body').innerText();
+      const openPatterns = (value) =>
+        maskText.filter((source) => new RegExp(source).test(value)).map((source) => `/${source}/`);
+      let text;
+      for (let attempt = 1; ; attempt += 1) {
+        maskedCount = Math.max(maskedCount, await applyMasks());
+        await page.screenshot({ path: join(dir, file), clip: area });
+        // Текст снимаемой области — из той же разметки и после замазывания.
+        text = await readText();
+        const open = openPatterns(text);
+        if (!open.length) break;
+        // Остался открытым и после повтора — кадра нет: лучше упавшая съёмка, чем ключ в справке.
+        if (attempt >= 3) {
+          rmSync(join(dir, file), { force: true });
+          throw new Error(`кадр ${id}: после снимка видно то, что закрывается: ${open.join(', ')}`);
+        }
+        await page.waitForTimeout(500);
+      }
 
       const taken = {
         file,
@@ -548,6 +835,8 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
         shotAt: new Date().toISOString(),
         text: text.replace(/\s+/g, ' ').trim(),
       };
+      // Печать — от байтов, которые легли на диск, и текста, который уходит в опись.
+      taken.seal = frameSeal(readFileSync(join(dir, file)), taken.text);
 
       thisRun.side = side;
       thisRun.ids.add(id);
@@ -574,10 +863,13 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
      * кадр — это картинка, которой в справке уже нет места, но которая лежит в
      * git и однажды снова попадёт человеку на глаза. Чужая сторона не
      * трогается: её снимает соседний прогон.
+     *
+     * `keepUnshot` — прогон снимал только часть кадров по выбору (пересъёмка одного кадра):
+     * не снятые им кадры не устарели, а просто не входили в выбор, и остаются с файлами.
      */
-    finish() {
+    finish({ keepUnshot = false } = {}) {
       for (const [id, frame] of [...frames]) {
-        if (frame.side !== thisRun.side || thisRun.ids.has(id)) continue;
+        if (keepUnshot || frame.side !== thisRun.side || thisRun.ids.has(id)) continue;
         // Прогон варианта снимает с учёта только СВОЙ вариант: светлый русский
         // кадр и соседние варианты сняты не им, и удалять чужую работу он права
         // не имеет.
@@ -609,11 +901,18 @@ export function openScenario(topic, scenario, lang = shotLanguage(), theme = sho
         rmSync(join(dir, name), { force: true });
         console.log(`  удалён кадр-сирота ${name}`);
       }
-      writeFileSync(
+      writeFileRetry(
         manifestPath,
         JSON.stringify({ topic, scenario, frames: list }, null, 2) + '\n',
-        'utf8',
       );
+      // С долга без печати уходят снятые этим прогоном кадры и те, чьих файлов больше нет.
+      const prefix = unsealedKey(topic, scenario, '');
+      dropUnsealed([
+        ...[...thisRun.ids].map((id) => unsealedKey(topic, scenario, fileOf(id))),
+        ...readUnsealed()
+          .files.filter((key) => key.startsWith(prefix))
+          .filter((key) => !known.has(key.slice(prefix.length))),
+      ]);
       // Опись вариантов раздела — производная от описей сценариев, и
       // переписывается вместе с ними, иначе справка не узнает о новом кадре.
       writeVariantIndex(topic);

@@ -44,5 +44,7 @@ export function createOwnRoute(options: OwnRouteOptions): OwnRoute {
     endpoint: createOwnEndpoint(ctx),
     release: release.releaseLease,
     shutdown: release.shutdown,
+    restore: ensureRestored,
+    slotHeld: () => ctx.slots.held(ctx.slotKey),
   };
 }

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { serverFieldList, serverMessageText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
@@ -23,7 +24,8 @@ export function StepCapabilities({ model }: WizardStepProps) {
         <>
           <Stack direction="row" gap="var(--spacing-xs)" align="center" justify="between" wrap>
             <Typography variant="body-sm">
-              {t(`platform.outcome.${probe.outcome}`)} · {probe.detail}
+              {t(`platform.outcome.${probe.outcome}`)} ·{' '}
+              {serverMessageText(probe.detailCode, probe.detailParams, t) ?? probe.detail}
             </Typography>
             <Button
               variant="secondary"
@@ -55,7 +57,7 @@ export function StepCapabilities({ model }: WizardStepProps) {
             </Stack>
           )}
 
-          {probe.notes.map((note) => (
+          {serverFieldList(probe, 'notes', t).map((note) => (
             <Typography key={note} variant="caption" color="muted">
               {note}
             </Typography>

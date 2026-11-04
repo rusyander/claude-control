@@ -1,5 +1,8 @@
+import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import type { LocalLayerStatus } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
+import { claudeFolderTrust } from '../domains/local-layer/folder-trust.ts';
 import { checkProjectDir } from '../domains/projects/projects.ts';
 import { readProjectLocalConfig } from '../domains/project-local/project-local.ts';
 import { localLayerStatus, writeLayerMode } from '../domains/local-layer/local-layer.ts';
@@ -36,10 +39,20 @@ export function registerProjectLocalRoutes(app: FastifyInstance, ctx: ServerCont
 
   // Локальный слой проекта (`domains/local-layer`): состояние и режим. Чтение
   // собирает слой, если командный слой изменился, — тот же путь, что у старта чата.
+  // Доверие папке читается на каждый ответ (не в памяти сборки): человек мог
+  // ответить «да» в терминале минуту назад (s10 G14 p7).
+  const withTrust = (path: string): LocalLayerStatus => ({
+    ...localLayerStatus(path),
+    folderTrust: claudeFolderTrust(path, {
+      legacy: join(ctx.location.paths.root, '.config.json'),
+      main: ctx.location.paths.mcpConfig,
+    }),
+  });
+
   app.get<{ Params: { id: string } }>('/api/projects/:id/local-layer', (request, reply) => {
     const project = requireProject(ctx, request.params.id, reply);
     if (!project) return reply;
-    return localLayerStatus(project.path);
+    return withTrust(project.path);
   });
 
   app.put<{ Params: { id: string }; Body: { mode?: unknown } }>(
@@ -54,7 +67,7 @@ export function registerProjectLocalRoutes(app: FastifyInstance, ctx: ServerCont
           .send({ error: 'invalid_mode', message: 'Режим слоя: auto, on или off.' });
       }
       writeLayerMode(project.path, mode);
-      return localLayerStatus(project.path);
+      return withTrust(project.path);
     },
   );
 }

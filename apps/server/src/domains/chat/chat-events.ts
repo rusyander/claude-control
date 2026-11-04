@@ -1,19 +1,25 @@
 import type { PermissionGuardReason } from '@agentdeck/contracts/backend-guard';
-import type { HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
+import type { CorePermitAsk, HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type { LimitSample } from '@agentdeck/contracts/limit-share';
 import type { CascadeStage, ReviewDepthGap } from '@agentdeck/contracts/model-cascade';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import type { BranchGateChild } from './ChatBranchGate/ChatBranchGate.ts';
-import type { EscalationNotice, RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
+import type { RecommendedPick } from '@agentdeck/contracts/chat-group-settings';
 
 /**
  * Словарь событий чата: что панель получает от CLI и что отдаёт интерфейсу.
  *
  * Живёт отдельно от самого прогона, потому что разбор потока разнесён по двум
- * модулям — `ChatRunner` (запуск и перевод строк в события) и `stream-usage`
+ * модулям — перевод строк CLI в события (ядро, `core-run`) и `stream-usage`
  * (расход по ходам модели). Общие типы в одном из них сделали бы их
  * взаимозависимыми, а слои сервера циклов не допускают.
  */
+
+/**
+ * Вопрос права задачи ядра в карточке чата (этап 10, F2b). Ответ `answer` у ядра — класс
+ * human-strict (06 §Authority): его шлёт браузер с числом страницы; «Разрешить» — грант
+ * (`project` + `globs`, правка), затем ответ `grant`.
+ */
+export type CorePermitCard = CorePermitAsk;
 
 /** Событие для интерфейса — уже разобранное, без служебного шума CLI. */
 export type ChatEvent =
@@ -103,7 +109,15 @@ export type ChatEvent =
       toolUseId: string;
       /** Защита бэкенда проекта узнала команду — карточка называет причину. */
       guard?: PermissionGuardReason;
+      /** Вопрос права задачи ядра: ответ шлёт браузер командой ядра, не этот сервер. */
+      core?: CorePermitCard;
     }
+  /**
+   * Задача ядра, которая ведёт этот ход чата, и ключ её репозитория (этап 10): браузер с
+   * включённым автоподтверждением выдаёт ей грант правки своей командой — вопросы права пункта 5
+   * не возникают.
+   */
+  | { kind: 'coreTask'; taskId: string; project: string }
   /**
    * Запрос прав решён. `expired` — решал не человек: CLI перестал ждать ответа
    * (или истёк срок брокера), и карточка обязана сказать «истекло», а не
@@ -114,8 +128,6 @@ export type ChatEvent =
       toolUseId: string;
       behavior: 'allow' | 'deny';
       expired?: true;
-      /** Карточку решил срок: она стала отложенным вопросом D-n, кнопки отвечают ему. */
-      deferredId?: string;
     }
   /**
    * CLI вернул результат вызова `toolUseId` — ВНУТРЕННЕЕ событие реестра, в
@@ -178,32 +190,6 @@ export type ChatEvent =
    */
   | { kind: 'autoPick'; toolUseId: string; picks: RecommendedPick[] }
   /**
-   * Критическое замечание ребёнка — в ленту ГЛАВНОГО чата дерева. Правда о нём
-   * хранится у панели (`GET /api/chat/escalations`); событие лишь будит идущий
-   * прогон корня, чтобы карточка появилась без перезагрузки.
-   */
-  | { kind: 'escalation'; notice: EscalationNotice }
-  /**
-   * Ворота ветки: первая правка в основной рабочей копии придержана, человек
-   * выбирает — копия с веткой, здесь же или отказ. Это тот же придержанный
-   * запрос прав (`toolUseId` — его), показанный другой карточкой: ответ на неё
-   * разрешает или отклоняет ровно этот вызов.
-   */
-  | {
-      kind: 'branchGate';
-      toolName: string;
-      input: unknown;
-      toolUseId: string;
-      /** Каталог, в котором идёт прогон, — он же основная копия репозитория. */
-      cwd: string;
-      /** Имя ветки, предложенное панелью; человек правит его в карточке. */
-      branch: string;
-      /** Работа разговора отдана группам разделения — им и передавать правку (Д15). */
-      children?: BranchGateChild[];
-      /** Копия отводится от ветки MR, на которой работают дети, а не от HEAD (Д15). */
-      base?: string;
-    }
-  /**
    * Заметка панели в ленту — про прогон, а не от агента. Сейчас два повода, оба
    * про усыновление после перезапуска сервера: прогон подхвачен без потока
    * вывода (`adopted`) и его процесс закрылся (`detachedDone`). Код — для
@@ -234,8 +220,6 @@ export type ChatEvent =
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
-       * 'autonomyDeferred' — галочку автономии переключили, а процесс держит фоновые
-       *   команды: перезапуск с новой меткой ждёт их конца (F-31).
        * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
        *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
        * 'conversationLost' — файла сессии группы нет на диске, ход пошёл новым разговором (Q2).
@@ -273,7 +257,6 @@ export type ChatEvent =
         | 'deliveryUnchecked'
         | 'pathStep'
         | 'pathGateFailed'
-        | 'autonomyDeferred'
         | 'stopUnconfirmed'
         | 'conversationLost'
         | 'autoContinue'

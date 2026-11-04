@@ -190,21 +190,20 @@ describe('присмотр за сервером моделей', () => {
     expect(await supervisor.tick()).toBe('restarted');
   });
 
-  it('тик и шлюз одновременно — один подъём, а не два процесса на один порт', async () => {
+  it('два тика одновременно — один подъём, а не два процесса на один порт', async () => {
     const { state, supervisor } = await watched();
-    const [first, second] = await Promise.all([supervisor.tick(), supervisor.revive()]);
+    const [first, second] = await Promise.all([supervisor.tick(), supervisor.tick()]);
     expect(first).toBe('restarted');
-    // Запрос шлюза ждёт идущий подъём и проверяет заново: сервер уже жив.
-    expect(second).toBe('alive');
+    expect(second).toBe('restarted');
     expect(state.restarts).toBe(1);
   });
 
-  it('таймер не будит модель, которая при нас не жила (после перезагрузки), а запрос шлюза — будит', async () => {
+  // Запрос её будит — у ядра: hold.integration.test.ts «a dead hold server is raised again by the
+  // next request on the stable port» (подъём шлюзом панели снят вместе со шлюзом, этап 10).
+  it('таймер не будит модель, которая при нас не жила (после перезагрузки)', async () => {
     const { state, supervisor } = make();
     expect(await supervisor.tick()).toBe('none');
     expect(state.restarts).toBe(0);
-    expect(await supervisor.revive()).toBe('restarted');
-    expect(state.restarts).toBe(1);
   });
 
   it('запись стёрта неудачным подъёмом — поднимает по запомненной', async () => {
@@ -217,13 +216,12 @@ describe('присмотр за сервером моделей', () => {
     expect(state.restarts).toBe(2);
   });
 
-  it('человек остановил сервер (forget) — ни таймер, ни шлюз не воскрешают', async () => {
+  it('человек остановил сервер (forget) — таймер не воскрешает', async () => {
     const { state, supervisor } = await watched();
     state.record = undefined;
     supervisor.forget();
     expect(supervisor.target()).toBeUndefined();
     expect(await supervisor.tick()).toBe('none');
-    expect(await supervisor.revive()).toBe('none');
     expect(state.restarts).toBe(0);
   });
 
@@ -234,9 +232,9 @@ describe('присмотр за сервером моделей', () => {
     expect(state.restarts).toBe(1);
   });
 
-  it('шлюз просит подъём, когда сервер жив, — «alive», без подъёма', async () => {
+  it('сервер жив — «alive», без подъёма', async () => {
     const { state, supervisor } = make({ health: 'ok', alive: true });
-    expect(await supervisor.revive()).toBe('alive');
+    expect(await supervisor.tick()).toBe('alive');
     expect(state.restarts).toBe(0);
   });
 });
@@ -293,13 +291,13 @@ describe('после потолка — редкие попытки, а не о�
     expect(state.restarts - base).toBe(MAX_RESTARTS);
   });
 
-  it('шлюз в паузе после потолка не поднимает сервер, пока не прошло окно', async () => {
+  it('тик в паузе после потолка не поднимает сервер, пока не прошло окно', async () => {
     const { supervisor, state } = await failingNight(2);
     const before = state.restarts;
-    expect(await supervisor.revive()).toBe('capped');
+    expect(await supervisor.tick()).toBe('capped');
     expect(state.restarts).toBe(before);
     state.clock += RESTART_WINDOW_MS;
-    expect(await supervisor.revive()).toBe('failed');
+    expect(await supervisor.tick()).toBe('failed');
     expect(state.restarts).toBe(before + 1);
   });
 });
@@ -356,7 +354,7 @@ describe('Стоп человека посреди подъёма (L4c, F4)', ()
   });
 
   it('Стоп во время подъёма, который падает: «подъём не удался» не показывается — это не сбой', async () => {
-    const made = slow({ failWith: 'local-exited' });
+    const made = slow({ failWith: 'router failed to load (exit 1)' });
     const outcome = goneDown(made);
     await new Promise((resolve) => setTimeout(resolve, 0));
     made.supervisor.forget();

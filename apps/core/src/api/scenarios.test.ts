@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import Fastify from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -86,5 +86,106 @@ describe('GET /v1/scenarios', () => {
     const res = await api(home)('/v1/scenarios');
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({ code: 'library-unreadable' });
+  });
+});
+
+describe('POST /v1/scenarios/from-path (stage 10, F1)', () => {
+  function post(home: string) {
+    const app = Fastify();
+    apps.push(app);
+    const ctx = {
+      env: commandEnv({ home }),
+      requireRead: (request, reply) => {
+        if (request.headers.authorization === 'Bearer t') return 'core';
+        void reply.code(401).send({ code: 'token-required' });
+        return undefined;
+      },
+    } as Pick<RouteContext, 'env' | 'requireRead'> as RouteContext;
+    registerScenarios(app, ctx);
+    return (payload: unknown, auth = true) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/scenarios/from-path',
+        payload: payload as object,
+        headers: auth ? { authorization: 'Bearer t' } : {},
+      });
+  }
+
+  const pathStep = (id: string, order: number, title: string, prompt: string) => ({
+    id,
+    anchor: 'work',
+    order,
+    kind: 'prompt',
+    title: { ru: title, en: title },
+    prompt: { ru: prompt, en: prompt },
+    source: 'en',
+    createdAt: '2026-10-01T00:00:00.000Z',
+  });
+
+  it('a scenario-flow Path becomes its steps in order, then the core delivery; nothing is written', async () => {
+    const home = tempDir('api-scn-fp-');
+    const send = post(home);
+    const res = await send({
+      id: 'group-abc',
+      title: 'Группа',
+      flow: 'scenario',
+      path: {
+        steps: [pathStep('b', 1, 'Second', 'do second'), pathStep('a', 0, 'First', 'do first')],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      scenario: {
+        id: string;
+        steps: { id: string; title: string; knowledge: { text?: string } }[];
+      };
+      problems: string[];
+      ids: Record<string, string>;
+    };
+    expect(body.problems).toEqual([]);
+    expect(body.scenario.id).toBe('group-abc');
+    expect(body.scenario.steps.map((s) => s.title)).toEqual([
+      'First',
+      'Second',
+      'Финальная проверка',
+      'Публикация',
+    ]);
+    expect(body.scenario.steps[0]?.knowledge.text).toBe('do first');
+    expect(body.ids).toEqual({ a: 'path-1', b: 'path-2' });
+    // Только перевод: библиотека пуста — сохраняет человек своим судом.
+    const lib = layoutOf(home).scenarios;
+    expect(existsSync(lib) ? readdirSync(lib) : []).toEqual([]);
+  });
+
+  it('lang from the body names every step in that language; an unknown lang is 400', async () => {
+    const send = post(tempDir('api-scn-fp-'));
+    const step = {
+      ...pathStep('a', 0, '', 'do it'),
+      title: { ru: 'Проверить', en: 'Check' },
+    };
+    const titles = async (lang: 'ru' | 'en'): Promise<string[]> => {
+      const res = await send({ id: 'group-l', title: 'Группа', path: { steps: [step] }, lang });
+      expect(res.statusCode).toBe(200);
+      return (res.json() as { scenario: { steps: { title: string }[] } }).scenario.steps
+        .map((s) => s.title)
+        .slice(2, 4);
+    };
+    expect(await titles('en')).toEqual(['Work', 'Check']);
+    expect(await titles('ru')).toEqual(['Работа', 'Проверить']);
+    expect((await send({ id: 'group-l', title: 'x', lang: 'de' })).statusCode).toBe(400);
+  });
+
+  it('problems are a 422 with the list and no scenario; a bad body is 400; no token is 401', async () => {
+    const send = post(tempDir('api-scn-fp-'));
+    const long = await send({
+      id: 'group-long',
+      title: 'Группа',
+      path: { steps: [pathStep('a', 0, 'x'.repeat(201), 'p')] },
+    });
+    expect(long.statusCode).toBe(422);
+    expect(long.json()).toMatchObject({ scenario: null });
+    expect((long.json() as { problems: string[] }).problems.join(' ')).toMatch(/longer than 200/);
+    expect((await send({ id: 'Bad Id', title: 'x' })).statusCode).toBe(400);
+    expect((await send({ id: 'group-a', title: 'x' }, false)).statusCode).toBe(401);
   });
 });

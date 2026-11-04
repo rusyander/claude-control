@@ -1,4 +1,5 @@
 import type { groupsPageRu } from './page-ru.ts';
+import { groupsCoreEn } from './core-en.ts';
 
 /** English texts of the Groups page shell; typed against the Russian module. */
 export const groupsPageEn: typeof groupsPageRu = {
@@ -145,4 +146,5 @@ export const groupsPageEn: typeof groupsPageRu = {
     env: 'Environment variables: {{names}}',
     loadFailed: 'Could not find out what reaches {{cli}}.',
   },
+  core: groupsCoreEn,
 };

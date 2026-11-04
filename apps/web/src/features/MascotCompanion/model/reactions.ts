@@ -8,11 +8,8 @@ export const REACTION_VARIANTS: Record<ReactionKind, number> = {
   linkLost: 3,
   linkBack: 3,
   runFailed: 3,
-  groupFailed: 3,
-  groupStopped: 3,
   limitHit: 3,
   longDone: 3,
-  groupDelivered: 3,
 };
 
 /**
@@ -20,16 +17,7 @@ export const REACTION_VARIANTS: Record<ReactionKind, number> = {
  * это должна быть строка о том, что требует человека. Связь пропала — первой:
  * пока её нет, остальное на экране может быть неправдой.
  */
-const ORDER: ReactionKind[] = [
-  'linkLost',
-  'limitHit',
-  'groupFailed',
-  'runFailed',
-  'groupStopped',
-  'linkBack',
-  'groupDelivered',
-  'longDone',
-];
+const ORDER: ReactionKind[] = ['linkLost', 'limitHit', 'runFailed', 'linkBack', 'longDone'];
 
 /** Тот же род реакции — не чаще раза в столько, мс: пять упавших ходов подряд — одна фраза. */
 export const REACTION_COOLDOWN_MS = 60_000;

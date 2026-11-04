@@ -4,26 +4,23 @@ import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { blockLang } from '@agentdeck/contracts/brand';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
-import type { GroupAsk } from '../../../domains/groups/model.ts';
 import { registerAnalyticsRoutes } from '../../analytics-routes/analytics-routes.ts';
 import { registerChatBrowseRoutes } from '../../chat/browse-routes.ts';
 import { registerConfigRoutes } from '../../config-routes/config-routes.ts';
 import { registerProviderCheckRoutes } from '../../provider-check-routes.ts';
 import { registerIntegrationsRoutes } from '../../integrations-routes/integrations-routes.ts';
 import { registerPortabilityRoutes } from '../../portability-routes/portability-routes.ts';
-import { registerGroupPathRoutes } from '../../group-path-routes/group-path-routes.ts';
 import { registerProjectRoutes } from '../../project-routes/project-routes.ts';
 import { HARNESS_ORIGIN, manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 
 /**
- * Настройки, провайдер, интеграции, перенос и группы дорожки A — на настоящих
+ * Настройки, провайдер, интеграции и перенос дорожки A — на настоящих
  * маршрутах и ВРЕМЕННОМ доме (HOME/USERPROFILE), как в тесте переноса. Подменены
- * только внешние границы: сеть прайса (снимок), Jira (http-стаб на 127.0.0.1) и
- * вызов модели сводки. Доказательства — что дошло до маршрута (тело проверки,
- * `refresh` прайса, вызовы стаба и модели) и файлы, а не текст ответа действия.
+ * только внешние границы: сеть прайса (снимок) и Jira (http-стаб на 127.0.0.1).
+ * Доказательства — что дошло до маршрута (тело проверки,
+ * `refresh` прайса, вызовы стаба) и файлы, а не текст ответа действия.
  */
 const TOKEN_IN_FILE = 'sk-ant-oat01-CREDFILECREDFILECREDFILECREDFILE0000';
 const ATLASSIAN_TOKEN = 'ATLASSIAN-PAT-HUMAN-ONLY-Lane-A';
@@ -60,7 +57,7 @@ async function startJira() {
   };
 }
 
-describe('panel-agent actions: settings / provider / integrations / portability / groups gaps (lane A)', () => {
+describe('panel-agent actions: settings / provider / integrations / portability gaps (lane A)', () => {
   const savedEnv = { ...process.env };
   let home: string;
   let appData: string;
@@ -68,7 +65,6 @@ describe('panel-agent actions: settings / provider / integrations / portability 
   let jira: Awaited<ReturnType<typeof startJira>>;
   let h: ManageHarness;
   let pricingForced: boolean[];
-  let modelCalls: string[];
   /** Тела, дошедшие до маршрута проверки провайдера. */
   let checkBodies: unknown[];
 
@@ -101,7 +97,6 @@ describe('panel-agent actions: settings / provider / integrations / portability 
 
     jira = await startJira();
     pricingForced = [];
-    modelCalls = [];
     checkBodies = [];
     const store = new AppStore(appData);
     store.addProject({ id: 'p-shop', name: 'shop', path: join(home, 'work', 'shop') });
@@ -143,14 +138,6 @@ describe('panel-agent actions: settings / provider / integrations / portability 
       },
       models: { current: () => ({ models: [] }) },
     } as unknown as ServerContext;
-    const ask: GroupAsk = async (messages) => {
-      modelCalls.push(messages.map((message) => message.content).join('\n'));
-      return [
-        '```' + blockLang('resource-summary'),
-        '{"ru":"Строит лестницу","en":"Builds a ladder"}',
-        '```',
-      ].join('\n');
-    };
     h = await manageHarness(ctx, (app) => {
       app.addHook('preHandler', async (request) => {
         if (request.url.startsWith('/api/providers/') && request.method === 'POST') {
@@ -164,7 +151,6 @@ describe('panel-agent actions: settings / provider / integrations / portability 
       registerProviderCheckRoutes(app, ctx);
       registerIntegrationsRoutes(app, ctx, 'http://127.0.0.1:5178');
       registerPortabilityRoutes(app, ctx);
-      registerGroupPathRoutes(app, ctx, () => ask);
     });
   });
 
@@ -332,38 +318,5 @@ describe('panel-agent actions: settings / provider / integrations / portability 
 
     const unknown = await h.call('portability_fidelity', { target: 'no-such-cli' });
     expect(unknown.outcome).toBe('failed');
-  });
-
-  it('summarize_resource: card before the model call, cached after; unknown resource and foreign project refused', async () => {
-    const rejected = await h.decided(
-      'summarize_resource',
-      { type: 'skill', id: 'ladder' },
-      'reject',
-    );
-    expect(rejected.result.outcome).toBe('rejected');
-    expect(modelCalls).toEqual([]);
-
-    const { card, result } = await h.decided('summarize_resource', { type: 'skill', id: 'ladder' });
-    expect(card.preview.summaryCode).toBe('summary-summarize-resource');
-    expect(result.outcome, result.message).toBe('done');
-    expect(result.result).toEqual({ ru: 'Строит лестницу', en: 'Builds a ladder' });
-    expect(modelCalls).toHaveLength(1);
-    expect(modelCalls[0]).toContain('Делает лестницу');
-
-    const cached = await h.decided('summarize_resource', { type: 'skill', id: 'ladder' });
-    expect(cached.result.outcome).toBe('done');
-    expect(modelCalls).toHaveLength(1);
-
-    const missing = await h.decided('summarize_resource', { type: 'skill', id: 'nope' });
-    expect(missing.result.outcome).toBe('failed');
-
-    const foreign = await h.call('summarize_resource', {
-      type: 'rule',
-      id: 'x',
-      project: join(home, 'elsewhere'),
-    });
-    expect(foreign.outcome).toBe('failed');
-    expect(foreign.message).toContain('not registered');
-    expect(modelCalls).toHaveLength(1);
   });
 });

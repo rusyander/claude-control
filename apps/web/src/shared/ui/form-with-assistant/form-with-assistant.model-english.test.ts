@@ -35,8 +35,8 @@ function formFiles(): string[] {
 
 /**
  * Описания полей помощника в фичах: `model/<что-то>Assistant<что-то>.ts`, тесты
- * мимо. Хвост после `Assistant` нужен: описания групп вынесены в
- * `groupAssistantSpec.ts`, и строгая маска `*Assistant.ts` молча их теряла.
+ * мимо. Хвост после `Assistant` допускается: описание, вынесенное в
+ * `<что-то>AssistantSpec.ts`, строгая маска `*Assistant.ts` молча теряла.
  */
 function specFiles(): string[] {
   const found: string[] = [];
@@ -95,8 +95,10 @@ export function assistantDrift(path: string, text: string): string[] {
 }
 
 describe('помощник формы — задание модели по-английски (D-E)', () => {
+  // Семь форм настроек (env, hook, MCP, права, правило, скрипт, навык); форма групп ушла вместе с
+  // прежними группами панели (этап 10 ядра).
   it('все формы с помощником найдены', () => {
-    expect(formFiles().length).toBeGreaterThanOrEqual(8);
+    expect(formFiles().length).toBeGreaterThanOrEqual(7);
   });
 
   it('ни в одной форме kind/schema не русские и не из словаря', () => {
@@ -110,9 +112,16 @@ describe('помощник формы — задание модели по-ан�
 
   it('описания полей в model/*Assistant*.ts — по-английски', () => {
     const files = specFiles();
-    expect(files.length).toBeGreaterThanOrEqual(8);
-    // Каждый файл фичи с полем `hint` в описании помощника попал в обход.
-    expect(files.some((path) => path.endsWith('groupAssistantSpec.ts'))).toBe(true);
+    expect(files.length).toBeGreaterThanOrEqual(7);
+    // У каждой фичи с формой помощника описание полей попало в обход: файл с другим именем
+    // выпал бы из проверки молча, а его `hint` ушли бы модели непроверенными.
+    const featureOf = (path: string) => path.slice(FEATURES.length + 1).split(/[\\/]/)[0];
+    const covered = new Set(files.map(featureOf));
+    expect(
+      formFiles()
+        .map(featureOf)
+        .filter((feature) => !covered.has(feature)),
+    ).toEqual([]);
     const drift = files.flatMap((path) =>
       hintDrift(path, readFileSync(path, 'utf8')).map(
         (hit) => `${path.slice(FEATURES.length + 1).replaceAll('\\', '/')}:${hit}`,

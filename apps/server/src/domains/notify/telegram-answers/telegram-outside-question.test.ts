@@ -110,9 +110,7 @@ function setup(entrypoint: string) {
     }
     return collectPendingAsks({
       inbox,
-      foreign: [],
       defaultCli: 'Claude Code',
-      cliName: (id) => id,
     });
   };
   return { collect, relay };
@@ -380,8 +378,7 @@ const ask: InboxAsk = {
   question: QUESTION,
   askedAt: '2026-10-25T12:00:00Z',
 };
-const items = (inbox: ChatInbox) =>
-  collectPendingAsks({ inbox, foreign: [], defaultCli: 'Claude Code', cliName: (id) => id });
+const items = (inbox: ChatInbox) => collectPendingAsks({ inbox, defaultCli: 'Claude Code' });
 
 describe('сборка ожиданий: кому можно ответить продолжением чата', () => {
   it('клиент неизвестен и хода панели нет — только для чтения, «на компьютере»', () => {

@@ -4,6 +4,7 @@ import { rebuildStatuses } from './agent-runs.statuses';
 import type { AgentRun, ChatEvent, HandoffEvent } from './agent-runs.types';
 import { addUsage } from './agent-runs.usage';
 import { isOpenAsk } from '@shared/lib/chat-stream';
+import { serverMessageText } from '@shared/config/i18n/server-message';
 import { persistQueue } from './persistQueue';
 import { emit } from './emit';
 import { runs } from './agent-runs.state.constants';
@@ -50,8 +51,6 @@ export function applyEvent(id: string, event: ChatEvent): void {
           errorRetriable: undefined,
           askedQuestion: false,
           permissions: [],
-          // Новый ход — отложенные карточки прошлого живут в списке «Ждёт решения».
-          deferredPermissions: undefined,
           stalled: undefined,
           dropped: undefined,
           tailOnly: undefined,
@@ -151,7 +150,10 @@ export function applyEvent(id: string, event: ChatEvent): void {
       next.sessionId = event.sessionId || run.sessionId;
       break;
     case 'error':
-      next.error = event.message;
+      // Текст самой панели по коду — на языке интерфейса (s10 G7): русская строка сервера под
+      // переводом была бы повтором; строку CLI показываем как есть, её несут в тикет.
+      next.error =
+        (event.panel ? serverMessageText(event.code, event.params) : undefined) ?? event.message;
       // Признак временности — только тот, что прислал сервер.
       next.errorRetriable = event.retriable === true;
       // Код известной ошибки CLI: карточка скажет её словами и даст действие.
@@ -171,49 +173,18 @@ export function applyEvent(id: string, event: ChatEvent): void {
               input: event.input,
               toolUseId: event.toolUseId,
               ...(event.guard ? { guard: event.guard } : {}),
+              ...(event.core ? { core: event.core } : {}),
             },
           ];
       firePermission = !already;
       break;
     }
-    case 'branchGate': {
-      const already = run.branchGates.some((gate) => gate.toolUseId === event.toolUseId);
-      next.branchGates = already
-        ? run.branchGates
-        : [
-            ...run.branchGates,
-            {
-              toolName: event.toolName,
-              input: event.input,
-              toolUseId: event.toolUseId,
-              cwd: event.cwd,
-              branch: event.branch,
-              ...(event.children?.length ? { children: event.children } : {}),
-              ...(event.base ? { base: event.base } : {}),
-            },
-          ];
-      // Точка «агент ждёт человека» — та же, что у прав: работа стоит одинаково,
-      // чем бы карточка ни была.
-      firePermission = !already;
+    case 'coreTask':
+      next.coreTask = { taskId: event.taskId, project: event.project };
       break;
-    }
-    case 'permissionResolved': {
-      // Отложена как D-n — карточка переезжает в свой список: агента она больше
-      // не держит, а кнопки решают запись.
-      const deferred = event.deferredId
-        ? run.permissions.find((p) => p.toolUseId === event.toolUseId)
-        : undefined;
-      if (deferred && event.deferredId) {
-        next.deferredPermissions = [
-          ...(run.deferredPermissions ?? []).filter((p) => p.toolUseId !== event.toolUseId),
-          { ...deferred, deferredId: event.deferredId },
-        ];
-      }
+    case 'permissionResolved':
       next.permissions = run.permissions.filter((p) => p.toolUseId !== event.toolUseId);
-      // Ворота ветки отвечают тем же `toolUseId` — снимаем и их карточку.
-      next.branchGates = run.branchGates.filter((gate) => gate.toolUseId !== event.toolUseId);
       break;
-    }
     case 'handoff':
       // В самом прогоне ничего не меняется: он закрыт, а работа уехала в другой
       // разговор. Колбэк вызываем ПОСЛЕ записи снимка, ниже, — обработчик
@@ -248,7 +219,6 @@ export function applyEvent(id: string, event: ChatEvent): void {
   // перерисовывала бы ленту табов, ради чего кэш и заводился.
   const shownInSnapshot =
     event.kind === 'permission' ||
-    event.kind === 'branchGate' ||
     event.kind === 'permissionResolved' ||
     event.kind === 'usage' ||
     (event.kind === 'tool' && event.name === 'AskUserQuestion') ||

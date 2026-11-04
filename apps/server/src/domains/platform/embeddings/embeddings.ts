@@ -1,7 +1,7 @@
 import type { Platform, PlatformEmbeddingResult } from '@agentdeck/contracts';
 import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
 import { foreignTail } from '../redact/redact.ts';
-import { callUpstream, UpstreamError } from '../gateway/upstream/upstream.ts';
+import { callUpstream, UpstreamError } from '../upstream/upstream.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 
 /**

@@ -47,6 +47,9 @@ function doneItem(meta, part, index) {
       status: 'completed',
       call_id: part.id ?? `call_stub_${suffix}`,
       name: part.name,
+      // Пространство имён вызова (инструменты MCP у Codex: `mcp__<сервер>`): без него Codex
+      // ищет имя среди своих функций и вызов не доходит до сервера.
+      ...(part.namespace ? { namespace: part.namespace } : {}),
       arguments: JSON.stringify(part.args ?? {}),
     };
   return {

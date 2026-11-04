@@ -4,19 +4,17 @@ import { rm } from 'node:fs/promises';
 import { arch, platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { PlatformGatewayEvent } from '@agentdeck/contracts';
 import {
   AGENT_MIN_CONTEXT,
   GPU_RESERVE_GB,
   catalogModelSchema,
-  contextStepsFor,
   deviceGpu,
   fitChoice,
   fitModel,
   gpuTableSchema,
   heldVramBytes,
-  layerNeedContext,
   modelCatalogSchema,
-  LOCAL_REPLY_RESERVE_TOKENS,
   modelNeedGb,
   resolveChoice,
   usableVramGb,
@@ -34,7 +32,6 @@ import {
   type LocalDevice,
   type LocalIdleMinutes,
   type LocalJob,
-  type LocalLayerFit,
   type LocalModelBody,
   type LocalModelsInfo,
   type LocalQuantRow,
@@ -49,8 +46,8 @@ import {
 import {
   claudeSwitchEnv,
   claudeSwitchPicker,
+  coreFrontUrl,
   describeClaudeSwitch,
-  readSwitchEnv,
   switchClaudeOff,
   switchClaudeOn,
 } from './claude-switch.ts';
@@ -64,21 +61,17 @@ import {
 } from './connect.ts';
 import { buildCustomModel, parseRepoInput } from './custom.ts';
 import type { FetchLike } from './download.ts';
-import { codeOf } from '../../lib/server-text/server-text.ts';
 import { localError } from './errors.ts';
 import { quantNameOf, readGgufFacts, readGgufWeightType } from './gguf.ts';
 import { detectHardware, runCommand, type RunCommand } from './hardware.ts';
 import { SPILL_BYTES, processVram, type ProcessVram } from './process-vram.ts';
-import { createSlotStore } from './slot-store.ts';
+import { sweepSlotDir } from './slot-sweep.ts';
 import { downloadModelFile, listRepoFiles, modelFilePath, quantsOf, type RepoQuant } from './hf.ts';
 import { type JobHandle, LocalJobs } from './jobs.ts';
-import { killProcessTree } from '../../lib/kill-tree.mjs';
-import { serverText } from '../../lib/server-texts/server-texts.ts';
-import { pidAlive } from './hidden-launch.ts';
+import { pidAlive } from '../../lib/hidden-launch/hidden-launch.ts';
 import { llamaClient } from './llama-client.ts';
-import { MAX_RESTARTS, createServerSupervisor, type ReviveResult } from './supervisor.ts';
-import { createActivityWatch, type ActivityTrack } from './activity.ts';
-import { importOllamaModel } from './ollama-import.ts';
+import { createServerSupervisor } from './supervisor.ts';
+import { localActivityOf } from './activity.ts';
 import { LOCAL_GATEWAY_RUN_ENV, localRunEnv } from './run-env.ts';
 import { createLocalMcp } from './mcp-service.ts';
 import { freesBytes, insideDir, pruneEmptyDirs, removeCounted, samePath } from './remove.ts';
@@ -89,7 +82,6 @@ import {
   localPaths,
   readState,
   updateState,
-  type LayerDetail,
   type LocalPaths,
 } from './paths.ts';
 import { addQwenToPath, describeQwenCode, installQwenCode } from './qwen-code.ts';
@@ -105,26 +97,19 @@ import {
   panelRuntimeTag,
   pickRuntime,
 } from './runtime.ts';
+import type { CoreHold } from './core-hold.ts';
 import {
   baseUrlOf,
-  lastErrorLine,
+  holdServer,
   probe,
   readRecord,
+  releaseServer,
   sameShape,
-  startServer,
-  stopServer,
-  testLoadModel,
   type Offload,
   type ServerRecord,
   type ServerShape,
 } from './server.ts';
-import {
-  dirSize,
-  dropUnreferencedBlobs,
-  listStoredModels,
-  manifestPathOf,
-  systemModelsDir,
-} from './store.ts';
+import { dirSize, dropUnreferencedBlobs, manifestPathOf } from './store.ts';
 
 /**
  * Раздел «Локальные модели» одним объектом: живёт дольше запроса (работы с
@@ -142,10 +127,6 @@ const DATA = new URL('./data/', import.meta.url);
 /** Железо меряется не на каждый опрос страницы: `nvidia-smi` и PowerShell — сотни миллисекунд. */
 const HARDWARE_TTL_MS = 15_000;
 const BYTES_PER_GB = 1024 ** 3;
-/** Как часто проверять, не пора ли сохранить кеш слота перед сном (L8). */
-const IDLE_SAVE_CHECK_MS = 15_000;
-/** За сколько до сна по простою сохранять: запись 2–13 ГБ идёт секунды, сон их не ждёт. */
-const IDLE_SAVE_LEAD_MS = 45_000;
 /** Как часто убирать устаревшие файлы кеша слота, пока панель работает (L8). */
 const SLOT_SWEEP_EVERY_MS = 60 * 60_000;
 
@@ -239,20 +220,22 @@ export interface LocalModelsDeps {
   run?: RunCommand;
   port?: number;
   os?: NodeJS.Platform;
-  /** Подмена запуска сервера для проверок. */
-  spawnServer?: Parameters<typeof startServer>[0]['spawnImpl'];
-  /** Подмена снятия процесса сервера для проверок: настоящий `kill` по чужому номеру не нужен. */
-  kill?: (pid: number, startedAt: number) => void;
+  /**
+   * Удержание модели в ядре (`core-hold.ts`): свой сервер панель не поднимает, кнопки и подъём —
+   * `hold`/`release` ядра. Нет — запуск отказывает «ядро не отвечает» (библиотека работает).
+   */
+  hold?: CoreHold;
   /** Присмотр за сервером: проверки задают срок тика и подменяют «жив ли процесс». */
   supervise?: { intervalMs?: number; pidAlive?: (pid: number) => boolean };
-  /** Опрос сервера, пока запрос чата в пути (`activity.ts`); проверки подставляют свои сроки. */
-  activity?: { intervalMs?: number; stallMs?: (device: string) => number; now?: () => number };
+  /**
+   * События книги контуров ядра (последний снимок `CoreContours.live()`): по ним чат видит
+   * отказ сервера моделей (L6, `activity.ts`). Нет — отказа не видно.
+   */
+  coreEvents?: () => readonly PlatformGatewayEvent[] | undefined;
   /** Свободная оперативная память, байт, — под неё считается `--cache-ram`; проверки подставляют своё. */
   freeBytes?: () => number;
   /** Откуда MCP-серверы проекта и как их опросить; нет — раздел MCP локального прогона пуст. */
   mcp?: LocalMcpSource;
-  /** Подмена пробной загрузки (импорт из Ollama) для проверок. */
-  testLoad?: (file: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
   /**
    * settings.json Claude для переключателя «Claude Code на локальной модели» и
    * каталог копий. Функциями: каталог конфигурации меняется на лету.
@@ -287,12 +270,6 @@ interface ModelFile {
 
 /** Окно по умолчанию для модели вне каталога: меньшего агенту не хватит. */
 const UNKNOWN_CONTEXT = AGENT_MIN_CONTEXT;
-/** Неудачных подъёмов по запросу чата подряд, после которых панель сама больше не поднимает сервер. */
-export const ON_DEMAND_MAX = MAX_RESTARTS;
-/** Пауза после первой неудачи подъёма по запросу; каждая следующая — вдвое длиннее. */
-export const ON_DEMAND_BACKOFF_MS = 30_000;
-/** Наибольший слой за это время держится: служебные запросы прогона несут слой меньше основного. */
-const LAYER_HOLD_MS = 10 * 60_000;
 
 export function createLocalModels(deps: LocalModelsDeps) {
   const env = deps.env ?? process.env;
@@ -592,26 +569,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
     return [...catalog.models, ...customModels()];
   }
 
-  /** Хранилища Ollama, откуда можно забрать слой: прежнее собственное панели и системное. */
-  function ollamaStores(): string[] {
-    const system = systemModelsDir(env);
-    return system === paths.models ? [paths.models] : [paths.models, system];
-  }
-
-  async function importable(): Promise<{ tag: string; sizeBytes: number }[]> {
-    const state = readState(paths);
-    const out = new Map<string, number>();
-    for (const store of ollamaStores()) {
-      for (const model of await listStoredModels(store)) {
-        if (filesOf(model.tag).length > 0 || state.importFailed[model.tag]) continue;
-        if (!out.has(model.tag)) out.set(model.tag, model.sizeBytes);
-      }
-    }
-    return [...out]
-      .map(([tag, sizeBytes]) => ({ tag, sizeBytes }))
-      .sort((a, b) => a.tag.localeCompare(b.tag));
-  }
-
   // ── Запуск сервера ─────────────────────────────────────────────────────
 
   async function gpuFor(): Promise<{ hw: HardwareInfo; gpu: ReturnType<typeof deviceGpu> }> {
@@ -710,7 +667,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
   /** Настройка сохранена, а перезапуск сервера ждёт конца прогона. Хранится в файле состояния: переживает перезапуск панели. */
   let pendingRestart = readState(paths).pendingRestart === true;
   // Шаблон чата идущего сервера сменился с обновлением панели (L7: пометка отложенных
-  // инструментов): сервер держит прежний, пока его не перезапустят, а шлюз уже шлёт
+  // инструментов): сервер держит прежний, пока его не перезапустят, а шлюз ядра уже шлёт
   // тела под новый. Перезапуск — как у отложенной настройки, когда прогонов нет.
   {
     const record = readRecord(paths);
@@ -797,6 +754,34 @@ export function createLocalModels(deps: LocalModelsDeps) {
     return true;
   }
 
+  function coreHold(): CoreHold {
+    if (deps.hold) return deps.hold;
+    throw localError('local-core-unreachable', 'ядро не подключено к разделу', {
+      reason: 'no core hold',
+    });
+  }
+
+  function fileSize(file: string): number {
+    try {
+      return statSync(file).size;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Память карты под запуск, как её считает подбор панели (слои + окно + кеш + запас): ядро судит
+   * по ней, влезет ли модель. Слои раскладывает сам сервер (`fit`) или карта не нужна (`none`) — 0.
+   */
+  function gpuNeedBytes(shape: ServerShape): number {
+    if (shape.offload !== 'all') return 0;
+    const known = catalogModel(shape.tag);
+    if (!known) return 0;
+    const model = withInstalledQuant(known, activeFile(shape.tag, shape.quant));
+    const gb = modelNeedGb(model, shape.context, shape.kvCache, shape.quant) + GPU_RESERVE_GB;
+    return Math.round(gb * 1024 ** 3);
+  }
+
   async function ensureServerNow(shape: ServerShape): Promise<void> {
     const record = readRecord(paths);
     const running = (await probe(port, fetchImpl)) !== undefined;
@@ -804,19 +789,23 @@ export function createLocalModels(deps: LocalModelsDeps) {
       await settlePending();
       return;
     }
-    if (running && record) await stopServer(paths, port, fetchImpl, deps.kill);
+    // Прежний запуск снимать не нужно: ядро само освобождает прежнее удержание (память карты
+    // сверяется) и только потом грузит новое — две модели на одной карте не бывают.
     const { binary } = runtimeBinary();
     if (!binary)
       throw localError('local-runtime-missing', 'сервер моделей не установлен — нажмите «Скачать»');
     ensureDirs(paths);
-    await startServer({
+    const speed = readState(paths).bench[shape.tag]?.promptTokensPerSec;
+    await holdServer({
       paths,
       binary,
       port,
       shape,
+      sizeBytes: activeFile(shape.tag)?.sizeBytes ?? fileSize(shape.file),
+      needBytes: gpuNeedBytes(shape),
+      hold: coreHold(),
       fetchImpl,
-      ...(deps.spawnServer ? { spawnImpl: deps.spawnServer } : {}),
-      ...(deps.kill ? { kill: deps.kill } : {}),
+      ...(speed ? { promptTokensPerSecond: speed } : {}),
       ...(deps.freeBytes ? { freeBytes: deps.freeBytes } : {}),
     });
     const started = readRecord(paths);
@@ -830,121 +819,14 @@ export function createLocalModels(deps: LocalModelsDeps) {
     if (claude) writeClaude(claude.model, shape.context);
   }
 
-  /**
-   * Сервер не запущен и не помнится, а запрос чата на скачанную модель уже пришёл: панель
-   * поднимает его сама и держит запрос до готовности (L6, «с первого клика»). Раньше такой
-   * запрос получал «Нет связи с контуром», и человек включал и выключал модель, пока сервер
-   * не поднимался другим путём. Одновременные запросы ждут один и тот же подъём.
-   */
-  let onDemand: Promise<ReviveResult> | undefined;
-  /**
-   * Подъём по запросу ограничен (L6, ревью M1): модель, падающая при загрузке (нехватка
-   * видеопамяти на большом окне), не оставляет ни записи, ни цели присмотра, и каждый повтор
-   * 529 у Claude Code (а он повторяет бесконечно) грузил 17 ГБ заново — всю ночь. Теперь
-   * `MAX_RESTARTS` неудач подряд с паузой 30 с, 60 с между ними, дальше отказ с причиной из
-   * журнала, пока человек сам не запустит сервер. Удачный подъём снимает счёт.
-   */
-  let onDemandFailures = 0;
-  let onDemandNextAt = 0;
-  let onDemandCause: string | undefined;
-  const clock = deps.now ?? Date.now;
-  function resetOnDemand(): void {
-    onDemandFailures = 0;
-    onDemandNextAt = 0;
-    onDemandCause = undefined;
-  }
-  /** Причина неудачи: последняя строка-ошибка журнала этого запуска, иначе прошлого, иначе текст отказа. */
-  function crashCause(error: unknown): string {
-    const log = paths.serverLog;
-    return (
-      lastErrorLine([log, log.replace(/\.log$/, '.out.log'), log.replace(/\.log$/, '.prev.log')]) ??
-      (error instanceof Error ? error.message : String(error))
-    );
-  }
-  function noteStartFailure(error: unknown): void {
-    onDemandFailures += 1;
-    onDemandCause = crashCause(error);
-    onDemandNextAt =
-      onDemandFailures >= ON_DEMAND_MAX
-        ? Number.POSITIVE_INFINITY
-        : clock() + ON_DEMAND_BACKOFF_MS * 2 ** (onDemandFailures - 1);
-  }
-  function startOnDemand(tag: string): Promise<ReviveResult> {
-    if (readRecord(paths) || supervisor.target()) return supervisor.revive();
-    if (onDemandFailures >= ON_DEMAND_MAX || clock() < onDemandNextAt)
-      return Promise.resolve('capped');
-    onDemand ??= (async (): Promise<ReviveResult> => {
-      try {
-        await ensureServer(await shapeFor({ tag }));
-        // Поднят заново — у присмотра новая эпоха: прежние неудачи ему не в счёт.
-        supervisor.reset();
-        resetOnDemand();
-        return 'restarted';
-      } catch (error) {
-        noteStartFailure(error);
-        return 'failed';
-      } finally {
-        onDemand = undefined;
-      }
-    })();
-    return onDemand;
-  }
-
-  /**
-   * Окно, с которым поднимется сервер этой модели, — до того, как он поднят. То же правило,
-   * что у `shapeFor`: выбор, иначе подбор под эту карту (на 16 ГБ — меньше умолчания каталога).
-   * Шлюз по нему считает предел промпта и урезает ответ: окно умолчания вместо подобранного
-   * пропускало запрос, который сервер потом отвергал переполнением. Железо — последний замер;
-   * его ещё не было — умолчание каталога, и замер заводится на следующий раз.
-   */
-  function plannedContext(tag: string): number {
-    const chosen = readState(paths).choices[tag]?.context;
-    if (chosen) return chosen;
-    const known = catalogModel(tag);
-    const file = activeFile(tag);
-    const hw = hardware?.value;
-    if (!hw) void readHardware().catch(() => undefined);
-    if (known && file && hw)
-      return fitModel(
-        withInstalledQuant(known, file),
-        deviceGpu(hw, device()),
-        hw.ramGb,
-        file.quant,
-      ).context;
-    return known?.defaultContext ?? UNKNOWN_CONTEXT;
-  }
-
-  /** Что сказать прогону, когда сервер не поднялся: текст ошибки шлюза. */
-  function noticeText(): string | undefined {
-    if (onDemandFailures > 0 && onDemandCause && !readRecord(paths)) {
-      if (onDemandFailures >= ON_DEMAND_MAX)
-        return serverText('local-on-demand-failed', {
-          attempts: onDemandFailures,
-          cause: onDemandCause,
-        });
-      return serverText('local-on-demand-backoff', {
-        attempts: onDemandFailures,
-        max: ON_DEMAND_MAX,
-        cause: onDemandCause,
-        seconds: Math.max(0, Math.ceil((onDemandNextAt - clock()) / 1_000)),
-      });
-    }
-    const notice = supervisor.notice();
-    if (!notice || notice.kind === 'restarted') return undefined;
-    const said = serverText('local-supervisor-gave-up', { restarts: notice.restarts });
-    return notice.reason ? `${said}: ${notice.reason}` : said;
-  }
-
   // Присмотр: умерший сервер поднимается по записи, пока человек его не остановил.
   const supervisor = createServerSupervisor({
     record: () => readRecord(paths),
     health: () => probe(port, fetchImpl),
     pidAlive: deps.supervise?.pidAlive ?? pidAlive,
-    kill: (record) => {
-      (deps.kill ?? ((pid, startedAt) => killProcessTree(pid, { spawnedAt: startedAt })))(
-        record.pid,
-        record.startedAt,
-      );
+    // Процесс сервера — ядра: зависший снимается освобождением удержания, не снятием по номеру.
+    kill: async () => {
+      await releaseServer(paths, port, coreHold());
     },
     restart: async (record, control) => {
       // Снятый зависший процесс отпускает порт не сразу.
@@ -963,105 +845,16 @@ export function createLocalModels(deps: LocalModelsDeps) {
     ...(deps.supervise?.intervalMs ? { intervalMs: deps.supervise.intervalMs } : {}),
   });
 
-  /**
-   * Перезапуск сервера теми же параметрами: слот застыл посреди разбора при живом
-   * `/health` (L6) или человек нажал «Перезапустить» в чате. Присмотр молчит, пока идёт.
-   */
+  /** Перезапуск сервера теми же параметрами: человек нажал «Перезапустить» в чате. Присмотр молчит, пока идёт. */
   async function restartServerNow(): Promise<void> {
     await managedBy(async () => {
       // Запись читается в очереди: пока ждали, сервер могли остановить или поднять иначе.
       const record = readRecord(paths) ?? supervisor.target();
       if (!record) return;
-      await stopServer(paths, port, fetchImpl, deps.kill);
+      // Тот же запуск ядро бы не перезагрузило: удержание снимается, затем берётся заново.
+      await releaseServer(paths, port, coreHold());
       await ensureServerNow(record);
     });
-  }
-
-  // Что сервер делает с запросом чата: живость вместо срока ожидания (L6, `activity.ts`).
-  const activity = createActivityWatch({
-    health: () => probe(port, fetchImpl),
-    slot: () => client.slot(0),
-    server: () => {
-      const record = readRecord(paths) ?? supervisor.target();
-      return record
-        ? { model: record.tag, quant: record.quant, context: record.context, device: record.device }
-        : undefined;
-    },
-    onWedged: () => void restartServerNow().catch(() => undefined),
-    stallText: (seconds) => serverText('local-stalled', { seconds }),
-    ...deps.activity,
-  });
-
-  // ── Слой прогона против окна (L6, ревью B1) ────────────────────────────
-
-  /**
-   * Шлюз меряет слой (системный промпт и инструменты) на каждом запросе с инструментами.
-   * Держится наибольший за `LAYER_HOLD_MS`: подагенты и служебные запросы несут слой меньше
-   * основного и иначе прятали бы его. В файл состояния — только когда изменился заметно:
-   * страница показывает его и до первого хода после перезапуска панели.
-   */
-  function noteLayer(tag: string, tokens: number, detail: LayerDetail = {}): void {
-    const at = clock();
-    const stored = readState(paths).layers[tag];
-    const held = stored !== undefined && at - stored.at < LAYER_HOLD_MS;
-    // Тот же разговор с другим ответом о замороженных описаниях — запись, даже при том же слое.
-    const sameFrozen =
-      stored?.session === detail.session && stored?.frozenTools === detail.frozenTools;
-    if (held && tokens < stored.tokens && sameFrozen) return;
-    if (held && Math.abs(stored.tokens - tokens) < 512 && sameFrozen) return;
-    updateState(paths, (state) => {
-      state.layers[tag] = {
-        tokens,
-        at,
-        ...(detail.session ? { session: detail.session } : {}),
-        ...(detail.frozenTools ? { frozenTools: detail.frozenTools } : {}),
-      };
-    });
-  }
-
-  /** Чем починить слой, который не влезает: окно, а если нынешнее квантование его не вынесет — и квантование. */
-  async function layerFix(tag: string, tokens: number): Promise<LocalLayerFit['fix']> {
-    const need = layerNeedContext(tokens);
-    const known = catalogModel(tag);
-    if (!known) return undefined;
-    const file = activeFile(tag);
-    const model = withInstalledQuant(known, file);
-    const context = contextStepsFor(model).find((step) => step >= need);
-    if (context === undefined) return undefined;
-    const hw = await readHardware();
-    const gpu = deviceGpu(hw, device());
-    const current = file?.quant ?? model.defaultQuant;
-    const fitsWith = (quant: string): boolean =>
-      fitChoice(model, gpu, hw.ramGb, { quant, context }).fits;
-    if (fitsWith(current)) return { context };
-    const other = [...model.quants]
-      .sort((a, b) => b.sizeBytes - a.sizeBytes)
-      .find((quant) => quant.id !== current && fitsWith(quant.id));
-    return other ? { context, quant: other.id } : { context };
-  }
-
-  /** Слой последней модели против окна её сервера (идущего, иначе того, с которым поднимется). */
-  async function layerFit(): Promise<LocalLayerFit | undefined> {
-    const record = readRecord(paths) ?? supervisor.target();
-    const { layers } = readState(paths);
-    // Сервера нет — модель последнего замера: её поднимет первый же запрос чата.
-    const tag = record?.tag ?? Object.entries(layers).sort(([, a], [, b]) => b.at - a.at)[0]?.[0];
-    const stored = tag ? layers[tag] : undefined;
-    if (!tag || !stored || !activeFile(tag)) return undefined;
-    const context = record?.context ?? plannedContext(tag);
-    const limit = Math.max(0, context - LOCAL_REPLY_RESERVE_TOKENS);
-    const fits = layerNeedContext(stored.tokens) <= context;
-    const fix = fits ? undefined : await layerFix(tag, stored.tokens).catch(() => undefined);
-    return {
-      tokens: stored.tokens,
-      context,
-      limit,
-      fits,
-      at: stored.at,
-      ...(fix ? { fix } : {}),
-      ...(stored.session ? { session: stored.session } : {}),
-      ...(stored.frozenTools ? { frozenTools: stored.frozenTools } : {}),
-    };
   }
 
   /** Спит ли сервер по простою: `/props` его не будит (замер 14.10); не отвечает — не спит. */
@@ -1073,63 +866,23 @@ export function createLocalModels(deps: LocalModelsDeps) {
     }
   }
 
-  // Кеш прочитанного промпта на диске (L8, `slot-store.ts`).
-  const slots = createSlotStore({
-    dir: paths.slotsDir,
-    client,
-    shape: () => {
-      const record = readRecord(paths);
-      return record ? slotShapeOf(record) : undefined;
-    },
-    pid: () => readRecord(paths)?.pid,
-    sleeping: isSleeping,
-    now: clock,
-  });
-  // Уборка кеша слота при старте панели и раз в час: файл, оставшийся от прошлого запуска или
-  // брошенного чата, иначе лежал бы до следующей записи (её может не быть неделями).
-  void slots.sweep().catch(() => undefined);
-  const slotSweeper = setInterval(
-    () => void slots.sweep().catch(() => undefined),
-    SLOT_SWEEP_EVERY_MS,
-  );
-  slotSweeper.unref?.();
-
-  /**
-   * Разговор, чей запрос сервер получит сейчас. Сменился — кеш прежнего уходит на диск, а
-   * кеш этого поднимается из файла; файла нет — слот стирается: новый чат не наследует чужой
-   * префикс. Спящий сервер без файла не будится. Сбой запрос не срывает (`slot-store.ts`).
-   */
-  async function noteSession(session: string | undefined): Promise<void> {
-    ensureIdleSaver();
-    try {
-      await (session ? slots.switchTo(session) : slots.release());
-    } catch {
-      // Сервер без каталога слотов (запущен прежней панелью) или занят: запрос идёт как есть.
-    }
-  }
-
-  /**
-   * Перед сном по простою кеш слота — на диск: спящий сервер выгружает модель вместе с
-   * кешем, и первый ход после сна читал бы весь промпт заново. Проверка раз в
-   * `IDLE_SAVE_CHECK_MS`; запись — за `IDLE_SAVE_LEAD_MS` до сна, один раз до следующего запроса.
-   */
-  let idleSaver: ReturnType<typeof setInterval> | undefined;
-  function ensureIdleSaver(): void {
-    if (idleSaver) return;
-    idleSaver = setInterval(
-      () => void saveBeforeSleep().catch(() => undefined),
-      IDLE_SAVE_CHECK_MS,
-    );
-    idleSaver.unref?.();
-  }
-  async function saveBeforeSleep(): Promise<void> {
+  // Уборка каталога кеша слотов (L8, `slot-sweep.ts`; пишет и читает кеш ядро) при старте
+  // панели и раз в час: файл прошлого запуска или брошенного чата иначе лежал бы неделями.
+  const sweepSlots = (): void => {
     const record = readRecord(paths);
-    const idle = slots.idleMs();
-    if (!record?.idleSeconds || idle === undefined || activity.snapshot().inFlight > 0) return;
-    const minIdleMs = record.idleSeconds * 1000 - IDLE_SAVE_LEAD_MS;
-    if (idle < minIdleMs) return;
-    await slots.saveIdle(minIdleMs);
-  }
+    try {
+      sweepSlotDir({
+        dir: paths.slotsDir,
+        shape: record ? slotShapeOf(record) : undefined,
+        now: (deps.now ?? Date.now)(),
+      });
+    } catch {
+      // Файл занят сервером или антивирусом — следующая уборка возьмёт его.
+    }
+  };
+  sweepSlots();
+  const slotSweeper = setInterval(sweepSlots, SLOT_SWEEP_EVERY_MS);
+  slotSweeper.unref?.();
 
   // MCP-серверы локального прогона. Источника нет (проверки без панели) — раздел пуст.
   const mcp = createLocalMcp({
@@ -1163,12 +916,10 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const keepLoaded = state.keepLoaded;
     const sleeping = running && record ? await isSleeping() : false;
     const notice = supervisor.notice();
-    const layer = await layerFit();
     const base: LocalServerInfo = {
       ...(notice ? { notice } : {}),
       ...(pendingRestart ? { restartPending: true } : {}),
       ...(restartError ? { restartError } : {}),
-      ...(layer ? { layer } : {}),
       keepLoaded,
       keepAwake: readState(paths).keepAwake,
       ...(deps.awakeHeld?.() ? { awake: true } : {}),
@@ -1214,11 +965,12 @@ export function createLocalModels(deps: LocalModelsDeps) {
     const record = switchClaudeOn({
       settingsPath: deps.claude.settingsPath(),
       model,
-      vars: claudeSwitchEnv({ baseUrl: baseUrlOf(port), model, context }),
+      // Постоянный порт ядра: сервер модели за ним меняет порт каждый запуск, адрес — нет.
+      vars: claudeSwitchEnv({ baseUrl: coreFrontUrl(port), model, context }),
       picker: claudeSwitchPicker({
         model,
         title: catalogModel(model)?.title ?? model,
-        baseUrl: baseUrlOf(port),
+        baseUrl: coreFrontUrl(port),
       }),
       current: readState(paths).claude,
       backupDir: deps.claude.backupDir(),
@@ -1379,8 +1131,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
     updateState(paths, (state) => {
       state.choices[body.tag] = next;
     });
-    // Новый выбор — новая попытка: отказ подъёма по запросу касался прежнего окна или файла.
-    resetOnDemand();
     // Идёт именно эта модель, выбрано скачанное квантование и запуск изменился —
     // перезапуск виден работой с этапом «restart». Не скачанное квантование сервер
     // не трогает: страница предлагает его скачать.
@@ -1419,59 +1169,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
     return model;
   }
 
-  // ── Импорт из Ollama ───────────────────────────────────────────────────
-
-  async function importOne(tag: string, handle: JobHandle): Promise<void> {
-    if (!runtimeBinary().binary) await provisionRuntime(handle);
-    const { binary } = runtimeBinary();
-    ensureDirs(paths);
-    try {
-      const entry = await importOllamaModel({
-        paths,
-        stores: ollamaStores(),
-        tag,
-        handle,
-        testLoad:
-          deps.testLoad ??
-          ((file) =>
-            testLoadModel({
-              binary,
-              file,
-              fetchImpl,
-              ...(deps.spawnServer ? { spawnImpl: deps.spawnServer } : {}),
-            })),
-      });
-      updateState(paths, (state) => {
-        state.imported[tag] = entry;
-        delete state.importFailed[tag];
-      });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      // Не открыл именно llama.cpp (а не «не нашли манифест»): запоминаем, чтобы не
-      // пробовать при каждом запуске панели, и предлагаем скачать заново.
-      if (codeOf(error).messageCode === 'local-load-failed')
-        updateState(paths, (state) => {
-          state.importFailed[tag] = reason;
-        });
-      throw error;
-    }
-  }
-
-  /**
-   * Модели из собственного прежнего хранилища панели (скачаны Ollama, пока она
-   * была сервером) забираются сами, один раз: человек ждёт, что скачанное
-   * осталось. Системное хранилище Ollama так не трогается — оно чужое, его
-   * модели забираются кнопкой.
-   */
-  async function migrateOwnStore(): Promise<void> {
-    if (!runtimeBinary().binary) return;
-    const state = readState(paths);
-    for (const model of await listStoredModels(paths.models)) {
-      if (filesOf(model.tag).length > 0 || state.importFailed[model.tag]) continue;
-      jobs.start('model', model.tag, (handle) => importOne(model.tag, handle));
-    }
-  }
-
   /** Рекомендуемая из скачанных: первая по порядку каталога, что есть на диске. */
   function recommendedTag(): string | undefined {
     const have = new Set(installedTags());
@@ -1484,11 +1181,10 @@ export function createLocalModels(deps: LocalModelsDeps) {
     jobs,
 
     async describe(): Promise<LocalModelsInfo> {
-      const [hw, runtime, server, canImport] = await Promise.all([
+      const [hw, runtime, server] = await Promise.all([
         readHardware(),
         describeRuntime(),
         describeServer(),
-        importable(),
       ]);
       const state = readState(paths);
       return {
@@ -1498,8 +1194,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
         server,
         catalog: { ...catalog, models: allModels() },
         installed: installed(),
-        importable: canImport,
-        importFailed: Object.entries(state.importFailed).map(([tag, reason]) => ({ tag, reason })),
         jobs: jobs.list(),
         connect: { configured: false, active: false, model: '' },
         device: state.device,
@@ -1532,8 +1226,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
       const shape = await shapeFor(request);
       rememberChoice(request);
       supervisor.reset();
-      // Человек запустил сам — отказ подъёма по запросу снят: следующий сбой снова получит попытки.
-      resetOnDemand();
       await ensureServer(shape);
       return describeServer();
     },
@@ -1543,7 +1235,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
       return managedBy(() => {
         // И в очереди тоже: подъём, шедший перед «Стопом», успел взять сервер под присмотр.
         supervisor.forget();
-        return stopServer(paths, port, fetchImpl, deps.kill);
+        return releaseServer(paths, port, coreHold());
       });
     },
 
@@ -1577,10 +1269,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
           await connect(inject, { ...body, quant: quant.id });
         }
       });
-    },
-
-    importFromSystem(tag: string): LocalJob {
-      return jobs.start('model', tag, (handle) => importOne(tag, handle));
     },
 
     /**
@@ -1709,7 +1397,7 @@ export function createLocalModels(deps: LocalModelsDeps) {
         supervisor.forget();
         await managedBy(() => {
           supervisor.forget();
-          return stopServer(paths, port, fetchImpl, deps.kill);
+          return releaseServer(paths, port, coreHold());
         });
         return;
       }
@@ -1730,8 +1418,8 @@ export function createLocalModels(deps: LocalModelsDeps) {
         });
       }
       supervisor.reset();
-      resetOnDemand();
-      void ensureServer(shape).catch(noteStartFailure);
+      // Сбой подъёма виден карточкой сервера (запись не появилась), ход здесь не ждёт.
+      void ensureServer(shape).catch(() => undefined);
       await switchLocalOn(inject);
     },
 
@@ -1860,17 +1548,10 @@ export function createLocalModels(deps: LocalModelsDeps) {
     claudeRedirected: (): boolean => Boolean(readState(paths).claude),
 
     /**
-     * Окружение переключателя для запусков без слоя `user` (лёгкое окно);
-     * выключен — пусто, и такой запуск идёт как раньше.
-     */
-    claudeEnv: (): Record<string, string> =>
-      deps.claude && readState(paths).claude ? readSwitchEnv(deps.claude.settingsPath()) : {},
-
-    /**
      * Окружение прогона Claude на локальной модели: окно — настоящее окно
      * запущенного сервера. Сервера нет (ещё не поднят, остановлен) — наименьшее
      * окно агента: сжатие по меньшему окну наступит раньше, а не позже
-     * переполнения. `route` — как запрос дойдёт до сервера: через шлюз панели или прямо
+     * переполнения. `route` — как запрос дойдёт до сервера: через шлюз контуров ядра или прямо
      * (переключатель Claude пишет адрес llama-server в settings.json).
      */
     runEnv: (route: 'gateway' | 'direct' = 'direct'): Record<string, string> => {
@@ -1880,65 +1561,6 @@ export function createLocalModels(deps: LocalModelsDeps) {
         ...localRunEnv(record?.context || AGENT_MIN_CONTEXT, speed),
         // Через шлюз — поиск инструментов (L7); переключатель Claude ведёт прямо на сервер.
         ...(route === 'gateway' ? LOCAL_GATEWAY_RUN_ENV : {}),
-      };
-    },
-
-    /**
-     * Окно и скорость обработки промпта для шлюза: нет записи о сервере — шлюзу
-     * нечем отказывать, и он идёт как раньше. Скорость — замер этой модели.
-     */
-    upstream: (
-      model: string,
-    ):
-      | {
-          context: number;
-          promptTokensPerSecond?: number;
-          prepare: (session: string | undefined) => Promise<void>;
-          revive: () => Promise<ReviveResult>;
-          notice: () => string | undefined;
-          watch: (promptTokens: number) => ActivityTrack;
-          layer: (tokens: number, detail?: LayerDetail) => void;
-          readonly deferredInline: boolean;
-        }
-      | undefined => {
-      const serverContext = (): number | undefined =>
-        (readRecord(paths) ?? supervisor.target())?.context;
-      const known = serverContext();
-      // Сервера нет, а модель скачана — его поднимет первый же запрос (`startOnDemand`).
-      const planned = known ?? (activeFile(model) ? plannedContext(model) : undefined);
-      if (!planned) return undefined;
-      const speed = readState(paths).bench[model]?.promptTokensPerSec;
-      return {
-        // Читается заново: после подъёма по запросу окно — настоящее окно поднятого сервера.
-        get context(): number {
-          return serverContext() ?? planned;
-        },
-        ...(speed ? { promptTokensPerSecond: speed } : {}),
-        prepare: noteSession,
-        revive: () => (known ? supervisor.revive() : startOnDemand(model)),
-        notice: noticeText,
-        watch: (promptTokens: number) => {
-          slots.noteTokens(promptTokens);
-          const track = activity.track(promptTokens);
-          return {
-            ...track,
-            done: () => {
-              track.done();
-              slots.done();
-            },
-          };
-        },
-        layer: (tokens: number, detail?: LayerDetail) => noteLayer(model, tokens, detail),
-        // Пометку знает только наш шаблон, и только тот, что сейчас лежит в данных: сервер,
-        // поднятый с прежним (ждёт перезапуска), показал бы пометку модели вместо описания.
-        get deferredInline(): boolean {
-          const record = readRecord(paths);
-          return Boolean(
-            record?.templateFile &&
-            record.templateHash !== undefined &&
-            record.templateHash === templateHashOf(record.templateFile),
-          );
-        },
       };
     },
 
@@ -1953,14 +1575,13 @@ export function createLocalModels(deps: LocalModelsDeps) {
     /**
      * После перезапуска панели: запись о сервере сверяется с живым процессом,
      * включённому Claude нужен живой сервер (иначе первый сеанс в терминале получит
-     * отказ соединения), а модели прежнего хранилища забираются в llama.cpp.
+     * отказ соединения).
      */
     async resume(): Promise<void> {
       supervisor.start();
       const claude = readState(paths).claude;
       if (claude && activeFile(claude.model))
         await ensureServer(await shapeFor({ tag: claude.model }));
-      await migrateOwnStore();
     },
 
     installQwen(): LocalJob {
@@ -1980,10 +1601,17 @@ export function createLocalModels(deps: LocalModelsDeps) {
       if (!jobs.cancel(id)) throw localError('local-job-unknown', 'такой загрузки нет');
     },
 
-    /** Что сервер делает с запросом чата прямо сейчас (L6). */
+    /** Какой сервер стоит и чем кончился последний запрос к нему по книге ядра (L6). */
     async activity(): Promise<LocalActivity> {
-      const layer = await layerFit();
-      return { ...activity.snapshot(), ...(layer ? { layer } : {}) };
+      return localActivityOf({
+        server: () => {
+          const record = readRecord(paths) ?? supervisor.target();
+          return record
+            ? { model: record.tag, quant: record.quant, context: record.context }
+            : undefined;
+        },
+        events: () => deps.coreEvents?.(),
+      });
     },
 
     /** «Перезапустить» из чата: тот же сервер заново, теми же параметрами. */
@@ -1991,15 +1619,12 @@ export function createLocalModels(deps: LocalModelsDeps) {
       if (!readRecord(paths) && !supervisor.target())
         throw localError('local-model-missing', 'нет скачанной модели', { tag: '—' });
       supervisor.reset();
-      resetOnDemand();
       await restartServerNow();
       return describeServer();
     },
 
     shutdown(): void {
       clearInterval(slotSweeper);
-      if (idleSaver) clearInterval(idleSaver);
-      activity.stop();
       supervisor.stop();
       jobs.cancelAll();
     },

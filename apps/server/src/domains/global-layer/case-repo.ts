@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { GlobalLayerText } from '@agentdeck/contracts';
@@ -70,16 +70,28 @@ export function isolatedGitEnv(root: string): NodeJS.ProcessEnv {
   };
 }
 
-function git(cwd: string, env: NodeJS.ProcessEnv, args: string[]): void {
-  const result = spawnSync('git', ['-c', 'core.autocrlf=false', ...args], {
-    cwd,
-    env,
-    encoding: 'utf8',
-    windowsHide: true,
+/*
+ * git — асинхронно. Сверка запускается наблюдателем за конфигурацией на любую
+ * правку `~/.claude`, и при spawnSync сборка корпуса (восемь вызовов git на
+ * случай) держала поток сервера 8–12 секунд: все запросы панели вставали, а
+ * страница, открытая в эту минуту, рисовалась на языке по умолчанию, пока не
+ * дойдёт ответ /api/settings.
+ */
+function git(cwd: string, env: NodeJS.ProcessEnv, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'git',
+      ['-c', 'core.autocrlf=false', ...args],
+      { cwd, env, encoding: 'utf8', windowsHide: true },
+      (error, stdout, stderr) => {
+        if (!error) {
+          resolve();
+          return;
+        }
+        reject(new Error(`git ${args.join(' ')}: ${(stderr || stdout || error.message).trim()}`));
+      },
+    );
   });
-  if (result.status !== 0) {
-    throw new Error(`git ${args.join(' ')}: ${(result.stderr || result.stdout || '').trim()}`);
-  }
 }
 
 function writeFiles(dir: string, files: CaseFiles): void {
@@ -95,23 +107,23 @@ function writeFiles(dir: string, files: CaseFiles): void {
 }
 
 /** Собрать репозиторий случая; вернуть каталог рабочей копии на ветке `feature`. */
-export function buildCaseRepo(
+export async function buildCaseRepo(
   root: string,
   corpus: Corpus,
   item: CorpusCase,
   env: NodeJS.ProcessEnv,
-): string {
+): Promise<string> {
   const origin = join(root, item.id, 'origin');
   const work = join(root, item.id, 'work');
   mkdirSync(origin, { recursive: true });
-  git(origin, env, ['init', '-q', '-b', 'main']);
+  await git(origin, env, ['init', '-q', '-b', 'main']);
   writeFiles(origin, { ...corpus.base, ...item.base });
-  git(origin, env, ['add', '-A']);
-  git(origin, env, ['commit', '-q', '-m', 'base']);
-  git(join(root, item.id), env, ['clone', '-q', 'origin', 'work']);
-  git(work, env, ['checkout', '-q', '-b', 'feature']);
+  await git(origin, env, ['add', '-A']);
+  await git(origin, env, ['commit', '-q', '-m', 'base']);
+  await git(join(root, item.id), env, ['clone', '-q', 'origin', 'work']);
+  await git(work, env, ['checkout', '-q', '-b', 'feature']);
   writeFiles(work, item.branch);
-  git(work, env, ['add', '-A']);
-  git(work, env, ['commit', '-q', '-m', item.id]);
+  await git(work, env, ['add', '-A']);
+  await git(work, env, ['commit', '-q', '-m', item.id]);
   return work;
 }

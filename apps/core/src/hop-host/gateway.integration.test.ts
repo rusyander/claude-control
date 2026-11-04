@@ -27,6 +27,19 @@ describe('шлюз хоста звеньев', () => {
     expect(stand.seen[0]?.path).toBe('/v1/chat/completions');
   });
 
+  it('контур по имени под .localhost (стенд в k8s) доходит потоком — резолвер ОС не спрашивается', async () => {
+    // Резолвер Windows не знает `api.localhost`: шлюз отвечал «Нет связи с контуром: fetch failed».
+    stand = await hopStand({ script: [{ text: ['stand ', 'answer'] }] });
+    const upstream = stand.stub.baseUrl.replace('127.0.0.1', 'stand-check.localhost');
+    expect(new URL(upstream).hostname).toBe('stand-check.localhost');
+    const reply = await stand.register({ to: 'openai-chat', upstream });
+    const answer = await ask(reply.port, reply.placeholder, 'anthropic', anthropicBody('x', true));
+    expect(answer.status).toBe(200);
+    expect(answer.text).toContain('stand ');
+    expect(answer.text).toContain('event: message_stop');
+    expect(stand.seen[0]?.path).toBe('/v1/chat/completions');
+  });
+
   it('родная ручка: Anthropic ↔ Anthropic с возможностью deferred-tools идёт шлюзом', async () => {
     stand = await hopStand({ script: ['native answer'] });
     const reply = await stand.register({ features: ['deferred-tools'] });

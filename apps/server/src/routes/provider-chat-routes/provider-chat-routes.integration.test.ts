@@ -1,50 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ProviderChatDetail, ProviderChatSummary } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
-import type {
-  ProviderChatRunEvent,
-  ProviderChatRunLike,
-} from '../../domains/provider-chat/provider-chat.ts';
-import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import { writePanelJson } from '../../lib/app-store/group-sources.ts';
+import { appendMessage, createChat } from '../../domains/provider-chat/store/store.ts';
 import { registerProviderChatRoutes } from './provider-chat-routes.ts';
 
 /**
- * Маршруты чата чужого провайдера. Настоящий CLI не запускается: прогон подменён.
- * Главное, что проверяется на уровне HTTP, — что при активном Claude сюда не
- * пройти, что разговоры принадлежат активному провайдеру, и что отказы приходят
- * понятным кодом, а не 500.
+ * @covers routes/provider-chat-routes/provider-chat-routes.ts
+ * @scenario старый разговор чужого CLI после переезда чата на ядро (этап 10, F2c): история
+ *   читается, переименовывается и удаляется; любой маршрут прежнего исполнителя (ход,
+ *   остановка, перезапуск, очередь, ответ на запрос прав, состояние, поток, новый разговор)
+ *   отвечает 410 с кодом `provider-chat-core` и ничего не пишет на диск.
  */
-
-/** Прогон, управляемый тестом. */
-class FakeRun implements ProviderChatRunLike {
-  static last: FakeRun | undefined;
-  emit: ((event: ProviderChatRunEvent) => void) | undefined;
-  options: { systemPrefix?: string } | undefined;
-
-  constructor() {
-    FakeRun.last = this;
-  }
-
-  start(
-    options: { systemPrefix?: string },
-    onEvent: (event: ProviderChatRunEvent) => void,
-  ): Promise<void> {
-    this.options = options;
-    this.emit = onEvent;
-    return new Promise<void>(() => {
-      // Ответ завершает тест, вызывая emit — сам по себе прогон не кончается.
-    });
-  }
-
-  stop(): void {}
-}
 
 function makeCtx(root: string, provider: string): ServerContext {
   const appData = join(root, 'agentdeck');
@@ -59,437 +30,91 @@ function makeCtx(root: string, provider: string): ServerContext {
   } as unknown as ServerContext;
 }
 
-describe('provider-chat роуты', () => {
+const RETIRED: Array<['GET' | 'POST' | 'DELETE', string]> = [
+  ['POST', '/api/provider-chat/chats'],
+  ['POST', '/api/provider-chat/chats/old/send'],
+  ['POST', '/api/provider-chat/chats/old/restart'],
+  ['POST', '/api/provider-chat/chats/old/stop'],
+  ['DELETE', '/api/provider-chat/chats/old/queue/q1'],
+  ['POST', '/api/provider-chat/chats/old/queue/q1/send'],
+  ['POST', '/api/provider-chat/chats/old/permissions/a1'],
+  ['GET', '/api/provider-chat/chats/old/status'],
+  ['GET', '/api/provider-chat/chats/old/stream'],
+];
+
+describe('provider-chat history routes', () => {
   let root: string;
   let app: FastifyInstance;
-  let chats: ProviderChatService;
   let ctx: ServerContext;
 
   const boot = async (provider: string): Promise<void> => {
     app = Fastify();
-    chats = new ProviderChatService(() => new FakeRun());
     ctx = makeCtx(root, provider);
-    registerProviderChatRoutes(app, ctx, chats, new HandoffChains());
+    registerProviderChatRoutes(app, ctx);
     await app.ready();
   };
-
-  const createChat = async (): Promise<ProviderChatSummary> => {
-    const res = await app.inject({ method: 'POST', url: '/api/provider-chat/chats', payload: {} });
-    return res.json<ProviderChatSummary>();
+  const appData = () => ctx.location.paths.appData;
+  const seed = () => {
+    createChat(appData(), 'codex', { id: 'old', title: 'старый', workdir: root });
+    appendMessage(appData(), 'codex', 'old', { role: 'user', content: 'привет' });
+    appendMessage(appData(), 'codex', 'old', { role: 'assistant', content: 'ответ' });
   };
 
   beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'cc-pchat-route-'));
-    FakeRun.last = undefined;
+    root = mkdtempSync(join(tmpdir(), 'cc-provider-chat-history-'));
   });
-
   afterEach(async () => {
-    chats?.stopAll();
     await app?.close();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  it('при активном Claude все маршруты закрыты — у него свой чат', async () => {
-    await boot('claude');
-
-    const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
-    const create = await app.inject({
-      method: 'POST',
-      url: '/api/provider-chat/chats',
-      payload: {},
-    });
-
-    expect(list.statusCode).toBe(400);
-    expect(create.statusCode).toBe(400);
-    expect(list.json<{ message: string }>().message).toMatch(/Claude/);
-  });
-
-  it('создаёт разговор и отдаёт его в списке', async () => {
+  it('lists and reads an old conversation of the active CLI', async () => {
     await boot('codex');
-    const chat = await createChat();
-
+    seed();
     const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
     expect(list.statusCode).toBe(200);
-    expect(list.json<ProviderChatSummary[]>().map((item) => item.id)).toEqual([chat.id]);
-    expect(chat.providerId).toBe('codex');
-  });
-
-  it('разговоры не видны из-под другого провайдера', async () => {
-    await boot('codex');
-    await createChat();
-    await app.close();
-
-    await boot('gemini');
-    const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
-    expect(list.json<ProviderChatSummary[]>()).toEqual([]);
-  });
-
-  it('разговор другого CLI читается по ?provider= (телефон по уведомлению), без него — нет', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    await app.close();
-
-    await boot('qwen');
-    const url = `/api/provider-chat/chats/${chat.id}`;
-    const named = await app.inject({ method: 'GET', url: `${url}?provider=codex` });
-    const bare = await app.inject({ method: 'GET', url });
-    // Claude и незнакомое имя — не адрес чужого чата: решает активный CLI.
-    const claude = await app.inject({ method: 'GET', url: `${url}?provider=claude` });
-    const unknown = await app.inject({ method: 'GET', url: `${url}?provider=nope` });
-
-    expect(named.statusCode).toBe(200);
-    expect(named.json<ProviderChatSummary>().providerId).toBe('codex');
-    expect([bare.statusCode, claude.statusCode, unknown.statusCode]).toEqual([404, 404, 404]);
-  });
-
-  it('несуществующий разговор — 404, а не пустой ответ', async () => {
-    await boot('codex');
-
-    const read = await app.inject({ method: 'GET', url: '/api/provider-chat/chats/nope' });
-    const patch = await app.inject({
-      method: 'PATCH',
-      url: '/api/provider-chat/chats/nope',
-      payload: { title: 'Э' },
-    });
-    const remove = await app.inject({ method: 'DELETE', url: '/api/provider-chat/chats/nope' });
-
-    expect([read.statusCode, patch.statusCode, remove.statusCode]).toEqual([404, 404, 404]);
-  });
-
-  it('переименовывает и удаляет разговор', async () => {
-    await boot('codex');
-    const chat = await createChat();
-
-    const patch = await app.inject({
-      method: 'PATCH',
-      url: `/api/provider-chat/chats/${chat.id}`,
-      payload: { title: 'Сборка' },
-    });
-    expect(patch.json<ProviderChatSummary>().title).toBe('Сборка');
-
-    const remove = await app.inject({
-      method: 'DELETE',
-      url: `/api/provider-chat/chats/${chat.id}`,
-    });
-    expect(remove.statusCode).toBe(200);
-
-    const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
-    expect(list.json<ProviderChatSummary[]>()).toEqual([]);
-  });
-
-  it('несуществующий рабочий каталог — 400 с человеческим текстом', async () => {
-    await boot('codex');
-
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/provider-chat/chats',
-      payload: { workdir: join(root, 'нет-такого') },
-    });
-
-    expect(res.statusCode).toBe(400);
-    expect(res.json<{ message: string }>().message).toMatch(/не существует/);
-  });
-
-  it('вопрос возвращает записанную реплику, не дожидаясь ответа', async () => {
-    await boot('codex');
-    const chat = await createChat();
-
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: 'Почини сборку' },
-    });
-
-    expect(res.statusCode).toBe(200);
-    expect(res.json<{ message: { content: string } }>().message.content).toBe('Почини сборку');
-
-    const detail = await app.inject({ method: 'GET', url: `/api/provider-chat/chats/${chat.id}` });
-    expect(detail.json<ProviderChatDetail>().messages).toHaveLength(1);
-  });
-
-  // Числа группы доезжали только до звена разделения: обычный разговор чужого
-  // CLI с выбранной группой шёл без них, и скилл спрашивал то, что уже задано.
-  it('обычный разговор получает «числа» выбранной группы, без выбора — нет', async () => {
-    await boot('qwen');
-    const appData = join(root, 'agentdeck');
-    ctx.store.saveGroup({
-      id: 'x',
-      name: 'Набор X',
-      description: '',
-      color: 'accent',
-      icon: 'folder',
-      members: [{ kind: 'skill', id: 'ladder' }],
-      env: {},
-      projectPaths: [],
-      knobs: { 'ladder:review-rounds': 4 },
-      isEnabled: false,
-      order: 0,
-    });
-    writePanelJson(appData, 'skill-knobs.json', {
-      'global|skill:ladder': {
-        hash: 'h',
-        knobs: [
-          {
-            key: 'review-rounds',
-            skillId: 'ladder',
-            label: { ru: 'Круги ревью', en: 'Review rounds' },
-            default: 2,
-            min: 1,
-            max: 5,
-            quote: 'Run 2 review rounds.',
-          },
-        ],
-      },
-    });
-    const send = async (id: string) => {
-      await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${id}/send`,
-        payload: { text: 'Проверь' },
-      });
-      return FakeRun.last?.options?.systemPrefix ?? '';
-    };
-
-    const plain = await createChat();
-    expect(await send(plain.id)).not.toContain('Review rounds');
-
-    const chosen = await createChat();
-    ctx.store.setChatGroupSettings(`qwen:${chosen.id}`, { groupChoice: 'global:x' });
-    expect(await send(chosen.id)).toContain('ladder — Review rounds: 4 (skill default 2)');
-  });
-
-  it('пустой вопрос отклоняется', async () => {
-    await boot('codex');
-    const chat = await createChat();
-
-    const res = await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: '   ' },
-    });
-
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('второй вопрос поверх идущего ответа — 409', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    const ask = { method: 'POST' as const, url: `/api/provider-chat/chats/${chat.id}/send` };
-
-    await app.inject({ ...ask, payload: { text: 'Первый' } });
-    const second = await app.inject({ ...ask, payload: { text: 'Второй' } });
-
-    expect(second.statusCode).toBe(409);
-  });
-
-  it('вопрос в несуществующий разговор — 404', async () => {
-    await boot('codex');
-
-    const res = await app.inject({
-      method: 'POST',
-      url: '/api/provider-chat/chats/nope/send',
-      payload: { text: 'Э' },
-    });
-
-    expect(res.statusCode).toBe(404);
-  });
-
-  it('состояние показывает уже напечатанное — этим вкладка догоняет пропущенное', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: 'Вопрос' },
-    });
-
-    FakeRun.last?.emit?.({ type: 'delta', text: 'Половина' });
-
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/provider-chat/chats/${chat.id}/status`,
-    });
-    expect(res.json()).toMatchObject({ isRunning: true, partial: 'Половина' });
-  });
-
-  it('длинный опрос отвечает на конце хода, а не по истечении ожидания', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: 'Вопрос' },
-    });
-
-    const started = Date.now();
-    const waiting = app.inject({
-      method: 'GET',
-      url: `/api/provider-chat/chats/${chat.id}/status?wait=20000`,
-    });
-    // Ответ не должен прийти раньше конца хода: дельта — не повод будить телефон.
-    FakeRun.last?.emit?.({ type: 'delta', text: 'Половина' });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    FakeRun.last?.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
-
-    const res = await waiting;
-    expect(res.json()).toMatchObject({ isRunning: false });
-    expect(Date.now() - started).toBeLessThan(5_000);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(40);
-  });
-
-  it('длинный опрос без идущего хода отвечает сразу', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    const started = Date.now();
-    const res = await app.inject({
-      method: 'GET',
-      url: `/api/provider-chat/chats/${chat.id}/status?wait=20000`,
-    });
-    expect(res.json()).toMatchObject({ isRunning: false });
-    expect(Date.now() - started).toBeLessThan(2_000);
-  });
-
-  it('остановка гасит идущий ответ и честно отвечает, когда гасить нечего', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    const stopUrl = `/api/provider-chat/chats/${chat.id}/stop`;
-
-    const idle = await app.inject({ method: 'POST', url: stopUrl });
-    expect(idle.json<{ stopped: boolean }>().stopped).toBe(false);
-
-    await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: 'Вопрос' },
-    });
-    const running = await app.inject({ method: 'POST', url: stopUrl });
-    expect(running.json<{ stopped: boolean }>().stopped).toBe(true);
-  });
-
-  it('готовый ответ дописывается в переписку', async () => {
-    await boot('codex');
-    const chat = await createChat();
-    await app.inject({
-      method: 'POST',
-      url: `/api/provider-chat/chats/${chat.id}/send`,
-      payload: { text: 'Вопрос' },
-    });
-
-    FakeRun.last?.emit?.({ type: 'done', reply: 'Готово', transport: 'stream' });
-
-    const detail = await app.inject({ method: 'GET', url: `/api/provider-chat/chats/${chat.id}` });
-    expect(detail.json<ProviderChatDetail>().messages.map((message) => message.content)).toEqual([
-      'Вопрос',
-      'Готово',
+    expect(list.json<ProviderChatSummary[]>().map((c) => c.id)).toEqual(['old']);
+    const one = await app.inject({ method: 'GET', url: '/api/provider-chat/chats/old' });
+    expect(one.json<ProviderChatDetail>().messages.map((m) => m.content)).toEqual([
+      'привет',
+      'ответ',
     ]);
   });
 
-  /**
-   * «Перезапустить сессию» у чужого CLI (Т7). Сессии у него нет, поэтому кнопка
-   * заводит НОВЫЙ разговор в том же каталоге. Ответа два, и оба важны: файл-опора
-   * свежий — продолжение стартует сразу, несвежий — панель просит его обновить, а
-   * не молча делает вид, что перезапустила.
-   */
-  describe('перезапуск разговора', () => {
-    /** Разговор с копией на диске и одной репликой человека. */
-    const chatWithWork = async (checkpointAt: 'fresh' | 'stale'): Promise<ProviderChatSummary> => {
-      const workdir = join(root, 'repo');
-      mkdirSync(join(workdir, '.agent'), { recursive: true });
-      const checkpoint = join(workdir, '.agent', 'PROGRESS.md');
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/provider-chat/chats',
-        payload: { workdir },
-      });
-      const chat = res.json<ProviderChatSummary>();
-      await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/send`,
-        payload: { text: 'Переименуй foo в bar' },
-      });
-      FakeRun.last?.emit?.({ type: 'done', reply: 'Сделал часть', transport: 'stream' });
-      writeFileSync(checkpoint, '# состояние', 'utf8');
-      // Время правки задаётся явно: миллисекунды реплики и файла иначе совпали
-      // бы, и «несвежий» случай не воспроизводился бы вовсе.
-      const when = checkpointAt === 'fresh' ? Date.now() + 60_000 : Date.now() - 60_000;
-      utimesSync(checkpoint, when / 1000, when / 1000);
-      return chat;
-    };
-
-    it('свежий файл-опора — продолжение заводится сразу, новым разговором', async () => {
-      await boot('codex');
-      const chat = await chatWithWork('fresh');
-
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/restart`,
-      });
-
-      expect(res.statusCode).toBe(200);
-      const body = res.json<{ mode: string; chatId: string }>();
-      expect(body.mode).toBe('started');
-
-      const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
-      const next = list.json<ProviderChatSummary[]>().find((item) => item.id === body.chatId);
-      expect(next?.title).toMatch(/продолжение/);
-      expect(next?.workdir).toBe(join(root, 'repo'));
-
-      // В старом разговоре осталась заметка: человек вернётся именно в него.
-      const detail = await app.inject({
-        method: 'GET',
-        url: `/api/provider-chat/chats/${chat.id}`,
-      });
-      const last = detail.json<ProviderChatDetail>().messages.at(-1);
-      expect(last?.role).toBe('notice');
-      expect(last?.content).toContain('сессии у CLI нет');
+  it('renames and deletes; only the title is patched', async () => {
+    await boot('codex');
+    seed();
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: '/api/provider-chat/chats/old',
+      payload: { title: 'новое имя', workdir: '', allowEdits: true },
     });
+    expect(patched.statusCode).toBe(200);
+    const detail = patched.json<ProviderChatDetail>();
+    expect(detail.title).toBe('новое имя');
+    expect(detail.workdir).toBe(root);
+    expect(detail.allowEdits).not.toBe(true);
+    const gone = await app.inject({ method: 'DELETE', url: '/api/provider-chat/chats/old' });
+    expect(gone.json()).toEqual({ ok: true });
+    const again = await app.inject({ method: 'GET', url: '/api/provider-chat/chats/old' });
+    expect(again.statusCode).toBe(404);
+  });
 
-    it('несвежий файл-опора — панель просит его обновить, а не перезапускает', async () => {
-      await boot('codex');
-      const chat = await chatWithWork('stale');
+  it.each(RETIRED)('%s %s refuses by name and writes nothing', async (method, url) => {
+    await boot('codex');
+    seed();
+    const before = readdirSync(join(appData(), 'provider-chats', 'codex')).sort();
+    const res = await app.inject({ method, url, payload: { text: 'ещё' } });
+    expect(res.statusCode).toBe(410);
+    expect(res.json()).toMatchObject({ messageCode: 'provider-chat-core' });
+    expect(res.json<{ message: string }>().message).toContain('ядро');
+    expect(readdirSync(join(appData(), 'provider-chats', 'codex')).sort()).toEqual(before);
+  });
 
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/restart`,
-      });
-
-      const body = res.json<{ mode: string; prompt: string }>();
-      expect(body.mode).toBe('requested');
-      expect(body.prompt).toContain('.agent/PROGRESS.md');
-
-      // Новый разговор при этом НЕ заведён: перезапускать не по чему.
-      const list = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
-      expect(list.json<ProviderChatSummary[]>()).toHaveLength(1);
-    });
-
-    it('пока идёт ответ — 409, а не второй разговор', async () => {
-      await boot('codex');
-      const chat = await chatWithWork('fresh');
-      await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/send`,
-        payload: { text: 'ещё' },
-      });
-
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/restart`,
-      });
-
-      expect(res.statusCode).toBe(409);
-    });
-
-    it('разговор без рабочего каталога перезапускать негде', async () => {
-      await boot('codex');
-      const chat = await createChat();
-
-      const res = await app.inject({
-        method: 'POST',
-        url: `/api/provider-chat/chats/${chat.id}/restart`,
-      });
-
-      expect(res.statusCode).toBe(400);
-      expect(res.json<{ message: string }>().message).toMatch(/рабочего каталога/);
-    });
+  it('refuses the active Claude by name', async () => {
+    await boot('claude');
+    const res = await app.inject({ method: 'GET', url: '/api/provider-chat/chats' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ messageCode: 'foreign-chat-not-for-claude' });
   });
 });

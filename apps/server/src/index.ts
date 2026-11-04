@@ -4,6 +4,7 @@ import { ServerContext } from './context.ts';
 import { allowedOrigins } from './lib/origin-guard/origin-guard.ts';
 import { readApiToken } from './lib/api-token/api-token.ts';
 import { registerAccessGate } from './lib/access-gate/access-gate.ts';
+import { createBridgeTokenLedger } from './lib/bridge-tokens/bridge-tokens.ts';
 import { createConfigWatcher } from './lib/config-watcher/config-watcher.ts';
 import { appStateDomains } from './lib/app-state-events/app-state-events.ts';
 import { registerEmptyBodyGuard } from './lib/empty-body.ts';
@@ -12,15 +13,13 @@ import { registerCodedErrors } from './lib/server-text/server-text.ts';
 import { detectProviders } from './providers/detect/detect.ts';
 import { autostartProjects } from './domains/project-runner/project-runner.ts';
 import { isProjectOrCopy } from './domains/project-tests/project-tests.ts';
-import { buildDlpRuntime } from './domains/dlp/dlp.ts';
-import { gatewayPricing } from './domains/platform/spend/spend.ts';
 import { reconcileActivePlatform } from './domains/platform/activation/activation.ts';
 import { startSandboxHousekeeping } from './domains/sandbox/SandboxConfig.ts';
 import { createRuntime, installShutdownHandlers } from './bootstrap/runtime/runtime.ts';
 import { buildRouteTable } from './bootstrap/route-table.ts';
+import { registerContourPushHook } from './bootstrap/contour-push-hook.ts';
 import { startupBanner } from './bootstrap/banner.ts';
-import { createWatchCapture } from './bootstrap/watcher-capture/watcher-capture.ts';
-import { forgetInheritedChildMarks } from './domains/chat/ChatRunner/ChatRunner.ts';
+import { forgetInheritedChildMarks } from './domains/chat/run-options/run-options.ts';
 
 /**
  * Сборка сервера: гейт доступа, долгоживущие объекты, таблица маршрутов,
@@ -42,11 +41,8 @@ forgetInheritedChildMarks(process.env);
 expandPathVars(process.env);
 
 const ctx = new ServerContext();
-// Журнал идёт через перехват фонового наблюдателя: в stdout всё как раньше, а
-// ошибка кода панели становится сигналом, пока тумблер наблюдателя включён.
-const watchCapture = createWatchCapture();
 const app = Fastify({
-  logger: { level: 'warn', stream: watchCapture.logStream },
+  logger: { level: 'warn' },
   // Ключ находки групп несёт путь проекта: глубокая папка Windows за 100 знаков давала 414 при импорте.
   routerOptions: { maxParamLength: 2048 },
 });
@@ -58,6 +54,8 @@ const access = {
   allowedOrigins: ALLOWED_ORIGINS,
   requiresToken: () => ctx.store.getSettings().remoteAccess.enabled,
   expectedToken: readApiToken,
+  // Мост сессии ядра (ход агента панели) входит своим токеном хода, а не токеном панели.
+  bridges: createBridgeTokenLedger(),
 };
 registerAccessGate(app, access);
 
@@ -68,13 +66,8 @@ registerEmptyBodyGuard(app);
 // Ошибка с кодом текста, не пойманная маршрутом, уезжает с кодом (`server-text.ts`).
 registerCodedErrors(app);
 
-// Ответы 5xx — сигнал фоновому наблюдателю. Хук до маршрутов: добавленный
-// позже, он бы к ним не применился.
-watchCapture.registerHooks(app);
-
 // Объекты, живущие дольше запроса, — только отсюда их можно погасить при выходе.
 const runtime = createRuntime(ctx, `http://${HOST}:${PORT}`);
-watchCapture.attach(runtime.watcher);
 
 // Состояние читается на каждый sync, а не замыкается: и настройки, и
 // расположение подменяются целиком при смене каталога (`ctx.relocate`).
@@ -109,6 +102,9 @@ app.addHook('onResponse', (request, reply, done) => {
   }
   done();
 });
+
+// Правка контура доходит до шлюза человека у ядра до ответа на запрос (`contour-push-hook.ts`).
+registerContourPushHook(app, runtime.contourPush);
 
 // Читать ответ разрешено только своему интерфейсу. Запрос без Origin сюда
 // доходит уже отфильтрованным гейтом выше, поэтому здесь он считается своим.
@@ -158,19 +154,12 @@ const autostarted = await autostartProjects(runtime.projectRunner, ctx.store, (p
   ),
 );
 
-// Прокси защиты данных поднимается сам, если он включён: CLI уже настроен на
-// его адрес, и молчаливое «панель перезапустилась, прокси не поднялся» означало
-// бы либо отказ всех запросов, либо — хуже — их уход в модель без фильтра.
-let dlpNote = '';
-if (ctx.store.getSettings().dlp.enabled) {
-  const { dlpProxy } = runtime;
-  try {
-    await dlpProxy.start(buildDlpRuntime(ctx.store, ctx.location.paths.appData));
-    dlpNote = `Защита данных: ${dlpProxy.status().address} → ${dlpProxy.status().upstream}`;
-  } catch (error) {
-    dlpNote = `Защита данных НЕ поднялась: ${error instanceof Error ? error.message : String(error)}`;
-  }
-}
+// Прокси защиты данных держит ядро (C3c): оно само открывает его по `settings.dlp.enabled` и
+// повторяет настройку каждый такт, так что «панель перезапустилась, прокси не поднялся» больше
+// не про панель. Баннер лишь называет, кто держит адрес.
+const dlpNote = ctx.store.getSettings().dlp.enabled
+  ? `Защита данных включена: слушатель :${ctx.store.getSettings().dlp.port} держит ядро`
+  : '';
 
 // Инвариант 1 сводится ЗДЕСЬ, на каждом старте, а не только на первом после
 // Т2: настройки правит не одна панель — снимок с чужой машины и архив переноса
@@ -179,29 +168,12 @@ if (ctx.store.getSettings().dlp.enabled) {
 // здесь нет: только состояние панели.
 reconcileActivePlatform(ctx.store);
 
-// Шлюз контуров — по тому же доводу, и по своему: адрес шлюза уже вписан в
-// конфигурацию CLI, а ключ контура есть только у панели. Не поднявшийся шлюз
-// означает CLI без модели, и человек обязан узнать об этом из баннера, а не из
-// «ошибки соединения» через полчаса.
-let gatewayNote = '';
-if (ctx.store.getSettings().platformGateway.enabled) {
-  const { platformGateway } = runtime;
-  const settings = ctx.store.getSettings().platformGateway;
-  try {
-    await platformGateway.start({
-      store: ctx.store,
-      appDataDir: ctx.location.paths.appData,
-      port: settings.port,
-      pricing: gatewayPricing(ctx.store, ctx.pricing),
-    });
-    const status = platformGateway.status();
-    gatewayNote =
-      `Шлюз контуров: ${status.address}` +
-      (status.port === status.requestedPort ? '' : ` (порт ${settings.port} был занят)`);
-  } catch (error) {
-    gatewayNote = `Шлюз контуров НЕ поднялся: ${error instanceof Error ? error.message : String(error)}`;
-  }
-}
+// Шлюз контуров держит ядро (C3d): шлюз человека на хосте звеньев, адрес из настроек (5179) —
+// тот, что уже вписан в конфигурацию CLI. Баннер называет, кто держит адрес; слушает ли он,
+// говорит карточка шлюза (состояние ядра), а не панель.
+const gatewayNote = ctx.store.getSettings().platformGateway.enabled
+  ? `Шлюз контуров: 127.0.0.1:${ctx.store.getSettings().platformGateway.port} держит ядро`
+  : '';
 
 process.stdout.write(
   startupBanner({

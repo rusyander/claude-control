@@ -47,8 +47,8 @@ export function agentTextView(
   // Служебные блоки вырезаются только из ответа агента, как в ленте панели:
   // человек, описавший формат, видит свой пример (ревью 28.09, F-226).
   const agent = !options.fromUser;
-  // Блок `escalate` — служебный, как в ленте панели: заметку главному чату
-  // показывает его карточка, а незакрытый блок прячется вместе с хвостом.
+  // Блок `escalate` — служебный, как в ленте панели: в текст не идёт (карточек
+  // заметок больше нет), незакрытый блок прячется вместе с хвостом.
   const split = scanSplitBlocks(
     agent
       ? withoutSieveBlocks(withoutEscalateBlocks(text, { streaming: options.streaming }), {

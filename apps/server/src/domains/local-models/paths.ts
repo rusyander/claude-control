@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { LOCAL_FRONT_PORT } from '@agentdeck/contracts/core/local-hold';
 import {
   LOCAL_IDLE_MINUTES_DEFAULT,
   isLocalIdleMinutes,
@@ -21,16 +22,21 @@ import type { McpCostRecord } from './local-mcp.ts';
  * положила. Каталог в `.gitignore`.
  */
 export const LOCAL_MODELS_DIR = '.local-models';
-/** Порт нашего сервера моделей. Не 11434: тот принадлежит Ollama пользователя, если он стоит; панель её не трогает. */
-export const LOCAL_SERVER_PORT = 11435;
+/**
+ * Постоянный адрес своей модели — порт ядра (`LOCAL_FRONT_PORT`): ядро слушает его и пересылает
+ * серверу удержания, чей порт меняется каждый запуск. Не 11434: тот занят чужим сервером моделей,
+ * если он стоит.
+ */
+export const LOCAL_SERVER_PORT = LOCAL_FRONT_PORT;
 
 export interface LocalPaths {
   root: string;
   runtime: string;
-  /** GGUF-файлы: `<репозиторий>/<файл>.gguf`; рядом `ollama-import/` и прежнее хранилище Ollama (`blobs/`, `manifests/`). */
+  /**
+   * GGUF-файлы: `<репозиторий>/<файл>.gguf`; рядом прежнее хранилище (`blobs/`, `manifests/`) и
+   * перенесённые раньше файлы `ollama-import/` — их записи в хранилище по-прежнему ведут туда.
+   */
   models: string;
-  /** Жёсткие ссылки на слои моделей Ollama, которые открыл llama.cpp. */
-  ollamaImport: string;
   downloads: string;
   tools: string;
   logs: string;
@@ -50,7 +56,6 @@ export function localPaths(appRoot: string, env: NodeJS.ProcessEnv = process.env
     root,
     runtime: join(root, 'runtime'),
     models: join(root, 'models'),
-    ollamaImport: join(root, 'models', 'ollama-import'),
     downloads: join(root, 'downloads'),
     tools: join(root, 'tools'),
     logs: join(root, 'logs'),
@@ -67,7 +72,6 @@ export function ensureDirs(paths: LocalPaths): void {
     paths.root,
     paths.runtime,
     paths.models,
-    paths.ollamaImport,
     paths.downloads,
     paths.tools,
     paths.logs,
@@ -92,17 +96,6 @@ export interface ImportedModel {
 }
 
 /** Что раздел помнит между запусками панели. */
-/** Замер слоя шлюзом (`LayerDetail` в `local-window.ts`). */
-export interface LayerRecord {
-  tokens: number;
-  at: number;
-  session?: string;
-  frozenTools?: number;
-}
-
-/** Что шлюз сообщает о слое сверх токенов. */
-export type LayerDetail = Pick<LayerRecord, 'session' | 'frozenTools'>;
-
 export interface LocalState {
   bench: Record<string, ModelBench>;
   /** Выбор квантования, контекста и кеша по моделям. */
@@ -115,8 +108,6 @@ export interface LocalState {
   custom: Record<string, Record<string, unknown>>;
   /** Итог пробы инструментов при подключении модели агентам: `ok` или `failed`. */
   tools: Record<string, 'ok' | 'failed'>;
-  /** Модели Ollama, которых llama.cpp не открыл, и почему: их предлагается скачать заново. */
-  importFailed: Record<string, string>;
   kit: { claude: KitMode; qwen: KitMode; variant: 'standard' | 'local' };
   /** Где считать: видеокарта (умолчание) или процессор. */
   device: LocalDevice;
@@ -137,11 +128,6 @@ export interface LocalState {
   mcpPicks: Record<string, string[]>;
   /** Замеренная цена инструментов сервера в токенах, по `scope:id`. */
   mcpCosts: Record<string, McpCostRecord>;
-  /**
-   * Слой прогона (системный промпт и инструменты), замеренный шлюзом, по моделям: токены и когда;
-   * чей разговор и сколько в слое описаний MCP, замороженных этим разговором.
-   */
-  layers: Record<string, LayerRecord>;
 }
 
 /**
@@ -174,7 +160,6 @@ export function defaultState(): LocalState {
     imported: {},
     custom: {},
     tools: {},
-    importFailed: {},
     kit: { claude: 'global', qwen: 'global', variant: 'local' },
     device: 'gpu',
     keepLoaded: false,
@@ -182,7 +167,6 @@ export function defaultState(): LocalState {
     keepAwake: true,
     mcpPicks: {},
     mcpCosts: {},
-    layers: {},
   };
 }
 
@@ -197,7 +181,6 @@ export function readState(paths: LocalPaths): LocalState {
       imported: raw.imported ?? base.imported,
       custom: raw.custom ?? base.custom,
       tools: raw.tools ?? base.tools,
-      importFailed: raw.importFailed ?? base.importFailed,
       kit: { ...base.kit, ...(raw.kit ?? {}) },
       device: raw.device === 'cpu' ? 'cpu' : 'gpu',
       keepLoaded: raw.keepLoaded === true,
@@ -206,32 +189,12 @@ export function readState(paths: LocalPaths): LocalState {
       ...(raw.pendingRestart === true ? { pendingRestart: true as const } : {}),
       mcpPicks: picksOf(raw.mcpPicks),
       mcpCosts: isRecord(raw.mcpCosts) ? raw.mcpCosts : base.mcpCosts,
-      layers: layersOf(raw.layers),
       ...(raw.claude ? { claude: raw.claude } : {}),
     };
   } catch {
     // Испорченный файл состояния не должен запирать раздел: начинаем с умолчаний.
     return defaultState();
   }
-}
-
-/** Замер слоя читается на каждом опросе чата: запись не той формы пропускается, а не роняет раздел. */
-function layersOf(value: unknown): LocalState['layers'] {
-  if (!isRecord(value)) return {};
-  const layers: LocalState['layers'] = {};
-  for (const [tag, entry] of Object.entries(value)) {
-    if (!isRecord(entry)) continue;
-    const { tokens, at, session, frozenTools } = entry;
-    if (typeof tokens === 'number' && tokens > 0 && typeof at === 'number') {
-      layers[tag] = {
-        tokens,
-        at,
-        ...(typeof session === 'string' ? { session } : {}),
-        ...(typeof frozenTools === 'number' && frozenTools > 0 ? { frozenTools } : {}),
-      };
-    }
-  }
-  return layers;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

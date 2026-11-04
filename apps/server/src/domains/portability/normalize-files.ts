@@ -19,7 +19,8 @@ import {
   needsNone,
   needsUndetermined,
 } from './canon.ts';
-import { expandInstructionImports } from './instruction-imports.ts';
+import { expandInstructionImports, type ImportProblem } from './instruction-imports.ts';
+import { codedIntent, describedOr, nested, type CodedIntent } from './intent-codes.ts';
 import type { EnvSourceFactory } from './normalize-types.ts';
 import {
   readSkillAttachments,
@@ -50,7 +51,7 @@ export function instructionsItem(params: {
    * Готовый текст вместо раскрытия файла: так приезжает ОДИН раздел
    * `## ПРАВИЛО:` — файл у него общий, а текст свой.
    */
-  content?: { text: string; includes: readonly string[]; problems?: readonly string[] };
+  content?: { text: string; includes: readonly string[]; problems?: readonly ImportProblem[] };
   /**
    * Куда сложить нераскрытые импорты. Цикл и превышение глубины обязаны дойти до
    * человека пропуском с именем файла: молча собранный текст без куска инструкций
@@ -62,16 +63,29 @@ export function instructionsItem(params: {
   // Проблемы раскрытия едут и с готовым текстом: нераскрытый импорт внутри
   // одного правила — такая же потеря, как и в целом файле.
   for (const problem of expanded.problems ?? []) {
-    params.skips?.push(envSkip('instructions', 'not_readable', `${params.fileName}: ${problem}`));
+    params.skips?.push(
+      envSkip(
+        'instructions',
+        'not_readable',
+        `${params.fileName}: ${problem.text}`,
+        'portability-skip-import-problem',
+        { file: params.fileName, problem: nested(problem.code, problem.params) },
+      ),
+    );
   }
   return {
     id: envItemId('instructions', params.fileName),
     kind: 'instructions',
     source: params.source('file', params.filePath),
     intent: `файл инструкций ${params.fileName}: его текст читает модель в каждом разговоре`,
+    intentCode: 'portability-intent-instructions',
+    intentParams: { name: params.fileName },
     trigger: { on: 'always' },
     blocking: 'inapplicable',
-    needs: needsNone('текст инструкций читает модель; фактов рантайма ему не нужно'),
+    needs: needsNone(
+      'текст инструкций читает модель; фактов рантайма ему не нужно',
+      'portability-needs-instructions',
+    ),
     sideEffects: ['changes_prompt'],
     fileName: params.fileName,
     text: expanded.text,
@@ -112,10 +126,13 @@ export function skillItem(params: {
     id: envItemId('skill', origin === 'account' ? `account/${params.name}` : params.name),
     kind: 'skill',
     source: params.source(origin, params.dir),
-    intent: intentOfSkill(params.name, params.description, origin, params.dir, subtree),
+    ...intentOfSkill(params.name, params.description, origin, params.dir, subtree),
     trigger: { on: 'model' },
     blocking: 'inapplicable',
-    needs: needsNone('скилл выбирает модель по описанию; фактов рантайма ему не нужно'),
+    needs: needsNone(
+      'скилл выбирает модель по описанию; фактов рантайма ему не нужно',
+      'portability-needs-skill',
+    ),
     sideEffects: ['changes_prompt'],
     name: params.name,
     description: params.description,
@@ -138,14 +155,27 @@ function intentOfSkill(
   origin: 'file' | 'account',
   dir: string | null,
   subtree: SkillAttachments,
-): string {
-  const owner =
-    origin !== 'account'
-      ? `скилл ${name}: ${description || 'без описания'}`
-      : dir === null
-        ? `скилл ${name}: источник — аккаунт, файла на диске нет`
-        : `скилл ${name}: синхронизирован с аккаунтом, владелец записи — аккаунт`;
-  return `${owner}${subtreeNote(subtree)}`;
+): CodedIntent {
+  const note = subtreeNote(subtree);
+  if (origin !== 'account') {
+    const described = describedOr(description);
+    return codedIntent(`скилл ${name}: ${described.ru}${note.ru}`, 'portability-intent-skill', {
+      name,
+      description: described.param,
+      subtree: note.param,
+    });
+  }
+  return dir === null
+    ? codedIntent(
+        `скилл ${name}: источник — аккаунт, файла на диске нет${note.ru}`,
+        'portability-intent-skill-account-only',
+        { name, subtree: note.param },
+      )
+    : codedIntent(
+        `скилл ${name}: синхронизирован с аккаунтом, владелец записи — аккаунт${note.ru}`,
+        'portability-intent-skill-account-synced',
+        { name, subtree: note.param },
+      );
 }
 
 /**
@@ -153,11 +183,31 @@ function intentOfSkill(
  * записи: строка паспорта не место для списка файлов, но умолчать о потере
  * нельзя — человек читает паспорт, а не опись.
  */
-function subtreeNote(subtree: SkillAttachments): string {
-  const parts: string[] = [];
-  if (subtree.attachments.length > 0) parts.push(`вложений ${subtree.attachments.length}`);
-  if (subtree.skipped.length > 0) parts.push(`не переносится ${subtree.skipped.length}`);
-  return parts.length > 0 ? ` (${parts.join(', ')})` : '';
+function subtreeNote(subtree: SkillAttachments): {
+  ru: string;
+  param: string | ReturnType<typeof nested>;
+} {
+  const attached = subtree.attachments.length;
+  const skipped = subtree.skipped.length;
+  if (attached > 0 && skipped > 0) {
+    return {
+      ru: ` (вложений ${attached}, не переносится ${skipped})`,
+      param: nested('portability-intent-subtree-both', { attached, skipped }),
+    };
+  }
+  if (attached > 0) {
+    return {
+      ru: ` (вложений ${attached})`,
+      param: nested('portability-intent-subtree-attached', { count: attached }),
+    };
+  }
+  if (skipped > 0) {
+    return {
+      ru: ` (не переносится ${skipped})`,
+      param: nested('portability-intent-subtree-skipped', { count: skipped }),
+    };
+  }
+  return { ru: '', param: '' };
 }
 
 /** Подстановка аргументов в теле команды — то, ради чего команде нужен текст запроса. */
@@ -174,16 +224,24 @@ export function commandItem(params: {
   raw: string;
 }): CommandItem {
   const takesArguments = COMMAND_ARGUMENTS.test(params.prompt);
+  const command = `/${params.namespace ? `${params.namespace}:` : ''}${params.name}`;
+  const described = describedOr(params.description);
   return {
     id: envItemId('command', params.namespace ? `${params.namespace}-${params.name}` : params.name),
     kind: 'command',
     source: params.source('file', params.file),
-    intent: `команда /${params.namespace ? `${params.namespace}:` : ''}${params.name}: ${params.description || 'без описания'}`,
+    ...codedIntent(`команда ${command}: ${described.ru}`, 'portability-intent-command', {
+      command,
+      description: described.param,
+    }),
     trigger: { on: 'user' },
     blocking: 'inapplicable',
     needs: takesArguments
       ? needsFacts(['prompt'], 'declared')
-      : needsNone('команда разворачивается в готовый текст и аргументов не берёт'),
+      : needsNone(
+          'команда разворачивается в готовый текст и аргументов не берёт',
+          'portability-needs-command',
+        ),
     sideEffects: ['changes_prompt'],
     name: params.name,
     namespace: params.namespace,
@@ -195,14 +253,21 @@ export function commandItem(params: {
 
 /** Субагент: разбор `~/.claude/agents/*.md` (`subagents.ts`) → запись канона. */
 export function subagentItem(source: EnvSourceFactory, parsed: ParsedSubagent): SubagentItem {
+  const described = describedOr(parsed.description);
   return {
     id: envItemId('subagent', parsed.name),
     kind: 'subagent',
     source: source('file', parsed.filePath),
-    intent: `субагент ${parsed.name}: ${parsed.description || 'без описания'}`,
+    ...codedIntent(`субагент ${parsed.name}: ${described.ru}`, 'portability-intent-subagent', {
+      name: parsed.name,
+      description: described.param,
+    }),
     trigger: { on: 'model' },
     blocking: 'inapplicable',
-    needs: needsNone('субагент получает задачу текстом; фактов рантайма ему не нужно'),
+    needs: needsNone(
+      'субагент получает задачу текстом; фактов рантайма ему не нужно',
+      'portability-needs-subagent',
+    ),
     sideEffects: ['changes_prompt'],
     name: parsed.name,
     description: parsed.description,
@@ -234,13 +299,14 @@ export function pluginItem(params: {
     id: envItemId('plugin', params.name),
     kind: 'plugin',
     source: params.source(params.origin ?? 'file', params.file),
-    intent: `плагин ${params.name}${params.version ? ` ${params.version}` : ''}`,
+    ...pluginIntent(`${params.name}${params.version ? ` ${params.version}` : ''}`),
     trigger: { on: 'always' },
     blocking: 'inapplicable',
     // Плагин приносит с собой чужой код и чужие записи; чего он требует от
     // рантайма, знает только его содержимое — а оно разбирается не здесь.
     needs: needsUndetermined(
       'содержимое плагина разбирается отдельно: его требования пока неизвестны',
+      'portability-needs-plugin',
     ),
     sideEffects: ['runs_process'],
     name: params.name,
@@ -252,6 +318,9 @@ export function pluginItem(params: {
     raw: params.raw,
   };
 }
+
+const pluginIntent = (name: string): CodedIntent =>
+  codedIntent(`плагин ${name}`, 'portability-intent-plugin', { name });
 
 /**
  * Имя ключа выглядит учётной записью — ТЕМ ЖЕ детектором, каким панель решает
@@ -291,10 +360,17 @@ export function envVarOrSecret(params: {
       id: envItemId('secret', params.key),
       kind: 'secret',
       source: params.source('file', params.file),
-      intent: `ключ ${params.key}: значение остаётся у держателя и в перенос не едет`,
+      ...codedIntent(
+        `ключ ${params.key}: значение остаётся у держателя и в перенос не едет`,
+        'portability-intent-secret',
+        { key: params.key },
+      ),
       trigger: { on: 'always' },
       blocking: 'inapplicable',
-      needs: needsNone('ключ нужен процессу целиком, фактов разговора ему не требуется'),
+      needs: needsNone(
+        'ключ нужен процессу целиком, фактов разговора ему не требуется',
+        'portability-needs-secret',
+      ),
       sideEffects: ['reads_secrets'],
       name: params.key,
       mask: maskSecret(params.value),
@@ -306,10 +382,15 @@ export function envVarOrSecret(params: {
     id: envItemId('envVar', params.key),
     kind: 'envVar',
     source: params.source('file', params.file),
-    intent: `переменная окружения ${params.key}`,
+    ...codedIntent(`переменная окружения ${params.key}`, 'portability-intent-env', {
+      key: params.key,
+    }),
     trigger: { on: 'always' },
     blocking: 'inapplicable',
-    needs: needsNone('переменная окружения действует постоянно и фактов разговора не требует'),
+    needs: needsNone(
+      'переменная окружения действует постоянно и фактов разговора не требует',
+      'portability-needs-env',
+    ),
     sideEffects: [],
     name: params.key,
     value: params.value,

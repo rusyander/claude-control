@@ -40,6 +40,8 @@ export const DECISION_OUTCOMES = {
     'extend-tokens',
     'answered',
     'close-human-step',
+    'close-chat',
+    'close-ask',
     'raise',
     'skip-step',
     'end-unit',

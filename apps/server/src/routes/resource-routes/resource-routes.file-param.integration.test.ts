@@ -4,10 +4,14 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'node:
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ServerContext } from '../../context.ts';
+import type { CoreAskPort } from '../../domains/core-ask/core-ask.types.ts';
 import { registerResourceRoutes } from './resource-routes.ts';
 
-/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
-const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+/** Вопрос ядра помощнику структуры здесь не задаётся: обращение — ошибка теста, а не тихий ответ. */
+const unused = (): never => {
+  throw new Error('core ask is not used in this test');
+};
+const NO_ROUTE: CoreAskPort = { ask: unused, task: unused, pages: unused, cancel: unused };
 
 /**
  * Имя файла — обязательный параметр запроса, а не «как получится».

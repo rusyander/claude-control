@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { GRANT_OPS } from './journal-data.ts';
+import type { GRANT_OPS } from './grant-ops.ts';
 
 /**
  * Слой пользователя в сеансе ядра (06 §User layer, 03 §Layer control, фаза 7): метка платформы,

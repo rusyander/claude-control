@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from '@tanstack/react-router';
 import { useWorkspace } from '@shared/lib/workspace';
 import {
   agentRuns,
@@ -14,7 +15,6 @@ import { useDraftBox } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
-import { ChatWatchIsland } from '@features/ChatMessages';
 import { useRunModelName } from '@features/ChatModelPicker';
 import { useChats } from '@entities/Chat';
 import { closeAgentPane } from '@entities/AgentTree';
@@ -26,7 +26,6 @@ import { Stack } from '@shared/ui/stack';
 import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from '../ChatSidebar/ChatSidebar';
 import { ChatHeader } from '../ChatHeader/ChatHeader';
-import { ChatEscalationNotices } from '../ChatEscalationNotices/ChatEscalationNotices';
 import { ChatArtifactsBar } from '../ChatArtifactsBar/ChatArtifactsBar';
 import { ChatThread } from '../ChatThread/ChatThread';
 import { ChatOverlays } from '../ChatOverlays/ChatOverlays';
@@ -38,7 +37,6 @@ import { useChatSession } from '../model/useChatSession';
 import { useChatSend } from '../model/useChatSend';
 import { useChatArtifacts } from '../model/useChatArtifacts';
 import { useParallelLaunch } from '../model/useParallelLaunch';
-import { useTaskSplit } from '../model/useTaskSplit';
 import { useChatHandoff } from '../model/useChatHandoff';
 import { useRunLifecycle } from '../model/useRunLifecycle';
 import { useQueuedAsPending } from '../model/useQueuedAsPending';
@@ -52,6 +50,7 @@ import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
 import { useChatFeed } from '../model/useChatFeed';
 import { useChatAutoApprove } from '../model/useChatAutoApprove';
+import { useCoreAutoGrant } from '../model/useCoreAutoGrant';
 import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
 import { downloadChatExport } from '../lib/downloadChatExport';
@@ -86,6 +85,14 @@ export function ChatPage() {
   const projects = useProjects();
   const shelf = useProjectShelf();
   const ws = useWorkspace();
+  const navigate = useNavigate();
+  // Новый чат — задача ядра (этап 10, F2): он идёт на месте в папке открытого проекта, CLI —
+  // процесс ядра, а не панели. Прежние разговоры открываются и продолжаются здесь.
+  const createCoreChat = () =>
+    void navigate({
+      to: '/core/chat',
+      search: ws.activeProject ? { project: ws.activeProject.path } : {},
+    } as never);
   // Цветные точки по разговорам и проектам — живые прогоны плюс те, что стоят
   // на вопросе мимо панели (подробности и почему их два источника — в хуке).
   const { chatStatuses, projectStatuses } = useChatDots();
@@ -102,6 +109,8 @@ export function ChatPage() {
   const run = useAgentRun(chatId);
   // Авторежим прав этого чата: выбор чата сильнее глобальной настройки (подробности — в хуке).
   const autoMode = useChatAutoApprove(chatId, run.sessionId, settings?.chatAutoMode);
+  // Ход через ядро: тумблер включён — грант правки задаче шлёт это окно (сервер не вправе).
+  useCoreAutoGrant(chatId, run, autoMode.autoApprove);
   // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
   useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
@@ -130,7 +139,7 @@ export function ChatPage() {
   // прав и они сами — по именам (подробности и почему именно так — в хуке).
   // Четвёртым — чей ребёнок сам этот разговор: карточку решения по ревью (Т7)
   // человек видит и в группе, а её состояние лежит в дереве родителя.
-  const child = useChildHub(chats.data, activeChat?.id, activeRuns, activeChat?.parentId);
+  const child = useChildHub(chats.data, activeChat?.id, activeRuns);
 
   // Лента: окно истории, история без текущего хода, подсказка контура,
   // автообновление, прогресс агента и ход субагента справа (подробности — в хуке).
@@ -187,19 +196,6 @@ export function ChatPage() {
     // Тот же ключ, что и у разделения: запущенные встают ветвями этого
     // разговора, а не отдельными вкладками проектов.
     parentChatId: activeChat?.id ?? run.sessionId,
-  });
-
-  // Разделение списка задач по нескольким чатам: агент предлагает его блоком в
-  // ответе, панель показывает карточку, а копии заводит сервер одним запросом.
-  const taskSplit = useTaskSplit({
-    projectPath,
-    // Настоящий ключ разговора, а не черновик: под ним чат стоит в списке, и
-    // именно к нему дерево подвесит порождённые чаты.
-    parentChatId: activeChat?.id ?? run.sessionId,
-    allowEdits,
-    ...models.effective,
-    dispatch,
-    ...(child.tree ? { tree: child.tree } : {}),
   });
 
   // Продолжение в чистой сессии: этап закрыт — работа уезжает в новый разговор
@@ -279,7 +275,7 @@ export function ChatPage() {
           activeChatId={activeChat?.id}
           chatStatuses={chatStatuses}
           onSelectChat={session.openChat}
-          onCreateChat={ws.activeProject ? () => session.enterProjectDraft() : session.startNewChat}
+          onCreateChat={createCoreChat}
           projects={projects.data ?? []}
           isProjectsLoading={projects.isLoading}
           activeProjectId={ws.activeProject?.id}
@@ -296,7 +292,6 @@ export function ChatPage() {
             projectName={ws.activeProject?.name}
             projectPath={projectPath}
             isProjectContext={isProjectContext}
-            {...(child.groupDeliver === undefined ? {} : { groupDeliver: child.groupDeliver })}
             chatId={chatId}
             {...(run.sessionId ? { sessionId: run.sessionId } : {})}
             activeRuns={activeRuns}
@@ -361,16 +356,6 @@ export function ChatPage() {
             onDelete={askDelete}
           />
 
-          {/* Критичное от детей разделения — только у главного чата дерева. */}
-          <ChatEscalationNotices
-            chatId={chatId}
-            {...(run.sessionId ? { sessionId: run.sessionId } : {})}
-            onOpenChild={session.openChatById}
-          />
-
-          {/* Сторож одиночного чата: беда этого разговора — над его лентой. */}
-          <ChatWatchIsland chatId={chatId} sessionId={run.sessionId} />
-
           <ChatThread
             messages={[...feed.shownHistory, ...pending]}
             conversationId={activeChat?.id}
@@ -387,10 +372,6 @@ export function ChatPage() {
             localRun={localRun}
             chatId={chatId}
             permissions={run.permissions}
-            {...(run.deferredPermissions?.length
-              ? { deferredPermissions: run.deferredPermissions }
-              : {})}
-            branchGates={run.branchGates}
             queued={pendingBubbles(run)}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
             child={child}
@@ -402,7 +383,6 @@ export function ChatPage() {
             childAnswerOptions={{ allowEdits, ...models.effective }}
             costUnit={costUnit}
             effort={run.effort}
-            taskSplit={taskSplit}
             onContinue={() => chatId && agentRuns.continue(chatId, t('chat.continueWord'))}
             onCompact={() => dispatch('/compact', [])}
             {...(handoff.restartOverflow ? { onFreshSession: handoff.restartOverflow } : {})}
@@ -443,7 +423,6 @@ export function ChatPage() {
             // агента он уходит обычным сообщением — просьбой ответить блоком.
             onSend={media.isMediaMode ? sendMedia : send}
             onStop={() => chatId && agentRuns.stop(chatId)}
-            onSplitTasks={taskSplit.askSplit}
             onHandoff={handoff.askHandoff}
             modes={media.modes}
           />

@@ -39,4 +39,18 @@ export const mediaEn: Record<MediaMessageCode, string> = {
   'media-agent-image-too-large':
     '{{name}} is {{size}} MB, and an image goes to the agent up to {{limit}} MB',
   'media-agent-image-not-image': '{{name}} is not a PNG, JPEG, GIF or WebP image',
+  'media-image-blocked-no-route': 'Nobody to draw: no active contour and no endpoint of your own.',
+  'media-image-blocked-driver-none': 'This contour has no image generation.',
+  'media-image-blocked-no-model': 'No model of the key declared drawing.',
+  'media-image-blocked-endpoint-no-url': 'The endpoint profile has no image generation address.',
+  'media-image-blocked-endpoint-api-kind': 'Only an OpenAI-kind endpoint can make images.',
+  'media-image-blocked-no-agent':
+    'Nobody to draw: no raster road and no conversation with an agent.',
+  'media-upstream-timeout-image':
+    'The image did not arrive within {{seconds}} s — the panel does not wait longer',
+  'media-upstream-timeout-deck':
+    'The deck did not arrive within {{seconds}} s — the panel does not wait longer',
+  'media-core-not-connected':
+    "The request to the contour goes through a core hop, and the panel's core is not connected.",
+  'media-contour-link-failed': 'The core hop gave no address for contour «{{contour}}»: {{reason}}',
 };

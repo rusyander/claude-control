@@ -1,16 +1,20 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatRun } from '../../domains/chat/ChatRunner/ChatRunner.ts';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createGroup, upsertCase } from '../../domains/project-tests/store/store.ts';
+import {
+  fakeCorePort,
+  waitFor,
+} from '../../domains/project-tests/agent/__fixtures__/fake-core-port.ts';
 import { ActivatingTestRunRegistry } from './activating-test-runs.ts';
 
 /**
  * Реестр стенда включает переходник MCP и обязан передать заявку дальше
  * ЦЕЛИКОМ: прежняя перегрузка звала `super.start(request, now)`, и материал
  * генерации («по требованию»), доступы стенда и выбор папки e2e на стенде
- * терялись, хотя в тестах голого реестра всё доходило.
+ * терялись, хотя в тестах голого реестра всё доходило. Прогон идёт задачей ядра
+ * (этап 10): подменена только граница процесса ядра.
  */
 describe('bootstrap/activating-test-runs', () => {
   let root = '';
@@ -22,18 +26,14 @@ describe('bootstrap/activating-test-runs', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  it('включает переходник и передаёт материал и доступы в задание и окружение агента', async () => {
-    const seen: { prompt: string; env: Record<string, string> } = { prompt: '', env: {} };
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (options) => {
-      seen.prompt = options.prompt;
-      seen.env = (options as { env?: Record<string, string> }).env ?? {};
-    });
+  it('включает переходник и передаёт материал и доступы стенда в задачу ядра', async () => {
+    const core = fakeCorePort({ hold: true });
     const activated: string[] = [];
     const registry = new ActivatingTestRunRegistry((path) => activated.push(path));
+    registry.setCorePort(core.port);
 
     registry.start(
       { projectPath: root, mode: 'generate', groupId: 'gui', source: 'requirement' },
@@ -42,13 +42,21 @@ describe('bootstrap/activating-test-runs', () => {
         source: 'requirement',
         requirement: { key: 'QA-42', url: 'https://tracker.example.com/QA-42', title: 'Вход' },
       },
-      () => ({ values: { STAND_TOKEN: 'tok-123' }, missing: [] }),
+      () => ({ values: { STAND_TOKEN: 'tok-123', NODE_OPTIONS: '--inspect' }, missing: [] }),
     );
-    await vi.waitFor(() => expect(seen.prompt).not.toBe(''));
+    await waitFor(() => core.estimates.length > 0);
+    const log = registry.get(root)!.log;
     registry.stop(root);
 
     expect(activated).toEqual([root]);
-    expect(seen.prompt).toContain('REQUIREMENT QA-42');
-    expect(seen.env.STAND_TOKEN).toBe('tok-123');
+    expect(core.estimates[0]!.request).toContain('REQUIREMENT QA-42');
+    // Доступы дошли сквозь перегрузку: значение — окружением задачи ядра (телом рядом с оценкой),
+    // имя — в полях оценки; имя, которое ядро держит само, названо в логе. Этап 10: прежний
+    // «в задачу ядра значение не уходит» снят, когда ядро стало держать окружение задачи.
+    expect(core.envs[0]).toEqual({ STAND_TOKEN: 'tok-123' });
+    expect(core.estimates[0]!.session?.env).toEqual(['STAND_TOKEN']);
+    expect(JSON.stringify(core.estimates)).not.toContain('tok-123');
+    expect(log).toContain('переменная NODE_OPTIONS в прогон не передана');
+    expect(log).not.toContain('tok-123');
   });
 });

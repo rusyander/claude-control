@@ -1,5 +1,13 @@
 import type { CliAdapter } from './adapter.types.ts';
+import { createAiderAdapter } from './aider/index.ts';
 import { createClaudeAdapter } from './claude/claude.ts';
+import { createCodexAdapter } from './codex/index.ts';
+import { createContinueAdapter } from './continue/index.ts';
+import { createCursorAdapter } from './cursor/index.ts';
+import { createGeminiAdapter } from './gemini/index.ts';
+import { createGooseAdapter } from './goose/index.ts';
+import { createKimiAdapter } from './kimi/index.ts';
+import { createOpencodeAdapter } from './opencode/index.ts';
 import { createQwenAdapter } from './qwen/qwen.ts';
 import type { SdkAdapterOptions } from './sdk-stream/sdk-adapter.ts';
 
@@ -17,6 +25,16 @@ export type AdapterOptions = SdkAdapterOptions;
 const FACTORIES: readonly ((options?: AdapterOptions) => CliAdapter)[] = [
   createClaudeAdapter,
   createQwenAdapter,
+  // Этап 10: codex, opencode, goose — настоящие переходники с профилями набора соответствия;
+  // aider и continue — без судьи (`no_core_hook`, `gateless.ts`): поставить хук ядра некуда.
+  createCodexAdapter,
+  createOpencodeAdapter,
+  createGooseAdapter,
+  createAiderAdapter,
+  createContinueAdapter,
+  createGeminiAdapter,
+  createKimiAdapter,
+  createCursorAdapter,
 ];
 
 export interface AdapterRegistry {

@@ -74,9 +74,8 @@ matrix. The `- ✗` line names the paths it covered:
 ```
 
 What keeps it alive as ❓: a check of one side only, an empty grep with no command shown, a defence
-inferred from a function's name, «the framework handles it» without the line where it does. !778: the
-RBAC candidate was struck after checking that enabling storage required the permission; reading the
-content did not, and it was 🔴.
+inferred from a function's name, «the framework handles it» without the line where it does. A
+permission checked on the write path proves nothing about the read path.
 
 ## A clean verdict against a specification
 

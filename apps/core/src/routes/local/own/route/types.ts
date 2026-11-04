@@ -27,6 +27,13 @@ export interface OwnModel {
   sizeBytes: number;
   contextTokens?: number;
   tools?: boolean;
+  /** Аргументы экземпляра модели в пресете (`server.ts` `PresetModel.args`). */
+  args?: Readonly<Record<string, string>>;
+  /**
+   * Сколько памяти карты требует этот запуск по раскладке вызывающего (слои + окно + кеш);
+   * 0 — сервер раскладывает слои сам (`--fit on`) или считает на процессоре. Нет — файл + запас.
+   */
+  needBytes?: number;
 }
 
 export interface OwnRouteOptions {
@@ -70,6 +77,13 @@ export interface OwnRouteOptions {
 export interface OwnRoute extends Route {
   /** Освободить все аренды маршрута (свои и возвращённые) полным протоколом, с записью исхода. */
   shutdown(record: RouteRecorder): Promise<ReleaseOutcome>;
+  /**
+   * Вернуть себе аренды прошлого ядра сейчас, не дожидаясь первой выдачи: держатель, которого
+   * никто не спрашивает (удержание панели), иначе оставил бы слот свободным рядом с живым сервером.
+   */
+  restore(): Promise<void>;
+  /** Слот карты этого маршрута держит кто-то сейчас (любой маршрут на той же очереди слотов). */
+  slotHeld(): boolean;
 }
 
 export const MIB = 1024 ** 2;

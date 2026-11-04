@@ -142,32 +142,13 @@ describe('отправка всей карточки', () => {
     ]);
   });
 
-  it('ворота ветки уходят своим маршрутом', async () => {
-    const gate: InboxAsk = {
-      kind: 'branchGate',
-      key: 'g:g1',
-      toolUseId: 'g1',
-      toolName: 'Edit',
-      input: {},
-      askedAt: '2026-09-27T10:00:00.000Z',
-    };
-    const plan = planSubmissions({ runKey: 'k' }, [gate], {
-      answers: { 'g:g1': { kind: 'branchGate', choice: 'here' } },
-    });
-    const post = vi.fn().mockResolvedValue({ ok: true });
-    await submitAll(plan, { post, sendMessage: vi.fn() });
-    expect(post).toHaveBeenCalledWith('/chat/k/branch-decision', {
-      toolUseId: 'g1',
-      choice: 'here',
-    });
-  });
-
   it('всё ушло — все ключи отправлены', async () => {
     const post = vi.fn().mockResolvedValue({ ok: true });
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
     const outcome = await submitAll(planSubmissions({ runKey: 'new-1' }, asks, full()), {
       post,
       sendMessage,
+      sendCore: vi.fn(),
     });
     expect(outcome).toEqual({ sentKeys: ['p:t1', 'q:u1:0', 'q:u1:1'] });
     expect(post).toHaveBeenCalledWith('/chat/new-1/permission-decision', {
@@ -183,6 +164,7 @@ describe('отправка всей карточки', () => {
     const outcome = await submitAll(planSubmissions({ runKey: 'new-1' }, asks, full()), {
       post,
       sendMessage,
+      sendCore: vi.fn(),
     });
     expect(outcome).toEqual({ sentKeys: ['p:t1'], error: 'занято' });
   });
@@ -193,6 +175,7 @@ describe('отправка всей карточки', () => {
     const outcome = await submitAll(planSubmissions({ runKey: 'new-1' }, asks, full()), {
       post,
       sendMessage,
+      sendCore: vi.fn(),
     });
     expect(outcome).toEqual({ sentKeys: [], error: 'нет сети' });
     expect(sendMessage).not.toHaveBeenCalled();

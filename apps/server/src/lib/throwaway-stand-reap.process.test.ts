@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,6 +34,13 @@ interface Identity {
 interface StandApi {
   root: string;
   coreHome: string;
+  bin: string;
+  apiUrl: string;
+  webUrl: string;
+  api(
+    path: string,
+    init?: { method?: string; headers?: Record<string, string>; body?: unknown },
+  ): Promise<{ status: number; text: string }>;
   stop(): Promise<{ left: (Identity & { why: string })[]; removeError?: string } | undefined>;
 }
 interface StandModule {
@@ -51,6 +58,13 @@ interface StandModule {
   liveCoreSessions(ids: Identity[], impl?: Record<string, unknown>): (Identity & { why: string })[];
 }
 const stand = (await import(STAND)) as StandModule;
+const { startPanelAgentModel } = (await import(
+  pathToFileURL(join(REPO, 'packages', 'stub-model', 'src', 'scenarios', 'panel-agent.mjs')).href
+)) as {
+  startPanelAgentModel(
+    program: () => Promise<string>,
+  ): Promise<{ baseUrl: string; close(): Promise<void> }>;
+};
 
 const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 /** Процессы теста: pid → время создания (снимаются только той же личностью). */
@@ -187,6 +201,202 @@ describe.runIf(IS_WIN)('stand teardown stops the core session hosts (real host p
     // Посторонний не записан ядром — стенд его не трогает: снятие по личности, не деревом.
     expect(alive(holder, mine.get(holder)!)).toBe(true);
   }, 240_000);
+
+  // Проход s10: после `core-panel.mjs` жили сиротами хост звеньев и четыре сервера заглушки —
+  // оба по замыслу переживают снятие ядра (P10, P123), а стенд ядро снимает жёстко. Процессы
+  // здесь — отвязанные, с рабочей папкой в стенде (держат каталог, как держали в прогоне),
+  // записанные ровно так, как их пишет ядро: `procs.json → servers[]` и `resource.created`.
+  it('stop() reaps the hop host (procs.json) and stub servers (journal ref) that outlive the core', async () => {
+    const api = await stand.startStand({ label: 'reap-srv', web: false, core: true });
+    dirs.push(api.root);
+    const hop = stranger(join(api.root, 'hop-cwd'));
+    const stub = stranger(join(api.root, 'stub-cwd'));
+    const procsPath = join(api.coreHome, 'procs.json');
+    const procs = (
+      existsSync(procsPath) ? JSON.parse(readFileSync(procsPath, 'utf8')) : { v: 1, cores: [] }
+    ) as { servers?: unknown[] };
+    writeFileSync(
+      procsPath,
+      JSON.stringify({
+        ...procs,
+        servers: [
+          ...(procs.servers ?? []),
+          { kind: 'hop-host', id: 'hop-host', pid: hop, pidStart: String(mine.get(hop)) },
+        ],
+      }),
+    );
+    const task = join(api.coreHome, 'tasks', 't-stub');
+    mkdirSync(task, { recursive: true });
+    const ref = `http://127.0.0.1:52697/?dialect=anthropic-messages&pid=${stub}&start=${mine.get(stub)}`;
+    writeFileSync(
+      join(task, 'journal.jsonl'),
+      `${JSON.stringify({ kind: 'resource.created', data: { kind: 'stub-server', release: 'task-end', ref } })}\n`,
+    );
+
+    const outcome = await stopOf(api);
+    expect(alive(hop, mine.get(hop)!)).toBe(false);
+    expect(alive(stub, mine.get(stub)!)).toBe(false);
+    expect(outcome.error).toBeUndefined();
+    expect(outcome.report).toEqual({ left: [] });
+    expect(existsSync(api.root)).toBe(false);
+  }, 240_000);
+});
+
+/**
+ * Обёртка формы npm cmd-shim: на Windows ядро разбирает только её, обёртку стенда оно отвергает
+ * («нужна оболочка») — так же подменяют `check-core-launch.mjs` и `core-scenario-stand.mjs`.
+ */
+const CMD_SHIM = [
+  '@ECHO off',
+  'GOTO start',
+  ':find_dp0',
+  'SET dp0=%~dp0',
+  'EXIT /b',
+  ':start',
+  'SETLOCAL',
+  'CALL :find_dp0',
+  '',
+  'IF EXIST "%dp0%\\node.exe" (',
+  '  SET "_prog=%dp0%\\node.exe"',
+  ') ELSE (',
+  '  SET "_prog=node"',
+  '  SET PATHEXT=%PATHEXT:;.JS;=;%',
+  ')',
+  '',
+  'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\claude.mjs" %*',
+  '',
+].join('\r\n');
+
+/**
+ * Подставной `claude`: версию отвечает (без неё ядро не замеряет базу), а ход не кончает никогда —
+ * хост сессии и хост замера базы живы, когда стенд снимают, как у настоящего CLI посреди хода.
+ */
+const HANGING_CLAUDE = [
+  "if (process.argv.includes('--version')) { console.log('2.1.0 (Claude Code)'); process.exit(0); }",
+  'process.stdin.resume();',
+  'setInterval(() => {}, 1000);',
+  '',
+].join('\n');
+
+/**
+ * Процессы node, чья командная строка называет `root`, — независимо от записей ядра (их читает
+ * проверяемый код): хост сессии получает каталог сессии в argv, CLI — свои файлы из него.
+ */
+function processesNaming(root: string): { pid: number; created: bigint; cmd: string }[] {
+  const listed = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-Command',
+      'Get-CimInstance Win32_Process -Filter "Name=\'node.exe\'" | ForEach-Object { "$($_.ProcessId)`t$($_.CommandLine)" }',
+    ],
+    { encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024 },
+  );
+  const table = new Map((readProcessTable() ?? []).map((row) => [row.pid, row.created]));
+  const needle = root.toLowerCase();
+  return listed.stdout.split(/\r?\n/).flatMap((line) => {
+    const [pid, ...rest] = line.split('\t');
+    const cmd = rest.join('\t');
+    const created = table.get(Number(pid));
+    if (!cmd.toLowerCase().includes(needle) || created === undefined) return [];
+    return [{ pid: Number(pid), created, cmd }];
+  });
+}
+
+describe.runIf(IS_WIN)('stand teardown reaps every session host its own core started', () => {
+  // Проход s10 (F3): хост замера базы (`…/sessions/<id>/base-probe/`) с CLI под ним пережил
+  // стенд, а итог снятия был `left: []`. Здесь хосты запускает НАСТОЯЩЕЕ ядро стенда: ход агента
+  // панели → вопрос ядра → сессия CLI и замер базы, оба через отвязанный хост сессии.
+  it('core-started hosts (session + base probe) die on stop; a host under another home lives', async () => {
+    const model = await startPanelAgentModel(async () => 'never');
+    const env: Record<string, string> = {};
+    let api: StandApi | undefined;
+    try {
+      api = await stand.startStand({
+        label: 'reap-core-hosts',
+        core: true,
+        web: true,
+        fakeCli: { claude: HANGING_CLAUDE },
+        env,
+        // Реестр маршрутов ядро строит при загрузке из `state.json` панели — каталог называется явно.
+        seed: async (paths: { cfg: string }) => {
+          env.AGENTDECK_PANEL_DATA = join(paths.cfg, 'agentdeck');
+        },
+        settings: {
+          provider: 'claude',
+          endpointProfiles: [
+            {
+              id: 'stub',
+              name: 'Stub',
+              baseUrl: model.baseUrl,
+              apiKind: 'anthropic',
+              model: 'stub-model',
+              writeToken: false,
+              imagesUrl: '',
+              ownerPlatformId: '',
+            },
+          ],
+          assistantEndpointId: 'stub',
+        },
+      });
+      const live = api;
+      dirs.push(live.root);
+      writeFileSync(join(live.bin, 'claude.cmd'), CMD_SHIM);
+      const token = await live.api('/endpoints/stub/token', {
+        method: 'PUT',
+        headers: { origin: live.webUrl },
+        body: { token: 'stand-stub-key' },
+      });
+      expect(token.status).toBe(200);
+
+      // Хост под ДРУГИМ домом (как хост человека): снятие стенда его не касается.
+      const otherHome = mkdtempSync(join(tmpdir(), 'reap-other-'));
+      dirs.push(otherHome);
+      const other = await launchHost(
+        join(otherHome, 'tasks', 't', 'sessions', 's'),
+        join(otherHome, 'cwd'),
+      );
+
+      const run = new AbortController();
+      const reply = fetch(`${live.apiUrl}/api/agent/run`, {
+        method: 'POST',
+        signal: run.signal,
+        headers: { 'content-type': 'application/json', origin: live.webUrl },
+        body: JSON.stringify({
+          conversationId: 'reap-1',
+          messages: [{ role: 'user', content: 'hi' }],
+          context: { route: '/', title: 'reap' },
+        }),
+      })
+        .then((r) => r.text())
+        // Ход оборван здесь же (`abort`) — поток ответа рвётся, это не предмет проверки.
+        .catch(() => '');
+      const isHost = (cmd: string) => cmd.includes('session-host');
+      const before = await until(() => {
+        const found = processesNaming(live.root);
+        const hosts = found.filter((p) => isHost(p.cmd));
+        return hosts.length >= 2 &&
+          hosts.some((p) => p.cmd.includes('base-probe')) &&
+          found.length >= 4
+          ? found
+          : undefined;
+      }, 120_000);
+      for (const p of before) mine.set(p.pid, p.created);
+
+      run.abort();
+      const outcome = await stopOf(live);
+      await reply;
+      const survivors = before.filter((p) => alive(p.pid, p.created));
+      expect(survivors.map((p) => `${p.pid} ${p.cmd.slice(0, 200)}`)).toEqual([]);
+      expect(outcome.error).toBeUndefined();
+      expect(outcome.report?.left).toEqual([]);
+      expect(alive(other.host.pid, BigInt(other.host.start))).toBe(true);
+      expect(alive(other.child.pid, BigInt(other.child.start))).toBe(true);
+    } finally {
+      if (api) await api.stop();
+      await model.close();
+    }
+  }, 300_000);
 });
 
 describe.runIf(IS_WIN)('reapCoreSessions matches pid AND start, never the pid alone', () => {
@@ -244,6 +454,40 @@ describe('core session identities and the leftover report', () => {
     const ids = stand.coreSessionIdentities(home).map((id) => `${id.role}:${id.pid}`);
     expect(ids.sort()).toEqual(['cli:12', 'cli:22', 'host:11', 'host:21']);
     expect(stand.coreSessionIdentities(join(home, 'absent'))).toEqual([]);
+  });
+
+  it('reads the hop host from procs.json and stub servers from their journal ref', () => {
+    const home = mkdtempSync(join(tmpdir(), 'reap-srv-'));
+    dirs.push(home);
+    writeFileSync(
+      join(home, 'procs.json'),
+      JSON.stringify({
+        v: 1,
+        cores: [{ pid: 1, pidStart: '1' }],
+        servers: [
+          { kind: 'hop-host', id: 'hop-host', pid: 31, pidStart: '300' },
+          { kind: 'hop-host', id: 'torn', pid: 32 },
+        ],
+      }),
+    );
+    const task = join(home, 'tasks', 't1');
+    mkdirSync(task, { recursive: true });
+    const created = (ref: unknown, kind = 'stub-server') =>
+      JSON.stringify({ kind: 'resource.created', data: { kind, ref } });
+    writeFileSync(
+      join(task, 'journal.jsonl'),
+      [
+        created('http://127.0.0.1:52697/?dialect=anthropic-messages&pid=41&start=400'),
+        created('http://127.0.0.1:52698/?dialect=openai-chat&pid=42'),
+        created('not a url'),
+        created('http://127.0.0.1:1/?pid=43&start=401', 'tmpdir'),
+        '',
+      ].join('\n'),
+    );
+    const ids = stand.coreSessionIdentities(home).map((id) => `${id.role}:${id.pid}:${id.start}`);
+    // Ядро (`cores[]`) — тоже: ядро панели стенда съёмки дочерним стенду не бывает (проход 6, 03.11).
+    // Запись без старта — личность не доказать.
+    expect(ids.sort()).toEqual(['core:1:1', 'hop-host:31:300', 'stub-server:41:400']);
   });
 
   it('start tokens per OS: Windows exact, macOS seconds, Linux only on the same boot', () => {

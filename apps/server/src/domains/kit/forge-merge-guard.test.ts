@@ -11,7 +11,7 @@ import { builtinKitDir } from './service.ts';
  */
 const DISPATCH = join(builtinKitDir(), 'hooks', 'lib', 'run.mjs');
 
-function verdict(tool_name: string, tool_input: Record<string, unknown>, splitChild = '') {
+function verdict(tool_name: string, tool_input: Record<string, unknown>, stepKind = '') {
   const out = spawnSync(process.execPath, [DISPATCH, 'pre'], {
     input: JSON.stringify({
       hook_event_name: 'PreToolUse',
@@ -20,7 +20,7 @@ function verdict(tool_name: string, tool_input: Record<string, unknown>, splitCh
       session_id: 'kit-fmg',
     }),
     encoding: 'utf8',
-    env: { ...process.env, AGENTDECK_SPLIT_CHILD: splitChild, AGENTDECK_KIT_VARIANT: '' },
+    env: { ...process.env, AGENTDECK_STEP_KIND: stepKind, AGENTDECK_KIT_VARIANT: '' },
     timeout: 15_000,
   });
   const text = out.stdout.trim();
@@ -68,7 +68,9 @@ describe('forge-merge-guard набора', () => {
     ).toBe('deny');
   });
 
-  it('одобрение MR — отказ только в группе: MCP, opencode, glab, gh, REST под POST', () => {
+  // Одобрение MR в шаге задачи держит разрешение ядра (`publish-commands.ts`), не этот страж: ветка
+  // группы разделения снята, и в шаге, и у человека одобрение стражем не отказывается.
+  it('одобрение MR стражем не отказывается ни в шаге задачи, ни у человека', () => {
     const approves: [string, Record<string, unknown>][] = [
       ['mcp__gitlab__approve_merge_request', { merge_request_iid: 5 }],
       ['gitlab_approve_merge_request', { merge_request_iid: 5 }],
@@ -83,17 +85,12 @@ describe('forge-merge-guard набора', () => {
       ],
     ];
     for (const [tool, input] of approves) {
-      const inGroup = verdict(tool, input, '1');
-      expect(inGroup?.permissionDecision, JSON.stringify(input)).toBe('deny');
-      expect(inGroup?.permissionDecisionReason).toContain('approves a request');
-      expect(
-        verdict(tool, input)?.permissionDecisionReason ?? '',
-        JSON.stringify(input),
-      ).not.toContain('approves a request');
+      for (const step of ['implement', '']) {
+        expect(
+          verdict(tool, input, step)?.permissionDecisionReason ?? '',
+          `${step} ${JSON.stringify(input)}`,
+        ).not.toContain('forge-merge-guard');
+      }
     }
-    expect(
-      verdict('mcp__gitlab__unapprove_merge_request', { merge_request_iid: 5 }, '1')
-        ?.permissionDecisionReason ?? '',
-    ).not.toContain('forge-merge-guard');
   });
 });

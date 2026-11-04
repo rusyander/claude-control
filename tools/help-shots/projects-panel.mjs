@@ -12,13 +12,10 @@
  *   projects/setup — папка становится проектом, и у неё появляются свои
  *                    правила, MCP-серверы и права;
  *   projects/local — в репозитории УЖЕ есть свой `.claude`: что из него видно
- *                    и почему панель его не правит;
- *   groups/bundle  — набор под задачу, который включают руками;
- *   groups/auto    — то же, но чтобы включалось само: привязка к проекту,
- *                    строка «Когда» и сценарий из одних шагов;
- *   groups/sources — откуда группы берутся: обнаружение, пара
- *                    глобальная↔проектная, копия в общие, слияние;
- *   groups/path    — «Путь» группы и окно шага с ассистентом.
+ *                    и почему панель его не правит.
+ *
+ * Сцены групп (набор, «Когда», обнаружение, «Путь») ушли вместе с редактором прежних групп
+ * (этап 10, F1): группы ведёт ядро, его сцены снимает `core-panel.mjs`.
  *
  * ПАНЕЛЬ ОДНОРАЗОВАЯ: каталог конфигурации во временной папке, свои порты, свой
  * фронт. Рабочий стенд не трогается, настоящий `~/.claude` не читается.
@@ -36,13 +33,10 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { shootSetup } from './projects-setup.mjs';
 import { shootLocal } from './projects-local.mjs';
-import { shootBundle } from './groups-bundle.mjs';
-import { shootAuto } from './groups-auto.mjs';
-import { shootSources } from './groups-sources.mjs';
-import { shootPath } from './groups-path.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5195);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8905);
@@ -65,10 +59,6 @@ async function waitFor(url, seconds) {
 const SCENARIOS = [
   { only: 'setup', topic: 'projects', name: 'setup', shoot: shootSetup },
   { only: 'local', topic: 'projects', name: 'local', shoot: shootLocal },
-  { only: 'bundle', topic: 'groups', name: 'bundle', shoot: shootBundle },
-  { only: 'auto', topic: 'groups', name: 'auto', shoot: shootAuto },
-  { only: 'sources', topic: 'groups', name: 'sources', shoot: shootSources },
-  { only: 'path', topic: 'groups', name: 'path', shoot: shootPath },
 ];
 
 const started = [];
@@ -78,12 +68,15 @@ writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
 writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-projects' },
+  );
 
   started.push(
     spawn(
@@ -125,6 +118,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех четырёх.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -141,5 +135,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true });
 }

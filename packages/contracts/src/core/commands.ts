@@ -67,6 +67,11 @@ export const COMMAND_FIELDS = {
   'publish-now': z.strictObject({ unitId: uuidv7 }),
   'move-build': z.strictObject({ build: z.string().min(1) }),
   'message-to-step': z.strictObject({ stepId: uuidv7, text: z.string().min(1).max(16_000) }),
+  /**
+   * Закрыть шаг `chat` (этап 10): ход человека — `message-to-step`, конец разговора — только эта
+   * команда или отмена задачи. Шаг другого вида команда не закрывает (409 `not-a-chat`).
+   */
+  'end-chat': z.strictObject({ stepId: uuidv7 }),
   'release-resource': z.strictObject({ rid: uuidv7 }),
   grant: z.strictObject({
     project: z.string().min(1),
@@ -100,7 +105,7 @@ export type CommandKind = keyof typeof COMMAND_FIELDS;
  * оба машинные, задачи у них нет.
  */
 export type AuthorityKind =
-  CommandKind | 'estimate' | 'set-config' | 'save-scenario' | 'adopt-devices';
+  CommandKind | 'estimate' | 'ask' | 'set-config' | 'save-scenario' | 'adopt-devices';
 export const COMMAND_KINDS = Object.keys(COMMAND_FIELDS) as CommandKind[];
 
 /**

@@ -27,7 +27,11 @@ export const DEFERRED_ASK_STATES: readonly DeferredAskState[] = [
   'withdrawn',
 ];
 
-/** Что отложено: запрос прав или ворота ветки одиночного чата. */
+/**
+ * Что отложено. Новые записи — только `permission`; `branchGate` (ворота ветки
+ * одиночного чата, сняты с ChatBranchGate на этапе 10) остаётся, чтобы старые
+ * записи файла читались, и показывается как обычный вызов.
+ */
 export type DeferredAskKind = 'permission' | 'branchGate';
 
 /**

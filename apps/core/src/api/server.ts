@@ -27,17 +27,27 @@ import {
   type TokenClass,
   type TokenSources,
 } from './auth.ts';
+import { registerAsk, type AskPort } from './ask.ts';
+import { registerTaskAttachments } from './attachments.ts';
+import { registerReviewLink, type ReviewLinkPort } from './review-link.ts';
 import { registerConfig } from './config.ts';
 import { registerDevices, type DevicesPort } from './devices.ts';
+import { registerLocalHold, type LocalHoldPort } from './local-hold.ts';
 import type { ConfigPort } from './config.types.ts';
+import { registerContours, type ContoursPort } from './contours.ts';
+import { registerDlpProxy, type DlpProxyPort } from './dlp-proxy.ts';
 import { apiError, commandStatus } from './errors.ts';
 import { registerEstimate } from './estimate.ts';
 import type { RouteContext } from './route-context.types.ts';
 import { registerProfiles } from './profiles.ts';
 import { registerRecords } from './records.ts';
 import { registerReport } from './report.ts';
+import { registerDelivery } from './delivery.ts';
+import { registerMcpOffers, type McpOffersPort } from './mcp-offers.ts';
 import { registerRoutesView } from './routes.ts';
 import { registerScenarios } from './scenarios.ts';
+import { registerSessionStream } from './session-stream.ts';
+import type { AdapterRegistry } from '../adapters/index.ts';
 import { followTask, lastEventId, openSse } from './sse.ts';
 import { priceBookOf, taskViewOf } from './task-view.ts';
 
@@ -85,6 +95,20 @@ export interface ApiDeps {
   trustedHops?: () => { count: number; recordedAt: number | null };
   /** Перенос ключей телефона в устройства ядра (G9); нет — `/v1/devices/adopt` отвечает 501. */
   devices?: () => DevicesPort | undefined;
+  /** Реестр переходников загрузки: вид сеанса читает поток их нормализатором (этап 10). */
+  adapters?: AdapterRegistry;
+  /** Серверы MCP человека по CLI для экрана выбора (s10 p9); нет — `/v1/mcp-offers` отвечает 501. */
+  mcpOffers?: () => McpOffersPort | undefined;
+  /** Удержание своей модели панелью (этап 10, зона C); нет — `/v1/local/*` отвечает 501. */
+  localHold?: () => LocalHoldPort | undefined;
+  /** Учёт контуров звена (этап 10, C3b); нет — `/v1/contours*` отвечает 501. */
+  contours?: () => ContoursPort | undefined;
+  /** Прокси защиты данных человека (C3c); нет — `/v1/dlp-proxy*` отвечает 501. */
+  dlpProxy?: () => DlpProxyPort | undefined;
+  /** Лёгкая сессия панели (этап 10, F2); нет — `/v1/ask` после суда отвечает 501. */
+  ask?: () => AskPort | undefined;
+  /** Ревью MR по ссылке (этап 10, F8); нет — `/v1/review-link` после суда отвечает 501. */
+  reviewLink?: () => ReviewLinkPort | undefined;
 }
 
 const READ_TOKENS: ReadonlySet<TokenClass> = new Set(['core', 'panel-bearer']);
@@ -201,15 +225,25 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
     tokenOf,
     proof: { nonces: deps.nonces, peer: deps.peer, signature: deps.signature, seen },
     now: deps.now,
+    ...(deps.adapters ? { adapters: deps.adapters } : {}),
   };
+  registerSessionStream(app, routeContext);
   registerEstimate(app, routeContext);
+  registerTaskAttachments(app, routeContext);
+  registerAsk(app, routeContext, () => deps.ask?.());
+  registerReviewLink(app, routeContext, () => deps.reviewLink?.());
   registerScenarios(app, routeContext);
   registerConfig(app, routeContext, () => deps.config?.());
   registerRecords(app, routeContext);
   registerReport(app, routeContext);
+  registerDelivery(app, routeContext);
   registerProfiles(app, routeContext);
   registerRoutesView(app, routeContext, () => deps.routes?.());
+  registerMcpOffers(app, routeContext, () => deps.mcpOffers?.());
   registerDevices(app, routeContext, () => deps.devices?.());
+  registerLocalHold(app, routeContext, () => deps.localHold?.());
+  registerContours(app, routeContext, () => deps.contours?.());
+  registerDlpProxy(app, routeContext, () => deps.dlpProxy?.());
 
   app.get<{ Querystring: { page?: string } }>('/v1/nonce', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;

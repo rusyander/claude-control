@@ -13,6 +13,7 @@ import {
   journaledSessionDir,
   processPin,
   sessionDirOf,
+  sessionPin,
   STEP_DENY,
   stepStart,
 } from './session-start.ts';
@@ -25,7 +26,12 @@ import {
 const ROUTE = { adapter: 'claude', route: { kind: 'cli-login' as const, id: 'cli-login:claude' } };
 
 async function taskWith(
-  opts: { ceiling?: string | null; pattern?: string; extraRoute?: string } = {},
+  opts: {
+    ceiling?: string | null;
+    pattern?: string;
+    extraRoute?: string;
+    session?: Record<string, unknown>;
+  } = {},
 ) {
   const { task } = await openFresh();
   const extra = opts.extraRoute
@@ -44,6 +50,7 @@ async function taskWith(
       ...CREATED,
       modelCeiling: opts.ceiling === undefined ? 'sonnet' : opts.ceiling,
       allowedRoutes: [{ ...ROUTE, modelPattern: opts.pattern ?? '*' }, ...extra],
+      ...(opts.session ? { session: opts.session } : {}),
     },
   });
   const unitId = newId();
@@ -294,6 +301,8 @@ describe('continuation decision → road resume (stage 5 W, 03:150-155)', () => 
     expect(got.ok && got.start.resume).toEqual({
       conversationId: root,
       of: second,
+      // Источник переноса разговора — каталог прежней сессии (её дом CLI держит весь разговор).
+      from: journaledSessionDir(task, second),
       cacheAgeMs: 4000,
     });
     const fresh = stepStart({ task, pin: PIN }, s, 'sess-4');
@@ -320,5 +329,49 @@ describe('continuation decision → road resume (stage 5 W, 03:150-155)', () => 
     const other = started(task, 'qwen');
     const got = stepStart({ task, pin: PIN }, sameSession(ctx(task, unitId, WORK), other), 's');
     expect(got.ok && got.start.resume).toBeUndefined();
+  });
+});
+
+describe('caller session settings (stage 10, F6)', () => {
+  const CHAT = presetStep('chat', 'chat', 'Чат', []);
+
+  it('task env: the named values come only from the book; a name without a value drops the core value', async () => {
+    const { task } = await taskWith({ session: { env: ['CLAUDE_CONFIG_DIR', 'STAND_USER'] } });
+    const pin = { HOME: '/h', CLAUDE_CONFIG_DIR: '/real/.claude', OTHER: 'keep' };
+    expect(
+      sessionPin({ task, pin, env: { CLAUDE_CONFIG_DIR: '/sb/config', STAND_USER: 'qa' } }),
+    ).toEqual({ HOME: '/h', CLAUDE_CONFIG_DIR: '/sb/config', STAND_USER: 'qa', OTHER: 'keep' });
+    // Книга пуста (ядро перезапускалось): настоящий каталог человека НЕ остаётся в пине.
+    expect(sessionPin({ task, pin })).toEqual({ HOME: '/h', OTHER: 'keep' });
+    expect(pin.CLAUDE_CONFIG_DIR).toBe('/real/.claude');
+  });
+
+  it('no task env names — the core pin as is', async () => {
+    const { task } = await taskWith();
+    const pin = { HOME: '/h' };
+    expect(sessionPin({ task, pin, env: { X: '1' } })).toBe(pin);
+  });
+
+  it('brief none drops the chat brief; sources user reaches the layer; the env value reaches the start pin', async () => {
+    const { task, unitId } = await taskWith({
+      session: { brief: 'none', sources: 'user', env: ['CLAUDE_CONFIG_DIR'] },
+    });
+    placeCopy(task, unitId, '/copies/u', '/repos/src');
+    const got = stepStart(
+      { task, pin: PIN, env: { CLAUDE_CONFIG_DIR: '/sb/config' } },
+      ctx(task, unitId, CHAT),
+      's',
+    );
+    expect(got.ok).toBe(true);
+    if (!got.ok) return;
+    expect(got.start.brief).toBe('');
+    expect(got.start.layer.sources).toBe('user');
+    expect(got.start.pin.CLAUDE_CONFIG_DIR).toBe('/sb/config');
+
+    const { task: plain, unitId: plainUnit } = await taskWith();
+    placeCopy(plain, plainUnit, '/copies/u', '/repos/src');
+    const normal = stepStart({ task: plain, pin: PIN }, ctx(plain, plainUnit, CHAT), 's');
+    expect(normal.ok && normal.start.brief).not.toBe('');
+    expect(normal.ok && normal.start.layer.sources).toBeUndefined();
   });
 });

@@ -112,6 +112,24 @@ const EMITTED: SignalDef[] = [
     ),
   ),
   emitted(
+    'ask-refused',
+    'conductor/ask/ask',
+    ['warn'],
+    test(
+      'api/ask.api.test.ts',
+      'POST /v1/ask: proof of a human, refusals journaled (stage 10 F2, P41/P97) > an adapter outside the allowed set is a 422: the task fails at once and its bridge token is dropped',
+    ),
+  ),
+  emitted(
+    'mcp-human',
+    'bootstrap/session-road/road',
+    ['info'],
+    test(
+      'bootstrap/session-road/mcp-human.integration.test.ts',
+      'session road: panel chat gets the human servers by default (s10 p8, old chat parity) > a present mcpPicks.chat is exact: [] = none, [picked] = only it; other kinds stay explicit',
+    ),
+  ),
+  emitted(
     'estimate-refused',
     'conductor/estimate/estimate',
     ['stop'],
@@ -240,6 +258,24 @@ const EMITTED: SignalDef[] = [
     test(
       'bootstrap/conductor-wiring/session-refused.loop.integration.test.ts',
       'Q1: a road refusal of openSession is journaled and reaches point 6 on the booted loop > route without a named model: each refusal is a task-journal signal, the 3rd ends the step no-outcome, the fresh attempt the same, then point 6 asks the human',
+    ),
+  ),
+  emitted(
+    'resume-refused',
+    'bootstrap/session-road/road',
+    ['warn'],
+    test(
+      'bootstrap/session-road.adopt.integration.test.ts',
+      'adopting an outside CLI conversation through the real session road (stage 10 F2) > a forged id the CLI store does not hold is refused resume_not_owned before any process',
+    ),
+  ),
+  emitted(
+    'chat-in-place',
+    'bootstrap/conductor-wiring/wiring',
+    ['info'],
+    test(
+      'bootstrap/conductor-wiring/wiring.in-place.integration.test.ts',
+      'panel chat in place: the chat start is the grant for the root (Q1) > unit start lays no copy and names the root once; the final gate builds nothing over a copy',
     ),
   ),
   emitted(

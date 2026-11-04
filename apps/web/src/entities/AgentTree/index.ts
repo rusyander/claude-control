@@ -7,12 +7,7 @@ export {
   shortModel,
 } from './model/agentTree';
 export { openAgentPane, closeAgentPane, getAgentPane, useAgentPane } from './model/agentPane';
-export {
-  useAgentTranscript,
-  useStopAgent,
-  useAgentExtensions,
-  agentTreeKeys,
-} from './api/agentTreeApi';
+export { useAgentTranscript, useAgentExtensions, agentTreeKeys } from './api/agentTreeApi';
 export { AgentTranscript } from './ui/AgentTranscript/AgentTranscript';
 export { extensionTotals, mergeSummaries } from './model/extensions';
 export { ExtensionChips } from './ui/AgentExtensions/ExtensionChips';

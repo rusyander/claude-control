@@ -39,20 +39,15 @@ const SETTINGS_KEYS = {
   mcpAutoCheck: 'portable',
   chatModel: 'portable',
   chatEffort: 'portable',
-  taskSplitInitiative: 'portable',
   handoffInitiative: 'portable',
   handoffContextLimit: 'portable',
   // Автопродолжение во всех разговорах: цепочка идёт без кнопки человека.
   handoffAutoDefault: 'lever',
   deliverToMr: 'portable',
-  autoApproveRules: 'lever',
   chatAutoMode: 'lever',
   chatLeanTools: 'portable',
-  // Сроки отложенных вопросов D-n: ноль — карточка прав не откладывается никогда.
-  deferAfterMinutes: 'lever',
+  // Срок прежних записей D-n.
   deferredTtlDays: 'lever',
-  groupEconomy: 'portable',
-  groupWatch: 'portable',
   modelPricing: 'portable',
   encryptSecretBackups: 'portable',
   autoUpdateModels: 'portable',

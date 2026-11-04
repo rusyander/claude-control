@@ -1,4 +1,25 @@
-import { QWEN_TOOL_NAMES } from '../../project-tests/agent/foreign-gate.ts';
+/**
+ * Встроенные инструменты Qwen Code → имена Claude. Сверено с картой набора панели
+ * (`kit-paths.mjs`, `QWEN_TOOLS`) тестом `token-audit.test.ts`: два перевода одних имён не должны
+ * расходиться. `agent`/`task` здесь нет — субагент идёт своим классом. Жила в шлюзе прав прогона
+ * тестов (`project-tests/agent/foreign-gate.ts`), ушедшем в архив на этапе 10 вместе с прогоном
+ * CLI мимо ядра.
+ */
+export const QWEN_TOOL_NAMES: Readonly<Record<string, string>> = {
+  write_file: 'Write',
+  edit: 'Edit',
+  replace: 'Edit',
+  run_shell_command: 'Bash',
+  shell: 'Bash',
+  read_file: 'Read',
+  read_many_files: 'Read',
+  glob: 'Glob',
+  grep_search: 'Grep',
+  search_file_content: 'Grep',
+  list_directory: 'LS',
+  web_fetch: 'WebFetch',
+  todo_write: 'TodoWrite',
+};
 
 /**
  * Класс шага по его инструментам: где уходит окно — в снимках, гейтах, чтении.
@@ -28,7 +49,7 @@ export interface ToolUseLike {
 
 /**
  * Встроенные инструменты Codex и субагенты Qwen Code → имена Claude; остальное
- * у Qwen — карта шлюза тестов (`QWEN_TOOL_NAMES`), второй перевод не заводится.
+ * у Qwen — карта выше (`QWEN_TOOL_NAMES`), второй перевод не заводится.
  */
 const FOREIGN_TOOL_NAMES: Readonly<Record<string, string>> = {
   shell: 'Bash',

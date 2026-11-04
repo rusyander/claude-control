@@ -492,7 +492,7 @@ function accepts(consumer, text, sym, origin) {
     : basename(origin, extname(origin));
   const folder = basename(dirname(origin));
   // A folder NAME is not an import: every Go service has an `internal/db`, and matching on `db` sent
-  // thirteen `cp-*/main.go` into the radius of an `inst-admin-api` change (!778). Go is matched on the
+  // thirteen `*/main.go` of other services into the radius of one service's change. Go is matched on the
   // exact import path from go.mod, Python on the dotted module; the name rule stays only inside a package.
   if (family(origin) === 'go') {
     const ip = goImportPath(dirname(origin));
@@ -1461,7 +1461,8 @@ const PROTOCOL = {
   ],
   T2: [
     'Everything from T1, plus:',
-    'mustfail over the changed files: node <kit>/tools/mustfail.mjs --cmd "<tests>"',
+    'mustfail over the critical changed files, each judged only by its own tests, 10 min budget per package:',
+    '  node <kit>/tools/mustfail.mjs --cmd "<package test script>"',
     'Review through two entry points (diff / frame), not two copies of one pass.',
     'Live, two variations of four: one of N requests delayed · a role without the right ·',
     '  empty state · knowingly bad input.',

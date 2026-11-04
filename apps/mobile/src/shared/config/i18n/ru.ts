@@ -2,13 +2,12 @@ import type { PanelAgentRunRefusalCode } from '@agentdeck/contracts/panel-agent'
 import { serverMessagesRu } from './server-messages/ru.ts';
 import { panelTextsRu } from './panel-texts/texts.ru.ts';
 import { homeRu } from './home/ru.ts';
-import { watcherRu } from './watcher/ru.ts';
 import { usageLimitsRu } from './usage-limits/ru.ts';
 import { foreignChatRu } from './foreign-chat/ru.ts';
 import { projectsRu } from './projects/ru.ts';
 import { computersRu } from './computers/ru.ts';
 import { signingRu } from './signing/ru.ts';
-import { groupWatchRu } from './group-watch/ru.ts';
+import { coreTaskRu } from './core-task/ru.ts';
 
 /**
  * Русский словарь — источник истины. Английский типизирован по нему, поэтому
@@ -34,8 +33,6 @@ export const ru = {
   panelTexts: panelTextsRu,
   // Главный экран — отдельным модулем (`home/`).
   home: homeRu,
-  // Фоновый наблюдатель панели — отдельным модулем (`watcher/`).
-  watcher: watcherRu,
   // Лимиты подписки — отдельным модулем (`usage-limits/`).
   usageLimits: usageLimitsRu,
   // Разговор с чужим CLI — отдельным модулем (`foreign-chat/`).
@@ -96,17 +93,6 @@ export const ru = {
     // Вопрос, закрытый автономией чата, — та же строка, что в ленте панели.
     autoPick: (label: string) => `Автовыбор: ${label}`,
     autoPickUnparsed: 'Автовыбор: вопрос закрыт рекомендованным вариантом',
-    // Группа и автономность чата: здесь только видны, меняются в меню чата панели.
-    groupLine: (group: string, autonomous: boolean) =>
-      `Группа: ${group} · ${autonomous ? 'автономно' : 'спрашивать'}`,
-    groupAuto: 'авто',
-    // Критичное от ребёнка разделения — карточка в главном чате.
-    escalation: {
-      title: (title: string) => `Критично от группы «${title}»`,
-      fromBlock: 'Группа сообщила сама',
-      fromAutoPick: 'Автономия выбрала за вас в критичном вопросе',
-      dismiss: 'Прочитано',
-    },
     // Та же подпись, что у ответа в веб-чате (`context-managed`).
     contextSummarized:
       'Контур сжал историю перед этим ответом: модель видела пересказ начала разговора, а не весь ' +
@@ -267,8 +253,6 @@ export const ru = {
         'driver-none': 'Этот контур картинок не рисует: возможность в его драйвере не объявлена',
         'no-model': 'В каталоге ключа нет модели с генерацией картинок',
         'endpoint-no-url': 'В профиле эндпоинта не задан адрес генерации картинок',
-        'gateway-off': 'Шлюз панели выключен, а запрос в контур идёт через него',
-        'gateway-failed': 'Шлюз панели включён, но не поднялся',
         'endpoint-api-kind': 'У этого вида API отдельной ручки картинок нет',
         'no-agent': 'Нет ни растровой дороги, ни разговора, в котором можно попросить агента',
       },
@@ -277,8 +261,6 @@ export const ru = {
         'driver-none': 'растра нет: этот контур картинок не рисует',
         'no-model': 'растра нет: в каталоге ключа нет модели с генерацией картинок',
         'endpoint-no-url': 'растра нет: в профиле эндпоинта не задан адрес генерации',
-        'gateway-off': 'растра нет: шлюз панели выключен',
-        'gateway-failed': 'растра нет: шлюз панели не поднялся',
         'endpoint-api-kind': 'растра нет: у этого вида API ручки картинок нет',
         'no-agent': 'растра нет: рисовать некому',
       },
@@ -315,8 +297,8 @@ export const ru = {
   projects: projectsRu,
   computers: computersRu,
   signing: signingRu,
-  // Сторож групп: копия панельного словаря файл в файл (check-mobile-contracts), строка списка чатов.
-  groupWatch: groupWatchRu,
+  // Задачи ядра: список и карточки вопросов (`core-task/`).
+  coreTask: coreTaskRu,
 
   git: {
     title: 'Git',

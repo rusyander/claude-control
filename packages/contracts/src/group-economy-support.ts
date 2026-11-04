@@ -1,12 +1,13 @@
 import { enum as zodEnum, object, partialRecord, type infer as Infer } from 'zod';
+import type { CoreConfig } from './core/config.ts';
 import type { GroupEconomy } from './group-economy.ts';
 import { economyMessageParams } from './server-messages/economy.ts';
 import type { EconomyMessageCode } from './server-messages/table.ts';
 
 /**
- * Где рычаг экономии групп действует — по каждому CLI (план экономии чужих CLI, 22.10.2026).
+ * Где рычаг экономии шагов задачи действует — по каждому CLI (план экономии чужих CLI, 22.10.2026).
  *
- * Рычаги страницы «Настройки → Группы» общие на все CLI, а действуют по-разному:
+ * Рычаги карточки «Экономия шагов задачи» общие на все CLI, а действуют по-разному:
  * у Claude все родные, у Codex и Qwen Code часть — ключом самого CLI, часть
  * панель изображает сама, а часть у CLI не существует вовсе. Каталог провайдера
  * объявляет это один раз, сервер отдаёт в `ProviderInfo.groupEconomy`, страница
@@ -15,8 +16,10 @@ import type { EconomyMessageCode } from './server-messages/table.ts';
  */
 
 /**
- * Девять рычагов, у которых бывает «где действует». `keepWarmPings` — число
- * пингов рычага `keepWarm`, своей отметки ему не нужно.
+ * Шесть рычагов, у которых бывает «где действует», — ровно рычаги раздела `economy`
+ * настройки ядра (`core/config.ts`), их рисует карточка «Экономия шагов задачи».
+ * Доставка на младшей модели, новый разговор после паузы и тёплый кэш ожидания
+ * у ядра всегда включены, рычагов у них нет (этап 10, G15) — и отметок тоже.
  */
 export const GROUP_ECONOMY_LEVERS = [
   'compactWindow',
@@ -24,11 +27,8 @@ export const GROUP_ECONOMY_LEVERS = [
   'readOutputTokens',
   'cacheTtl',
   'detachIde',
-  'sonnetDeliver',
-  'freshOnColdResume',
-  'keepWarm',
   'workHabits',
-] as const satisfies readonly (keyof GroupEconomy)[];
+] as const satisfies readonly (keyof GroupEconomy & keyof NonNullable<CoreConfig['economy']>)[];
 
 export type GroupEconomyLever = (typeof GROUP_ECONOMY_LEVERS)[number];
 

@@ -21,10 +21,17 @@
 //   - `## Found by others` — other reviewers' threads opened after our first note that we never answered:
 //     candidates to classify. Rows are keyed by `#note_N`, so annotations survive a re-run. Written into
 //     one report per MR (not a `-lane-` file); none when the MR is our own.
+//   - `- **Synced:** <date> — addressed by <sha7> (lines changed)` — the implicit verdict: a commit after
+//     the reviewed head changed lines within ±3 of the finding's `Where` site, computed from local git
+//     (see "implicit verdict" below). `Status` is never touched by it.
+//   - calibration per report and in total: published · accepted (reply) · addressed (commit) · declined ·
+//     other · silent, precision = (accepted+addressed)/published, the silent share printed beside it.
 //
 //   node <kit>/tools/review-sync.mjs <report.agent.md> [--mr N] [--project grp/proj] [--me user] [--write]
 //   node <kit>/tools/review-sync.mjs --all [<reviews-dir>] [--write]     calibration over every MR report
 //   … --json   one JSON object on stdout instead of the text (review-sync-brief's background run)
+//   … --offline   no forge call: commit verdicts from local git, reply verdicts as recorded
+//   … --head <sha> / --ref <ref> / --repo <dir>   single report: override the reviewed head, the branch tip, the repo
 //
 // Without --write nothing changes on disk. MR iid: --mr, else `MR !N` in the H1, else `mr-N` in the file
 // name; a file with no `## F-NN` finding is not a review and is skipped. Project: --project, else the
@@ -44,7 +51,8 @@ const opt = (name) => {
   const i = argv.indexOf(name);
   return i >= 0 ? argv[i + 1] : undefined;
 };
-const VALUED = new Set(['--mr', '--project', '--me']);
+const VALUED = new Set(['--mr', '--project', '--me', '--head', '--ref', '--repo']);
+const OFFLINE = flag('--offline');
 const positional = argv.filter((a, i) => !a.startsWith('--') && !VALUED.has(argv[i - 1]));
 const WRITE = flag('--write');
 const ALL = flag('--all');
@@ -343,8 +351,371 @@ function othersSection(lines, iid, now) {
   return out;
 }
 
+// ---------- implicit verdict: commits after the reviewed head ----------
+// An audit of ~50 reports: "confirmed by author" read "awaiting replies" in half, because authors
+// rarely reply in threads — the precision of what was published went unmeasured. A commit on the MR
+// after the reviewed head that changed lines within ±NEAR of a finding's `Where` site is an answer
+// without words. Local git only (no network): the branch tip is `--ref`, else the MR's own head sha when
+// the MR was fetched and that commit is local, else the one non-default local/remote-tracking ref
+// holding the reviewed head. Walked along the first-parent line, oldest first; a merge (main brought
+// in) moves the site but is never attributed. Renames are followed and the site is mapped through
+// every hunk. The verdict is a `Synced` line only: `Status` never changes — `fixed` is the reviewer's
+// after re-running the evidence, and an `addressed` status would leave the parser's `open`/`confirmed`
+// sets (hooks/lib/review-report.mjs) and block a later accept flip, which reads `open` only.
+const NEAR = 3;
+const COMMIT_SYNC = /^\s*[-*]\s+\*\*Synced:\*\*\s*\S+\s+—\s+addressed by\s+([0-9a-f]{7,40})/i;
+const SYNC_LINE = /^\s*[-*]\s+\*\*Synced:\*\*/;
+const DEFAULT_REF = /^refs\/(?:heads|remotes\/[^/]+)\/(?:main|master|dev|develop|HEAD)$/;
+const git = (cwd, args) => {
+  const r = spawnSync('git', ['-C', cwd, '-c', 'core.quotePath=false', ...args], {
+    encoding: 'utf8',
+    maxBuffer: 512 * 1024 * 1024,
+  });
+  return r.status === 0 ? r.stdout : null;
+};
+
+/** The head the review read, from the header block (before the first `##`): `reviewed head`, the
+ *  middle sha of `Base · review · current head`, else a bare `head <sha>` that is not the CURRENT head. */
+function reviewedHead(text, single) {
+  if (single && opt('--head')) return opt('--head');
+  const cut = text.search(/^##\s/m);
+  const head = cut < 0 ? text : text.slice(0, cut);
+  const SHA_AT = '`?([0-9a-f]{7,40})(?![0-9a-z])';
+  return (
+    head.match(new RegExp(`reviewed\\s+head\\s*:?\\**\\s*${SHA_AT}`, 'iu'))?.[1] ??
+    head.match(
+      new RegExp(
+        `Base\\s*·\\s*review\\s*·[^:\\n]*:\\**\\s*\`?[0-9a-f]{7,40}\`?\\s*·\\s*${SHA_AT}`,
+        'iu',
+      ),
+    )?.[1] ??
+    head.match(new RegExp(`(?<!current\\s)(?<![\\p{L}])head\\s*:?\\**\\s*${SHA_AT}`, 'iu'))?.[1] ??
+    null
+  );
+}
+
+const repoOf = (file, single) =>
+  (single && opt('--repo')) ||
+  git(path.dirname(path.resolve(file)), ['rev-parse', '--show-toplevel'])?.trim() ||
+  null;
+
+/** The tip whose first-parent line runs back to `full`. Divergent candidates pair nothing. */
+function resolveTip(repo, full, mrSha, single, iid) {
+  const sha = (r) => git(repo, ['rev-parse', '--verify', '-q', `${r}^{commit}`])?.trim() || null;
+  const after = (tip) => git(repo, ['merge-base', '--is-ancestor', full, tip]) != null;
+  if (single && opt('--ref')) {
+    const t = sha(opt('--ref'));
+    return t && after(t)
+      ? { tip: t, ref: opt('--ref') }
+      : { why: `--ref ${opt('--ref')} does not hold the reviewed head` };
+  }
+  if (mrSha) {
+    const t = sha(mrSha);
+    if (t && after(t)) return { tip: t, ref: `MR head ${t.slice(0, 7)}` };
+  }
+  const refs = (
+    git(repo, [
+      'for-each-ref',
+      '--contains',
+      full,
+      '--format=%(objectname) %(refname)',
+      'refs/heads',
+      'refs/remotes',
+    ]) ?? ''
+  )
+    .split('\n')
+    .map((l) => l.trim().split(' '))
+    .filter(([o, r]) => o && r && !DEFAULT_REF.test(r));
+  const tips = new Map(); // sha → shortest ref name
+  for (const [o, r] of refs) {
+    const short = r.replace(/^refs\/(?:heads|remotes)\//, '');
+    if (!tips.has(o) || short.length < tips.get(o).length) tips.set(o, short);
+  }
+  if (!tips.size)
+    return {
+      why: `no non-default ref holds the reviewed head ${full.slice(0, 7)} (branch gone or rebased)`,
+    };
+  // A merged MR names its source branch in GitLab's merge commit ("Merge branch 'x' into 'main'" …
+  // "See merge request grp/proj!N"): a follow-up branch stacked on the head must not lend its commits.
+  if (iid && tips.size > 1) {
+    const defaults = (
+      git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']) ?? ''
+    )
+      .split('\n')
+      .filter((r) => DEFAULT_REF.test(r));
+    const msg = defaults.length
+      ? git(repo, [
+          'log',
+          ...defaults,
+          '--merges',
+          '-E',
+          `--grep=See merge request \\S+!${iid}([^0-9]|$)`,
+          '--format=%s',
+          '-1',
+        ])
+      : null;
+    const src = msg?.match(/^Merge branch '([^']+)'/)?.[1];
+    const named = src && [...tips].find(([, short]) => short === src || short.endsWith(`/${src}`));
+    if (named) return { tip: named[0], ref: named[1] };
+  }
+  const list = [...tips.keys()];
+  // All on one line → the furthest; a fork (two branches grew from the head) is ambiguous.
+  const top = list.find((t) =>
+    list.every((o) => o === t || git(repo, ['merge-base', '--is-ancestor', o, t]) != null),
+  );
+  if (!top)
+    return {
+      why: `ambiguous refs hold the reviewed head: ${list.map((t) => tips.get(t)).join(', ')} — pass --ref`,
+    };
+  return {
+    tip: top,
+    ref:
+      list.length > 1
+        ? `${tips.get(top)} (furthest of ${list.length} refs on one line)`
+        : tips.get(top),
+  };
+}
+
+/** First-parent commits head..tip, oldest first, each with its name-status against its first parent. */
+function walk(repo, full, tip) {
+  const out = git(repo, [
+    'log',
+    '--reverse',
+    '--first-parent',
+    '--diff-merges=first-parent',
+    '-M',
+    '--name-status',
+    '--format=@@@%H %cs %P',
+    `${full}..${tip}`,
+  ]);
+  if (out == null) return null;
+  const commits = [];
+  for (const line of out.split('\n')) {
+    const h = line.match(/^@@@([0-9a-f]{40}) (\S+) (.*)$/);
+    if (h) {
+      const parents = h[3].trim().split(/\s+/).filter(Boolean);
+      commits.push({
+        sha: h[1],
+        date: h[2],
+        parent: parents[0],
+        merge: parents.length > 1,
+        files: [],
+      });
+      continue;
+    }
+    const f = line.split('\t');
+    if (commits.length && f.length >= 2 && /^[A-Z]/.test(f[0]))
+      commits.at(-1).files.push({ st: f[0][0], old: f[1], new: f[2] ?? f[1] });
+  }
+  if (commits.length && commits[0].parent !== full) return { commits: null };
+  return { commits };
+}
+
+/** Hunks of one file's diff (-U0): {os, oc, ns, nc}, old-side sorted. */
+function hunks(repo, c, oldPath, newPath) {
+  const out =
+    git(repo, [
+      'diff',
+      '--no-color',
+      '--no-ext-diff',
+      '-M',
+      '--unified=0',
+      c.parent,
+      c.sha,
+      '--',
+      ...new Set([oldPath, newPath]),
+    ]) ?? '';
+  return [...out.matchAll(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/gm)].map((m) => ({
+    os: +m[1],
+    oc: m[2] == null ? 1 : +m[2],
+    ns: +m[3],
+    nc: m[4] == null ? 1 : +m[4],
+  }));
+}
+
+/** An old-side line through the hunks to the new side; `end` picks the far edge of a replaced block. */
+function mapLine(x, hs, end) {
+  let delta = 0;
+  for (const h of hs) {
+    if (h.oc === 0) {
+      if (h.os < x)
+        delta += h.nc; // inserted after line os, i.e. above x
+      else break;
+      continue;
+    }
+    if (h.os + h.oc - 1 < x) {
+      delta += h.nc - h.oc;
+      continue;
+    }
+    if (h.os > x) break;
+    if (h.nc === 0) return end ? h.ns : h.ns + 1; // x was deleted: collapse to the boundary
+    return end ? h.ns + h.nc - 1 : h.ns;
+  }
+  return x + delta;
+}
+const touches = (h, a, b) =>
+  h.oc === 0 ? h.os >= a - 1 && h.os <= b : h.os <= b && h.os + h.oc - 1 >= a;
+
+/**
+ * Per finding: the first non-merge commit after the reviewed head that changed lines within ±NEAR of
+ * one of its sites. Returns { source, why, checked, byId: Map(id → {sha, date, file, from, to, deleted}) }.
+ */
+function implicitVerdicts(
+  file,
+  text,
+  findings,
+  { mrSha = null, iid = null, single = false, memo = new Map() } = {},
+) {
+  const res = { source: null, why: null, checked: 0, byId: new Map(), notes: [] };
+  const head = reviewedHead(text, single);
+  if (!head) return { ...res, why: 'no reviewed head sha in the header' };
+  const repo = repoOf(file, single);
+  if (!repo) return { ...res, why: 'the report is not inside a git repo (--repo)' };
+  const full = git(repo, ['rev-parse', '--verify', '-q', `${head}^{commit}`])?.trim();
+  if (!full) return { ...res, why: `reviewed head ${head} is not in the local repo` };
+  const tipKey = `${repo}\0${full}\0${mrSha ?? ''}\0${iid ?? ''}\0${single ? (opt('--ref') ?? '') : ''}`;
+  if (!memo.has(tipKey)) {
+    const t = resolveTip(repo, full, mrSha, single, iid);
+    memo.set(tipKey, t.tip ? { ...t, ...walk(repo, full, t.tip) } : t);
+  }
+  const t = memo.get(tipKey);
+  if (!t.tip) return { ...res, why: t.why };
+  if (!t.commits)
+    return {
+      ...res,
+      why: `reviewed head ${full.slice(0, 7)} is not on the first-parent line of ${t.ref}`,
+    };
+  res.source = `${t.ref}: ${t.commits.filter((c) => !c.merge).length} commits after ${full.slice(0, 7)}`;
+  const treeKey = `${repo}\0tree\0${full}`;
+  if (!memo.has(treeKey))
+    memo.set(
+      treeKey,
+      (git(repo, ['ls-tree', '-r', '--name-only', full]) ?? '').split('\n').filter(Boolean),
+    );
+  const tree = memo.get(treeKey);
+  const hunkMemo = memo; // shared across findings and lane reports of one run
+  for (const f of findings) {
+    if (!f.locs.length) continue;
+    res.checked++;
+    let best = null;
+    for (const loc of f.locs) {
+      // A full path that exists wins; the 3-component tail match is for elided citations
+      // (`svc-a/internal/store/chats.go` also tail-matches svc-b's file).
+      const exact = expand(loc.file).filter((c) => tree.includes(c));
+      const real = exact.length ? exact : tree.filter((p) => sameFile(p, loc.file));
+      if (real.length !== 1) {
+        res.notes.push(
+          `${f.id}: \`${loc.file}\` ${real.length ? `matches ${real.length} files` : 'is not in the reviewed tree'} — site skipped`,
+        );
+        continue;
+      }
+      let p = real[0];
+      let a = loc.from;
+      let b = loc.to;
+      for (let i = 0; i < t.commits.length; i++) {
+        if (best && i >= best.i) break; // a later commit cannot beat the one already found
+        const c = t.commits[i];
+        const fe = c.files.find((x) => x.old === p && x.st !== 'C'); // a copy leaves the original in place
+        if (!fe) continue;
+        if (fe.st === 'D') {
+          if (!c.merge) best = { i, commit: c, file: p, from: a, to: b, deleted: true };
+          break;
+        }
+        const k = `${repo}\0h\0${c.sha}\0${fe.old}\0${fe.new}`;
+        if (!hunkMemo.has(k)) hunkMemo.set(k, hunks(repo, c, fe.old, fe.new));
+        const hs = hunkMemo.get(k);
+        if (!c.merge && hs.some((h) => touches(h, a - NEAR, b + NEAR))) {
+          best = { i, commit: c, file: p, from: a, to: b, deleted: false };
+          break;
+        }
+        const na = mapLine(a, hs, false);
+        const nb = mapLine(b, hs, true);
+        a = na;
+        b = Math.max(na, nb);
+        p = fe.new;
+      }
+    }
+    if (best)
+      res.byId.set(f.id, {
+        sha: best.commit.sha,
+        date: best.commit.date,
+        file: best.file,
+        from: best.from,
+        to: best.to,
+        deleted: best.deleted,
+      });
+  }
+  return res;
+}
+
+/** The edits that record the implicit verdict; an existing line naming the same sha is left alone. */
+function commitEdits(f, lines, hit, threadSyncAt, anchor) {
+  if (!hit) return [];
+  const text = `- **Synced:** ${today} — addressed by ${hit.sha.slice(0, 7)} (lines changed)`;
+  const at = lines.slice(f.start, f.end).findIndex((l) => COMMIT_SYNC.test(l));
+  if (at >= 0)
+    return hit.sha.startsWith(lines[f.start + at].match(COMMIT_SYNC)[1].toLowerCase())
+      ? []
+      : [{ replace: f.start + at, text }];
+  return [{ at: threadSyncAt >= 0 ? threadSyncAt : anchor, text }];
+}
+
+// ---------- calibration ----------
+// accepted = an accepting reply, or `accepted`/`fixed` in the file; declined = a refusing reply (wins
+// over a commit near the site: the author said no); addressed = no such reply, a commit changed the
+// site; other = deferred/unclear reply, no commit; silent = no reply, no commit; unknown = offline and
+// the thread was never synced, so whether the author replied is not known here.
+const CLASSES = ['accepted', 'addressed', 'declined', 'other', 'silent', 'unknown'];
+const RANK = { accepted: 0, declined: 1, addressed: 2, other: 3, silent: 4, unknown: 5 };
+function classify(status, verdict, addressed) {
+  if (status === 'accepted' || status === 'fixed' || verdict === 'accepted') return 'accepted';
+  if (verdict === 'declined') return 'declined';
+  if (addressed) return 'addressed';
+  if (verdict === 'deferred' || verdict === 'unclear') return 'other';
+  return verdict === 'unknown' ? 'unknown' : 'silent';
+}
+const VERDICTS = new Set(['accepted', 'declined', 'deferred', 'unclear']);
+/** The reply verdict as an earlier networked sync wrote it into the thread `Synced` line. */
+function recordedVerdict(line) {
+  if (!line) return 'unknown';
+  const v = line.match(/last \(([^)]+)\)/)?.[1];
+  if (v) return VERDICTS.has(v) ? v : 'unclear';
+  return /author did not reply/.test(line) ? null : 'unknown';
+}
+function calibration(classes) {
+  const c = Object.fromEntries(CLASSES.map((k) => [k, 0]));
+  for (const k of classes) c[k]++;
+  const published = classes.length;
+  return { published, ...c };
+}
+const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : '—');
+const calibLine = (c) =>
+  `published ${c.published} · accepted ${c.accepted} · addressed ${c.addressed} · declined ${c.declined} · other ${c.other} · silent ${c.silent} (${pct(c.silent, c.published)})` +
+  (c.unknown ? ` · reply unknown ${c.unknown}` : '') +
+  ` · precision ${pct(c.accepted + c.addressed, c.published)} = (accepted+addressed)/published`;
+
+// Bottom-up so earlier indexes stay valid; at one index a replacement goes before inserts, and of two
+// inserts the earlier-queued one ends up on top (Where → Thread → Synced → Synced addressed).
+function applyEdits(lines, edits) {
+  const out = [...lines];
+  const ordered = edits
+    .map((e, i) => ({ ...e, i, pos: e.replace ?? e.at }))
+    .sort((a, b) => b.pos - a.pos || (b.replace != null) - (a.replace != null) || b.i - a.i);
+  for (const e of ordered) {
+    if (e.replace != null) out[e.replace] = e.text;
+    else out.splice(e.at + 1, 0, e.text);
+  }
+  return out;
+}
+
 // ---------- one report ----------
-async function syncOne(cred, file, text, me, { writeOthers, cache }) {
+async function syncOne(
+  cred,
+  file,
+  text,
+  me,
+  { writeOthers, cache, single = false, memo = new Map() },
+) {
   const parsed = parseReport(text);
   const findings = parsed.findings;
   if (!findings.length) return { file, skipped: 'no `## F-NN` finding — not a review report' };
@@ -373,6 +744,13 @@ async function syncOne(cred, file, text, me, { writeOthers, cache }) {
   const edits = []; // { at: insert after line index } | { replace: line index }
   const rows = [];
   const outcomes = [];
+  const iv = implicitVerdicts(
+    file,
+    text,
+    findings.filter((f) => pairs.has(f.id)),
+    { mrSha: mr.sha, iid, single, memo },
+  );
+  const classes = [];
   const tally = {
     resolved: 0,
     replied: 0,
@@ -429,20 +807,31 @@ async function syncOne(cred, file, text, me, { writeOthers, cache }) {
       f.status === 'accepted' && o.verdict && o.verdict !== 'accepted'
         ? ` → marked accepted, last reply now ${o.verdict}`
         : '';
+    const hit = iv.byId.get(f.id) ?? null;
+    const cls = classify(f.status, o.verdict, hit);
+    classes.push(cls);
+    const addr = hit
+      ? ` → addressed by ${hit.sha.slice(0, 7)} (${hit.file}:${hit.from}-${hit.to}${hit.deleted ? ', file deleted' : ''})`
+      : '';
     rows.push(
-      `${f.id}: ${state}${o.replies.length ? `, author replied ${o.replies.length} (${o.verdict})` : ''}${flip ? ' → accepted' : ''}${read}${regress}`,
+      `${f.id}: ${state}${o.replies.length ? `, author replied ${o.replies.length} (${o.verdict})` : ''}${flip ? ' → accepted' : ''}${read}${regress}${addr}`,
     );
 
     const anchor = f.whereEnd >= 0 ? f.whereEnd : f.start;
     if (!f.threadUrl)
       edits.push({ at: anchor, text: `- **Thread:** ${mr.web_url}#note_${o.first.id}` });
     const syncLine = `- **Synced:** ${today} — ${state}${said}${others}`;
-    const syncAt = lines
-      .slice(f.start, f.end)
-      .findIndex((l) => /^\s*[-*]\s+\*\*Synced:\*\*/.test(l));
+    const block = lines.slice(f.start, f.end);
+    const syncAt = block.findIndex((l) => SYNC_LINE.test(l) && !COMMIT_SYNC.test(l));
+    // An addressed line written by an --offline run and no thread line yet: the thread line goes right above it.
+    const commitAt = block.findIndex((l) => COMMIT_SYNC.test(l));
     edits.push(
-      syncAt >= 0 ? { replace: f.start + syncAt, text: syncLine } : { at: anchor, text: syncLine },
+      syncAt >= 0
+        ? { replace: f.start + syncAt, text: syncLine }
+        : { at: commitAt >= 0 ? f.start + commitAt - 1 : anchor, text: syncLine },
     );
+    // Queued after the thread line: at one anchor the earlier-queued insert ends up on top.
+    edits.push(...commitEdits(f, lines, hit, syncAt >= 0 ? f.start + syncAt : -1, anchor));
     // recorded = the report's Synced line already counts every author reply; a merge or a resolve since
     // changes the line but is no news from the author.
     const recorded =
@@ -456,6 +845,8 @@ async function syncOne(cred, file, text, me, { writeOthers, cache }) {
       recorded,
       verdict: o.verdict,
       flipped: flip,
+      addressed: hit?.sha ?? null,
+      cls,
     });
     if (flip)
       edits.push({
@@ -506,16 +897,7 @@ async function syncOne(cred, file, text, me, { writeOthers, cache }) {
 
   let changed = false;
   if (WRITE) {
-    // Bottom-up so earlier indexes stay valid; at one index a replacement goes before inserts, and of two
-    // inserts the earlier-queued one ends up on top (Where → Thread → Synced).
-    let out = [...lines];
-    const ordered = edits
-      .map((e, i) => ({ ...e, i, pos: e.replace ?? e.at }))
-      .sort((a, b) => b.pos - a.pos || (b.replace != null) - (a.replace != null) || b.i - a.i);
-    for (const e of ordered) {
-      if (e.replace != null) out[e.replace] = e.text;
-      else out.splice(e.at + 1, 0, e.text);
-    }
+    let out = applyEdits(lines, edits);
     if (writeOthers) out = othersSection(out, iid, otherRows);
     const next = out.join(eol);
     if (next !== text) {
@@ -541,18 +923,87 @@ async function syncOne(cred, file, text, me, { writeOthers, cache }) {
     writeOthers,
     rows,
     changed,
+    calibration: calibration(classes),
+    commits: iv.source ?? `n/a — ${iv.why}`,
+    ivNotes: iv.notes,
+  };
+}
+
+// ---------- one report, offline ----------
+// No network, no forge call: published = a finding with a `Thread` line; the reply verdict is what an
+// earlier networked sync recorded in the thread `Synced` line; the commit verdict comes from local git.
+function syncOffline(file, text, { single = false, memo = new Map() } = {}) {
+  const findings = parseReport(text).findings;
+  if (!findings.length) return { file, skipped: 'no `## F-NN` finding — not a review report' };
+  const iid = mrIid(text, file);
+  if (!iid) return { file, skipped: 'no MR iid (H1 `MR !N`, file `mr-N`, or --mr)' };
+  const published = findings.filter((f) => f.thread);
+  const iv = implicitVerdicts(file, text, published, { iid, single, memo });
+  const lines = text.split(/\r?\n/);
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
+  const edits = [];
+  const rows = [];
+  const outcomes = [];
+  const classes = [];
+  for (const f of published) {
+    const block = lines.slice(f.start, f.end);
+    const syncAt = block.findIndex((l) => SYNC_LINE.test(l) && !COMMIT_SYNC.test(l));
+    const verdict = recordedVerdict(syncAt >= 0 ? block[syncAt] : null);
+    const hit = iv.byId.get(f.id) ?? null;
+    const cls = classify(f.status, verdict, hit);
+    classes.push(cls);
+    // No thread `Synced` line yet: the commit line goes under `Thread` (else under `Where`).
+    const threadAt = block.findIndex((l) => /^\s*(?:[-*]\s+)?\*{0,2}Thread\s*:/i.test(l));
+    const anchor = Math.max(f.whereEnd, threadAt >= 0 ? f.start + threadAt : -1, f.start);
+    const e = commitEdits(f, lines, hit, syncAt >= 0 ? f.start + syncAt : -1, anchor);
+    edits.push(...e);
+    const note = f.threadUrl?.match(/#note_(\d+)/)?.[1];
+    outcomes.push({
+      key: note ? `${iid}:note_${note}` : `${iid}:${path.basename(file)}:${f.id}`,
+      verdict: verdict === 'unknown' ? null : verdict,
+      addressed: hit?.sha ?? null,
+      cls,
+    });
+    rows.push(
+      hit
+        ? `${f.id}: addressed by ${hit.sha.slice(0, 7)} ${hit.date} (${hit.file}:${hit.from}-${hit.to}${hit.deleted ? ', file deleted' : ''})${e.length ? '' : ' — already recorded'} → ${cls}`
+        : `${f.id}: no commit at the site → ${cls}`,
+    );
+  }
+  let changed = false;
+  if (WRITE && edits.length) {
+    const next = applyEdits(lines, edits).join(eol);
+    if (next !== text) {
+      writeFileSync(file, next);
+      changed = true;
+    }
+  }
+  return {
+    file,
+    iid,
+    offline: true,
+    findings: findings.length,
+    published: published.length,
+    outcomes,
+    rows,
+    changed,
+    pending: edits.length,
+    calibration: calibration(classes),
+    commits: iv.source ?? `n/a — ${iv.why}`,
+    ivNotes: iv.notes,
   };
 }
 
 // ---------- main ----------
 async function main() {
-  const cred = secrets();
-  if (cred.error) {
+  // --offline: no forge login checked, no request made — local git and the report text only.
+  const cred = OFFLINE ? null : secrets();
+  if (cred?.error) {
     console.error(`review-sync: ${cred.error}`);
     return 2;
   }
   let me = opt('--me');
-  if (!me) {
+  if (!me && !OFFLINE) {
     try {
       me = (await get(cred, `${cred.api}/user`)).body?.username;
     } catch (e) {
@@ -598,6 +1049,8 @@ async function main() {
 
   const score = path.join(path.dirname(fileURLToPath(import.meta.url)), 'review-score.mjs');
   const cache = new Map();
+  const memo = new Map(); // git answers shared by every report of the run
+  const single = !ALL;
   const results = [];
   let code = 0;
   for (const f of files) {
@@ -606,7 +1059,9 @@ async function main() {
     const writeOthers = ALL ? p?.f === f : !/-lane-/i.test(path.basename(f));
     let r;
     try {
-      r = await syncOne(cred, f, texts.get(f), me, { writeOthers, cache });
+      r = OFFLINE
+        ? syncOffline(f, texts.get(f), { single, memo })
+        : await syncOne(cred, f, texts.get(f), me, { writeOthers, cache, single, memo });
     } catch (e) {
       r = {
         file: f,
@@ -627,14 +1082,30 @@ async function main() {
       if (s.status !== 0)
         say(`  ${name}: header not recomputed — ${(s.stderr || s.stdout).trim().split('\n')[0]}`);
     }
+    if (r.offline) {
+      say(
+        `${name} (MR !${r.iid}, offline): findings ${r.findings} · published ${r.published} · commits: ${r.commits} · addressed ${r.calibration.addressed}` +
+          (WRITE
+            ? r.changed
+              ? ' · written'
+              : ' · no change'
+            : ` · dry run${r.pending ? `, would write ${r.pending} line(s)` : ''}`),
+      );
+      say(`  calibration: ${calibLine(r.calibration)}`);
+      if (!ALL) for (const row of [...r.rows, ...r.ivNotes]) say(`  ${row}`);
+      continue;
+    }
     say(
       `${name} (MR !${r.iid}, ${r.state}${r.ownMr ? ', own MR' : ''}): findings ${r.findings} · published ${r.published} · resolved ${r.resolved}` +
         ` · author replied ${r.replied} (accepted ${r.accepted}, declined ${r.declined}, deferred ${r.deferred}, unclear ${r.unclear}) · → accepted ${r.flipped}` +
         ` · others ${r.others.length} (+${r.general.length} general)${r.writeOthers ? '' : ' [section in the MR report]'}` +
-        (WRITE ? (r.changed ? ' · written' : ' · no change') : ' · dry run'),
+        (WRITE ? (r.changed ? ' · written' : ' · no change') : ' · dry run') +
+        ` · commits: ${r.commits}`,
     );
+    say(`  calibration: ${calibLine(r.calibration)}`);
     if (!ALL) {
       for (const row of r.rows) say(`  ${row}`);
+      for (const n of r.ivNotes) say(`  ${n}`);
       for (const t of r.ties) say(`  tie, left unpaired: ${t}`);
       for (const l of r.linkMissing) say(`  Thread link points at no thread of this MR: ${l}`);
       for (const d of r.unmatched) {
@@ -651,6 +1122,19 @@ async function main() {
 
   const done = results.filter((r) => !r.skipped);
   if (ALL) {
+    // One finding seen from several lane reports counts once, under its strongest evidence.
+    const best = new Map();
+    for (const o of done.flatMap((r) => r.outcomes))
+      if (!best.has(o.key) || RANK[o.cls] < RANK[best.get(o.key)]) best.set(o.key, o.cls);
+    const noCommits = done.filter((r) => /^n\/a/.test(r.commits));
+    say(
+      `CALIBRATION ${calibLine(calibration([...best.values()]))} · commit data n/a in ${noCommits.length} of ${done.length} reports` +
+        (noCommits.length
+          ? ` (their addressed count is 0 by absence of data, not by evidence)`
+          : ''),
+    );
+  }
+  if (ALL && !OFFLINE) {
     // One thread seen from several lane reports counts once; a flip proposed by any lane counts.
     const uniq = new Map();
     for (const o of done.flatMap((r) => r.outcomes)) {
@@ -722,7 +1206,9 @@ async function main() {
             ownMr: r.ownMr,
             flipped: r.flipped,
             outcomes: r.outcomes,
-            others: r.others.map((o) => ({ key: o.key, recorded: noted(r.iid, o.key) })),
+            others: (r.others ?? []).map((o) => ({ key: o.key, recorded: noted(r.iid, o.key) })),
+            calibration: r.calibration,
+            commits: r.commits,
           };
     console.log(JSON.stringify({ reports: results.map(slim) }));
   }

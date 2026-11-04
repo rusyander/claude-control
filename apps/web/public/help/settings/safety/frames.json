@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1116,
       "height": 389,
-      "shotAt": "2026-09-28T15:09:33.572Z",
+      "shotAt": "2026-11-03T15:40:09.615Z",
       "text": "Безопасность правок Резервная копия перед записью Копия файла сохраняется в agentdeck/backups Показывать дифф перед записью в чужой CLI Перед сохранением в конфиг Codex, Gemini и других панель покажет, что именно окажется в файле. Для Claude предпросмотра нет: его разделы свои и проверены. Сколько копий хранить Глубина ротации: больше — дальше откат, меньше — меньше копий (в т.ч. секретов) на диске Следить за изменениями файлов Обновлять интерфейс, если конфиги правили мимо приложения Показывать секреты сразу Иначе значения скрыты за маской",
       "en": {
         "file": "01-safety.en.png",
         "masked": 0,
         "width": 1116,
         "height": 371,
-        "shotAt": "2026-09-28T14:59:10.590Z",
-        "text": "Edit safety Back up before writing A copy is stored in agentdeck/backups Show a diff before writing to another CLI Before saving into a Codex, Gemini or other config the panel shows exactly what will land in the file. Claude has no preview: its sections are the panel’s own and verified. How many copies to keep Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk Watch files for changes Refresh the interface when configs are edited outside the app Reveal secrets by default Otherwise values stay masked"
+        "shotAt": "2026-11-03T15:54:47.218Z",
+        "text": "Edit safety Back up before writing A copy is stored in agentdeck/backups Show a diff before writing to another CLI Before saving into a Codex, Gemini or other config the panel shows exactly what will land in the file. Claude has no preview: its sections are the panel’s own and verified. How many copies to keep Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk Watch files for changes Refresh the interface when configs are edited outside the app Reveal secrets by default Otherwise values stay masked",
+        "seal": {
+          "png": "1d430dba622f4edd",
+          "text": "92c2318325668f76"
+        }
       },
       "dark": {
         "file": "01-safety.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 389,
-        "shotAt": "2026-09-28T15:38:45.281Z",
-        "text": "Безопасность правок Резервная копия перед записью Копия файла сохраняется в agentdeck/backups Показывать дифф перед записью в чужой CLI Перед сохранением в конфиг Codex, Gemini и других панель покажет, что именно окажется в файле. Для Claude предпросмотра нет: его разделы свои и проверены. Сколько копий хранить Глубина ротации: больше — дальше откат, меньше — меньше копий (в т.ч. секретов) на диске Следить за изменениями файлов Обновлять интерфейс, если конфиги правили мимо приложения Показывать секреты сразу Иначе значения скрыты за маской"
+        "shotAt": "2026-11-03T16:04:23.574Z",
+        "text": "Безопасность правок Резервная копия перед записью Копия файла сохраняется в agentdeck/backups Показывать дифф перед записью в чужой CLI Перед сохранением в конфиг Codex, Gemini и других панель покажет, что именно окажется в файле. Для Claude предпросмотра нет: его разделы свои и проверены. Сколько копий хранить Глубина ротации: больше — дальше откат, меньше — меньше копий (в т.ч. секретов) на диске Следить за изменениями файлов Обновлять интерфейс, если конфиги правили мимо приложения Показывать секреты сразу Иначе значения скрыты за маской",
+        "seal": {
+          "png": "1524daa423b8319a",
+          "text": "b863f434a6e3ba04"
+        }
       },
       "darkEn": {
         "file": "01-safety.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 371,
-        "shotAt": "2026-09-28T16:05:03.650Z",
-        "text": "Edit safety Back up before writing A copy is stored in agentdeck/backups Show a diff before writing to another CLI Before saving into a Codex, Gemini or other config the panel shows exactly what will land in the file. Claude has no preview: its sections are the panel’s own and verified. How many copies to keep Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk Watch files for changes Refresh the interface when configs are edited outside the app Reveal secrets by default Otherwise values stay masked"
+        "shotAt": "2026-11-03T16:10:00.176Z",
+        "text": "Edit safety Back up before writing A copy is stored in agentdeck/backups Show a diff before writing to another CLI Before saving into a Codex, Gemini or other config the panel shows exactly what will land in the file. Claude has no preview: its sections are the panel’s own and verified. How many copies to keep Rotation depth: more means further rollback, fewer means fewer copies (incl. secrets) on disk Watch files for changes Refresh the interface when configs are edited outside the app Reveal secrets by default Otherwise values stay masked",
+        "seal": {
+          "png": "5582eaa4a472a1a0",
+          "text": "92c2318325668f76"
+        }
+      },
+      "seal": {
+        "png": "9557fcc26d3fe9ae",
+        "text": "b863f434a6e3ba04"
       }
     },
     {
@@ -42,32 +58,48 @@
       "side": "panel",
       "masked": 0,
       "width": 1116,
-      "height": 304,
-      "shotAt": "2026-09-28T15:09:34.483Z",
-      "text": "Резервные копии Копия делается перед каждой записью в конфигурацию. Откат возвращает файл целиком к выбранному состоянию, а текущее состояние сохраняет новой копией — так что откатить можно и сам откат. settings.json 28 сент. 2026 г. · 89 B Откатить settings.json 28 сент. 2026 г. · 59 B Откатить settings.json 28 сент. 2026 г. · 3 B Откатить",
+      "height": 350,
+      "shotAt": "2026-11-03T15:40:11.002Z",
+      "text": "Резервные копии Копия делается перед каждой записью в конфигурацию. Откат возвращает файл целиком к выбранному состоянию, а текущее состояние сохраняет новой копией — так что откатить можно и сам откат. settings.json 3 нояб. 2026 г. · 1.3 KB Откатить settings.json 3 нояб. 2026 г. · 1.3 KB Откатить settings.json 3 нояб. 2026 г. · 1.2 KB Откатить settings.json 3 нояб. 2026 г. · 3 B Откатить",
       "en": {
         "file": "02-backups.en.png",
         "masked": 0,
         "width": 1116,
-        "height": 284,
-        "shotAt": "2026-09-28T14:59:11.490Z",
-        "text": "Backups A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone. settings.json Sep 28, 2026 · 89 B Restore settings.json Sep 28, 2026 · 59 B Restore settings.json Sep 28, 2026 · 3 B Restore"
+        "height": 330,
+        "shotAt": "2026-11-03T15:54:48.147Z",
+        "text": "Backups A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone. settings.json Nov 3, 2026 · 1.3 KB Restore settings.json Nov 3, 2026 · 1.3 KB Restore settings.json Nov 3, 2026 · 1.2 KB Restore settings.json Nov 3, 2026 · 3 B Restore",
+        "seal": {
+          "png": "affefd3e15a29fbb",
+          "text": "5a38356260a6c85f"
+        }
       },
       "dark": {
         "file": "02-backups.dark.png",
         "masked": 0,
         "width": 1116,
-        "height": 304,
-        "shotAt": "2026-09-28T15:38:46.198Z",
-        "text": "Резервные копии Копия делается перед каждой записью в конфигурацию. Откат возвращает файл целиком к выбранному состоянию, а текущее состояние сохраняет новой копией — так что откатить можно и сам откат. settings.json 28 сент. 2026 г. · 89 B Откатить settings.json 28 сент. 2026 г. · 59 B Откатить settings.json 28 сент. 2026 г. · 3 B Откатить"
+        "height": 350,
+        "shotAt": "2026-11-03T16:04:24.489Z",
+        "text": "Резервные копии Копия делается перед каждой записью в конфигурацию. Откат возвращает файл целиком к выбранному состоянию, а текущее состояние сохраняет новой копией — так что откатить можно и сам откат. settings.json 3 нояб. 2026 г. · 1.3 KB Откатить settings.json 3 нояб. 2026 г. · 1.3 KB Откатить settings.json 3 нояб. 2026 г. · 1.2 KB Откатить settings.json 3 нояб. 2026 г. · 3 B Откатить",
+        "seal": {
+          "png": "65f447d0495ae407",
+          "text": "1c1a32eef595658c"
+        }
       },
       "darkEn": {
         "file": "02-backups.dark.en.png",
         "masked": 0,
         "width": 1116,
-        "height": 284,
-        "shotAt": "2026-09-28T16:05:04.547Z",
-        "text": "Backups A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone. settings.json Sep 28, 2026 · 89 B Restore settings.json Sep 28, 2026 · 59 B Restore settings.json Sep 28, 2026 · 3 B Restore"
+        "height": 330,
+        "shotAt": "2026-11-03T16:10:01.093Z",
+        "text": "Backups A copy is made before every write to your configuration. Restoring replaces the file with the chosen state and saves the current one as a fresh copy — so even a restore can be undone. settings.json Nov 3, 2026 · 1.3 KB Restore settings.json Nov 3, 2026 · 1.3 KB Restore settings.json Nov 3, 2026 · 1.2 KB Restore settings.json Nov 3, 2026 · 3 B Restore",
+        "seal": {
+          "png": "17cee52340588787",
+          "text": "5a38356260a6c85f"
+        }
+      },
+      "seal": {
+        "png": "484fea088bddcabf",
+        "text": "1c1a32eef595658c"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 468,
       "height": 368,
-      "shotAt": "2026-09-28T15:09:36.097Z",
+      "shotAt": "2026-11-03T15:40:12.715Z",
       "text": "Парольная фраза шифрования Задайте парольную фразу — ей будут шифроваться копии файла секретов. Запомните её: без неё копию не восстановить, а восстановить фразу нельзя. Парольная фраза Не короче 8 символов Отмена Сохранить",
       "en": {
         "file": "03-encrypt.en.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T14:59:13.085Z",
-        "text": "Encryption passphrase Set a passphrase — it will encrypt copies of the secrets file. Remember it: without it a copy cannot be restored, and the passphrase itself cannot be recovered. Passphrase At least 8 characters Cancel Save"
+        "shotAt": "2026-11-03T15:54:49.793Z",
+        "text": "Encryption passphrase Set a passphrase — it will encrypt copies of the secrets file. Remember it: without it a copy cannot be restored, and the passphrase itself cannot be recovered. Passphrase At least 8 characters Cancel Save",
+        "seal": {
+          "png": "fde0465214c9f077",
+          "text": "d241f8da271ae44a"
+        }
       },
       "darkEn": {
         "file": "03-encrypt.dark.en.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T16:05:06.163Z",
-        "text": "Encryption passphrase Set a passphrase — it will encrypt copies of the secrets file. Remember it: without it a copy cannot be restored, and the passphrase itself cannot be recovered. Passphrase At least 8 characters Cancel Save"
+        "shotAt": "2026-11-03T16:10:02.720Z",
+        "text": "Encryption passphrase Set a passphrase — it will encrypt copies of the secrets file. Remember it: without it a copy cannot be restored, and the passphrase itself cannot be recovered. Passphrase At least 8 characters Cancel Save",
+        "seal": {
+          "png": "5abdbee08359486d",
+          "text": "d241f8da271ae44a"
+        }
       },
       "dark": {
         "file": "03-encrypt.dark.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T15:38:47.825Z",
-        "text": "Парольная фраза шифрования Задайте парольную фразу — ей будут шифроваться копии файла секретов. Запомните её: без неё копию не восстановить, а восстановить фразу нельзя. Парольная фраза Не короче 8 символов Отмена Сохранить"
+        "shotAt": "2026-11-03T16:04:26.116Z",
+        "text": "Парольная фраза шифрования Задайте парольную фразу — ей будут шифроваться копии файла секретов. Запомните её: без неё копию не восстановить, а восстановить фразу нельзя. Парольная фраза Не короче 8 символов Отмена Сохранить",
+        "seal": {
+          "png": "e1aa700c8580de98",
+          "text": "dbc2b3e7846dff27"
+        }
+      },
+      "seal": {
+        "png": "6b8b191f002c29b2",
+        "text": "dbc2b3e7846dff27"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1116,
       "height": 147,
-      "shotAt": "2026-09-28T15:09:41.129Z",
+      "shotAt": "2026-11-03T15:40:20.129Z",
       "text": "Расход Показывать в деньгах По умолчанию расход показывается в токенах",
       "en": {
         "file": "04-spend.en.png",
         "masked": 0,
         "width": 1116,
         "height": 147,
-        "shotAt": "2026-09-28T14:59:17.937Z",
-        "text": "Spend Show in money Spend is shown in tokens by default"
+        "shotAt": "2026-11-03T15:54:55.824Z",
+        "text": "Spend Show in money Spend is shown in tokens by default",
+        "seal": {
+          "png": "684a9c443f31f582",
+          "text": "1da532744cbf9776"
+        }
       },
       "darkEn": {
         "file": "04-spend.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 147,
-        "shotAt": "2026-09-28T16:05:11.027Z",
-        "text": "Spend Show in money Spend is shown in tokens by default"
+        "shotAt": "2026-11-03T16:10:08.354Z",
+        "text": "Spend Show in money Spend is shown in tokens by default",
+        "seal": {
+          "png": "e40f2f8a33664b4e",
+          "text": "1da532744cbf9776"
+        }
       },
       "dark": {
         "file": "04-spend.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 147,
-        "shotAt": "2026-09-28T15:38:52.825Z",
-        "text": "Расход Показывать в деньгах По умолчанию расход показывается в токенах"
+        "shotAt": "2026-11-03T16:04:31.549Z",
+        "text": "Расход Показывать в деньгах По умолчанию расход показывается в токенах",
+        "seal": {
+          "png": "2ef765c58b6ccda9",
+          "text": "c46177d812a50a75"
+        }
+      },
+      "seal": {
+        "png": "bd495b2eb62712ac",
+        "text": "c46177d812a50a75"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 1116,
       "height": 192,
-      "shotAt": "2026-09-28T15:09:45.181Z",
+      "shotAt": "2026-11-03T15:40:26.247Z",
       "text": "Перенос настроек панели Группы, сценарии, отметки и настройки панели — снимком в файл и обратно на другой машине. Настоящие конфиги Claude Code это не затрагивает. Скачать снимок Загрузить снимок",
       "en": {
         "file": "05-transfer.en.png",
         "masked": 0,
         "width": 1116,
         "height": 192,
-        "shotAt": "2026-09-28T14:59:21.918Z",
-        "text": "Transfer panel settings Groups, scenarios, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched. Download snapshot Load snapshot"
+        "shotAt": "2026-11-03T15:55:00.791Z",
+        "text": "Transfer panel settings Groups, scenarios, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched. Download snapshot Load snapshot",
+        "seal": {
+          "png": "128aaf53c824f85c",
+          "text": "dd134cddb6d0ae57"
+        }
       },
       "darkEn": {
         "file": "05-transfer.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 192,
-        "shotAt": "2026-09-28T16:05:14.945Z",
-        "text": "Transfer panel settings Groups, scenarios, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched. Download snapshot Load snapshot"
+        "shotAt": "2026-11-03T16:10:13.040Z",
+        "text": "Transfer panel settings Groups, scenarios, marks and panel settings — as a file snapshot and back on another machine. Your real Claude Code configs are untouched. Download snapshot Load snapshot",
+        "seal": {
+          "png": "83a0757dedd63c23",
+          "text": "dd134cddb6d0ae57"
+        }
       },
       "dark": {
         "file": "05-transfer.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 192,
-        "shotAt": "2026-09-28T15:38:56.827Z",
-        "text": "Перенос настроек панели Группы, сценарии, отметки и настройки панели — снимком в файл и обратно на другой машине. Настоящие конфиги Claude Code это не затрагивает. Скачать снимок Загрузить снимок"
+        "shotAt": "2026-11-03T16:04:36.155Z",
+        "text": "Перенос настроек панели Группы, сценарии, отметки и настройки панели — снимком в файл и обратно на другой машине. Настоящие конфиги Claude Code это не затрагивает. Скачать снимок Загрузить снимок",
+        "seal": {
+          "png": "e20d2fdc34aedd9b",
+          "text": "726a06bcaf9d0398"
+        }
+      },
+      "seal": {
+        "png": "d2793f1e3e805147",
+        "text": "726a06bcaf9d0398"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 0,
       "width": 668,
       "height": 608,
-      "shotAt": "2026-09-28T15:09:47.784Z",
-      "text": "Что уедет: Claude Code Перед сборкой архива видно, какие файлы в него попадут и чего в нём не будет. Файлов: 1, размер до сжатия: 132 Б Откуда берётся: C:\\work\\claude-demo-providers\\.claude Что придётся ввести руками Токены и ключи в архив не кладутся. Внутри архива есть README — его можно дать ассистенту на новой машине, чтобы он разложил всё сам. C:\\work\\claude-demo-providers\\.claude\\settings.json значения заменены меткой __REDACTED__: env.MAX_THINKING_TOKENS Отмена Выбрать папку и сохранить",
+      "shotAt": "2026-11-03T15:40:29.129Z",
+      "text": "Что уедет: Claude Code Перед сборкой архива видно, какие файлы в него попадут и чего в нём не будет. Файлов: 1, размер до сжатия: 1.3 КБ Откуда берётся: C:\\work\\claude-demo-providers\\.claude Что придётся ввести руками Токены и ключи в архив не кладутся. Внутри архива есть README — его можно дать ассистенту на новой машине, чтобы он разложил всё сам. C:\\work\\claude-demo-providers\\.claude\\settings.json значения заменены меткой __REDACTED__: env.MAX_THINKING_TOKENS Отмена Выбрать папку и сохранить",
       "en": {
         "file": "06-env-transfer.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-09-28T14:59:24.511Z",
-        "text": "What will leave: Claude Code Before the archive is built you can see which files go in and what stays out. Files: 1, size before compression: 132 Б Taken from: C:\\work\\claude-demo-providers\\.claude What you will have to enter by hand Tokens and keys are never packed. The archive contains a README you can hand to the assistant on the new machine so it lays everything out itself. C:\\work\\claude-demo-providers\\.claude\\settings.json values replaced with the __REDACTED__ marker: env.MAX_THINKING_TOKENS Cancel Pick a folder and save"
+        "shotAt": "2026-11-03T15:55:03.428Z",
+        "text": "What will leave: Claude Code Before the archive is built you can see which files go in and what stays out. Files: 1, size before compression: 1.3 КБ Taken from: C:\\work\\claude-demo-providers\\.claude What you will have to enter by hand Tokens and keys are never packed. The archive contains a README you can hand to the assistant on the new machine so it lays everything out itself. C:\\work\\claude-demo-providers\\.claude\\settings.json values replaced with the __REDACTED__ marker: env.MAX_THINKING_TOKENS Cancel Pick a folder and save",
+        "seal": {
+          "png": "73fa0a5101874928",
+          "text": "11f633d61611e42f"
+        }
       },
       "darkEn": {
         "file": "06-env-transfer.dark.en.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-09-28T16:05:17.533Z",
-        "text": "What will leave: Claude Code Before the archive is built you can see which files go in and what stays out. Files: 1, size before compression: 132 Б Taken from: C:\\work\\claude-demo-providers\\.claude What you will have to enter by hand Tokens and keys are never packed. The archive contains a README you can hand to the assistant on the new machine so it lays everything out itself. C:\\work\\claude-demo-providers\\.claude\\settings.json values replaced with the __REDACTED__ marker: env.MAX_THINKING_TOKENS Cancel Pick a folder and save"
+        "shotAt": "2026-11-03T16:10:15.661Z",
+        "text": "What will leave: Claude Code Before the archive is built you can see which files go in and what stays out. Files: 1, size before compression: 1.3 КБ Taken from: C:\\work\\claude-demo-providers\\.claude What you will have to enter by hand Tokens and keys are never packed. The archive contains a README you can hand to the assistant on the new machine so it lays everything out itself. C:\\work\\claude-demo-providers\\.claude\\settings.json values replaced with the __REDACTED__ marker: env.MAX_THINKING_TOKENS Cancel Pick a folder and save",
+        "seal": {
+          "png": "6e96804a5b1fe226",
+          "text": "11f633d61611e42f"
+        }
       },
       "dark": {
         "file": "06-env-transfer.dark.png",
         "masked": 0,
         "width": 668,
         "height": 608,
-        "shotAt": "2026-09-28T15:38:59.480Z",
-        "text": "Что уедет: Claude Code Перед сборкой архива видно, какие файлы в него попадут и чего в нём не будет. Файлов: 1, размер до сжатия: 132 Б Откуда берётся: C:\\work\\claude-demo-providers\\.claude Что придётся ввести руками Токены и ключи в архив не кладутся. Внутри архива есть README — его можно дать ассистенту на новой машине, чтобы он разложил всё сам. C:\\work\\claude-demo-providers\\.claude\\settings.json значения заменены меткой __REDACTED__: env.MAX_THINKING_TOKENS Отмена Выбрать папку и сохранить"
+        "shotAt": "2026-11-03T16:04:38.776Z",
+        "text": "Что уедет: Claude Code Перед сборкой архива видно, какие файлы в него попадут и чего в нём не будет. Файлов: 1, размер до сжатия: 1.3 КБ Откуда берётся: C:\\work\\claude-demo-providers\\.claude Что придётся ввести руками Токены и ключи в архив не кладутся. Внутри архива есть README — его можно дать ассистенту на новой машине, чтобы он разложил всё сам. C:\\work\\claude-demo-providers\\.claude\\settings.json значения заменены меткой __REDACTED__: env.MAX_THINKING_TOKENS Отмена Выбрать папку и сохранить",
+        "seal": {
+          "png": "5fb4f9d678073d34",
+          "text": "1ca3da960b5cef7a"
+        }
+      },
+      "seal": {
+        "png": "0574da0067b9db79",
+        "text": "1ca3da960b5cef7a"
       }
     }
   ]

@@ -6,6 +6,7 @@ import { Stack } from '@shared/ui/stack';
 import { Badge } from '@shared/ui/badge';
 import { Typography } from '@shared/ui/typography';
 import { TruncatedText } from '@shared/ui/truncated-text';
+import { serverFieldText } from '@shared/config/i18n';
 import {
   LEVEL_ORDER,
   LEVEL_TONE,
@@ -109,7 +110,7 @@ export function FidelityTable({ answer, targetName }: FidelityTableProps) {
           {shown.map((row) => (
             <div key={row.itemId} className={styles.row}>
               <div className={styles.intent}>
-                <Typography variant="body-sm">{row.intent}</Typography>
+                <Typography variant="body-sm">{serverFieldText(row, 'intent', t)}</Typography>
                 <TruncatedText className={styles.source} text={row.itemId} />
               </div>
 

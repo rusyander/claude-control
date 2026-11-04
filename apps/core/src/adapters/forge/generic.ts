@@ -20,6 +20,8 @@ export function createGenericPort(project: ForgeProject): ForgePort {
     threads: unknown,
     reply: unsupported,
     resolve: unsupported,
+    comment: unsupported,
+    comments: unknown,
     mergeability: unknown,
     pipelines: unknown,
     jobLogTail: unknown,

@@ -11,7 +11,10 @@ export const localLayerEn: typeof localLayerRu = {
     off: 'off',
     'no-gain': 'not needed',
     broken: 'build failed',
+    untrusted: 'folder not trusted',
   },
+  untrusted:
+    'The layer is on, but Claude Code does not trust this folder. The layer is built from repository files, and the core does not run it without trust: the chat will refuse the turn. Trust the folder — open claude in it in a terminal and answer «yes» to the trust question (the card sees it the next time it opens) — or switch the mode to «Off»: the chat then runs without the repository files until the folder is trusted.',
   reason: {
     'no-config':
       'The project has no .agent/local-layer/layer.json — chats run on the team layer as is.',

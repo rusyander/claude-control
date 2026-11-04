@@ -8,6 +8,7 @@ import type { ApplyCommand } from './commands.types.ts';
 import { applyEditRequirements } from './edit-requirements.ts';
 import { applyEditScenario } from './edit-scenario.ts';
 import { applyEditSplit } from './edit-split.ts';
+import { applyEndChat } from './end-chat.ts';
 import { applyFreshRerun } from './fresh-rerun.ts';
 import { applyGrant } from './grant.ts';
 import { applyLaunch } from './launch.ts';
@@ -41,6 +42,7 @@ export const APPLY: Record<CommandKind, ApplyCommand> = {
   'publish-now': applyPublishNow,
   'move-build': applyMoveBuild,
   'message-to-step': applyMessageToStep,
+  'end-chat': applyEndChat,
   'release-resource': applyReleaseResource,
   grant: applyGrant,
   'clean-remote': applyCleanRemote,

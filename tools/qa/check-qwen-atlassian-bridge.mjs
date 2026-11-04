@@ -1,5 +1,7 @@
 /**
- * Переходник Jira / Confluence в Qwen Code — настоящим qwen через настоящую панель.
+ * Переходник Jira / Confluence в Qwen Code — настоящая панель пишет, настоящий `qwen -p` читает.
+ * Разговор через чат панели снят на этапе 10 (F2c: чат Qwen — задача ядра); перенос MCP
+ * человека в сеанс ядра — дело ядра и здесь не проверяется.
  *
  * Кнопка «Подключить к CLI» у интеграций пишет переходник в раздел MCP
  * АКТИВНОГО CLI. У Qwen это `<QWEN_HOME>/settings.json`; проверяется, что qwen
@@ -19,6 +21,7 @@
  *
  * Запуск: node tools/qa/check-qwen-atlassian-bridge.mjs
  */
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
@@ -114,24 +117,29 @@ try {
 
   const project = join(root, 'project');
   mkdirSync(project, { recursive: true });
-  /** Новый разговор Qwen, один вопрос; тела запросов этого хода. */
+  /**
+   * Один вопрос настоящему `qwen -p` в каталоге проекта с тем же домом; тела запросов этого
+   * запуска. Чат панели (`qwen serve` её исполнителем) снят на этапе 10 (F2c): вопрос один —
+   * поднимает ли CLI переходник из своего settings.json, и отвечает на него сам CLI.
+   */
   const ask = async () => {
-    const chat = await stand.api('/provider-chat/chats', {
-      method: 'POST',
-      body: { workdir: project },
-    });
-    if (chat.status !== 200) throw new Error(`разговор не создан: ${chat.text}`);
     const from = model.bodies.length;
-    const sent = await stand.api(`/provider-chat/chats/${chat.body.id}/send`, {
-      method: 'POST',
-      body: { text: QUESTION },
+    const cli = join(cliDir, IS_WIN ? 'qwen.cmd' : 'qwen');
+    await new Promise((done) => {
+      // Windows: .cmd запускается только через оболочку — одной строкой, в кавычках как есть.
+      const child = IS_WIN
+        ? spawn(`"${cli}" -p "${QUESTION}" --yolo`, {
+            cwd: project,
+            shell: true,
+            env: process.env,
+          })
+        : spawn(cli, ['-p', QUESTION, '--yolo'], { cwd: project, env: process.env });
+      const timer = setTimeout(() => child.kill(), 120_000);
+      child.on('exit', () => {
+        clearTimeout(timer);
+        done();
+      });
     });
-    check('вопрос принят', sent.status === 200, sent.text);
-    for (let i = 0; i < 480; i += 1) {
-      const status = (await stand.api(`/provider-chat/chats/${chat.body.id}/status`)).body;
-      if (status?.isRunning === false && model.bodies.length > from) break;
-      await wait(250);
-    }
     await wait(500);
     return model.bodies.slice(from).join('\n');
   };

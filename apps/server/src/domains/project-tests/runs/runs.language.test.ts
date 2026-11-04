@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatRun } from '../../chat/ChatRunner/ChatRunner.ts';
+import { TestsCoreRun } from '../agent/core-run.ts';
 import { ProjectTestRunRegistry } from './runs.ts';
 import { createGroup, upsertCase } from '../store/store.ts';
 
@@ -31,13 +31,15 @@ describe('project-tests/runs: имя сессии на языке панели',
   ] as const)('панель %s — имя «%s…»', async (lang, prefix) => {
     const registry = new ProjectTestRunRegistry();
     registry.setLanguage(() => lang);
-    const start = vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    const start = vi
+      .spyOn(TestsCoreRun.prototype, 'start')
+      .mockImplementation(() => new Promise<void>(() => {}));
     registry.start(
       { projectPath: root, mode: 'generate', groupId: 'gui' },
       '2026-09-26T00:00:00.000Z',
     );
     await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-    expect(start.mock.calls[0]?.[0].name).toMatch(new RegExp(`^${prefix}`));
+    expect(start.mock.calls[0]?.[0].title).toMatch(new RegExp(`^${prefix}`));
     registry.stop(root);
   });
 });

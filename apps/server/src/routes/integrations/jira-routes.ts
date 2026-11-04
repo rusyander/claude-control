@@ -6,10 +6,8 @@ import {
   listProjects,
   listTransitions,
   readIssue,
-  readIssueBrief,
   searchIssues,
 } from '../../domains/integrations/atlassian/jira.ts';
-import type { AtlassianAccess } from '../../domains/integrations/atlassian/client.ts';
 import {
   jiraAccess,
   guard,
@@ -18,11 +16,6 @@ import {
   requireString,
   type IntegrationsDeps,
 } from './shared.ts';
-
-/** Почему комментарии не прочитаны — коды для `tests-cli delivery`, человеку их не показывают. */
-type JiraCommentsMiss = 'not-connected' | 'unreachable';
-
-type JiraCommentsReply = { comments: string[] } | { comments: null; reason: JiraCommentsMiss };
 
 /**
  * Jira глазами панели: найти задачу, прочитать её, завести дефект, дописать
@@ -51,32 +44,6 @@ export function registerIntegrationJiraRoutes(app: FastifyInstance, deps: Integr
 
   app.get<{ Params: { key: string } }>('/api/integrations/jira/issue/:key', (request, reply) =>
     guard(reply, () => readIssue(jiraAccess(deps), request.params.key)),
-  );
-
-  /**
-   * Тексты комментариев задачи — тем же чтением, что проверка доставки панели
-   * (`runtime.ts` `deliveryTracker`). Ключ трекера есть только у панели, поэтому
-   * `tests-cli delivery` в копии группы спрашивает здесь: без этого пробел «нет
-   * комментария со ссылкой на MR» группа узнавала только следующим кругом (g8 26.10).
-   * Трекер не подключён — `not-connected`: панель такие задачи и не проверяет.
-   */
-  app.get<{ Params: { key: string } }>(
-    '/api/integrations/jira/issue/:key/comments',
-    async (request, reply): Promise<JiraCommentsReply> => {
-      let access: AtlassianAccess;
-      try {
-        access = jiraAccess(deps);
-      } catch {
-        return { comments: null, reason: 'not-connected' };
-      }
-      try {
-        const issue = await readIssueBrief(access, request.params.key);
-        return { comments: issue.comments.map((comment) => comment.body) };
-      } catch {
-        void reply.code(502);
-        return { comments: null, reason: 'unreachable' };
-      }
-    },
   );
 
   /** Завести задачу. Тип по умолчанию «Bug» — панель заводит именно дефекты. */

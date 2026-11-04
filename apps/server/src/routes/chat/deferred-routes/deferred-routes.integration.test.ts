@@ -9,7 +9,7 @@ import type { ServerContext } from '../../../context.ts';
 import type { DeferredAskRecord } from '../../../domains/chat/deferred-asks/deferred-asks.ts';
 import { CLIENT_PORT_HEADER } from '../human-only/human-only.ts';
 import { registerDeferredRoutes } from './deferred-routes.ts';
-import { deferredAsksOf, setDeferredResumer } from './deferred-store.ts';
+import { deferredAsksOf } from './deferred-store.ts';
 
 /**
  * Решение D-n — только от человека (решение 3): настоящий маршрут на настоящем
@@ -158,25 +158,19 @@ describe('маршрут решения D-n: человек — да, проце
     expect(deferredAsksOf(ctx).get(record.id)?.state).toBe('waiting');
   }, 60_000);
 
-  it('вызов изнутри панели — решение принято, повтор ничего не меняет и не продолжает дважды', async () => {
-    const resumed: string[] = [];
-    setDeferredResumer(ctx, async (record) => {
-      resumed.push(record.id);
-      return 'sent';
-    });
+  it('вызов изнутри панели — решение принято, повтор ничего не меняет, хода решение не заводит', async () => {
     const record = seed();
     // Прогон жив и в `roots` — вызов изнутри панели всё равно принят.
     void fromModel('D-999');
     const first = await fromInside(record.id);
     expect(first).toMatchObject({
       status: 200,
-      body: { changed: true, resume: 'sent', item: { state: 'allowed' } },
+      body: { changed: true, item: { state: 'allowed' } },
     });
+    // Продолжателя панели больше нет (чат ведёт ядро): ответ без `resume`.
+    expect(first.body).not.toHaveProperty('resume');
     const again = await fromInside(record.id, 'deny');
     expect(again).toMatchObject({ status: 200, body: { changed: false } });
-    expect(resumed).toEqual([record.id]);
-    // «Сказано» помечает продолжатель по факту доставки (`deferred-wiring.ts`
-    // `onSent`), а не решение: заглушка здесь не помечает (RF-DL-01/04).
     expect(deferredAsksOf(ctx).get(record.id)?.toldAt).toBeUndefined();
     const missing = await fromInside('D-404');
     expect(missing).toMatchObject({ status: 404, body: { code: 'deferred_not_found' } });

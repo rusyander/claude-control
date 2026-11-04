@@ -1,0 +1,206 @@
+{
+  "topic": "sandbox",
+  "scenario": "conversation",
+  "frames": [
+    {
+      "id": "01-composition",
+      "side": "panel",
+      "file": "01-composition.png",
+      "masked": 0,
+      "width": 1428,
+      "height": 884,
+      "shotAt": "2026-11-03T16:51:41.348Z",
+      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здесь появится ответ из песочницы Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+      "en": {
+        "file": "01-composition.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:53:32.711Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox The sandbox answer will appear here What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "d642e3830077ad6e",
+          "text": "00e43619c3c5351a"
+        }
+      },
+      "dark": {
+        "file": "01-composition.dark.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:55:23.556Z",
+        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здесь появится ответ из песочницы Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+        "seal": {
+          "png": "ab825b762eb408c1",
+          "text": "91904fe46604e38d"
+        }
+      },
+      "darkEn": {
+        "file": "01-composition.dark.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:57:16.614Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox The sandbox answer will appear here What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "9b50db5770499909",
+          "text": "00e43619c3c5351a"
+        }
+      },
+      "seal": {
+        "png": "a6cb6dc9ee971302",
+        "text": "91904fe46604e38d"
+      }
+    },
+    {
+      "id": "02-waiting",
+      "side": "panel",
+      "file": "02-waiting.png",
+      "masked": 0,
+      "width": 1428,
+      "height": 884,
+      "shotAt": "2026-11-03T16:51:46.110Z",
+      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Остановить Claude отвечает… Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+      "en": {
+        "file": "02-waiting.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:53:37.475Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Stop Claude is answering… What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "3eea8826745fa9ca",
+          "text": "33c6fafca9335e96"
+        }
+      },
+      "dark": {
+        "file": "02-waiting.dark.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:55:28.299Z",
+        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Остановить Claude отвечает… Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+        "seal": {
+          "png": "38ced08a39f48f3d",
+          "text": "8d02198131e7f450"
+        }
+      },
+      "darkEn": {
+        "file": "02-waiting.dark.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:57:21.366Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Stop Claude is answering… What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "39f177002ccfc9d8",
+          "text": "33c6fafca9335e96"
+        }
+      },
+      "seal": {
+        "png": "bce790f4227a2467",
+        "text": "8d02198131e7f450"
+      }
+    },
+    {
+      "id": "03-answer",
+      "side": "panel",
+      "file": "03-answer.png",
+      "masked": 0,
+      "width": 1428,
+      "height": 884,
+      "shotAt": "2026-11-03T16:51:49.056Z",
+      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Имена файлов вроде `package.json` оставляю как есть. Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+      "en": {
+        "file": "03-answer.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:53:40.402Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Имена файлов вроде `package.json` оставляю как есть. What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "e6cd837d186265df",
+          "text": "a33ca8773cc4b958"
+        }
+      },
+      "dark": {
+        "file": "03-answer.dark.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:55:31.240Z",
+        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Имена файлов вроде `package.json` оставляю как есть. Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+        "seal": {
+          "png": "84e716d2d00b06d9",
+          "text": "4c914fdc0a3f3413"
+        }
+      },
+      "darkEn": {
+        "file": "03-answer.dark.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:57:24.322Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». Имена файлов вроде `package.json` оставляю как есть. What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "c3edb2a600ba3dc7",
+          "text": "a33ca8773cc4b958"
+        }
+      },
+      "seal": {
+        "png": "547ef87124efceb7",
+        "text": "4c914fdc0a3f3413"
+      }
+    },
+    {
+      "id": "04-refused",
+      "side": "panel",
+      "file": "04-refused.png",
+      "masked": 0,
+      "width": 1428,
+      "height": 884,
+      "shotAt": "2026-11-03T16:51:51.197Z",
+      "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Ядро не провело разговор в песочнице: the model turn ended with an error Здесь появится ответ из песочницы Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+      "en": {
+        "file": "04-refused.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:53:42.526Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox The core did not run the sandbox conversation: the model turn ended with an error The sandbox answer will appear here What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "6831cee1cc0386eb",
+          "text": "49082822140b8ec0"
+        }
+      },
+      "dark": {
+        "file": "04-refused.dark.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:55:33.368Z",
+        "text": "Песочница: Язык общения Проверка в изоляции: Claude Code запускается с временной конфигурацией, где есть только проверяемое. Настоящие настройки не затрагиваются. Правила и скиллы не запускаются сами — они меняют поведение модели. Задайте запрос, в котором проверяемое должно проявиться. Спровоцировать правило Знает ли о правиле Обычная задача Запрос Отправить в песочницу Ядро не провело разговор в песочнице: the model turn ended with an error Здесь появится ответ из песочницы Что подключено Правила Язык общения Доступ к аккаунту Файл настроек Claude Code Границы песочницы Отдельный каталог настроек и своя рабочая папка. Настоящие настройки открыты только на чтение, файл с токенами недоступен, а всё созданное убирается при выходе из песочницы — и в любом случае не позже чем через два часа простоя. Закрыть",
+        "seal": {
+          "png": "7d9914c2ec200a05",
+          "text": "caebadf329bdf668"
+        }
+      },
+      "darkEn": {
+        "file": "04-refused.dark.en.png",
+        "masked": 0,
+        "width": 1428,
+        "height": 884,
+        "shotAt": "2026-11-03T16:57:26.444Z",
+        "text": "Sandbox: Язык общения An isolated check: Claude Code runs with a temporary configuration containing only what you are testing. Your real settings are untouched. Rules and skills do not run on their own — they change how the model behaves. Ask something where the thing you are testing should show up. Provoke the rule Does it know the rule Ordinary task Prompt Send to the sandbox The core did not run the sandbox conversation: the model turn ended with an error The sandbox answer will appear here What is loaded Rules Язык общения Account access Claude Code settings file Sandbox boundaries A separate settings directory and its own working folder. Real settings are read-only, the token file is out of reach, and everything created is wiped when you leave the sandbox — and in any case no later than two hours of idling. Close",
+        "seal": {
+          "png": "595a570f19ab58b0",
+          "text": "49082822140b8ec0"
+        }
+      },
+      "seal": {
+        "png": "36175dab5f2b8ddf",
+        "text": "caebadf329bdf668"
+      }
+    }
+  ]
+}

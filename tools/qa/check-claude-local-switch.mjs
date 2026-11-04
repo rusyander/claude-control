@@ -1,52 +1,79 @@
 /**
  * «Claude Code на этой модели» (раздел «Локальные модели») — на одноразовом
  * стенде, через настоящий UI, настоящий `claude` и настоящий сервер моделей.
+ * Модель держит ЯДРО стенда (удержание `local:own`, этап 10); адрес для CLI —
+ * постоянный порт ядра, здесь — свободный порт проверки (порт продукта 11435
+ * занят панелью человека и не трогается).
  *
  * 1. Карточка агентов показывает галочку, она доступна (модель скачана).
- * 2. Щелчок: `settings.json` стенда получает адрес сервера моделей и модель
+ * 2. Щелчок: `settings.json` стенда получает постоянный адрес ядра и модель
  *    для всех ролей; подпись «Включено».
  * 3. Настоящий `claude -p` (терминал) с каталогом стенда отвечает, и ответ
- *    пришёл от локального сервера: модель загружена в нём (`/api/ps`).
+ *    пришёл от сервера ядра: модель загружена в нём (`GET /models` маршрутизатора).
  * 4. Чат панели (`/chat/send`) отвечает тем же путём.
  * 5. Щелчок обратно: `settings.json` ровно тот, что был до включения.
  *
- * Модели и сборка llama.cpp — настоящие папки панели (`.local-models/models`
- * и `runtime`, junction), а состояние раздела — временная копия настоящего:
- * отметка «Claude уведён» не попадает в `state.json` стенда человека, а
- * перенесённые из Ollama модели в копии уже значатся. Нужна модель
- * `LOCAL_SWITCH_TAG` (по умолчанию qwen3.6:27b-coding) среди скачанных или
- * перенесённых. `~/.claude` человека не трогается.
+ * Сборка llama.cpp — настоящая (`.local-models/runtime`, через `LLAMA_SERVER_BINARY`),
+ * файл модели — жёсткая ссылка во временный каталог раздела (удаление ссылки файл
+ * не трогает), состояние раздела — своё временное: выбор квантования берётся из
+ * настоящего `state.json`, сам он не меняется. Нужна скачанная модель
+ * `LOCAL_SWITCH_TAG` (по умолчанию qwen3.8:27b). `~/.claude` человека не трогается.
  *
- * ЗАМОК: грузит модель ~17 ГБ в видеопамять. Без `ALLOW_LOCAL_MODEL=1` (или
- * прежнего `ALLOW_OLLAMA=1`) — «не проверено», код 2. После прогона сервер
- * снимается, видеопамять печатается (протокол владельца).
+ * ЗАМОК: грузит модель ~17 ГБ в видеопамять. Без `ALLOW_LOCAL_MODEL=1` —
+ * «не проверено», код 2. После прогона сервер снимается, видеопамять
+ * печатается (протокол владельца).
  *
  * Запуск: ALLOW_LOCAL_MODEL=1 node tools/qa/check-claude-local-switch.mjs
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
+import { freePort, NotChecked, reporter, startStand, wait } from './throwaway-stand.mjs';
 
 const REPO = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const PORT = 11435;
+const PORT = await freePort();
 const IS_WIN = process.platform === 'win32';
 
-if (process.env.ALLOW_LOCAL_MODEL !== '1' && process.env.ALLOW_OLLAMA !== '1') {
+if (process.env.ALLOW_LOCAL_MODEL !== '1') {
   console.log('Не проверено: нужен ALLOW_LOCAL_MODEL=1 (грузит локальную модель в видеопамять).');
   process.exit(2);
 }
 const REAL_ROOT = join(REPO, '.local-models');
 const REAL_RUNTIME = join(REAL_ROOT, 'runtime');
 const REAL_STATE = join(REAL_ROOT, 'state.json');
-const model = process.env.LOCAL_SWITCH_TAG || 'qwen3.6:27b-coding';
+const model = process.env.LOCAL_SWITCH_TAG || 'qwen3.8:27b';
 const realState = existsSync(REAL_STATE) ? JSON.parse(readFileSync(REAL_STATE, 'utf8')) : {};
-if (!existsSync(REAL_RUNTIME) || !realState.imported?.[model]) {
+const catalog = JSON.parse(
+  readFileSync(join(REPO, 'apps/server/src/domains/local-models/data/catalog.json'), 'utf8'),
+);
+const entry = catalog.models.find((item) => item.tag === model);
+const quant = entry?.quants.find(
+  (item) => item.id === (realState.choices?.[model]?.quant ?? entry.defaultQuant),
+);
+const source =
+  entry && quant ? join(REAL_ROOT, 'models', ...entry.repo.split('/'), quant.file) : '';
+const build = existsSync(REAL_RUNTIME)
+  ? readdirSync(REAL_RUNTIME)
+      .filter((name) => /^llama-b\d+$/.test(name))
+      .sort()
+      .at(-1)
+  : undefined;
+const binary = build ? join(REAL_RUNTIME, build, IS_WIN ? 'llama-server.exe' : 'llama-server') : '';
+if (!source || !existsSync(source) || !existsSync(binary)) {
   console.log(
-    `Не проверено: нет собранного llama.cpp (${REAL_RUNTIME}) или модели ${model} среди перенесённых (${REAL_STATE}).`,
+    `Не проверено: нет собранного llama.cpp (${binary || REAL_RUNTIME}) или скачанной модели ${model} (${source || 'не в каталоге'}).`,
   );
   process.exit(2);
 }
@@ -74,10 +101,15 @@ const vram = () => {
     return 'nvidia-smi недоступен';
   }
 };
-const props = async () => {
+/** Модели маршрутизатора за постоянным адресом: `{ data: [{ id, status: { value } }] }`. */
+const loadedModels = async () => {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/props`);
-    return res.ok ? await res.json() : undefined;
+    const res = await fetch(`http://127.0.0.1:${PORT}/models`);
+    if (!res.ok) return undefined;
+    const body = await res.json();
+    return (body.data ?? [])
+      .filter((item) => item.status?.value === 'loaded')
+      .map((item) => item.id);
   } catch {
     return undefined;
   }
@@ -88,28 +120,22 @@ async function releaseGpu() {
   if (stand)
     await stand.api('/local-models/server/stop', { method: 'POST' }).catch(() => undefined);
   await wait(2500);
+  const left = await loadedModels();
   console.log(
-    `  сервер моделей после остановки: ${(await props()) ? 'ЕЩЁ ОТВЕЧАЕТ' : 'не отвечает'}`,
+    `  сервер моделей после остановки: ${left?.length ? 'ЕЩЁ ДЕРЖИТ МОДЕЛЬ' : 'модели нет'}`,
   );
   console.log(`  видеопамять после: ${vram()}`);
 }
 
 const localRoot = mkdtempSync(join(tmpdir(), 'cc-local-switch-'));
-// Junction на настоящие модели и сборку: гигабайты не копируются, а состояние раздела своё.
-const LINKS = ['models', 'runtime'];
-for (const name of LINKS) {
-  if (IS_WIN) {
-    execFileSync('cmd', ['/c', 'mklink', '/J', join(localRoot, name), join(REAL_ROOT, name)], {
-      stdio: 'ignore',
-    });
-  } else {
-    execFileSync('ln', ['-s', join(REAL_ROOT, name), join(localRoot, name)]);
-  }
-}
-// В копии — только проверяемая модель: переключатель берёт первую из установленных.
+// Жёсткая ссылка на настоящий файл модели: гигабайты не копируются, удаление ссылки файл не трогает.
+const linked = join(localRoot, 'models', ...entry.repo.split('/'), quant.file);
+mkdirSync(dirname(linked), { recursive: true });
+linkSync(source, linked);
+// Состояние раздела своё: выбор квантования — как у человека, отметка «Claude уведён» — только здесь.
 writeFileSync(
   join(localRoot, 'state.json'),
-  JSON.stringify({ ...realState, imported: { [model]: realState.imported[model] } }),
+  JSON.stringify({ choices: { [model]: { quant: quant.id, context: 32_768 } } }),
 );
 // Стенд не наследует AGENTDECK_* (увели бы его в каталоги человека) — только явным env.
 const realStateBefore = existsSync(REAL_STATE) ? readFileSync(REAL_STATE, 'utf8') : null;
@@ -125,7 +151,12 @@ try {
   stand = await startStand({
     label: 'local-switch-stand',
     extraPath: [claudeDir()],
-    env: { AGENTDECK_LOCAL_MODELS_DIR: localRoot },
+    core: true,
+    env: {
+      AGENTDECK_LOCAL_MODELS_DIR: localRoot,
+      AGENTDECK_LOCAL_FRONT_PORT: String(PORT),
+      LLAMA_SERVER_BINARY: binary,
+    },
   });
   {
     const settingsPath = join(stand.cfg, 'settings.json');
@@ -178,11 +209,14 @@ try {
       cli.stdout?.includes(word),
       `${cli.status} ${cli.stdout?.slice(0, 300)} ${cli.stderr?.slice(0, 300)}`,
     );
-    const served = await props();
+    const served = await loadedModels();
+    // Список маршрутизатора llama.cpp (сборка 11583) пишет метку размера заглавными: `qwen3.8:27B` —
+    // та же модель (ядро сопоставляет так же, `apps/core/src/routes/local/own/model-id.ts`).
+    const sameModel = (id) => typeof id === 'string' && id.toLowerCase() === model.toLowerCase();
     check(
-      'ответ дал локальный сервер: модель загружена в нём',
-      served?.model_alias === model,
-      JSON.stringify(served?.model_alias ?? null),
+      'ответ дал сервер ядра: модель загружена в нём',
+      served?.some(sameModel) === true,
+      JSON.stringify(served ?? null),
     );
 
     // Чат панели: ответ на отправку — поток прогона до конца.
@@ -222,6 +256,7 @@ try {
     const usage = events.find((event) => event.kind === 'usage');
     check(
       'чат панели: ход сделала локальная модель',
+      // Строго имя человека: фронт ядра возвращает имя запроса (траты и каталог считают по нему).
       usage?.model === model,
       JSON.stringify(usage ?? null),
     );
@@ -256,15 +291,9 @@ ${stand.log().slice(-3000)}`);
   // Сервер моделей, поднятый панелью стенда, держит каталог стенда: сперва он.
   await releaseGpu();
   if (stand) await stand.stop().catch((error) => console.log(`  ! стенд: ${error.code ?? error}`));
-  // Сначала junction (rmdir не идёт внутрь), потом остальное.
-  for (const name of LINKS) {
-    if (IS_WIN) spawnSync('cmd', ['/c', 'rmdir', join(localRoot, name)], { stdio: 'ignore' });
-    else rmSync(join(localRoot, name), { force: true });
-  }
-  // Рекурсивное удаление — только когда junction'ы сняты: иначе ушли бы модели.
-  if (!LINKS.some((name) => existsSync(join(localRoot, name)))) {
-    rmSync(localRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-  } else console.log(`  ! junction не снят, каталог оставлен: ${localRoot}`);
+  // Файл модели здесь — жёсткая ссылка: удаление каталога убирает ссылку, настоящий файл остаётся.
+  rmSync(localRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+  check('настоящий файл модели на месте после уборки', existsSync(source), source);
   if (project) {
     try {
       rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });

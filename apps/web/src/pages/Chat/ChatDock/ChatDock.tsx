@@ -40,7 +40,6 @@ export function ChatDock({
   draft,
   onSend,
   onStop,
-  onSplitTasks,
   onHandoff,
   modes,
 }: ChatDockProps) {
@@ -108,7 +107,6 @@ export function ChatDock({
         // отправке, а не второй механизм рядом.
         onRejectFiles={rejectFiles}
         isRunning={isRunning}
-        onSplitTasks={onSplitTasks}
         onHandoff={onHandoff}
         {...(modes ? { modes } : {})}
       />

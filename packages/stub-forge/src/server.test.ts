@@ -29,6 +29,11 @@ async function start(options: StubForgeOptions = {}): Promise<StubForge> {
   return stub;
 }
 
+/** Тело ответа заглушки в той форме, которую тест дальше сверяет `expect`. */
+async function body<T>(response: Response | Promise<Response>): Promise<T> {
+  return (await (await response).json()) as T;
+}
+
 function call(
   s: StubForge,
   path: string,
@@ -64,20 +69,20 @@ describe('stub-forge server', () => {
     expect(created.status).toBe(201);
     const mr = await created.json();
     expect(mr).toMatchObject({ iid: 1, draft: true, title: 'Draft: Add x', state: 'opened' });
-    const list = await (
-      await call(s, '/api/v4/projects/101/merge_requests?source_branch=feat&author_id=1')
-    ).json();
+    const list = await body<Array<{ iid: number }>>(
+      call(s, '/api/v4/projects/101/merge_requests?source_branch=feat&author_id=1'),
+    );
     expect(list.map((m: { iid: number }) => m.iid)).toEqual([1]);
     const none = await (
       await call(s, '/api/v4/projects/101/merge_requests?source_branch=feat&author_id=2')
     ).json();
     expect(none).toEqual([]);
     s.act('reviewer', { type: 'note', mrIid: 1, body: 'why?' });
-    const threads = await (
-      await call(s, '/api/v4/projects/101/merge_requests/1/discussions')
-    ).json();
+    const threads = await body<Array<{ id: string }>>(
+      call(s, '/api/v4/projects/101/merge_requests/1/discussions'),
+    );
     expect(threads).toHaveLength(1);
-    const id = threads[0].id as string;
+    const id = threads[0]!.id;
     const reply = await call(s, `/api/v4/projects/101/merge_requests/1/discussions/${id}/notes`, {
       method: 'POST',
       body: { body: 'because' },
@@ -88,7 +93,10 @@ describe('stub-forge server', () => {
       `/api/v4/projects/101/merge_requests/1/discussions/${id}?resolved=true`,
       { method: 'PUT' },
     );
-    expect((await resolved.json()).notes[1]).toMatchObject({ body: 'because', resolved: true });
+    expect((await body<{ notes: unknown[] }>(resolved)).notes[1]).toMatchObject({
+      body: 'because',
+      resolved: true,
+    });
     const types = s.state().events.map((e) => [e.type, e.authorId]);
     expect(types).toEqual([
       ['mr-open', 1],
@@ -104,9 +112,9 @@ describe('stub-forge server', () => {
     now += 60_000;
     const after = new Date(now - 1).toISOString();
     s.act('publisher', { type: 'mr-open', sourceBranch: 'a', targetBranch: 'main', title: 'New' });
-    const list = await (
-      await call(s, `/api/v4/projects/101/merge_requests?source_branch=a&created_after=${after}`)
-    ).json();
+    const list = await body<Array<{ title: string }>>(
+      call(s, `/api/v4/projects/101/merge_requests?source_branch=a&created_after=${after}`),
+    );
     expect(list.map((m: { title: string }) => m.title)).toEqual(['New']);
     const put = await call(s, '/api/v4/projects/101/merge_requests/2', {
       method: 'PUT',
@@ -132,35 +140,45 @@ describe('stub-forge server', () => {
     ).json();
     expect(byHead).toHaveLength(1);
     const q = { owner: 'acme', name: 'app', number: 1 };
-    const threads = await (
-      await call(s, '/api/graphql', {
+    const threads = await body<{
+      data: {
+        repository: {
+          pullRequest: {
+            reviewThreads: {
+              nodes: Array<{ id: string; comments: { nodes: { body: string }[] } }>;
+            };
+          };
+        };
+      };
+    }>(
+      call(s, '/api/graphql', {
         header: 'github',
         method: 'POST',
         body: { query: 'query { reviewThreads }', variables: q },
-      })
-    ).json();
+      }),
+    );
     const nodes = threads.data.repository.pullRequest.reviewThreads.nodes;
     expect(
       nodes.map((n: { comments: { nodes: { body: string }[] } }) => n.comments.nodes[0]!.body),
     ).toEqual([...REVIEW_THREAD_BODIES]);
-    const reply = await (
-      await call(s, '/graphql', {
+    const reply = await body<{ data: { addPullRequestReviewThreadReply: { comment: unknown } } }>(
+      call(s, '/graphql', {
         header: 'github',
         method: 'POST',
         body: {
           query: 'mutation { addPullRequestReviewThreadReply }',
-          variables: { threadId: nodes[0].id, body: 'done' },
+          variables: { threadId: nodes[0]!.id, body: 'done' },
         },
-      })
-    ).json();
+      }),
+    );
     expect(reply.data.addPullRequestReviewThreadReply.comment).toMatchObject({ body: 'done' });
-    const bad = await (
-      await call(s, '/graphql', {
+    const bad = await body<{ errors: unknown[] }>(
+      call(s, '/graphql', {
         header: 'github',
         method: 'POST',
         body: { query: 'mutation { resolveReviewThread }', variables: { threadId: 'nope' } },
-      })
-    ).json();
+      }),
+    );
     expect(bad.errors).toHaveLength(1);
   });
 
@@ -248,20 +266,90 @@ describe('stub-forge server', () => {
       title: 'T',
       headSha: 'a'.repeat(40),
     });
-    const pipelines = await (
-      await call(s, `/api/v4/projects/101/pipelines?sha=${'a'.repeat(40)}`)
-    ).json();
+    const pipelines = await body<Array<{ status: string; id: number }>>(
+      call(s, `/api/v4/projects/101/pipelines?sha=${'a'.repeat(40)}`),
+    );
     expect(pipelines.map((p: { status: string }) => p.status)).toEqual(['success', 'failed']);
-    const red = pipelines[1].id;
-    const jobs = await (await call(s, `/api/v4/projects/101/pipelines/${red}/jobs`)).json();
+    const red = pipelines[1]!.id;
+    const jobs = await body<unknown[]>(call(s, `/api/v4/projects/101/pipelines/${red}/jobs`));
     expect(jobs[0]).toMatchObject({ status: 'failed', failure_reason: 'runner_system_failure' });
-    const runs = await (
-      await call(s, `/repos/acme/app/actions/runs?head_sha=${'a'.repeat(40)}`, { header: 'github' })
-    ).json();
+    const runs = await body<{ workflow_runs: Array<{ conclusion: string }> }>(
+      call(s, `/repos/acme/app/actions/runs?head_sha=${'a'.repeat(40)}`, { header: 'github' }),
+    );
     expect(runs.workflow_runs.map((r: { conclusion: string }) => r.conclusion)).toEqual([
       'success',
       'failure',
     ]);
+  });
+
+  it('event feeds: newest first, paged like each forge, GitLab day filter, GitHub 300 cap', async () => {
+    let now = Date.parse('2026-01-01T12:00:00Z');
+    const s = await start({ now: () => now });
+    const head = 'b'.repeat(40);
+    s.act('publisher', { type: 'mr-open', sourceBranch: 'feat', targetBranch: 'main', title: 'X' });
+    s.act('publisher', { type: 'push', ref: 'feat', sha: head });
+    s.act('reviewer', { type: 'approval', mrIid: 1 });
+    expect(s.act('publisher', { type: 'mergeability', mrIid: 1, conflict: true })).toMatchObject({
+      iid: 1,
+      headSha: head,
+      conflict: true,
+      checking: false,
+    });
+    s.act('reviewer', { type: 'merge', mrIid: 1 });
+    now += 2 * 86_400_000;
+    s.act('publisher', { type: 'branch-delete', ref: 'feat' });
+    expect(() => s.act('publisher', { type: 'bogus' } as never)).toThrow(/unknown act «bogus»/);
+
+    const lab = await body<Array<{ action_name: string; push_data?: { action: string } }>>(
+      call(s, '/api/v4/projects/101/events'),
+    );
+    expect(lab.map((e) => e.action_name)).toEqual([
+      'deleted',
+      'accepted',
+      'approved',
+      'pushed to',
+      'opened',
+    ]);
+    expect(lab[0]!.push_data).toEqual({ ref: 'feat', ref_type: 'branch', action: 'removed' });
+    // `after` — день: события того же дня и раньше не идут, позже — идут.
+    const later = await body<Array<{ action_name: string }>>(
+      call(s, '/api/v4/projects/101/events?after=2026-01-01'),
+    );
+    expect(later.map((e) => e.action_name)).toEqual(['deleted']);
+    const second = await body<Array<{ action_name: string }>>(
+      call(s, '/api/v4/projects/101/events?per_page=2&page=2'),
+    );
+    expect(second.map((e) => e.action_name)).toEqual(['approved', 'pushed to']);
+
+    const hub = await body<Array<{ type: string; payload: Record<string, unknown> }>>(
+      call(s, '/repos/acme/app/events', { header: 'github' }),
+    );
+    expect(hub.map((e) => e.type)).toEqual([
+      'DeleteEvent',
+      'PullRequestEvent',
+      'PullRequestReviewEvent',
+      'PushEvent',
+      'PullRequestEvent',
+    ]);
+    expect(hub[1]!.payload).toMatchObject({ action: 'closed', pull_request: { merged: true } });
+    expect(hub[3]!.payload).toEqual({ ref: 'refs/heads/feat' });
+
+    for (let i = 0; i < 330; i++) s.act('publisher', { type: 'push', ref: `b${i}`, sha: head });
+    const gitlabPage = await body<unknown[]>(call(s, '/api/v4/projects/101/events'));
+    expect(gitlabPage).toHaveLength(20);
+    const capped = await body<unknown[]>(call(s, '/api/v4/projects/101/events?per_page=500'));
+    expect(capped).toHaveLength(100);
+    const fallback = await body<unknown[]>(
+      call(s, '/repos/acme/app/events?per_page=0', { header: 'github' }),
+    );
+    expect(fallback).toHaveLength(30);
+    const third = await body<Array<{ id: string }>>(
+      call(s, '/repos/acme/app/events?per_page=100&page=3', { header: 'github' }),
+    );
+    expect(third).toHaveLength(100);
+    const past = await call(s, '/repos/acme/app/events?per_page=100&page=4', { header: 'github' });
+    expect(past.status).toBe(422);
+    expect(await past.json()).toEqual({ message: 'pagination is limited for this resource' });
   });
 
   it('refuses reserved panel ports and unknown options', async () => {

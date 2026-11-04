@@ -1,3 +1,4 @@
+import { LOCAL_FRONT_PORT } from '@agentdeck/contracts/core/local-hold';
 import type { LocalClaudeInfo } from '@agentdeck/contracts/local-models';
 import { readJsonFile, writeJsonFile } from '../../lib/safe-io/safe-io.ts';
 import { localError } from './errors.ts';
@@ -79,7 +80,16 @@ export const CLAUDE_SWITCH_VARS = [
   ...LOCAL_RUN_ENV_VARS,
 ] as const;
 
+/**
+ * Адрес, на который включение уводит Claude Code: постоянный порт ядра (`LOCAL_FRONT_PORT`), а не
+ * порт сервера модели — тот ядро выбирает заново при каждом запуске, и settings.json устарел бы.
+ */
+export function coreFrontUrl(port: number = LOCAL_FRONT_PORT): string {
+  return `http://127.0.0.1:${port}`;
+}
+
 export function claudeSwitchEnv(input: {
+  /** Постоянный адрес ядра (`coreFrontUrl`). */
   baseUrl: string;
   model: string;
   context: number;
@@ -133,30 +143,6 @@ function envOf(settings: ClaudeSettingsFile): Record<string, unknown> {
   return settings.env && typeof settings.env === 'object' && !Array.isArray(settings.env)
     ? settings.env
     : {};
-}
-
-/**
- * Переменные переключателя так, как они лежат в settings.json, — для запусков
- * панели БЕЗ слоя `user` (лёгкое окно: помощники, агент панели, наблюдатель).
- * Такой запуск settings.json не читает и без этих переменных ушёл бы в облако
- * Claude, хотя человек увёл Claude на локальную модель (живой прогон 08.10:
- * «Not logged in» при включённом переключателе). Только наши переменные — прочее
- * окружение человека лёгкое окно не берёт намеренно. Сломанный файл — пусто:
- * окно ответит отказом облака, а не уронит маршрут.
- */
-export function readSwitchEnv(settingsPath: string): Record<string, string> {
-  let env: Record<string, unknown>;
-  try {
-    env = envOf(readSettings(settingsPath));
-  } catch {
-    return {};
-  }
-  const picked: Record<string, string> = {};
-  for (const key of CLAUDE_SWITCH_VARS) {
-    const value = env[key];
-    if (typeof value === 'string') picked[key] = value;
-  }
-  return picked;
 }
 
 /**

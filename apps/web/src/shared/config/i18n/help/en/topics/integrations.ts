@@ -242,14 +242,11 @@ export const integrationsEn: typeof integrationsRu = {
         'retells the answer in words and adds whether the body was signed.',
       notifyEvents: '3. What to write about is picked with checkboxes',
       notifyEventsText:
-        'Seven events: run finished, run failed, case failed, agent asks for permission, ' +
-        'agent asked a question, contour budget running out and a group watch signal ' +
-        '(“attention” and “alarm”). This is the webhook list; Telegram gathers the same ' +
-        'events into three groups (step 5), but each ' +
-        'card ticks its own — an on-call bot usually wants failures only. The group watch ' +
-        'signal is ticked by default in new settings. A Telegram card that got the signals ' +
-        'before keeps getting them: the tick is set in its list automatically, once. A ' +
-        'webhook saved earlier needs it ticked by hand.',
+        'Six events: run finished, run failed, case failed, agent asks for permission, ' +
+        'agent asked a question and contour budget running out. This is the webhook list; ' +
+        'Telegram gathers the same events into three groups (step 5), but each card ticks ' +
+        'its own — an on-call bot usually wants failures only. Core signals about a task’s ' +
+        'progress do not come here: they show in the task feed.',
       notifyTelegram: '4. Telegram: two steps to connect',
       notifyTelegramText:
         'Until Telegram is connected, the card shows only two steps. “1. Bot” — a token ' +
@@ -264,7 +261,7 @@ export const integrationsEn: typeof integrationsRu = {
         'first line, in bold, is the kind, the project after a folder mark and the session ' +
         '(up to 40 characters): “✅ Задача закрыта · 📁 shop · Аудит проекта”, “⏳ Агент ' +
         'ждёт вас · …”, “❓ ВОПРОС 1/3 · …” and “🔐 РАЗРЕШЕНИЕ · …” (with buttons), “⏳ ' +
-        'ОТЛОЖЕНО D-3 · …”, “🛑 ОШИБКА · …”, “🧪 ТЕСТЫ · …”, “⚠️ ТРЕВОГА · …”; another CLI, ' +
+        'ОТЛОЖЕНО D-3 · …”, “🛑 ОШИБКА · …”, “🧪 ТЕСТЫ · …”; another CLI, ' +
         'VS Code and the terminal go between the project and the session: “📁 shop · Codex · ' +
         'Аудит проекта”, “📁 shop · VS Code · …”; with no known project there is no mark. ' +
         'The second line is the essence, exactly once: for “Задача закрыта” one or two ' +
@@ -272,8 +269,8 @@ export const integrationsEn: typeof integrationsRu = {
         'with its options as a numbered list when they are named, or “Нужно разрешение:” and ' +
         'the tool; for a question with buttons its text (up to 300 characters, then ' +
         '“…полностью в панели”), the description or the command itself (up to 80 ' +
-        'characters), what to decide on a D-n, “Агент упал”, “5 из 120 упали”, what ' +
-        'happened to the group. A turn end carries “шёл 12 мин” under the essence. Options ' +
+        'characters), what to decide on a D-n, “Агент упал”, “5 из 120 упали”. ' +
+        'A turn end carries “шёл 12 мин” under the essence. Options ' +
         'of a question with buttons come as a numbered list only ' +
         'when at least one has a description; otherwise the buttons are enough. The command, ' +
         '“why you decide”, the group and the rule code are folded into a quote, and the last ' +
@@ -311,9 +308,8 @@ export const integrationsEn: typeof integrationsRu = {
         'ended only from its Stop hook in the Claude Code settings (“Agent on the computer” ' +
         'in the phone app writes it): no hook, or the panel closed at that moment — no ' +
         'message; a turn the Stop hook pushed back or a message from the phone continued has ' +
-        'not ended. “Something broke” — a failed run, red tests, ' +
-        'a group stuck or going in circles (a watch “attention” does not go to Telegram, ' +
-        'only an alarm). One Save writes everything; if half of it did not save, the card ' +
+        'not ended. “Something broke” — a failed run and red tests. One Save writes ' +
+        'everything; if half of it did not save, the card ' +
         'says which half. Buttons and answers are taken only from your id in the private ' +
         'chat with the bot; a button is signed and works once, and a press on a question ' +
         'that is gone answers “уже не актуально” and sends nothing to the chat. When ' +
@@ -325,6 +321,13 @@ export const integrationsEn: typeof integrationsRu = {
         'as text, and the bot answers “✉️ Отправлено в «чат»”. A reply to an open question ' +
         'answers it, to a closed one it is a normal message to the chat; a reply to a ' +
         'question without buttons sends nothing — the bot reminds you where to answer. A ' +
+        'task-core question (“Ядро ждёт ответа”) arrives without buttons, and a reply to it is ' +
+        'not passed to the core: the bot refuses with a link to the task, because such a question ' +
+        'takes an answer only in the panel or from the phone, where it is signed with the device key. The ' +
+        'same holds for a permission question in a chat the core runs (the «Core question» card in the ' +
+        'window): in Telegram it arrives only as that notice, with no Allow or Deny. A press on a button ' +
+        'of an older message about such a question collapses it into “🔒 Ответ ядру — в панели или с ' +
+        'телефона · …” and decides nothing: the question waits for an answer in the window. A ' +
         'VS Code or terminal session gets the message through the hook, never as a new ' +
         'panel run. Photos and image ' +
         'files (and PDF) up to 20 MB together go with the text as attachments; an album ' +
@@ -388,7 +391,10 @@ export const integrationsEn: typeof integrationsRu = {
     storageCoreReadValue:
       'the task core — the GitLab or GitHub key under the same name, for its tasks’ MRs (create, ' +
       'edit the description, answer review threads); it only reads the store, and its journal ' +
-      'gets the kind of access, never the key itself',
+      'gets the kind of access, never the key itself. It also takes the address of every ' +
+      'enabled GitLab or GitHub card: your MCP server that talks to that site (or to the cloud) ' +
+      'only reads in a core task — only the core publishes. The address is read on every step, ' +
+      'so a card edit takes effect without a restart',
     storageHealth: 'Check verdicts',
     storageHealthValue: 'agentdeck/state.json → integrationHealth (state, reason, account)',
     storageLinks: 'Project links',

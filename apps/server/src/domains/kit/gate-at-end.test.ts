@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -66,12 +66,9 @@ function run(event: 'pre' | 'prompt', payload: object, env: NodeJS.ProcessEnv = 
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       // Своё место состояния: проект внутри него был бы для secret-guard записью в хранилище разрешений.
       AGENTDECK_KIT_STATE: join(dir, 'state'),
-      // A panel group running this suite must not leak its own stage into the hook under test.
-      AGENTDECK_GROUP_STAGE: '',
-      AGENTDECK_GROUP_DELIVER_AHEAD: '',
       ...env,
     },
     timeout: 15_000,
@@ -127,10 +124,7 @@ describe('gate-at-end: полный гейт один раз в конце вс�
     expect(pre({ command }, [prompt('сделай')])).toBe('deny');
   });
 
-  it('группа разделения и локальная модель гоняют гейт на переднем плане', () => {
-    expect(
-      pre({ command: GATE }, [prompt('сделай')], { AGENTDECK_HEAVY_QUEUE_DIR: dir }),
-    ).toBeUndefined();
+  it('локальная модель гоняет гейт на переднем плане', () => {
     expect(
       pre({ command: GATE }, [prompt('сделай')], { AGENTDECK_KIT_VARIANT: 'local' }),
     ).toBeUndefined();
@@ -319,7 +313,8 @@ describe('gate-at-end: полный гейт один раз в конце вс�
     // `> log; echo fe=$?; tail` завершается кодом tail (0): гейт, упавший на старой Node за 3 с,
     // читался зелёным, и его повтор на нужной Node отклонялся как «ничего не правилось» (g0 26.10).
     const fe = `${GATE} > tmp-fe.log 2>&1; echo fe=$?; tail -5 tmp-fe.log`;
-    const env = { AGENTDECK_HEAVY_QUEUE_DIR: dir };
+    // Передний план разрешён локальной модели — им и гоняется гейт с замаскированным кодом.
+    const env = { AGENTDECK_KIT_VARIANT: 'local' };
     const history = (id: string, body: string) => [
       prompt('сделай'),
       use('Bash', { command: fe }, id),
@@ -467,586 +462,67 @@ describe('gate-at-end: полный гейт один раз в конце вс�
 });
 
 /**
- * Группа разделения (владелец 23.10): полный гейт — один на группу, в стадии доставки. Каждая стадия —
- * новая сессия, поэтому «первый гейт сессии бесплатен» обнулялся на каждой; журнал копии по дереву
- * git переживает стадии. Репозиторий настоящий, во временном каталоге: дерево считает сам git.
+ * Скрипты проекта и отказ движка — правила сессии. Стадий группы в хуке больше нет: полный гейт задачи
+ * ведёт ядро шагом `final-gate`, повторы по ключу дерева — его служба проверок.
  */
-describe('gate-at-end: группа гоняет полный гейт один раз, в доставке', () => {
-  const git = (cwd: string, ...args: string[]) => {
-    const out = spawnSync('git', args, { cwd, encoding: 'utf8' });
-    if (out.status !== 0) throw new Error(`git ${args.join(' ')}: ${out.stderr}`);
-    return out.stdout.trim();
-  };
-  const repo = () => {
-    const root = mkdtempSync(join(dir, 'repo-'));
-    git(root, 'init', '-q');
-    git(root, 'config', 'user.email', 't@example.com');
-    git(root, 'config', 'user.name', 't');
-    writeFileSync(join(root, 'a.ts'), 'export const a = 1;\n');
-    git(root, 'add', '-A');
-    git(root, 'commit', '-qm', 'init');
-    return root;
-  };
-  const GROUP = { AGENTDECK_HEAVY_QUEUE_DIR: dir };
-  const gate = (
-    cwd: string,
-    id: string,
-    path: string,
-    env: NodeJS.ProcessEnv,
-    command = GATE,
-  ): { decision?: string; reason: string } => {
-    const out = run(
-      'pre',
-      {
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command },
-        tool_use_id: id,
-        cwd,
-        transcript_path: path,
-      },
-      { ...GROUP, ...env },
-    );
-    const parsed = out
-      ? (JSON.parse(out) as {
-          hookSpecificOutput?: { permissionDecision?: string; permissionDecisionReason?: string };
-        })
-      : {};
-    return {
-      decision: parsed.hookSpecificOutput?.permissionDecision,
-      reason: parsed.hookSpecificOutput?.permissionDecisionReason ?? '',
-    };
-  };
+describe('gate-at-end: скрипты проекта и отказ движка', () => {
+  const foreground = (command: string) => pre({ command }, [prompt('сделай')]);
 
-  it('стадия работы с доставкой впереди — отказ, и повтор его не снимает', () => {
-    const cwd = repo();
-    const env = { AGENTDECK_GROUP_STAGE: 'work', AGENTDECK_GROUP_DELIVER_AHEAD: '1' };
-    const first = gate(cwd, 'w1', transcript([prompt('сделай')]), env);
-    expect(first.decision).toBe('deny');
-    expect(first.reason).toContain('delivery stage');
-    const refused = `PreToolUse:Bash hook error: ${first.reason}`;
-    const again = transcript([
-      prompt('сделай'),
-      use('Bash', { command: GATE }, 'w1'),
-      result('w1', refused),
-    ]);
-    expect(gate(cwd, 'w2', again, env).decision).toBe('deny');
-    // Доставки впереди нет (группа без доставки) — гейт этой стадии и есть единственный.
-    expect(
-      gate(cwd, 'w3', transcript([prompt('сделай')]), { AGENTDECK_GROUP_STAGE: 'work' }).decision,
-    ).toBeUndefined();
-    // Сама доставка гонит гейт.
-    expect(
-      gate(cwd, 'w4', transcript([prompt('доставь')]), {
-        AGENTDECK_GROUP_STAGE: 'deliver',
-        AGENTDECK_GROUP_DELIVER_AHEAD: '1',
-      }).decision,
-    ).toBeUndefined();
-  });
-
-  it('гейт на том же дереве в прошлой стадии — отказ со ссылкой на его итог; правка дерева — снова можно', () => {
-    const cwd = repo();
-    const fix = { AGENTDECK_GROUP_STAGE: 'fix' };
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    // Стадия правки: гейт разрешён и записан в журнал копии.
-    const fixPath = transcript([prompt('поправь')]);
-    expect(gate(cwd, 'f1', fixPath, fix).decision).toBeUndefined();
-    writeFileSync(
-      fixPath,
-      [prompt('поправь'), use('Bash', { command: GATE }, 'f1'), result('f1', 'all green')]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    // Доставка, новая сессия, то же дерево: итог уже есть.
-    const same = gate(cwd, 'd1', transcript([prompt('доставь')]), deliver);
-    expect(same.decision).toBe('deny');
-    expect(same.reason).toContain('already ran on exactly this tree');
-    expect(same.reason).toContain('green');
-    expect(same.reason).toContain('f1');
-    // Неотслеживаемый файл тоже меняет дерево: add -A в копию индекса.
-    writeFileSync(join(cwd, 'b.ts'), 'export const b = 2;\n');
-    expect(gate(cwd, 'd2', transcript([prompt('доставь')]), deliver).decision).toBeUndefined();
-    // Настоящий индекс копии не тронут.
-    expect(git(cwd, 'status', '--porcelain')).toBe('?? b.ts');
-  });
-
-  // g3 25.10: rule-card отклонил гейт доставки, а журнал копии уже записал его как прогон — повтор
-  // получил «уже шёл на этом дереве — red» со ссылкой на вызов, который не исполнялся.
-  it('гейт, отклонённый другим хуком, — не прогон: повтор на том же дереве проходит', () => {
-    const cwd = repo();
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    const path = transcript([prompt('доставь')]);
-    expect(gate(cwd, 'b1', path, deliver).decision).toBeUndefined();
-    writeFileSync(
-      path,
-      [prompt('доставь'), use('Bash', { command: GATE }, 'b1'), blockedBy('b1', RULE_CARD)]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    expect(gate(cwd, 'b2', path, deliver)).toEqual({ decision: undefined, reason: '' });
-  });
-
-  it('гейт на том же дереве ещё идёт в фоне другой стадии — отказ «ещё идёт»', () => {
-    const cwd = repo();
-    const env = { AGENTDECK_GROUP_STAGE: 'review' };
-    const first = transcript([prompt('проверь')]);
-    expect(gate(cwd, 'r1', first, env).decision).toBeUndefined();
-    writeFileSync(
-      first,
-      [
-        prompt('проверь'),
-        use('Bash', { command: GATE, run_in_background: true }, 'r1'),
-        result('r1', 'Command running in background with ID: bz1. Output is being written to: x'),
-      ]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    const second = gate(cwd, 'r2', transcript([prompt('проверь')]), {
-      AGENTDECK_GROUP_STAGE: 'fix',
-    });
-    expect(second.decision).toBe('deny');
-    expect(second.reason).toContain('still running');
-    expect(second.reason).toContain('Repeat this exact call only if that run is gone');
-  });
-
-  it('F-80: правка игнорируемого .env.local меняет ключ дерева; лог гейта под .gitignore — нет', () => {
-    const cwd = repo();
-    writeFileSync(join(cwd, '.gitignore'), '.env.local\n*.log\n');
-    git(cwd, 'add', '-A');
-    git(cwd, 'commit', '-qm', 'ignore');
-    writeFileSync(join(cwd, '.env.local'), 'VITE_X=1\n');
-    const fix = { AGENTDECK_GROUP_STAGE: 'fix' };
-    const fixPath = transcript([prompt('поправь')]);
-    expect(gate(cwd, 'f1', fixPath, fix).decision).toBeUndefined();
-    writeFileSync(
-      fixPath,
-      [prompt('поправь'), use('Bash', { command: GATE }, 'f1'), result('f1', 'all green')]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    // Свой лог гейта (игнорируемый) — то же дерево, итог прошлой стадии в силе.
-    writeFileSync(join(cwd, 'gate.log'), 'all green\n');
-    expect(gate(cwd, 'd1', transcript([prompt('доставь')]), deliver).decision).toBe('deny');
-    // Игнорируемый вход проверки сменился — прошлый зелёный ничего о нём не говорит.
-    writeFileSync(join(cwd, '.env.local'), 'VITE_X=2\n');
-    expect(gate(cwd, 'd2', transcript([prompt('доставь')]), deliver).decision).toBeUndefined();
-  });
-
-  /** Зелёный гейт стадии правок на дереве копии — запись в журнал и разговор с итогом. */
-  const greenIn = (cwd: string, id: string, command = GATE): void => {
-    const fixPath = transcript([prompt('поправь')]);
-    expect(
-      gate(cwd, id, fixPath, { AGENTDECK_GROUP_STAGE: 'fix' }, command).decision,
-    ).toBeUndefined();
-    writeFileSync(
-      fixPath,
-      [prompt('поправь'), use('Bash', { command }, id), result(id, 'all green')]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-  };
-
-  it('RF-BGCD-12d: игнорируемый .env* пакета монорепозитория тоже входит в ключ дерева', () => {
-    const cwd = repo();
-    mkdirSync(join(cwd, 'apps', 'web'), { recursive: true });
-    writeFileSync(join(cwd, '.gitignore'), '.env*\nnode_modules/\n');
-    writeFileSync(join(cwd, 'apps', 'web', 'a.ts'), 'export const w = 1;\n');
-    git(cwd, 'add', '-A');
-    git(cwd, 'commit', '-qm', 'monorepo');
-    writeFileSync(join(cwd, 'apps', 'web', '.env.local'), 'VITE_X=1\n');
-    mkdirSync(join(cwd, 'apps', 'web', 'node_modules'), { recursive: true });
-    writeFileSync(join(cwd, 'apps', 'web', 'node_modules', '.modules.yaml'), 'a: 1\n');
-    greenIn(cwd, 'f1');
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    expect(gate(cwd, 'd1', transcript([prompt('доставь')]), deliver).decision).toBe('deny');
-    writeFileSync(join(cwd, 'apps', 'web', '.env.local'), 'VITE_X=2\n');
-    expect(gate(cwd, 'd2', transcript([prompt('доставь')]), deliver).decision).toBeUndefined();
-    greenIn(cwd, 'f2');
-    expect(gate(cwd, 'd3', transcript([prompt('доставь')]), deliver).decision).toBe('deny');
-    // Переустановленные зависимости пакета — тоже другой вход.
-    writeFileSync(join(cwd, 'apps', 'web', 'node_modules', '.modules.yaml'), 'a: 2\n');
-    expect(gate(cwd, 'd4', transcript([prompt('доставь')]), deliver).decision).toBeUndefined();
-  });
-
-  it('RF-BGCD-11: зелёный гейт одного пакета (`cd backend &&`) не засчитывается другому', () => {
-    const cwd = repo();
-    for (const pkg of ['backend', 'frontend']) {
-      mkdirSync(join(cwd, pkg), { recursive: true });
-      writeFileSync(join(cwd, pkg, 'x.ts'), `export const ${pkg} = 1;\n`);
-    }
-    git(cwd, 'add', '-A');
-    git(cwd, 'commit', '-qm', 'packages');
-    greenIn(cwd, 'f1', `cd backend && ${GATE}`);
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    const other = gate(
-      cwd,
-      'd1',
-      transcript([prompt('доставь')]),
-      deliver,
-      `cd frontend && ${GATE}`,
-    );
-    expect(other.decision).toBeUndefined();
-    // Тот же пакет на том же дереве — итог прошлой стадии в силе.
-    const same = gate(cwd, 'd2', transcript([prompt('доставь')]), deliver, `cd backend && ${GATE}`);
-    expect(same.decision).toBe('deny');
-    expect(same.reason).toContain('already ran on exactly this tree');
-  });
-
-  it('F-79: фоновый гейт стадии, умершей без уведомления, через час не держит следующую стадию', () => {
-    const cwd = repo();
-    const first = transcript([prompt('проверь')]);
-    expect(gate(cwd, 'r1', first, { AGENTDECK_GROUP_STAGE: 'review' }).decision).toBeUndefined();
-    writeFileSync(
-      first,
-      [
-        prompt('проверь'),
-        use('Bash', { command: GATE, run_in_background: true }, 'r1'),
-        result('r1', 'Command running in background with ID: bz1. Output is being written to: x'),
-      ]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    // Стадия ушла два часа назад, уведомления о фоне так и нет.
-    const ledgerFile = join(git(cwd, 'rev-parse', '--absolute-git-dir'), 'agentdeck-gates.json');
-    const ledger = JSON.parse(readFileSync(ledgerFile, 'utf8')) as { runs: Array<{ ts: number }> };
-    for (const entry of ledger.runs) entry.ts = Date.now() - 2 * 60 * 60_000;
-    writeFileSync(ledgerFile, JSON.stringify(ledger));
-    const next = gate(cwd, 'f1', transcript([prompt('поправь')]), { AGENTDECK_GROUP_STAGE: 'fix' });
-    expect(next.decision).toBeUndefined();
-  });
-
-  it('выключить журнал проверок из команды группы нельзя — и повтором тоже; вне группы — можно', () => {
-    const cwd = repo();
-    const cmds = [
-      'AGENTDECK_VERIFY_LEDGER=off npx vitest run src/a.test.ts',
-      'AGENTDECK_VERIFY_LEDGER_DELTA=off pnpm test',
-      "$env:AGENTDECK_VERIFY_LEDGER='shadow'; npx vitest run",
-      'env -u AGENTDECK_VERIFY_LEDGER_LOCK npx vitest run',
-      'AGENTDECK_VERIFY_LEDGER_LOCK= npx vitest run',
-    ];
-    for (const command of cmds) {
-      const path = transcript([
-        prompt('сделай'),
-        use('Bash', { command }, 'v0'),
-        result('v0', 'PreToolUse:Bash hook error: [ctx-guard] gate-at-end: the verify ledger …'),
-      ]);
-      const payload = {
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command },
-        tool_use_id: 'v1',
-        cwd,
-        transcript_path: path,
-      };
-      expect(decision(run('pre', payload, { AGENTDECK_GROUP_STAGE: 'fix' })), command).toBe('deny');
-      expect(decision(run('pre', payload)), command).toBeUndefined();
-    }
-    // Упоминание без выключения — не обход.
-    const read = transcript([prompt('сделай')]);
-    const grep = {
-      hook_event_name: 'PreToolUse',
-      tool_name: 'Bash',
-      tool_input: { command: 'grep -rn AGENTDECK_VERIFY_LEDGER_HOME tools' },
-      tool_use_id: 'v2',
-      cwd,
-      transcript_path: read,
-    };
-    expect(decision(run('pre', grep, { AGENTDECK_GROUP_STAGE: 'fix' }))).toBeUndefined();
-  });
-
-  const groupPre = (command: string, env: NodeJS.ProcessEnv, cwd?: string, id = 'x1') =>
-    decision(
-      run(
-        'pre',
-        {
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Bash',
-          tool_input: { command },
-          tool_use_id: id,
-          ...(cwd ? { cwd } : {}),
-          transcript_path: transcript([prompt('сделай')]),
-        },
-        { ...GROUP, ...env },
-      ),
-    );
-
-  it('F-35: узкий скрипт проекта scripts/check_<x> — не гейт; гейт — только скрипт из списка, головой команды', () => {
-    const work = { AGENTDECK_GROUP_STAGE: 'work', AGENTDECK_GROUP_DELIVER_AHEAD: '1' };
+  // F-35, F1b (группа №1 24.10: `check_frontend_tests.mjs` — 12 из 27 полных прогонов, хуку не видны).
+  it('узкий скрипт scripts/check_<x> — не гейт; скрипт из списка головой команды — гейт', () => {
     for (const narrow of [
       'node scripts/check_i18n.mjs',
       'node scripts/check_windows_paths.mjs',
       'python scripts/check_help_keys.py',
       'npx eslint scripts/check_all.mjs',
       'npx prettier --check scripts/check_backend.py',
+      'npx eslint scripts/check_frontend_tests.mjs',
     ])
-      expect(groupPre(narrow, work), narrow).toBeUndefined();
+      expect(foreground(narrow), narrow).toBeUndefined();
     for (const full of [
       'node scripts/check_all.mjs',
       'python scripts/check_backend.py',
       'cd app && node ./scripts/check_frontend.mjs > ../gate.log 2>&1',
-    ])
-      expect(groupPre(full, work), full).toBe('deny');
-  });
-
-  it('F-36: зелёный гейт одного скрипта не засчитывается другому на том же дереве', () => {
-    const cwd = repo();
-    const backend = 'python scripts/check_backend.py';
-    const fixPath = transcript([prompt('поправь')]);
-    expect(groupPre(backend, { AGENTDECK_GROUP_STAGE: 'fix' }, cwd, 'b1')).toBeUndefined();
-    writeFileSync(
-      fixPath,
-      [prompt('поправь'), use('Bash', { command: backend }, 'b1'), result('b1', 'all green')]
-        .map((r) => JSON.stringify(r))
-        .join('\n') + '\n',
-    );
-    // Журнал копии ссылается на разговор прогона: подменяем путь на записанный.
-    const ledgerFile = join(git(cwd, 'rev-parse', '--absolute-git-dir'), 'agentdeck-gates.json');
-    const ledger = JSON.parse(readFileSync(ledgerFile, 'utf8')) as {
-      runs: Array<{ transcript: string }>;
-    };
-    for (const entry of ledger.runs) entry.transcript = fixPath;
-    writeFileSync(ledgerFile, JSON.stringify(ledger));
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    expect(groupPre('node scripts/check_frontend.mjs', deliver, cwd, 'd1')).toBeUndefined();
-    // Тот же скрипт (другой лог) на том же дереве — его итог есть.
-    expect(groupPre(`${backend} > .agent/tmp/b.log 2>&1`, deliver, cwd, 'd2')).toBe('deny');
-  });
-
-  it('F-37: чтение кода журнала в группе — не обход; присвоение и снятие замка — обход', () => {
-    const fix = { AGENTDECK_GROUP_STAGE: 'fix' };
-    for (const read of [
-      'grep -rn AGENTDECK_VERIFY_LEDGER_LOCK tools',
-      'grep -rn "AGENTDECK_VERIFY_LEDGER_LOCK=" tools',
-      'rg AGENTDECK_VERIFY_LEDGER_LOCK= apps/server',
-      'echo $AGENTDECK_VERIFY_LEDGER_LOCK',
-      'grep -n NODE_OPTIONS tools/verify-ledger/ledger.cjs',
-    ])
-      expect(groupPre(read, fix), read).toBeUndefined();
-    for (const escape of [
-      'AGENTDECK_VERIFY_LEDGER_LOCK= npx vitest run',
-      'export AGENTDECK_VERIFY_LEDGER_LOCK=0 && pnpm test',
-      'unset AGENTDECK_VERIFY_LEDGER_LOCK; pnpm test',
-      "$env:AGENTDECK_VERIFY_LEDGER_LOCK=''; npx vitest run",
-    ])
-      expect(groupPre(escape, fix), escape).toBe('deny');
-  });
-
-  it('F-30: снять preload журнала или увести его дом из команды группы нельзя; дописать к NODE_OPTIONS — можно', () => {
-    const fix = { AGENTDECK_GROUP_STAGE: 'fix' };
-    for (const escape of [
-      'NODE_OPTIONS= npx vitest run src/a.test.ts',
-      'NODE_OPTIONS="" pnpm test',
-      'NODE_OPTIONS=--max-old-space-size=8192 pnpm test',
-      'env -i PATH="$PATH" pnpm test',
-      'env --ignore-environment pnpm test',
-      'env -u NODE_OPTIONS pnpm test',
-      'unset NODE_OPTIONS; pnpm test',
-      "$env:NODE_OPTIONS=''; npx vitest run",
-      'set NODE_OPTIONS= && pnpm test',
-      'npx cross-env NODE_OPTIONS= vitest run',
-      'AGENTDECK_VERIFY_LEDGER_HOME=/tmp/fresh pnpm test',
-      'export AGENTDECK_VERIFY_LEDGER_HOME=/tmp/fresh && pnpm test',
-      'env -u AGENTDECK_VERIFY_LEDGER_HOME pnpm test',
-    ])
-      expect(groupPre(escape, fix), escape).toBe('deny');
-    for (const fine of [
-      'NODE_OPTIONS="$NODE_OPTIONS --max-old-space-size=8192" pnpm test',
-      'NODE_OPTIONS="${NODE_OPTIONS} --inspect" node a.js',
-      '$env:NODE_OPTIONS="$env:NODE_OPTIONS --max-old-space-size=8192"; pnpm test',
-      'echo "$NODE_OPTIONS"',
-    ])
-      expect(groupPre(fine, fix), fine).toBeUndefined();
-    // Вне группы — выбор человека.
-    expect(
-      decision(
-        run('pre', { tool_name: 'Bash', tool_input: { command: 'NODE_OPTIONS= pnpm test' } }),
-      ),
-    ).not.toBe('deny');
-  });
-
-  /**
-   * RF-BGCD-08: любое упоминание `$NODE_OPTIONS` считалось «сохранить», а
-   * обёртки и встроенные команды вне префикса не читались — каждая форма ниже
-   * живьём (Git Bash) оставляла потомку `NODE_OPTIONS` пустым или неопределённым.
-   * Правило теперь обратное: упоминание проходит, только если это голое
-   * раскрытие (`$NODE_OPTIONS`, `${NODE_OPTIONS}`) или присвоение, что его
-   * сохраняет, либо звено лишь читает (echo, grep, git log …).
-   */
-  /** Отказ именно стража журнала, а не соседнего правила набора. */
-  const ledgerPre = (command: string, cwd?: string): string => {
-    const out = run(
-      'pre',
-      {
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command },
-        tool_use_id: 'l1',
-        ...(cwd ? { cwd } : {}),
-        transcript_path: transcript([prompt('сделай')]),
-      },
-      { ...GROUP, AGENTDECK_GROUP_STAGE: 'fix' },
-    );
-    if (!out) return 'pass';
-    const spec = (JSON.parse(out) as { hookSpecificOutput?: Record<string, string> })
-      .hookSpecificOutput;
-    return spec?.permissionDecision === 'deny' &&
-      String(spec.permissionDecisionReason).includes('verify ledger is not switched off')
-      ? 'ledger'
-      : `other:${spec?.permissionDecision ?? 'none'}`;
-  };
-
-  it('RF-BGCD-08: переписать или снять NODE_OPTIONS иной формой — тоже обход', () => {
-    for (const escape of [
-      'NODE_OPTIONS="${NODE_OPTIONS/preload-locked.cjs/nope}" pnpm test',
-      'NODE_OPTIONS="${NODE_OPTIONS%%--require*}" pnpm test',
-      'NODE_OPTIONS=${NODE_OPTIONS:0:0} pnpm test',
-      "NODE_OPTIONS='$NODE_OPTIONS' pnpm test",
-      'export -n NODE_OPTIONS; pnpm test',
-      'declare +x NODE_OPTIONS; pnpm test',
-      'typeset +x NODE_OPTIONS && pnpm test',
-      "bash -c 'unset NODE_OPTIONS; pnpm test'",
-      'sh -c "NODE_OPTIONS= pnpm test"',
-      "eval 'unset NODE_OPTIONS'; pnpm test",
-      'nice env -u NODE_OPTIONS pnpm test',
-      'time env -u NODE_OPTIONS pnpm test',
-      'npx --yes cross-env NODE_OPTIONS= vitest run',
-      'pnpm dlx cross-env NODE_OPTIONS= vitest run',
-      "cmd //c 'set NODE_OPTIONS=&& pnpm test'",
-      'Clear-Item Env:NODE_OPTIONS; pnpm test',
-      "[Environment]::SetEnvironmentVariable('NODE_OPTIONS', $null, 'Process'); pnpm test",
-      'Set-Item env:NODE_OPTIONS ""; pnpm test',
-      "$env:NODE_OPTIONS = ''; pnpm test",
-      'printf -v NODE_OPTIONS "" && pnpm test',
-      "node -e \"delete process.env.NODE_OPTIONS; require('child_process').execSync('pnpm test')\"",
-      "bash -c 'AGENTDECK_VERIFY_LEDGER_HOME=/tmp/x pnpm test'",
-      'nice AGENTDECK_VERIFY_LEDGER_LOCK= pnpm test',
-    ])
-      expect(ledgerPre(escape), escape).toBe('ledger');
-    for (const fine of [
-      'NODE_OPTIONS="$NODE_OPTIONS --max-old-space-size=8000" pnpm test',
-      'NODE_OPTIONS+=" --inspect" node a.js',
-      "$env:NODE_OPTIONS += ' --inspect'; node a.js",
-      'echo NODE_OPTIONS= ; pnpm test',
-      'printenv NODE_OPTIONS',
-      'git log -S NODE_OPTIONS --oneline',
-      'git log --grep "NODE_OPTIONS=" --oneline',
-      'grep -rn "unset NODE_OPTIONS" tools',
-      'npx vitest run src/node_options.test.ts',
-    ])
-      expect(ledgerPre(fine), fine).toBe('pass');
-  });
-
-  it('RF-BGCD-08: снятие NODE_OPTIONS внутри скрипта гейта — тот же обход', () => {
-    const cwd = repo();
-    mkdirSync(join(cwd, '.agent', 'tmp'), { recursive: true });
-    writeFileSync(join(cwd, '.agent', 'tmp', 'gate.sh'), 'unset NODE_OPTIONS\npnpm test\n');
-    writeFileSync(join(cwd, '.agent', 'tmp', 'ok.sh'), 'echo "$NODE_OPTIONS"\npnpm test\n');
-    expect(ledgerPre('bash .agent/tmp/gate.sh', cwd)).toBe('ledger');
-    expect(ledgerPre('bash .agent/tmp/ok.sh', cwd)).toBe('pass');
-  });
-
-  it('вне git и без стадии журнала нет — прежние правила сессии', () => {
-    const plain = mkdtempSync(join(dir, 'plain-'));
-    const env = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    expect(gate(plain, 'p1', transcript([prompt('доставь')]), env).decision).toBeUndefined();
-    expect(gate(plain, 'p2', transcript([prompt('доставь')]), env).decision).toBeUndefined();
-    const cwd = repo();
-    expect(gate(cwd, 'n1', transcript([prompt('сделай')]), {}).decision).toBeUndefined();
-    expect(gate(cwd, 'n2', transcript([prompt('сделай')]), {}).decision).toBeUndefined();
-  });
-
-  // Группа №1 24.10: тестовый гейт проекта `check_frontend_tests.mjs` — 12 из 27 полных прогонов,
-  // и ни один не был виден хуку.
-  it('F1b: тестовый гейт стороны scripts/check_<side>_tests — тоже гейт; check_i18n — узкий', () => {
-    const work = { AGENTDECK_GROUP_STAGE: 'work', AGENTDECK_GROUP_DELIVER_AHEAD: '1' };
-    for (const full of [
       'node scripts/check_frontend_tests.mjs > .agent/tmp/g.log 2>&1',
       'python scripts/check_backend_tests.py',
     ])
-      expect(groupPre(full, work), full).toBe('deny');
-    for (const narrow of [
-      'node scripts/check_i18n.mjs',
-      'npx eslint scripts/check_frontend_tests.mjs',
-    ])
-      expect(groupPre(narrow, work), narrow).toBeUndefined();
+      expect(foreground(full), full).toBe('deny');
   });
 
-  // Группа №1 24.10, доставка: красный гейт → правка → полный гейт → правка, 7 полных прогонов за
-  // 10 минут (843 с), где красному линту или одному тесту хватало своего узкого прогона.
-  it('F2: доставка — после красного гейта и правки полный гейт ждёт узкой зелёной проверки', () => {
-    const plain = mkdtempSync(join(dir, 'deliver-'));
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
-    const red = [
-      prompt('доставь'),
-      use('Bash', { command: GATE }, 'r1'),
-      result('r1', 'Exit code 1\n✖ 3 problems (3 errors, 0 warnings)'),
-    ];
-    const fixed = [...red, ...edit()];
-    const first = gate(plain, 'd1', transcript(fixed), deliver);
-    expect(first.decision).toBe('deny');
-    expect(first.reason).toContain('pass narrowly on the fixed code');
-    expect(first.reason).toContain('vitest related <files> --run');
-    // Повтор того же вызова отказ не снимает: это и есть петля «правка → полный гейт».
-    const repeated = [
-      ...fixed,
-      use('Bash', { command: GATE }, 'd1'),
-      result('d1', `PreToolUse:Bash hook error: ${first.reason}`),
-    ];
-    expect(gate(plain, 'd2', transcript(repeated), deliver).decision).toBe('deny');
-    const narrow = (body: string) => {
-      const id = `n${++n}`;
-      return [use('Bash', { command: 'npx vitest related src/a.ts --run' }, id), result(id, body)];
-    };
-    // Узкая проверка после правки прошла — полный гейт один раз.
-    expect(
-      gate(plain, 'd3', transcript([...fixed, ...narrow('Test Files  1 passed (1)')]), deliver)
-        .decision,
-    ).toBeUndefined();
-    // Узкая красная, или зелёная ДО последней правки, — не довод.
-    expect(
-      gate(plain, 'd4', transcript([...fixed, ...narrow('Exit code 1\n 1 failed')]), deliver)
-        .decision,
-    ).toBe('deny');
-    expect(
-      gate(plain, 'd5', transcript([...red, ...narrow('Test Files  1 passed'), ...edit()]), deliver)
-        .decision,
-    ).toBe('deny');
-    // Вне доставки — прежнее правило: после красного и правки гейт можно.
-    expect(gate(plain, 'd6', transcript(fixed), { AGENTDECK_GROUP_STAGE: 'fix' }).decision).toBe(
-      undefined,
-    );
-  });
-
-  // g8 26.10, доставка: проверка движка отказала гейту на Node 24 за 3 с, единственной правкой после была
-  // заметка `.agent/run/notebook.agent.md` — и повтор на Node 22 получил «красный, код правился».
+  // g8 26.10: проверка движка отказала гейту на Node 24 за 3 с, единственной правкой после была
+  // заметка `.agent/run/notebook.agent.md` — и повтор на Node 22 получил «ничего не правилось».
   it('отказ движка — не прогон гейта; правка в .agent/ — не правка кода', () => {
     const plain = mkdtempSync(join(dir, 'engine-'));
-    const deliver = { AGENTDECK_GROUP_STAGE: 'deliver' };
+    const again = (id: string, records: object[], command = GATE) =>
+      decision(
+        run('pre', {
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Bash',
+          tool_input: { command, run_in_background: true },
+          tool_use_id: id,
+          cwd: plain,
+          transcript_path: transcript(records),
+        }),
+      );
     const note = (path: string) => {
       const id = `e${++n}`;
       return [use('Edit', { file_path: path }, id), result(id, 'ok')];
     };
     const ran = (body: string, command = GATE) => {
       const id = `g${++n}`;
-      return [prompt('доставь'), use('Bash', { command }, id), result(id, body)];
+      return [prompt('сделай'), use('Bash', { command }, id), result(id, body)];
     };
     const refusal = 'Exit code 1\nГейт рассчитан на Node 22, запущен на v24.13.0.';
     const notebook = note('C:/copy/.agent/run/notebook.agent.md');
-    expect(gate(plain, 'v1', transcript([...ran(refusal), ...notebook]), deliver).decision).toBe(
-      undefined,
-    );
-    // После отказа правился код — узкой проверки не нужно: гейт ещё ни разу не прогнал ни одной проверки.
+    // Отказ движка ни одной проверки не прогнал: повтор без правки кода — не «ничего не правилось».
     for (const body of [refusal, 'npm error code EBADENGINE', 'ERR_PNPM_UNSUPPORTED_ENGINE'])
-      expect(gate(plain, `v${++n}`, transcript([...ran(body), ...edit()]), deliver).decision).toBe(
-        undefined,
-      );
+      expect(again(`v${++n}`, [...ran(body), ...notebook]), body).toBeUndefined();
     // Отказ в логе фонового запуска за замаскированным кодом — тоже не прогон.
     mkdirSync(join(plain, '.agent', 'tmp'), { recursive: true });
     writeFileSync(join(plain, '.agent', 'tmp', 'g1.log'), `${refusal}\n`, 'utf8');
     const masked = `${GATE} > .agent/tmp/g1.log 2>&1; echo EXIT=$?`;
     const bg = [
-      prompt('доставь'),
+      prompt('сделай'),
       use('Bash', { command: masked, run_in_background: true }, 'b90'),
       result('b90', 'Command running in background with ID: b90. Output is being written to: x'),
       {
@@ -1058,17 +534,22 @@ describe('gate-at-end: группа гоняет полный гейт один 
             '<task-notification><task-id>b90</task-id><status>completed</status><summary>exit code 0</summary></task-notification>',
         },
       },
-      ...edit(),
+      ...notebook,
     ];
-    expect(gate(plain, 'v2', transcript(bg), deliver, masked).decision).toBeUndefined();
+    expect(again('v2', bg, masked)).toBeUndefined();
     // Настоящий красный гейт: предупреждение npm о движке его не отменяет, заметка в .agent/ правкой кода
-    // не считается — повтор без правки кода по-прежнему отклоняется как «ничего не правилось».
+    // не считается — повтор без правки кода отклоняется; после правки кода — проходит.
     const red = ran('npm WARN EBADENGINE Unsupported engine\nExit code 1\n✖ 3 problems (3 errors)');
-    expect(gate(plain, 'v3', transcript([...red, ...edit()]), deliver).reason).toContain(
-      'pass narrowly on the fixed code',
-    );
-    const onlyNote = gate(plain, 'v4', transcript([...red, ...notebook]), deliver);
-    expect(onlyNote.decision).toBe('deny');
-    expect(onlyNote.reason).toContain('nothing was edited since');
+    const onlyNote = run('pre', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: GATE, run_in_background: true },
+      tool_use_id: 'v4',
+      cwd: plain,
+      transcript_path: transcript([...red, ...notebook]),
+    });
+    expect(decision(onlyNote)).toBe('deny');
+    expect(onlyNote).toContain('nothing was edited since');
+    expect(again('v3', [...red, ...edit()])).toBeUndefined();
   });
 });

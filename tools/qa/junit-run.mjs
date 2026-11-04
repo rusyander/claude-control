@@ -50,6 +50,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -65,7 +66,11 @@ const option = (name) => {
   return value;
 };
 
-const project = resolve(option('--project') ?? process.cwd());
+// Корень — в настоящем регистре диска: `--project "c:\…"` иначе доезжал до скриптов в cwd и в путях
+// от него (`c:/Users/…`), и проверка, сверяющая свой путь с os.homedir() (`C:\Users\…`), краснела
+// только под прогоном блока (kit-120/121, rule-injector.test.mjs).
+const asked = resolve(option('--project') ?? process.cwd());
+const project = existsSync(asked) ? realpathSync.native(asked) : asked;
 const out = resolve(
   project,
   option('--out') ?? process.env.AGENTDECK_JUNIT_REPORT ?? 'test-results/junit.xml',
@@ -74,6 +79,11 @@ const timeoutMs = Number(option('--timeout-min') ?? 10) * 60_000;
 // Адрес стенда, без которого живые проверки не имеют смысла. Без флага
 // запускатель стенда не знает и судит только по коду выхода.
 const health = option('--health') ?? process.env.JUNIT_RUN_HEALTH;
+// Выбор кейсов — этому запуску, не его детям: тест, который сам поднимает junit-run над
+// временной библиотекой, иначе унаследовал бы чужой список и не нашёл своих кейсов
+// (прогон 717df261, 02.11: testing-103 красный только под `tests-cli run --case`).
+const pickedRaw = process.env.AGENTDECK_TEST_CASES;
+delete process.env.AGENTDECK_TEST_CASES;
 const entries = [
   ...new Set([...args.filter((arg) => !arg.startsWith('--')), ...listedFiles()].map(toEntry)),
 ];
@@ -164,11 +174,29 @@ function listedFiles() {
     .filter(Boolean);
 }
 
+/**
+ * Выбранные кейсы (`tests-cli run --case`): `группа:кейс` через запятую в `AGENTDECK_TEST_CASES`.
+ * Без выбора файл несёт все свои кейсы. С выбором — только выбранные: у `check-core-chat.mjs` пять
+ * кейсов с разными аргументами (пять одноразовых панелей), и прогон двух из них гонял все пять,
+ * упирался в предел 10 мин и клал оба в историю проваленными (прогон 3deb1cb9, 02.11).
+ */
+function pickedCases() {
+  const raw = pickedRaw;
+  if (!raw) return undefined;
+  return new Set(
+    raw
+      .split(/[,\r\n]+/)
+      .map((key) => key.trim())
+      .filter(Boolean),
+  );
+}
+
 /** Кейсы библиотеки по файлу автотеста: `automation.file` → [{caseId, testName}]. */
 function casesByFile(root) {
   const dir = join(root, '.agent', 'tests');
   const map = new Map();
   if (!existsSync(dir)) return map;
+  const picked = pickedCases();
   for (const name of readdirSync(dir).filter((item) => item.endsWith('.tests.json'))) {
     let data;
     try {
@@ -180,6 +208,11 @@ function casesByFile(root) {
     for (const item of Array.isArray(data?.cases) ? data.cases : []) {
       const file = item?.automation?.file;
       if (!file || item.archived) continue;
+      // Группа — из поля файла: часть группы лежит в `<группа>--<часть>.tests.json`, а выбор
+      // приходит как `chat:chat-011`, не `chat--p1:chat-011`.
+      const group =
+        typeof data?.group === 'string' ? data.group : name.slice(0, -'.tests.json'.length);
+      if (picked && !picked.has(`${group}:${item.id}`)) continue;
       const key = /[\\/]$/.test(file) ? `${toRelative(file) || '.'}/` : toRelative(file);
       const list = map.get(key) ?? [];
       list.push({ caseId: item.id, testName: item.automation.testName });
@@ -609,13 +642,32 @@ function mutationBusy(output) {
   return output.match(/mutation-guard: (?:mustfail \(pid|журнал mustfail)[^\n]*/)?.[0];
 }
 
-/** Строки, в которых скрипт сам назвал провал; иначе — хвост вывода. */
+// Объявление функции, а не `const`: верхний уровень модуля зовёт verdictLines раньше этой строки.
+function indentOf(line) {
+  return /^\s*/.exec(line)[0].length;
+}
+
+/**
+ * Строки, в которых скрипт сам назвал провал, с подробностью под каждой; иначе — хвост вывода.
+ * Подробность — строки глубже отступом сразу под отмеченной (`check(name, ok, detail)` стенда
+ * пишет её строкой ниже): без неё в истории оставалось одно имя проверки, и причину красного
+ * core-chat-012 под `tests-cli` прочитать было негде — полный отчёт лежит во временной папке (04.11).
+ */
 function verdictLines(output) {
   const lines = output.split(/\r?\n/).filter(Boolean);
-  const marked = lines.filter((line) =>
-    /✗|FAIL|ПРОБЛЕМ|Провалено|не работает|нет кнопки|^\s*-\s|Error/i.test(line),
-  );
-  return (marked.length > 0 ? marked : lines.slice(-10)).slice(0, 15).join('\n');
+  const isMarked = (line) =>
+    /✗|FAIL|ПРОБЛЕМ|Провалено|не работает|нет кнопки|^\s*-\s|Error/i.test(line);
+  const picked = [];
+  for (let i = 0; i < lines.length && picked.length < 15; i++) {
+    if (!isMarked(lines[i])) continue;
+    picked.push(lines[i]);
+    const depth = indentOf(lines[i]);
+    for (let j = i + 1, kept = 0; j < lines.length && kept < 3; j++, kept++) {
+      if (indentOf(lines[j]) <= depth || isMarked(lines[j])) break;
+      picked.push(lines[j].length > 400 ? `${lines[j].slice(0, 400)}…` : lines[j]);
+    }
+  }
+  return (picked.length > 0 ? picked : lines.slice(-10)).join('\n');
 }
 
 function tail(text, count) {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, resolve } from 'node:path';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 
 /**
  * Раскрытие `@`-импортов файла инструкций в ПЛОСКИЙ текст — с картой того,
@@ -42,7 +43,17 @@ export interface ExpandedInstructions {
   /** Файлы, из которых собран текст, включая исходный, в порядке включения. */
   includes: string[];
   /** Импорты, которые не раскрыты, — каждый с причиной и именем файла. */
-  problems: string[];
+  problems: ImportProblem[];
+}
+
+/**
+ * Нераскрытый импорт: русская фраза и её код — паспорт показывает причину и
+ * под английским интерфейсом (`portability-skip-import-problem` вкладывает её).
+ */
+export interface ImportProblem {
+  text: string;
+  code: ServerMessageCode;
+  params: Record<string, string | number>;
 }
 
 /**
@@ -52,7 +63,7 @@ export interface ExpandedInstructions {
  */
 export function expandInstructionImports(filePath: string): ExpandedInstructions {
   const includes: string[] = [];
-  const problems: string[] = [];
+  const problems: ImportProblem[] = [];
   const seen = new Set<string>();
 
   const text = expand(resolve(filePath), 0, seen, includes, problems);
@@ -68,7 +79,7 @@ export function expandInstructionImports(filePath: string): ExpandedInstructions
 export function expandInstructionText(text: string, filePath: string): ExpandedInstructions {
   const resolved = resolve(filePath);
   const includes: string[] = [resolved];
-  const problems: string[] = [];
+  const problems: ImportProblem[] = [];
   const seen = new Set<string>([seenKey(resolved)]);
 
   return { text: expandBody(text, resolved, 1, seen, includes, problems), includes, problems };
@@ -87,21 +98,33 @@ function expand(
   depth: number,
   seen: Set<string>,
   includes: string[],
-  problems: string[],
+  problems: ImportProblem[],
 ): string {
   const key = seenKey(filePath);
   if (seen.has(key)) {
-    problems.push(`цикл импортов: ${filePath} уже включён выше`);
+    problems.push({
+      text: `цикл импортов: ${filePath} уже включён выше`,
+      code: 'portability-import-cycle',
+      params: { path: filePath },
+    });
     return `<!-- импорт не раскрыт (цикл): ${filePath} -->`;
   }
   if (depth > MAX_IMPORT_DEPTH) {
-    problems.push(`превышена глубина импортов (${MAX_IMPORT_DEPTH}): ${filePath}`);
+    problems.push({
+      text: `превышена глубина импортов (${MAX_IMPORT_DEPTH}): ${filePath}`,
+      code: 'portability-import-depth',
+      params: { depth: MAX_IMPORT_DEPTH, path: filePath },
+    });
     return `<!-- импорт не раскрыт (глубина ${MAX_IMPORT_DEPTH}): ${filePath} -->`;
   }
 
   const body = readImport(filePath);
   if (body === undefined) {
-    problems.push(`импорт не прочитан: ${filePath}`);
+    problems.push({
+      text: `импорт не прочитан: ${filePath}`,
+      code: 'portability-import-unread',
+      params: { path: filePath },
+    });
     return `<!-- импорт не прочитан: ${filePath} -->`;
   }
 
@@ -118,7 +141,7 @@ function expandBody(
   depth: number,
   seen: Set<string>,
   includes: string[],
-  problems: string[],
+  problems: ImportProblem[],
 ): string {
   const base = dirname(filePath);
   return body.replace(IMPORT_LINE, (match, raw: string) => {

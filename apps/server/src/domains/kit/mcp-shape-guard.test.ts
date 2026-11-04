@@ -25,7 +25,7 @@ function reason(tool_name: string, jmespath?: string): string {
       session_id: 'kit-mcp-shape',
     }),
     encoding: 'utf8',
-    env: { ...process.env, AGENTDECK_SPLIT_CHILD: '', AGENTDECK_KIT_VARIANT: '' },
+    env: { ...process.env, AGENTDECK_STEP_KIND: '', AGENTDECK_KIT_VARIANT: '' },
     timeout: 15_000,
   });
   const text = out.stdout.trim();

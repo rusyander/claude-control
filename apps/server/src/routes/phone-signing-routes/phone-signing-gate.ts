@@ -169,11 +169,8 @@ export function leverLoosensFor(ctx: ServerContext, route: string, body: unknown
   const settings = ctx.store.getSettings();
   switch (route) {
     case 'PATCH /api/settings':
-      return settingsPatchLoosens(
-        { chatAutoMode: settings.chatAutoMode, autoApproveRules: settings.autoApproveRules },
-        body,
-      );
-    // Снимок чужой машины несёт и авторежим, и правила, и строки групп разом —
+      return settingsPatchLoosens({ chatAutoMode: settings.chatAutoMode }, body);
+    // Снимок чужой машины несёт и авторежим, и строки групп разом —
     // и может стереть более строгое положение проекта, просто не упомянув его.
     // Сличать по полям — значит пропустить одно из них; при включённой подписи
     // импорт целиком ждёт её выключения.

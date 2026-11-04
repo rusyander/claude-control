@@ -94,7 +94,7 @@ describe('маршруты картинок: своя сеть, свои заг�
     app = Fastify();
     // Порт шлюза 0 — он в этих проверках не участвует: дорога здесь ручка
     // профиля, и именно её адрес обязан уехать в сокет.
-    registerMediaRoutes(app, ctx, () => 0);
+    registerMediaRoutes(app, ctx, undefined);
     await app.ready();
   });
 
@@ -213,6 +213,8 @@ describe('маршруты картинок: своя сеть, свои заг�
 
     expect(response.statusCode).toBe(409);
     expect(response.json().reason).toBe('no-route');
+    // Текст отказа едет кодом: телефон и `curl` без плана читают его на своём языке (core-s10 G12).
+    expect(response.json().messageCode).toBe('media-image-blocked-no-route');
     expect(asked).toHaveLength(0);
   });
 

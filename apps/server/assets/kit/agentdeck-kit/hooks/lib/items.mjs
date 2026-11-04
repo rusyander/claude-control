@@ -43,8 +43,6 @@ export const HOOKS_DIR = join(KIT_ROOT, 'hooks');
 /** Run order per event. A name absent from disk (switched off in the panel) is skipped. */
 export const MANIFEST = {
   pre: [
-    // Judges only AskUserQuestion, which no other item looks at; first so its answer is never cut short.
-    'autonomous-pick',
     'git-guard',
     'forge-merge-guard',
     'mcp-shape-guard',
@@ -66,23 +64,17 @@ export const MANIFEST = {
     'todo-throttle',
     'gate-at-end',
     'check-cost',
-    'bash-read-cap',
     'verify-throttle',
     'search-discipline',
-    // After every read guard: any other refusal outranks a batching one.
-    'batch-nudge',
     'review-publish-guard',
-    'mr-description-gate',
     'pipeline-watch-guard',
-    'forge-toolset-guard',
-    'own-copy-guard',
     // Last on purpose: the only item that may touch the network (one `git fetch` before a publish),
     // so every cheaper refusal — git-guard's consent above all — gets to refuse first.
     'push-sieves',
     // After every verdict: it stamps the start of a call that will run, so nothing may refuse after it.
     'cmd-duration',
   ],
-  rules: ['batch-nudge', 'node-tmp-hint', 'bg-wait-guard', 'rule-injector'],
+  rules: ['node-tmp-hint', 'bg-wait-guard', 'rule-injector'],
   'post-edit': ['format-on-edit', 'doc-bloat-guard', 'doc-daily-review'],
   'post-any': [
     'context-watch',
@@ -90,18 +82,17 @@ export const MANIFEST = {
     'cmd-duration',
     'persisted-output-hint',
     'batch-nudge',
-    'mr-echo-trim',
+    // Deep-review lane subagents only (silent elsewhere): the brief's context cap and the lane batch line.
+    'lane-budget',
     'watch-keepalive',
   ],
   'post-fail': ['cmd-duration'],
   // verify-at-stop first: its block makes the model run the gate and write the summary again, and
   // that summary is what reply-language judges — the other order costs a possible third turn.
-  // notebook-at-stop after verify-at-stop: a check owed outranks a note owed, and one block per Stop.
-  // task-ledger after them: the ledger lines are written before a report or summary is redone; it bounds
+  // task-ledger after it: the ledger lines are written before a report or summary is redone; it bounds
   // itself by its own feedback record, so an earlier gate's block cannot hide it.
   stop: [
     'verify-at-stop',
-    'notebook-at-stop',
     'task-ledger',
     'review-report-guard',
     'reply-language',
@@ -114,7 +105,7 @@ export const MANIFEST = {
     'doc-hygiene-autoclean',
     'review-sync-brief',
     'node-need-brief',
-    // Split child after a compaction only (compactCards); silent everywhere else.
+    // Core task step after a compaction only (compactCards); silent everywhere else.
     'rule-injector',
   ],
   precompact: ['rule-injector', 'precompact-checkpoint'],
@@ -138,7 +129,6 @@ export const TOOLS = {
   EDIT: /^(Write|Edit|NotebookEdit)$/,
   SPAWN: /^(Agent|Task|SendMessage|Workflow)$/,
   CTX: /^(Read|Grep|Glob|TodoWrite|Bash|PowerShell)$/,
-  ASK: /^AskUserQuestion$/,
   /** A forge or tracker MCP server under any configured name, the panel's bridge included. */
   FORGE: /^mcp__[^_]*(?:gitlab|github|atlassian|jira|confluence)[^_]*__/i,
   /** The same code-forge servers in opencode's `<server>_<tool>` form. */
@@ -155,7 +145,6 @@ const BASH_EDIT = new RegExp(`${TOOLS.BASH.source}|${TOOLS.EDIT.source}`);
  * imported.
  */
 export const PRE_TOOLS = {
-  'autonomous-pick': TOOLS.ASK,
   'git-guard': TOOLS.BASH,
   'forge-merge-guard': new RegExp(
     `${TOOLS.BASH.source}|${TOOLS.FORGE.source}|${TOOLS.FORGE_OPENCODE.source}`,
@@ -181,22 +170,13 @@ export const PRE_TOOLS = {
   'todo-throttle': TOOLS.CTX,
   'gate-at-end': TOOLS.CTX,
   'check-cost': TOOLS.BASH,
-  'bash-read-cap': TOOLS.BASH,
   'verify-throttle': TOOLS.CTX,
   'search-discipline': TOOLS.CTX,
-  'batch-nudge': TOOLS.CTX,
   'review-publish-guard': new RegExp(
     `${TOOLS.BASH.source}|${TOOLS.EDIT.source}|${TOOLS.FORGE.source}`,
     'i',
   ),
-  'mr-description-gate': new RegExp(
-    `${TOOLS.BASH.source}|${TOOLS.FORGE.source}|${TOOLS.FORGE_OPENCODE.source}`,
-    'i',
-  ),
   'pipeline-watch-guard': new RegExp(`${TOOLS.BASH.source}|${TOOLS.FORGE.source}`, 'i'),
-  // Same pattern as lib/forge-toolset-guard.mjs DISCOVER (Claude and opencode tool-name forms).
-  'forge-toolset-guard': /^(?:mcp__[^_]*gitlab[^_]*__|[\w-]*gitlab[\w-]*_)discover_tools$/i,
-  'own-copy-guard': TOOLS.BASH,
   'push-sieves': TOOLS.BASH,
   'cmd-duration': TOOLS.BASH,
 };
@@ -290,10 +270,8 @@ export const REPEAT_ESCAPE = new Set([
   'todo-throttle',
   'gate-at-end',
   'check-cost',
-  'bash-read-cap',
   'verify-throttle',
   'search-discipline',
-  'batch-nudge',
   'cmd-duration',
   'task-ledger',
 ]);
@@ -360,8 +338,7 @@ async function runPre(input, only) {
     const escaped = logged ? repeatedRefusal(events, call) : null;
     for (const item of items) {
       if (item.tools && !item.tools.test(tool)) continue;
-      // An item may withdraw the escape for this call (gate-at-end in a delivery stage: a reason, not a repeat).
-      if (item.name === escaped && item.module?.repeatEscapes?.(call) !== false) continue;
+      if (item.name === escaped) continue;
       // cmd-duration stamps the start of a call that will run; a consent ask the user may decline
       // would leave a stamp that later reads as a cap kill.
       if (item.name === 'cmd-duration' && (ask || deferred.includes(call))) continue;
@@ -499,8 +476,14 @@ async function runPre(input, only) {
     });
 }
 
-// SessionStart lines for a human: a split group (the panel sets its heavy-queue dir) has nobody to
-// act on them, and each is billed on every turn; an onboarding offer even pulls a stage off its task.
+// A task step of the agentdeck core (it names the step kind; `chat` is a person at the panel).
+const coreStep = () => {
+  const step = String(process.env.AGENTDECK_STEP_KIND ?? '').trim();
+  return Boolean(step) && step !== 'chat';
+};
+
+// SessionStart lines for a human: a core task step has nobody to act on them, and each is billed on
+// every turn; an onboarding offer even pulls a step off its task.
 const HUMAN_SESSION = new Set([
   'context-budget',
   'project-onboard-check',
@@ -508,20 +491,17 @@ const HUMAN_SESSION = new Set([
   'review-sync-brief',
 ]);
 
-// The SessionStart block's cap. A split child's compaction carries the rule text pre-sent by compactCards
+// The SessionStart block's cap. A core step's compaction carries the rule text pre-sent by compactCards
 // (g9 review F3): 9000 there, under the CLI's 10k hook-output cut; 4000 everywhere else.
 const SESSION_MAX = 4000;
 const SESSION_COMPACT_MAX = 9000;
 const sessionMax = (input) =>
-  process.env.AGENTDECK_SPLIT_CHILD === '1' && input?.source === 'compact'
-    ? SESSION_COMPACT_MAX
-    : SESSION_MAX;
+  coreStep() && input?.source === 'compact' ? SESSION_COMPACT_MAX : SESSION_MAX;
 
-// `rewrite` collects a post item's `{updatedMCPToolOutput}` (mr-echo-trim) — an output, never text.
-async function runText(event, input, only, prompt, rewrite = null) {
+async function runText(event, input, only, prompt) {
   const calls = event.startsWith('post-') ? normalize(input) : [input];
   const out = [];
-  const group = event === 'session' && Boolean(process.env.AGENTDECK_HEAVY_QUEUE_DIR);
+  const group = event === 'session' && coreStep();
   for (const item of await itemsFor(event, only)) {
     if (group && HUMAN_SESSION.has(item.name)) continue;
     for (const call of calls) {
@@ -532,10 +512,7 @@ async function runText(event, input, only, prompt, rewrite = null) {
       const arg =
         event === 'session' ? { ...call, kit_room: sessionMax(input) - used - 300 } : call;
       const msg = attempt(item.run, arg, prompt);
-      if (msg && typeof msg === 'object') {
-        if (rewrite && msg.updatedMCPToolOutput != null)
-          rewrite.output ??= msg.updatedMCPToolOutput;
-      } else if (msg) out.push(msg);
+      if (msg && typeof msg !== 'object') out.push(msg);
     }
   }
   return out.length ? withRoot(out.join('\n\n')) : null;
@@ -601,23 +578,7 @@ export async function runEvent(event, raw, only = null) {
         ...((await engineRefused(call)) ? { engine: true } : {}),
       });
 
-  const rewrite = {};
-  const text = await runText(event, input, only, prompt, rewrite);
-  // Only Claude documents a PostToolUse output rewrite; OpenCode's plugin shim applies the same field to
-  // the MCP result object it holds (P-15). Elsewhere the output stays whole: Codex 0.155 ignores the
-  // field, Qwen 0.24 and Gemini can only add context or swap the result for an error.
-  if (
-    event.startsWith('post-') &&
-    rewrite.output != null &&
-    (cli === 'claude' || cli === 'opencode')
-  )
-    return write({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        ...(text ? { additionalContext: cap(text, CAP.post) } : {}),
-        updatedMCPToolOutput: rewrite.output,
-      },
-    });
+  const text = await runText(event, input, only, prompt);
   if (!text) return;
   // PreCompact output is plain text: its JSON shape is not the same on every CLI build.
   if (event === 'precompact') return void process.stdout.write(text);

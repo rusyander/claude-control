@@ -5,6 +5,13 @@ import type { ModelToolName } from '@agentdeck/contracts/core/model-tools';
 import type { DialectId } from '@agentdeck/stub-model';
 
 /**
+ * Протоколы задач-заглушек. Gemini API (`google-genai`) вне библиотеки: `script.ts` считает ходы
+ * по `messages`/`input`, а у Gemini история в `contents` с ролью `model` — задача на нём
+ * разошлась бы со сценарием молча. Нужна задача для Gemini — сначала ветка в `assistantTurns`.
+ */
+export type TaskDialect = Exclude<DialectId, 'google-genai'>;
+
+/**
  * Библиотека задач-заглушек (07 фаза 2, R:S2-25; 08 вид `stub`): задача = вход + ходы модели +
  * ожидаемые вердикты. Ходы модели описаны без CLI и без протокола (`write`, `shell`, вызов
  * инструмента ядра), сценарий заглушки строит из них `script.ts` под любой протокол и под имена
@@ -226,7 +233,7 @@ export interface StubTask {
   input: TaskInput;
   moves: TimedMove[];
   /** Протоколы, которыми задача обязана обслуживаться (переходники фазы 2 — Claude и Qwen). */
-  dialects: DialectId[];
+  dialects: TaskDialect[];
   verdicts: Verdict[];
   observer: ObserverExpectation;
   phase2: Phase2Probe[];

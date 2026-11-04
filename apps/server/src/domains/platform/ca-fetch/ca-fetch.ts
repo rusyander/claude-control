@@ -6,6 +6,8 @@ import { Readable } from 'node:stream';
 import { invalidField } from '../errors.ts';
 import {
   hasProxyEnv,
+  isLocalhostName,
+  loopbackLookup,
   openTunnel,
   proxyRequestOptions,
   resolveProxy,
@@ -63,7 +65,7 @@ const MAX_BODY_BYTES = 1_000_000;
  * (переехавший ingress, портал перехвата, подмена на пути) увёл бы туда весь
  * промпт, а панель показала бы 200 и путь клиента — то есть согласие, которого
  * никто не давал. Шлюз такой ответ превращает в НАЗВАННЫЙ отказ
- * (`gateway/upstream.ts`).
+ * (`upstream/upstream.ts`).
  */
 const MAX_REDIRECTS = 5;
 
@@ -167,11 +169,16 @@ function createFetch(
   // Своя реализация нужна ровно там, где без неё не обойтись: свой корень
   // доверия ИЛИ прокси в окружении. Ни того, ни другого — общий путь остаётся
   // встроенным `fetch`, и нашего кода на нём нет. Единственное, что ему
-  // приходится сказать явно, — не ходить по перенаправлениям самому.
+  // приходится сказать явно, — не ходить по перенаправлениям самому. Исключение —
+  // имена под `.localhost`: встроенный спрашивает о них ОС, а резолвер Windows их не знает.
   if (!ownTransport && !path && !hasProxyEnv(env)) {
-    return redirects > 0
-      ? globalThis.fetch
-      : (url, init) => globalThis.fetch(url, { ...init, redirect: 'manual' });
+    const own = createFetch('', stream, redirects, env, true);
+    return (url, init) => {
+      if (isLocalhostName(new URL(url).hostname)) return own(url, init);
+      return redirects > 0
+        ? globalThis.fetch(url, init)
+        : globalThis.fetch(url, { ...init, redirect: 'manual' });
+    };
   }
   const ca = path ? readCaCert(path) : undefined;
 
@@ -336,6 +343,7 @@ function createFetch(
             // Только РАСШИРЕНИЕ доверия. Проверка сертификата остаётся включённой:
             // её умолчание в Node — строгое, и мы его не трогаем.
             ...(secure && ca ? { ca } : {}),
+            ...(isLocalhostName(target.hostname) ? { lookup: loopbackLookup } : {}),
           },
           onResponse,
         ),

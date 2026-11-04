@@ -116,10 +116,12 @@ export async function runComparison(input: ComparisonInput): Promise<ComparisonR
   const scratch = mkdtempSync(join(tmpdir(), `agentdeck-global-layer-${input.pair.id}-`));
   try {
     const env = isolatedGitEnv(scratch);
-    const repos = corpus.cases.map((item) => ({
-      id: item.id,
-      cwd: buildCaseRepo(join(scratch, 'cases'), corpus, item, env),
-    }));
+    const repos = await Promise.all(
+      corpus.cases.map(async (item) => ({
+        id: item.id,
+        cwd: await buildCaseRepo(join(scratch, 'cases'), corpus, item, env),
+      })),
+    );
     const root = globalRoot(input, scratch);
     const globalModule = join(root, input.pair.global.module);
     const [panel, global] = await Promise.all([

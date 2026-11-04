@@ -20,40 +20,6 @@ export const RULE_SOURCES =
 export const DELIVERY_CHECKS_LINE = `The project's checks are the ones its rules name (${RULE_SOURCES}) — all of them, in the order named, frontend and backend alike, run ONCE on the final tree right before the push (between edits only the touched package's own); any red check means no MR until it is green.`;
 
 /**
- * Догон основной ветки — только при настоящем конфликте с ней (владелец 19.10,
- * MUST #1). Без конфликта брокер всё равно откажет (`MAIN_SYNC_DENIED`), и
- * задание, велящее догонять, стоило бы хода на отказ и гейта заново.
- */
-/**
- * Без `--quiet`: группа #0 23.10 получила код 0 от `merge-tree --quiet` при семи
- * конфликтах и потеряла 2,7 ч доставки; панель сверяет так же (`main-sync/conflicts.ts`).
- */
-export const SYNC_ON_CONFLICT_LINE =
-  '`git fetch origin`; `git merge-tree --write-tree HEAD origin/<main>` (without `--quiet`, ' +
-  'which can exit 0 over real conflicts): exit 0 and no CONFLICT line = no conflict: stay on ' +
-  'the current base, never rebase, merge or pull main (the panel refuses it); exit 1 or any ' +
-  'CONFLICT line = a real conflict: `git rebase origin/<main>` and resolve it yourself.';
-
-/**
- * Снимки в описании MR. g5 25.10 (MR !1101): правка экрана ушла в MR без снимков
- * и без слова почему — ревьюер не отличит «не снимали» от «нечего снимать».
- */
-export const MR_SHOTS_LINE =
-  'A change a user sees on screen carries its before/after shots in the MR description; ' +
-  'shipped without them, the description says so and why (stand down, no access) — never silently.';
-
-/**
- * Проверки звена работы, за которым идёт доставка (владелец 23.10: один полный
- * гейт на группу, в доставке). Охват назван панельным прямо: строка старшинства
- * иначе отдавала его правилу проекта «полные проверки перед “готово”».
- */
-export const WORK_STAGE_CHECKS_LINE =
-  "Checks in this stage: only the touched files' own (their package's tests, type-check and " +
-  'lint), no full project gate, no push, no MR and no review pass of your own. This schedule is ' +
-  "the panel's: the delivery stage runs the project's full checks ONCE on the final tree, and " +
-  'that run is what satisfies a project rule asking for full checks before "done".';
-
-/**
  * Нижняя планка качества заданий, которые панель пишет агентам (владелец, 12.10.2026:
  * «группа может только ДОБАВИТЬ качество»).
  *
@@ -159,90 +125,11 @@ export function labelledCut(text: string, limit: number): string {
 }
 
 /**
- * Разрешил ли владелец опубликовать ревью в MR — по его словам в задании.
- *
- * Живое ревью MR (12.10.2026): владелец написал «отпиши ревью в MR», а обёртка
- * группы сказала «ничего не пиши в MR», и публикация не случилась. Разрешение,
- * данное в задании, — то самое согласие, ради которого стоит карточка; второй
- * раз его не спрашивают.
- *
- * Запрет сильнее разрешения (12.10.2026): «в MR ничего не публикуй — отпиши
- * мне итог» читалось как разрешение, потому что «отпиши» стояло без отрицания.
- * Теперь любой запрет публикации в реплике снимает её разрешение целиком, а
- * «отпиши» разрешает, только когда пишут в MR или о ревью — не «мне», не «в
- * чат». Ошибиться в сторону «спросить» дешевле, чем написать в чужой MR.
- */
-export type PublishVerdict = 'grant' | 'ban';
-
-/** Публикация сама по себе — разрешает и без адреса. */
-const PUBLISH_VERB = /публик|\bpublish/giu;
-/** Запись, которая разрешает, если у неё есть адрес MR. */
-const WRITE_TO_MR_VERB = /отпиш|запиш|напиш|оставь|\bpost\b|\bleave\b|\bwrite\b|\badd\b/giu;
-/** Запись, которая разрешает и без адреса, если пишут ревью или замечания. */
-const WRITE_REVIEW_VERB = /отпиш|оставь|\bpost\b|\bleave\b/iu;
-/** Запись, запрет которой при адресе MR запрещает публикацию. */
-const WRITE_BAN_VERB = /пиш|публик|оставл|оставь|коммент|\bpost|\bwrite|\bcomment|\bpublish/giu;
-const MR_TARGET =
-  /(?:^|[^\p{L}])(?:в|во|к|на|по)\s+(?:этот\s+|этом\s+)?(?:mr|мр|merge request|pull request|pr)(?!\p{L})|\b(?:in|into|to|on)\s+(?:the\s+|this\s+)?(?:mr|merge request|pull request|pr)\b|\/-\/merge_requests\/|\/pull\//iu;
-const REVIEW_OBJECT = /ревью|замечан|коммент|тред|\breview|\bfinding|\bcomment|\bthread/iu;
-/** Итог уходит человеку, а не в MR. */
-const ELSEWHERE =
-  /(?:^|[^\p{L}])(?:мне|сюда|в чат|в телеграм|в слак)(?!\p{L})|\b(?:to me|me the|in (?:the )?chat|here)\b/iu;
-// `\b` в JS видит только латиницу — границу перед «не» ищем классом букв.
-const NEGATION_BEFORE =
-  /(?:^|[^\p{L}])(?:не|без|don'?t|do not|never)(?:\s+(?:надо|нужно|стоит|need to|to))?\s*$/iu;
-const NOTHING_AFTER = /^\p{L}*\s+(?:nothing|ничего)(?!\p{L})/iu;
-/** Части одной реплики: запрет и разрешение в разных частях не путаются. */
-const CLAUSE_SPLIT = /[.;!?\n—–]+|,\s+/u;
-
-function negated(clause: string, at: number, verbLength: number): boolean {
-  const before = clause.slice(Math.max(0, at - 16), at);
-  return NEGATION_BEFORE.test(before) || NOTHING_AFTER.test(clause.slice(at + verbLength - 1));
-}
-
-function clauseBans(clause: string): boolean {
-  for (const match of clause.matchAll(PUBLISH_VERB))
-    if (negated(clause, match.index, match[0].length)) return true;
-  if (!MR_TARGET.test(clause)) return false;
-  for (const match of clause.matchAll(WRITE_BAN_VERB))
-    if (negated(clause, match.index, match[0].length)) return true;
-  return false;
-}
-
-function clauseGrants(clause: string): boolean {
-  for (const match of clause.matchAll(PUBLISH_VERB))
-    if (!negated(clause, match.index, match[0].length)) return true;
-  for (const match of clause.matchAll(WRITE_TO_MR_VERB)) {
-    if (negated(clause, match.index, match[0].length)) continue;
-    if (MR_TARGET.test(clause)) return true;
-    if (WRITE_REVIEW_VERB.test(match[0]) && REVIEW_OBJECT.test(clause) && !ELSEWHERE.test(clause))
-      return true;
-  }
-  return false;
-}
-
-/** Что одна реплика говорит о публикации: запрет где угодно в ней сильнее разрешения. */
-export function publishVerdict(text: string | undefined): PublishVerdict | undefined {
-  if (!text) return undefined;
-  const clauses = text.split(CLAUSE_SPLIT).filter((part) => part.trim());
-  if (clauses.some(clauseBans)) return 'ban';
-  return clauses.some(clauseGrants) ? 'grant' : undefined;
-}
-
-export function grantsReviewPublish(text: string | undefined): boolean {
-  return publishVerdict(text) === 'grant';
-}
-
-/**
- * Слова владельца дословно (U1): при разделении панель САМА берёт его реплики
- * из разговора-родителя и ставит их первым абзацем общего контекста групп.
- * Пересказ агента терял условия (живое ревью MR, 12.10.2026: просьба о двух
- * входах ревью и разрешение публиковать не дошли до группы) — теперь пересказ
- * только добавляется под слова владельца, а не стоит вместо них.
- */
-/**
- * Начало шапки — по нему блок узнаётся, в том числе со старой шапкой из записи
- * конвейера, начатого до правки ниже.
+ * Слова владельца дословно (U1): старое разделение панели ставило реплики
+ * владельца первым абзацем общего контекста групп. Само разделение уехало в
+ * ядро (этап 10), а блок в старых заданиях читают как прежде: `owner-brief`
+ * (файл слов владельца в копии) и `panel-preamble` (название старого чата).
+ * Начало шапки — по нему блок узнаётся, в том числе со старой шапкой.
  */
 export const OWNER_REQUEST_OPENER =
   "Owner's request, verbatim — the owner's own messages from the conversation this work was split from, oldest first.";
@@ -256,36 +143,7 @@ export const OWNER_REQUEST_HEADER = `${OWNER_REQUEST_OPENER} This is the request
 /** Начала служебных строк блока — по ним `panel-preamble` не берёт их в название чата. */
 export const OWNER_MESSAGE_OPENER = '[owner message ';
 export const OWNER_MESSAGES_LEFT_OUT = '[owner messages left out by the panel:';
-const OWNER_MESSAGE_MARK = (n: number, of: number) => `${OWNER_MESSAGE_OPENER}${n} of ${of}]`;
-const OWNER_MESSAGE_LINE = /^\[owner message (\d+) of (\d+)\]$/;
 export const OWNER_REQUEST_END = "[end of the owner's messages]";
-
-/**
- * Блок слов владельца. Сверх `OWNER_TEXT_MAX` уходят САМЫЕ СТАРЫЕ реплики — с
- * меткой, сколько их было: последние слова определяют работу точнее первых.
- */
-export function ownerRequestBlock(messages: readonly string[]): string | undefined {
-  const said = messages.map((text) => text.trim()).filter(Boolean);
-  if (said.length === 0) return undefined;
-  let first = 0;
-  let size = said.reduce((sum, text) => sum + text.length, 0);
-  while (size > OWNER_TEXT_MAX && first < said.length - 1) {
-    size -= (said[first] as string).length;
-    first += 1;
-  }
-  const kept = said.slice(first).map((text) => labelledCut(text, OWNER_TEXT_MAX));
-  const parts = [OWNER_REQUEST_HEADER];
-  if (first > 0)
-    parts.push(
-      `${OWNER_MESSAGES_LEFT_OUT} the ${first} oldest, over the ${OWNER_TEXT_MAX}-char cap — ask the human for them if the work needs them]`,
-    );
-  kept.forEach((text, index) =>
-    parts.push(`${OWNER_MESSAGE_MARK(index + 1, kept.length)}\n\n${text}`),
-  );
-  parts.push(OWNER_REQUEST_END);
-  parts.push(ownerCoverageLine());
-  return parts.join('\n\n');
-}
 
 /** Строки отчёта о пунктах задания владельца (U2): `owner-1`, `owner-2`, … */
 export const OWNER_POINT_ID = /^owner-(\d+)$/;
@@ -341,95 +199,6 @@ export function taskCoverageLine(): string {
 /** В общем контексте группы есть блок слов владельца — значит, и след требований. */
 export function hasOwnerRequest(shared: string | undefined): boolean {
   return Boolean(shared?.startsWith(OWNER_REQUEST_OPENER));
-}
-
-/** Реплики владельца из блока и текст после него — обратная сторона `ownerRequestBlock`. */
-export function splitOwnerRequest(text: string | undefined): { messages: string[]; rest: string } {
-  if (!text?.startsWith(OWNER_REQUEST_OPENER)) return { messages: [], rest: text ?? '' };
-  const end = text.indexOf(OWNER_REQUEST_END);
-  if (end < 0) return { messages: [], rest: text };
-  const messages: string[] = [];
-  let current: string[] | undefined;
-  const body = text.indexOf('\n');
-  for (const line of text.slice(body < 0 ? end : body, end).split('\n')) {
-    if (OWNER_MESSAGE_LINE.test(line.trim())) {
-      if (current) messages.push(current.join('\n').trim());
-      current = [];
-    } else current?.push(line);
-  }
-  if (current) messages.push(current.join('\n').trim());
-  return { messages, rest: text.slice(end + OWNER_REQUEST_END.length).trim() };
-}
-
-/** Абзац для сравнения: без кавычек цитаты, разметки цитаты и разницы в пробелах. */
-const comparable = (text: string): string =>
-  text
-    .replace(/^\s*>\s?/gm, '')
-    .replace(/^\s*(?:\d+[.)]|[-*•])\s+/gm, '')
-    .replace(/[«»"“”„'`]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-
-/** Короче этого абзац совпадает случайно («Сделай тесты.») и остаётся на месте. */
-const DUPLICATE_MIN = 40;
-
-/**
- * Общий контекст группы: слова владельца первыми, под ними — то, что добавил
- * агент. Строка агента, которая дословно повторяет слова владельца, второй раз
- * не идёт: одно и то же дважды в задании — только расход (E5). Сверка по
- * строкам, а не по абзацам (TQ-07): агент собирал реплики владельца списком
- * или цитатой в один абзац, и абзац целиком в словах владельца не находился.
- */
-export function withOwnerRequest(
-  shared: string | undefined,
-  block: string | undefined,
-): string | undefined {
-  if (!block) return shared;
-  const said = comparable(block);
-  const repeated = (text: string): boolean => {
-    const own = comparable(text);
-    return own.length >= DUPLICATE_MIN && said.includes(own);
-  };
-  const rest = (shared ?? '')
-    .split(/\n[ \t]*\n/)
-    .filter((paragraph) => !repeated(paragraph))
-    .map((paragraph) =>
-      paragraph
-        .split('\n')
-        .filter((line) => !repeated(line))
-        .join('\n'),
-    )
-    .filter((paragraph) => comparable(paragraph).length > 0)
-    .join('\n\n')
-    .trim();
-  return rest ? `${block}\n\n${rest}` : block;
-}
-
-/** Реплика о ревью или MR — только в такой «отпиши» значит публикацию ревью. */
-const REVIEW_TOPIC =
-  /ревью|\breview|\bmr\b|\bмр\b|merge request|pull request|\bpr\b|\/-\/merge_requests\/|\/pull\//iu;
-
-/**
- * Разрешение публиковать ревью группы. Слова владельца из блока U1 — весь
- * разговор, и «отпиши» в нём могло относиться к другому делу: оттуда решение
- * берётся только из реплик о ревью или MR, и решает последняя такая — владелец
- * мог передумать в любую сторону. Его запрет добавки агента и задачи не
- * перебивают; без слова владельца они решают, как раньше, целиком. Чужой MR —
- * запись наружу, и ошибиться в сторону «спросить» дешевле.
- */
-export function reviewPublishGranted(
-  shared: string | undefined,
-  tasks: readonly string[],
-): boolean {
-  const { messages, rest } = splitOwnerRequest(shared);
-  let owner: PublishVerdict | undefined;
-  for (const text of messages) {
-    if (!REVIEW_TOPIC.test(text)) continue;
-    owner = publishVerdict(text) ?? owner;
-  }
-  if (owner) return owner === 'grant';
-  return grantsReviewPublish([rest, ...tasks].join('\n'));
 }
 
 /**

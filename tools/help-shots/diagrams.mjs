@@ -56,7 +56,7 @@ const SETS = [
   {
     source: 'docs/diagrams/chat-guide/chat-guide.drawio',
     topic: 'chat',
-    pages: ['message-path', 'split-conveyor', 'deferred-asks'],
+    pages: ['message-path', 'deferred-asks'],
   },
   {
     source: 'docs/diagrams/rules-guide/rules-guide.drawio',
@@ -72,11 +72,6 @@ const SETS = [
     source: 'docs/diagrams/projects-guide/projects-guide.drawio',
     topic: 'projects',
     pages: ['registry-and-files', 'other-cli'],
-  },
-  {
-    source: 'docs/diagrams/groups-guide/groups-guide.drawio',
-    topic: 'groups',
-    pages: ['two-marks', 'compiled-set'],
   },
   {
     source: 'docs/diagrams/permissions-guide/permissions-guide.drawio',
@@ -146,7 +141,7 @@ const SETS = [
   {
     source: 'docs/diagrams/settings-guide/settings-guide.drawio',
     topic: 'settings',
-    pages: ['what-happens-before-a-write', 'how-the-watcher-works'],
+    pages: ['what-happens-before-a-write'],
   },
   {
     source: 'docs/diagrams/providers-guide/providers-guide.drawio',

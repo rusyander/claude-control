@@ -197,24 +197,28 @@ const PAYLOAD_FIELDS: Record<string, EnvNeed> = {
  * может прочитать что угодно, и обещать переносимость по его тексту было бы
  * выдумкой.
  */
-const UNDETERMINED_PATTERNS: readonly { pattern: RegExp; why: string }[] = [
+const UNDETERMINED_PATTERNS: readonly { pattern: RegExp; why: string; whyCode: string }[] = [
   {
     // `payload[key]`, `input[$1]`, `data[var]` — имя поля считается в рантайме.
     pattern: /\b(?:payload|input|data|event|hook|json)\s*\[\s*[^'"\]\s][^\]]*\]/,
     why: 'скрипт обращается к нагрузке по вычисляемому ключу',
+    whyCode: 'portability-needs-script-computed-key',
   },
   {
     pattern:
       /\b(?:source|\.)\s+[^\s;|&]+\.(?:sh|bash)\b|\b(?:bash|sh|node|python3?|pwsh)\s+[^\s;|&]+\.(?:sh|bash|js|mjs|cjs|py|ps1)\b/,
     why: 'скрипт вызывает другой скрипт — его нагрузка отсюда не видна',
+    whyCode: 'portability-needs-script-calls-script',
   },
   {
     pattern: /transcript_path|\.jsonl\b/,
     why: 'скрипт читает транскрипт, а значит может прочитать что угодно из разговора',
+    whyCode: 'portability-needs-script-reads-transcript',
   },
   {
     pattern: /\beval\b|\bexec\s*\(/,
     why: 'скрипт исполняет вычисляемый код',
+    whyCode: 'portability-needs-script-evals',
   },
 ];
 
@@ -248,7 +252,13 @@ function accessPattern(field: string): RegExp {
 /** Что статический разбор смог сказать о скрипте. */
 export type StaticNeeds =
   | { readonly kind: 'facts'; readonly facts: readonly EnvNeed[] }
-  | { readonly kind: 'undetermined'; readonly why: string };
+  | {
+      readonly kind: 'undetermined';
+      readonly why: string;
+      /** Код того же текста — интерфейс переводит его (`serverFieldText`), русский остаётся запасным. */
+      readonly whyCode?: string;
+      readonly whyParams?: Record<string, string>;
+    };
 
 /**
  * Разобрать текст скрипта. Возвращает ГИПОТЕЗУ: список полей, обращение к
@@ -256,8 +266,8 @@ export type StaticNeeds =
  * живой прогон, — поэтому вызывающий обязан пометить результат как `static`.
  */
 export function inferNeedsFromScript(text: string): StaticNeeds {
-  for (const { pattern, why } of UNDETERMINED_PATTERNS) {
-    if (pattern.test(text)) return { kind: 'undetermined', why };
+  for (const { pattern, why, whyCode } of UNDETERMINED_PATTERNS) {
+    if (pattern.test(text)) return { kind: 'undetermined', why, whyCode };
   }
 
   const facts = new Set<EnvNeed>();
@@ -272,7 +282,12 @@ const MAX_SCRIPT_BYTES = 512_000;
 
 /** Почему скрипт не прочитан — текст для `undetermined`, а не тихий пропуск. */
 function unreadable(scriptPath: string, detail: string): StaticNeeds {
-  return { kind: 'undetermined', why: `скрипт ${scriptPath} не прочитан: ${detail}` };
+  return {
+    kind: 'undetermined',
+    why: `скрипт ${scriptPath} не прочитан: ${detail}`,
+    whyCode: 'portability-needs-script-unread',
+    whyParams: { path: scriptPath, detail },
+  };
 }
 
 /** Прочитать скрипт с диска и разобрать. Нечитаемый скрипт → `undetermined`. */
@@ -323,17 +338,23 @@ export function resolveHookNeeds(params: {
     if (declared.length === 0) {
       return needsUndetermined(
         `событие «${params.event}» не описано ни у одного известного формата: нагрузка неизвестна`,
+        'portability-needs-event-unknown',
+        { event: params.event },
       );
     }
     return needsFacts(declared, 'declared');
   }
 
   const parsed = inferNeedsFromScriptFile(params.scriptPath);
-  if (parsed.kind === 'undetermined') return needsUndetermined(parsed.why);
+  if (parsed.kind === 'undetermined')
+    return needsUndetermined(parsed.why, parsed.whyCode, parsed.whyParams);
 
   const merged = [...declared, ...parsed.facts];
   if (merged.length === 0) {
-    return needsNone('ни событие, ни текст скрипта не называют ни одного факта рантайма');
+    return needsNone(
+      'ни событие, ни текст скрипта не называют ни одного факта рантайма',
+      'portability-needs-hook-none',
+    );
   }
   return needsFacts(merged, 'static');
 }

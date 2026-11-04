@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ProviderChatMessage } from '@agentdeck/contracts';
 import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
@@ -11,12 +11,8 @@ import { withoutSieveBlocks } from '@agentdeck/contracts/sieves';
 import {
   TaskSplitCard,
   HandoffCard,
-  ChildStages,
   MediaFeedCard,
   MediaRequestText,
-  QueuedBubbles,
-  ReviewDecisionCard,
-  waitsDecision,
 } from '@features/ChatMessages';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -28,54 +24,19 @@ import type { ProviderChatMessagesProps } from './ProviderChatMessages.types';
 import styles from './ProviderChatMessages.module.scss';
 
 /**
- * Лента переписки. Идущий ответ показывается отдельной репликой, которая растёт
- * по мере печати, — это ровно то, что процесс вывел, без разбора чужого формата.
+ * Лента старого разговора чужого CLI — только история (этап 10, F2c): ход идёт в чате ядра,
+ * здесь нет ни растущего ответа, ни очереди, ни кнопок предложений. Карточки блоков
+ * (разделение, продолжение, рисунок, колода) показываются как запись того, что было.
  */
 export function ProviderChatMessages({
   messages,
   providerName,
-  partial,
-  isRunning,
-  queued,
-  onCancelQueued,
-  queueHeld,
-  onSendQueued,
   isEmptyState,
   onCreate,
-  isCreating,
-  onSplit,
-  onKeepHere,
-  isSplitPending,
-  onHandoff,
-  onHandoffKeepHere,
-  isHandoffPending,
-  stages,
-  tree,
-  onOpenChild,
-  providerId,
-  onPauseAll,
-  onResumeAll,
-  treeBusy,
-  onAnswerHold,
-  holdBusy,
-  onRelease,
-  releaseBusy,
-  onResumeInterrupted,
-  resumeInterruptedBusy,
-  onCheckOverlap,
-  overlapBusy,
-  reviews,
-  onReviewDecide,
-  onReviewPush,
-  onReviewRetry,
-  reviewBusy,
   mediaChatId,
   mediaModel,
-  mediaTopic,
-  mediaRevision,
 }: ProviderChatMessagesProps) {
   const { t } = useTranslation();
-  const listRef = useRef<HTMLDivElement>(null);
 
   /**
    * Время ответа и сумма по разговору. У Claude это живёт в бейдже расхода, но
@@ -90,11 +51,6 @@ export function ProviderChatMessages({
     running += message.durationMs;
     timings.set(message.id, { step: message.durationMs, total: running });
   }
-
-  // Предложения панели приходят блоками в ответе — теми же самыми, что и у
-  // Claude, и разбираются тем же кодом. Отвечать можно только по ПОСЛЕДНЕЙ
-  // реплике: предложение из середины истории давно отработано.
-  const lastId = messages[messages.length - 1]?.id;
 
   /**
    * Время под ответом: шаг и, со второго ответа, сумма по разговору. Формат и
@@ -157,29 +113,16 @@ export function ProviderChatMessages({
     if (!hasCards) {
       return <Typography className={styles.turnText}>{media.text}</Typography>;
     }
-    const isLast = message.id === lastId;
     return (
       <>
         {media.text && <Typography className={styles.turnText}>{media.text}</Typography>}
         {split.proposals.map((proposal, index) => (
-          <TaskSplitCard
-            key={index}
-            proposal={proposal}
-            onSplit={isLast && onSplit ? (options) => onSplit(proposal, options) : undefined}
-            {...(isLast && onKeepHere ? { onKeepHere } : {})}
-            isPending={isSplitPending}
-            disabled={isRunning}
-          />
+          // Разделение снято вместе с маршрутом: карточка — история, без кнопок.
+          <TaskSplitCard key={index} proposal={proposal} />
         ))}
         {handoff.proposals.map((proposal, index) => (
-          <HandoffCard
-            key={index}
-            proposal={proposal}
-            onContinue={isLast && onHandoff ? (options) => onHandoff(proposal, options) : undefined}
-            {...(isLast && onHandoffKeepHere ? { onKeepHere: onHandoffKeepHere } : {})}
-            isPending={isHandoffPending}
-            disabled={isRunning}
-          />
+          // Продолжение в чистой сессии — история: ход идёт в чате ядра.
+          <HandoffCard key={index} proposal={proposal} />
         ))}
         {media.pictures.map((svg, index) => (
           <MediaFeedCard
@@ -195,14 +138,7 @@ export function ProviderChatMessages({
             deck={deck}
             {...(mediaChatId ? { chatId: mediaChatId } : {})}
             {...(mediaModel ? { model: mediaModel } : {})}
-            // Тема человека сильнее заголовка модели: искать колоду он будет по
-            // тому, о чём просил.
-            prompt={mediaTopic ?? deck.title}
-            // Правка действует только по последнему ответу — та же причина, что
-            // у разделения и продолжения выше.
-            {...(isLast && mediaRevision?.reviseOf ? { reviseOf: mediaRevision.reviseOf } : {})}
-            {...(isLast && mediaRevision?.onDone ? { onDeckSaved: mediaRevision.onDone } : {})}
-            {...(mediaRevision ? { onRevise: mediaRevision.onStart } : {})}
+            prompt={deck.title}
           />
         ))}
         {/* Непринятый блок остаётся в тексте как есть, и решение об этом приняла
@@ -216,17 +152,10 @@ export function ProviderChatMessages({
     );
   };
 
-  // Лента едет вниз на каждый кусок ответа: иначе растущий текст уезжал бы за
-  // край, и человек читал бы середину, а не конец.
-  useEffect(() => {
-    const node = listRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [messages.length, partial]);
-
-  const isBlank = messages.length === 0 && !partial;
+  const isBlank = messages.length === 0;
 
   return (
-    <div className={styles.list} ref={listRef}>
+    <div className={styles.list}>
       {isBlank ? (
         // Ключи у веток разные намеренно: без них React переиспользует тот же
         // div и меняет на нём `flex` на месте, а смена сокращённого свойства на
@@ -247,40 +176,13 @@ export function ProviderChatMessages({
             {isEmptyState ? t('providerChat.startHint') : t('providerChat.empty')}
           </Typography>
           {isEmptyState && (
-            <Button
-              variant="primary"
-              onClick={onCreate}
-              isLoading={isCreating}
-              leftIcon={<Icon name="plus" size={18} />}
-            >
+            <Button variant="primary" onClick={onCreate} leftIcon={<Icon name="plus" size={18} />}>
               {t('providerChat.new')}
             </Button>
           )}
         </Stack>
       ) : (
         <Stack key="list" gap="var(--spacing-sm)" padding="var(--spacing-md) var(--spacing-xl)">
-          {/* Хаб родителя — первой строкой ленты, как у Claude: сперва «где
-              все», потом сама переписка. Групп нет — карточки нет вовсе. */}
-          {onOpenChild && (
-            <ChildStages
-              groups={stages ?? []}
-              onOpen={onOpenChild}
-              tree={tree}
-              {...(onPauseAll ? { onPauseAll } : {})}
-              {...(onResumeAll ? { onResumeAll } : {})}
-              {...(treeBusy !== undefined ? { treeBusy } : {})}
-              {...(onAnswerHold ? { onAnswerHold } : {})}
-              {...(holdBusy !== undefined ? { holdBusy } : {})}
-              {...(onRelease ? { onRelease } : {})}
-              {...(releaseBusy !== undefined ? { releaseBusy } : {})}
-              {...(onResumeInterrupted ? { onResumeInterrupted } : {})}
-              {...(resumeInterruptedBusy !== undefined ? { resumeInterruptedBusy } : {})}
-              {...(onCheckOverlap ? { onCheckOverlap } : {})}
-              {...(overlapBusy !== undefined ? { overlapBusy } : {})}
-              foreign
-              {...(providerId ? { providerId } : {})}
-            />
-          )}
           {messages.map((message) =>
             /* Заметка панели — не реплика: подписывать её именем провайдера
                значило бы приписать модели слова, которых она не говорила. */
@@ -318,59 +220,6 @@ export function ProviderChatMessages({
               </Stack>
             ),
           )}
-
-          {/*
-            Ревью чужих MR (Т6) — под перепиской, а не над ней: это решение
-            человека, а не отчёт, и место ему там же, где у Claude, — внизу
-            ленты, куда человек смотрит, вернувшись к разговору.
-          */}
-          {onReviewDecide &&
-            (reviews ?? []).map((item) => (
-              <ReviewDecisionCard
-                key={item.chatId}
-                item={item}
-                // «Ко всем» считается по СОСЕДЯМ: сколько ещё карточек дерева
-                // ждут решения. Своя в счёт не идёт — иначе тумблер обещал бы
-                // применить решение к самой себе.
-                others={
-                  (reviews ?? []).filter((other) => waitsDecision(other) && other !== item).length
-                }
-                onDecide={onReviewDecide}
-                {...(onReviewPush ? { onPush: onReviewPush } : {})}
-                {...(onReviewRetry ? { onRetry: onReviewRetry } : {})}
-                {...(reviewBusy !== undefined ? { busy: reviewBusy } : {})}
-              />
-            ))}
-
-          {isRunning && (
-            <Stack gap="var(--spacing-3xs)" className={styles.assistantTurn}>
-              <Typography variant="caption" color="subtle" as="span">
-                {providerName}
-              </Typography>
-              {/* Тот же разбор, что и у записанной реплики: недописанный блок
-                  вердикта прячется с открывающей кавычки и до конца, иначе
-                  человек несколько секунд смотрит, как растёт служебный JSON. */}
-              <Typography className={styles.turnText}>
-                {(partial
-                  ? withoutEscalateBlocks(
-                      withoutSieveBlocks(
-                        withoutSplitTickets(scanReviewBlocks(partial).text, { streaming: true }),
-                        { streaming: true },
-                      ),
-                      { streaming: true },
-                    )
-                  : '') || t('providerChat.thinking')}
-                <span className={styles.caret}>▍</span>
-              </Typography>
-            </Stack>
-          )}
-          {/* Дописанное, пока шёл ответ, — там, где встанет, когда уйдёт. */}
-          <QueuedBubbles
-            items={(queued ?? []).map((item) => ({ id: item.id, prompt: item.text }))}
-            {...(onCancelQueued ? { onCancel: onCancelQueued } : {})}
-            {...(queueHeld ? { held: true } : {})}
-            {...(onSendQueued ? { onSend: onSendQueued } : {})}
-          />
         </Stack>
       )}
     </div>

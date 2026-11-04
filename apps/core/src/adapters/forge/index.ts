@@ -35,6 +35,5 @@ export function createForgePort(input: ForgePortInput): ForgePort {
 
 export { GENERIC_REASON } from './generic.ts';
 export { DRAFT_PREFIX, mrBodyHash, noteHash } from './hash.ts';
-export { hostOf, projectPathOf, selectForge, type ForgeSite, type ForgeSites } from './select.ts';
 export type { ForgeAccess } from './forge.types.ts';
 export { forgeActionKey, parseForgeActionKey, type ForgeActionKey } from './action-keys.ts';

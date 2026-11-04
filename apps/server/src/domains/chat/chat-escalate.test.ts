@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
   ESCALATE_LANG,
+  ESCALATE_TEXT_MAX,
   parseEscalateBody,
   scanEscalateBlocks,
   withoutEscalateBlocks,
 } from '@agentdeck/contracts/chat-escalate';
-import { ESCALATE_BLOCK_LANG, escalationSchema } from '@agentdeck/contracts/chat-group-settings';
 
 /**
  * Блок критического замечания (контракт без zod — его берут и сервер, и лента,
  * и телефон). Три случая, как у блока продолжения: разобранный уходит из текста,
- * сломанный остаётся, незакрытый прячется только в потоке. И разбор без zod
- * обязан соглашаться со схемой — иначе телефон и сервер разойдутся.
+ * сломанный остаётся, незакрытый прячется только в потоке. Карточек замечаний
+ * панель больше не ведёт — блок только прячется из текста, разбор остаётся.
  */
 const fenced = (body: string): string => `\`\`\`${ESCALATE_LANG}\n${body}\n\`\`\``;
 
@@ -43,19 +43,21 @@ describe('блок agentdeck:escalate', () => {
     expect(withoutEscalateBlocks('  как есть  \n')).toBe('  как есть  \n');
   });
 
-  it('разбор без zod согласен со схемой', () => {
-    expect(ESCALATE_LANG).toBe(ESCALATE_BLOCK_LANG);
-    const bodies = [
-      { severity: 'critical', text: 'да' },
-      { severity: 'critical', text: '' },
-      { severity: 'minor', text: 'нет' },
-      { severity: 'critical', text: 'x'.repeat(2_001) },
-      { severity: 'critical' },
+  it('тело блока: только critical с непустым текстом до потолка', () => {
+    expect(ESCALATE_LANG).toBe('agentdeck:escalate');
+    const bodies: [unknown, boolean][] = [
+      [{ severity: 'critical', text: 'да' }, true],
+      [{ severity: 'critical', text: '' }, false],
+      [{ severity: 'minor', text: 'нет' }, false],
+      [{ severity: 'critical', text: 'x'.repeat(2_001) }, true],
+      [{ severity: 'critical', text: 'x'.repeat(ESCALATE_TEXT_MAX + 1) }, false],
+      [{ severity: 'critical' }, false],
     ];
-    for (const body of bodies) {
-      expect(Boolean(parseEscalateBody(JSON.stringify(body)))).toBe(
-        escalationSchema.safeParse(body).success,
-      );
+    for (const [body, valid] of bodies) {
+      expect(
+        Boolean(parseEscalateBody(JSON.stringify(body))),
+        JSON.stringify(body).slice(0, 60),
+      ).toBe(valid);
     }
     expect(parseEscalateBody('не json')).toBeUndefined();
     expect(parseEscalateBody('[1]')).toBeUndefined();

@@ -6,11 +6,7 @@ import type {
   FormatCheckReport,
   FormatCheckResponse,
   ModelCatalogResponse as SettingsExtraModels,
-  WatcherStatus as SettingsExtraWatcher,
 } from '@agentdeck/contracts';
-import type { SplitDefaults, SplitDefaultsView } from '@agentdeck/contracts/split-groups';
-import { SPLIT_HEAVY_RULE_MAX } from '@agentdeck/contracts/split-groups';
-import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
 import type { AccountInfo as AccountInfoView } from '../../../domains/account.ts';
 import {
   definePanelAction,
@@ -18,177 +14,14 @@ import {
   type AnyPanelAction,
   type InjectRoute,
 } from '../registry.ts';
-import { card, maskDeep, readRoute, stateCard } from '../action-kit/action-kit.ts';
+import { card, maskDeep, readRoute } from '../action-kit/action-kit.ts';
 import { dataField, textField } from '../texts/texts.ts';
 
 /**
- * Настройки сверх `get_settings`/`update_settings`: общие правила групп
- * разделения, фоновый наблюдатель, каталог моделей, сверка форматов, учётная
- * запись и система, версия и обновление CLI Claude. Всё — теми же маршрутами,
- * что зовут карточки вкладок «Общие», «Группы», «Провайдеры», «Доступ».
- *
- * Права групп и развилки групп из общих правил агент НЕ меняет: это решения об
- * автоодобрении и о вопросах человеку (список «только человек», D2). Вход
- * действия этих полей не имеет, а запись несёт сохранённые значения как есть.
+ * Настройки сверх `get_settings`/`update_settings`: каталог моделей, сверка
+ * форматов, учётная запись и система, версия и обновление CLI Claude. Всё —
+ * теми же маршрутами, что зовут карточки вкладок «Общие», «Провайдеры», «Доступ».
  */
-
-const SPLIT_URL = '/api/split-defaults';
-
-const count = (max: number) => z.number().int().min(1).max(max);
-
-const splitInput = z
-  .object({
-    parallelLight: count(SPLIT_MAX_GROUPS)
-      .optional()
-      .describe('Groups running at once on a light project'),
-    parallelHeavy: count(SPLIT_MAX_GROUPS)
-      .optional()
-      .describe('Groups running at once on a heavy project'),
-    heavyChains: count(SPLIT_HEAVY_RULE_MAX)
-      .optional()
-      .describe('A project counts as heavy from this many chains'),
-    heavySteps: count(SPLIT_HEAVY_RULE_MAX)
-      .optional()
-      .describe('A project counts as heavy from this many steps in a chain'),
-  })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: 'Name at least one value to change',
-  });
-type SplitInput = z.infer<typeof splitInput>;
-
-/** Правила после правки: названные числа поверх сохранённых, остальное как есть. */
-function nextSplit(current: SplitDefaults, input: SplitInput): SplitDefaults {
-  return {
-    ...current,
-    ...(input.parallelLight === undefined ? {} : { parallelLight: input.parallelLight }),
-    ...(input.parallelHeavy === undefined ? {} : { parallelHeavy: input.parallelHeavy }),
-    heavy: {
-      chains: input.heavyChains ?? current.heavy.chains,
-      steps: input.heavySteps ?? current.heavy.steps,
-    },
-  };
-}
-
-const readSplit = async (inject: InjectRoute) =>
-  (await readRoute<SplitDefaultsView>(inject, SPLIT_URL)).defaults;
-
-/** Числа правил — то, что агенту можно менять и что он читает. */
-const splitNumbers = (defaults: SplitDefaults) => ({
-  parallelLight: defaults.parallelLight,
-  parallelHeavy: defaults.parallelHeavy,
-  heavy: defaults.heavy,
-});
-
-const readSplitDefaults = definePanelAction({
-  name: 'read_split_defaults',
-  section: 'settings',
-  risk: 'read',
-  description:
-    'Shared rules of split groups (Settings → Groups): how many groups run at once on a light and ' +
-    'on a heavy project, and from how many chains/steps a project counts as heavy; plus the ' +
-    'built-in values. Group permissions and group forks are listed read-only: only the human sets them.',
-  input: z.object({}),
-  route: () => ({ method: 'GET', url: SPLIT_URL }),
-  shape: (_input, body) => {
-    const view = body as SplitDefaultsView;
-    return {
-      current: splitNumbers(view.defaults),
-      builtIn: splitNumbers(view.builtIn),
-      humanOnly: {
-        permissions: view.defaults.permissions,
-        groupQuestions: view.defaults.groupQuestions,
-      },
-    };
-  },
-  summary: 'journal-read-split-defaults',
-});
-
-const saveSplitDefaults = definePanelAction({
-  name: 'save_split_defaults',
-  section: 'settings',
-  risk: 'change',
-  title: 'journal-save-split-defaults',
-  description:
-    'Change the shared split-group numbers (groups at once on a light/heavy project, the heavy ' +
-    'rule). Only the named values change. Needs the human’s confirmation. Group permissions and ' +
-    'forks are not accepted here: the human sets them in Settings → Groups.',
-  input: splitInput,
-  route: async (input, inject) => ({
-    method: 'PUT',
-    url: SPLIT_URL,
-    body: nextSplit(await readSplit(inject), input),
-  }),
-  fingerprint: async (_input, inject) => fingerprintOf(await readSplit(inject)),
-  preview: async (input, inject) => {
-    const current = await readSplit(inject);
-    return stateCard(
-      'split-defaults',
-      splitNumbers(current),
-      splitNumbers(nextSplit(current, input)),
-      card('summary-save-split-defaults'),
-      [textField('label-split-human-only', 'value-split-human-only')],
-    );
-  },
-  shape: (_input, body) => ({
-    saved: true,
-    current: splitNumbers((body as SplitDefaultsView).defaults),
-  }),
-  page: () => ({ route: '/settings', focus: 'groups' }),
-});
-
-const WATCHER_URL = '/api/watcher';
-
-const watcherView = (status: SettingsExtraWatcher) => ({
-  enabled: status.enabled,
-  ...(status.since ? { since: status.since } : {}),
-  analyzing: status.analyzing,
-  pendingSignals: status.pending,
-  findings: status.findings,
-  remarks: status.remarks,
-});
-
-const watcherStatus = definePanelAction({
-  name: 'watcher_status',
-  section: 'watcher',
-  risk: 'read',
-  description:
-    'Background watcher (its own page, /watcher): on/off, since when, whether an analysis runs now, ' +
-    'signals waiting, findings in its report.',
-  input: z.object({}),
-  route: () => ({ method: 'GET', url: WATCHER_URL }),
-  shape: (_input, body) => watcherView(body as SettingsExtraWatcher),
-  summary: 'journal-watcher-status',
-});
-
-const setWatcher = definePanelAction({
-  name: 'set_watcher',
-  section: 'watcher',
-  risk: 'change',
-  title: 'journal-set-watcher',
-  description:
-    'Turn the background watcher on or off. When on, a model analyses page failures in the ' +
-    'background and spends quota; off stops the analysis at once. Needs the human’s confirmation.',
-  input: z.object({ enabled: z.boolean().describe('true = on, false = off') }),
-  route: (input) => ({ method: 'POST', url: WATCHER_URL, body: { enabled: input.enabled } }),
-  fingerprint: async (_input, inject) =>
-    fingerprintOf((await readRoute<SettingsExtraWatcher>(inject, WATCHER_URL)).enabled),
-  preview: async (input, inject) => {
-    const status = await readRoute<SettingsExtraWatcher>(inject, WATCHER_URL);
-    if (status.enabled === input.enabled) {
-      throw new Error(
-        `Nothing would change: the watcher is already ${input.enabled ? 'on' : 'off'}.`,
-      );
-    }
-    return {
-      ...card(input.enabled ? 'summary-watcher-on' : 'summary-watcher-off'),
-      fields: [
-        textField('label-watcher-cost', input.enabled ? 'value-watcher-cost' : 'value-watcher-off'),
-      ],
-    };
-  },
-  shape: (_input, body) => watcherView(body as SettingsExtraWatcher),
-  page: () => ({ route: '/watcher' }),
-});
 
 const listModels = definePanelAction({
   name: 'list_models',
@@ -374,10 +207,6 @@ const updateCli = definePanelAction({
 
 /** Настройки сверх общих: в порядке показа. */
 export const SETTINGS_EXTRA_ACTIONS: readonly AnyPanelAction[] = [
-  readSplitDefaults,
-  saveSplitDefaults,
-  watcherStatus,
-  setWatcher,
   listModels,
   formatCheck,
   readAccount,

@@ -115,7 +115,10 @@ export const hooksEn: typeof hooksRu = {
         'point". PreToolUse holds two guards, PostToolUse two handlers, and one of ' +
         'them carries a red "script file not found" mark: the entry is there, the ' +
         'file is not, and such a hook does exactly nothing. The local SessionEnd hook ' +
-        'carries the same mark.',
+        'carries the same mark. Under the command is the description from the comment ' +
+        'at the top of the script; linter directives like “global …” are left out, and ' +
+        'the header of hooks the panel installs itself (phone, Tests block) is shown in ' +
+        'the interface language.',
       lLocal: 'Entries from the personal file are marked',
       lLocalText:
         'A hook from settings.local.json is shown with a "local" badge and no ' +

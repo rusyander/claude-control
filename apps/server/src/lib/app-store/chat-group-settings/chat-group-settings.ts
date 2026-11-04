@@ -1,28 +1,20 @@
-import type {
-  ChatEscalationEntry,
-  EscalationNotice,
-  StoredChatGroupSettings,
-} from '@agentdeck/contracts/chat-group-settings';
-import type { AppState, StoredChatEscalation } from '../app-store.types.ts';
+import type { StoredChatGroupSettings } from '@agentdeck/contracts/chat-group-settings';
+import type { AppState } from '../app-store.types.ts';
 
 /**
- * Группа и автономность ЧАТА, заметки главному чату дерева и память о втором
- * написании ключа разговора.
+ * Группа и автономность ЧАТА (только чтение: записи остались в `state.json` от
+ * прежнего меню чата, новых панель не пишет — группы ведёт ядро, этап 10) и
+ * память о втором написании ключа разговора.
  *
  * Ключ — как у связей разделения (`chat-links.ts`): чат заводится под временным
- * `new-<ts>`, а настоящий `sessionId` Claude Code выдаёт уже в прогоне. Выбор,
- * сделанный в меню до первого сообщения, обязан пережить эту смену — иначе
- * второй же ход шёл бы на умолчаниях. Поэтому при смене ключа запись переезжает
- * на `sessionId`, а временный ключ запоминается синонимом: вкладка ещё какое-то
+ * `new-<ts>`, а настоящий `sessionId` Claude Code выдаёт уже в прогоне. Запись
+ * обязана пережить эту смену, поэтому при смене ключа она переезжает на
+ * `sessionId`, а временный ключ запоминается синонимом: вкладка ещё какое-то
  * время знает разговор по нему, и чтение по нему обязано найти ту же запись.
  */
 
 /** Сколько записей держим в каждой карте: сотни чатов назад, а не вся история. */
 const MAX_ENTRIES = 500;
-/** Заметок у одного главного чата: старые вытесняются новыми. */
-const MAX_NOTICES_PER_ROOT = 50;
-/** Главных чатов с заметками. */
-const MAX_ROOTS = 200;
 
 /**
  * Только собственный ключ карты: id чата `constructor`/`toString` иначе
@@ -66,27 +58,6 @@ export function getChatGroupSettings(
 ): StoredChatGroupSettings | undefined {
   const stored = ownOf(state.chatGroupSettings, canonicalChatKey(state, key));
   return stored ? { ...stored } : undefined;
-}
-
-/**
- * Записать своё у чата. Поле `undefined` — «своего нет, брать от родителя или
- * умолчание»; запись без полей удаляется: хранится только отклонение.
- */
-export function setChatGroupSettings(
-  state: AppState,
-  key: string,
-  settings: StoredChatGroupSettings,
-): StoredChatGroupSettings {
-  const canonical = canonicalChatKey(state, key);
-  const next: StoredChatGroupSettings = {
-    ...(settings.groupChoice !== undefined ? { groupChoice: settings.groupChoice } : {}),
-    ...(settings.autonomous !== undefined ? { autonomous: settings.autonomous } : {}),
-  };
-  state.chatGroupSettings ??= {};
-  delete state.chatGroupSettings[canonical];
-  if (Object.keys(next).length > 0) setOwn(state.chatGroupSettings, canonical, next);
-  pruneOldest(state.chatGroupSettings, MAX_ENTRIES);
-  return { ...next };
 }
 
 /**
@@ -152,54 +123,6 @@ function copyChatGroupSettings(state: AppState, source: string, target: string):
   setOwn(state.chatGroupSettings, target, { ...own });
   pruneOldest(state.chatGroupSettings, MAX_ENTRIES);
   return true;
-}
-
-/** Ключ заметки: один и тот же блок ребёнка, прочитанный дважды, — одна заметка. */
-function escalationId(notice: Pick<EscalationNotice, 'childChatId' | 'text'>): string {
-  let hash = 0;
-  const source = `${notice.childChatId}\n${notice.text}`;
-  for (let index = 0; index < source.length; index += 1) {
-    hash = (Math.imul(hash, 31) + source.charCodeAt(index)) | 0;
-  }
-  return `${notice.childChatId}:${(hash >>> 0).toString(36)}`;
-}
-
-/** Заметка в главный чат дерева. `false` — такая уже есть. */
-export function addChatEscalation(
-  state: AppState,
-  root: string,
-  notice: EscalationNotice,
-): boolean {
-  const key = canonicalChatKey(state, root);
-  const id = escalationId(notice);
-  state.chatEscalations ??= {};
-  const list = ownOf(state.chatEscalations, key) ?? [];
-  if (list.some((entry) => entry.id === id)) return false;
-  const next: StoredChatEscalation[] = [...list, { ...notice, id }];
-  setOwn(state.chatEscalations, key, next.slice(-MAX_NOTICES_PER_ROOT));
-  pruneOldest(state.chatEscalations, MAX_ROOTS);
-  return true;
-}
-
-export function listChatEscalations(state: AppState): Record<string, ChatEscalationEntry[]> {
-  const out: Record<string, ChatEscalationEntry[]> = {};
-  for (const [root, list] of Object.entries(state.chatEscalations ?? {})) {
-    out[root] = list.map(({ readAt, ...notice }) => ({ ...notice, read: Boolean(readAt) }));
-  }
-  return out;
-}
-
-/** Человек открыл главный чат: все его заметки прочитаны. `true` — что-то сменилось. */
-export function markChatEscalationsRead(state: AppState, root: string, at: string): boolean {
-  const list = ownOf(state.chatEscalations, canonicalChatKey(state, root));
-  if (!list) return false;
-  let changed = false;
-  for (const entry of list) {
-    if (entry.readAt) continue;
-    entry.readAt = at;
-    changed = true;
-  }
-  return changed;
 }
 
 /** Порядок ключей объекта — порядок вставки: самые ранние и вытесняем. */

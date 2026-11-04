@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:32:38.555Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Начните вводить запрос Ищет сразу по всем разделам конфигурации. Достаточно двух символов.",
+      "shotAt": "2026-11-03T17:29:22.102Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Начните вводить запрос Ищет сразу по всем разделам конфигурации. Достаточно двух символов.",
       "en": {
         "file": "01-prompt.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:14.387Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Start typing a query Searches every configuration section at once. Two characters are enough."
+        "shotAt": "2026-11-03T17:31:26.130Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Start typing a query Searches every configuration section at once. Two characters are enough.",
+        "seal": {
+          "png": "9d32aed97fa38e13",
+          "text": "3cf350d4f9e02ded"
+        }
       },
       "dark": {
         "file": "01-prompt.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:35:44.067Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Начните вводить запрос Ищет сразу по всем разделам конфигурации. Достаточно двух символов."
+        "shotAt": "2026-11-03T17:33:49.094Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Начните вводить запрос Ищет сразу по всем разделам конфигурации. Достаточно двух символов.",
+        "seal": {
+          "png": "6a50b73959c207ad",
+          "text": "ef955bedf3a2b6c6"
+        }
       },
       "darkEn": {
         "file": "01-prompt.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:37:17.197Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Start typing a query Searches every configuration section at once. Two characters are enough."
+        "shotAt": "2026-11-03T17:36:10.335Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Start typing a query Searches every configuration section at once. Two characters are enough.",
+        "seal": {
+          "png": "957882acb4bf2933",
+          "text": "3cf350d4f9e02ded"
+        }
+      },
+      "seal": {
+        "png": "97de981fa0f093f6",
+        "text": "ef955bedf3a2b6c6"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:32:40.020Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Правила 1 Не трогать каталог migrations Не трогать каталог migrations Права доступа 1 Edit(migrations/**) deny: Edit(migrations/**)",
+      "shotAt": "2026-11-03T17:29:24.016Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Правила 1 Не трогать каталог migrations Не трогать каталог migrations Права доступа 1 Edit(migrations/**) deny: Edit(migrations/**)",
       "en": {
         "file": "02-two-sections.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:15.870Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Rules 1 Не трогать каталог migrations Не трогать каталог migrations Permissions 1 Edit(migrations/**) deny: Edit(migrations/**)"
+        "shotAt": "2026-11-03T17:31:28.063Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Rules 1 Не трогать каталог migrations Не трогать каталог migrations Permissions 1 Edit(migrations/**) deny: Edit(migrations/**)",
+        "seal": {
+          "png": "c5b565c90f2cecde",
+          "text": "40fa3b1dade38533"
+        }
       },
       "dark": {
         "file": "02-two-sections.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:35:45.528Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Правила 1 Не трогать каталог migrations Не трогать каталог migrations Права доступа 1 Edit(migrations/**) deny: Edit(migrations/**)"
+        "shotAt": "2026-11-03T17:33:51.030Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Правила 1 Не трогать каталог migrations Не трогать каталог migrations Права доступа 1 Edit(migrations/**) deny: Edit(migrations/**)",
+        "seal": {
+          "png": "99ebf8c21a9d4b7e",
+          "text": "c46a6db260a2faec"
+        }
       },
       "darkEn": {
         "file": "02-two-sections.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:37:18.683Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Rules 1 Не трогать каталог migrations Не трогать каталог migrations Permissions 1 Edit(migrations/**) deny: Edit(migrations/**)"
+        "shotAt": "2026-11-03T17:36:12.268Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Rules 1 Не трогать каталог migrations Не трогать каталог migrations Permissions 1 Edit(migrations/**) deny: Edit(migrations/**)",
+        "seal": {
+          "png": "34371467f6cc4275",
+          "text": "40fa3b1dade38533"
+        }
+      },
+      "seal": {
+        "png": "269576377a9a9bb1",
+        "text": "c46a6db260a2faec"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:32:41.488Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Переменные окружения 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
+      "shotAt": "2026-11-03T17:29:25.489Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Переменные окружения 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
       "en": {
         "file": "03-variables.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:17.358Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Environment variables 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN"
+        "shotAt": "2026-11-03T17:31:29.552Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Environment variables 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
+        "seal": {
+          "png": "9ae1a3d9a2e57406",
+          "text": "c40c37dea9ebdc17"
+        }
       },
       "dark": {
         "file": "03-variables.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:35:46.992Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Переменные окружения 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN"
+        "shotAt": "2026-11-03T17:33:52.510Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Найдено: 2 Переменные окружения 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
+        "seal": {
+          "png": "bc2fedaebaa5ac3b",
+          "text": "4e7c83318e88c848"
+        }
       },
       "darkEn": {
         "file": "03-variables.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:37:20.165Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Environment variables 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN"
+        "shotAt": "2026-11-03T17:36:13.752Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Found: 2 Environment variables 2 MAX_THINKING_TOKENS MAX_THINKING_TOKENS SHOP_API_TOKEN SHOP_API_TOKEN",
+        "seal": {
+          "png": "e0b248ccfc733e1a",
+          "text": "c40c37dea9ebdc17"
+        }
+      },
+      "seal": {
+        "png": "999bc86a7e64ecf9",
+        "text": "4e7c83318e88c848"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:32:42.979Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Ничего не найдено По запросу «выгрузка склада» совпадений нет. Попробуйте другое слово или часть имени.",
+      "shotAt": "2026-11-03T17:29:26.974Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Ничего не найдено По запросу «выгрузка склада» совпадений нет. Попробуйте другое слово или часть имени.",
       "en": {
         "file": "04-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:18.835Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Nothing found No matches for \"выгрузка склада\". Try another word or part of a name."
+        "shotAt": "2026-11-03T17:31:31.044Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Nothing found No matches for \"выгрузка склада\". Try another word or part of a name.",
+        "seal": {
+          "png": "dd6d88ded6f415c2",
+          "text": "c715e6c8ab11fb5a"
+        }
       },
       "dark": {
         "file": "04-empty.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:35:48.459Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Ничего не найдено По запросу «выгрузка склада» совпадений нет. Попробуйте другое слово или часть имени."
+        "shotAt": "2026-11-03T17:33:53.993Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 3 Команды Хуки 3 Скрипты 4 Плагины Интеграции и доступы MCP-серверы 4 Права 7 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Поиск Одна строка по всем разделам: правила, скиллы, хуки, скрипты, права, переменные, серверы и плагины Ничего не найдено По запросу «выгрузка склада» совпадений нет. Попробуйте другое слово или часть имени.",
+        "seal": {
+          "png": "5e3e647b8f826a25",
+          "text": "a22c9866d4aad5af"
+        }
       },
       "darkEn": {
         "file": "04-empty.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:37:21.631Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Nothing found No matches for \"выгрузка склада\". Try another word or part of a name."
+        "shotAt": "2026-11-03T17:36:15.231Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 3 Commands Hooks 3 Scripts 4 Plugins Integrations and access MCP servers 4 Permissions 7 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Search One box across every section: rules, skills, hooks, scripts, permissions, variables, servers and plugins Nothing found No matches for \"выгрузка склада\". Try another word or part of a name.",
+        "seal": {
+          "png": "992f743aef6dcd0e",
+          "text": "c715e6c8ab11fb5a"
+        }
+      },
+      "seal": {
+        "png": "e498764e58b8ea96",
+        "text": "a22c9866d4aad5af"
       }
     }
   ]

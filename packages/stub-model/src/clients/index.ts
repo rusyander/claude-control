@@ -5,6 +5,7 @@
  */
 import type { DialectId } from '../index.d.mts';
 import { readAnthropicJson, readAnthropicStream } from './anthropic.ts';
+import { readGoogleJson, readGoogleStream } from './google-genai.ts';
 import { readChatJson, readChatStream } from './openai-chat.ts';
 import { readResponsesJson, readResponsesStream } from './openai-responses.ts';
 import type { Reply } from './reply.ts';
@@ -23,7 +24,8 @@ export interface RequestOptions {
 }
 
 export interface Client {
-  path: string;
+  /** Путь запроса; функция — у протокола, где поток выбирает путь, а не тело (Google). */
+  path: string | ((options: RequestOptions) => string);
   headers: Record<string, string>;
   request(options: RequestOptions): Record<string, unknown>;
   stream(text: string): Reply;
@@ -121,5 +123,48 @@ export const CLIENTS: Record<DialectId, Client> = {
     }),
     stream: readResponsesStream,
     json: readResponsesJson,
+  },
+  'google-genai': {
+    path: (o) =>
+      o.stream
+        ? '/v1beta/models/gemini-test:streamGenerateContent?alt=sse'
+        : '/v1beta/models/gemini-test:generateContent',
+    headers: { 'x-goog-api-key': 'AIza-test-SECRET-VALUE' },
+    request: (o) => ({
+      systemInstruction: { parts: [{ text: 'sys' }] },
+      ...(o.tool
+        ? {
+            tools: [
+              { functionDeclarations: [{ name: 'run_shell_command', parameters: SHELL_SCHEMA }] },
+            ],
+          }
+        : {}),
+      contents: [
+        { role: 'user', parts: [{ text: o.text }] },
+        ...(o.toolResult
+          ? [
+              {
+                role: 'model',
+                parts: [{ functionCall: { id: 'c1', name: 'run_shell_command', args: {} } }],
+              },
+              {
+                role: 'user',
+                parts: [
+                  {
+                    functionResponse: {
+                      id: 'c1',
+                      name: 'run_shell_command',
+                      response: { output: 'ok' },
+                    },
+                  },
+                ],
+              },
+            ]
+          : []),
+      ],
+      generationConfig: { temperature: 0 },
+    }),
+    stream: readGoogleStream,
+    json: readGoogleJson,
   },
 };

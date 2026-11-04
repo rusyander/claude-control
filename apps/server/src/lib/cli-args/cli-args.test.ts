@@ -1,12 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import {
-  safeSessionId,
-  safeModel,
-  safeName,
-  safePluginId,
-  quoteForShell,
-  shellArgs,
-} from './cli-args.ts';
+import { safeModel, safeName, safePluginId, quoteForShell, shellArgs } from './cli-args.ts';
 
 /**
  * Тесты защиты аргументов командной строки. Это модуль безопасности: значения
@@ -16,25 +9,6 @@ import {
  * .agent/TEST-CASES.md → «Аргументы командной строки (безопасность)».
  */
 describe('cli-args', () => {
-  describe('safeSessionId — только UUID-подобные идентификаторы', () => {
-    it('пропускает валидный id сессии', () => {
-      expect(safeSessionId('a1b2c3d4-5678-90ab-cdef-1234567890ab')).toBe(
-        'a1b2c3d4-5678-90ab-cdef-1234567890ab',
-      );
-    });
-
-    it('отбрасывает id с метасимволами оболочки', () => {
-      expect(safeSessionId('id & calc')).toBeUndefined();
-      expect(safeSessionId('$(rm -rf /)')).toBeUndefined();
-      expect(safeSessionId('a;b')).toBeUndefined();
-    });
-
-    it('пустое/undefined → undefined', () => {
-      expect(safeSessionId('')).toBeUndefined();
-      expect(safeSessionId(undefined)).toBeUndefined();
-    });
-  });
-
   describe('safeModel — имя модели по белому списку', () => {
     it('пропускает реальные имена моделей, в т.ч. с суффиксом в скобках', () => {
       expect(safeModel('claude-opus-4-8')).toBe('claude-opus-4-8');

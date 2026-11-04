@@ -53,6 +53,8 @@ export default tseslint.config(
       'apps/server/assets/**/*.mjs',
       // Подставные процессы тестов ядра (дерево, дамп argv) — такие же скрипты Node.
       'apps/core/src/**/__fixtures__/**/*.mjs',
+      // Самопроверки инструментов набора, которые тесты сервера запускают отдельным процессом Node.
+      'apps/server/src/**/__fixtures__/**/*.mjs',
       '*.cjs',
       '*.mjs',
     ],

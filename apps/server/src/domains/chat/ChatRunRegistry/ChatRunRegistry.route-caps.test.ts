@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ChatRunRegistry, type RunLike } from './ChatRunRegistry.ts';
-import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
 import type { GroupRunProfile } from '../group-profile/group-profile.ts';
 import { capKitToRoute } from './route-caps.ts';
 

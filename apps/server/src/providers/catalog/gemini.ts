@@ -100,7 +100,7 @@ export const geminiProvider: ConfigProvider = {
   configLocations: () => [geminiHome()],
   // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026). Канала нет: оба родных
   // ключа живут только в файлах настроек, а файл на прогон CLI не берёт — почему,
-  // см. `economy-run/gemini.ts` (живая проба gemini 0.65.0).
+  // см. `apps/core/src/adapters/economy-carry.ts` ядра (живая проба gemini 0.65.0).
   groupEconomy: {
     support: {
       // `model.compressionThreshold` и `tools.truncateToolOutputThreshold` — только в
@@ -113,11 +113,6 @@ export const geminiProvider: ConfigProvider = {
       cacheTtl: { support: 'impossible', note: 'economy-note-cache-implicit' },
       // `gemini -p` без редактора.
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      // Доставка — на младшей модели лестницы (`modelLadder` ниже, `cheap-deliver.ts`).
-      sonnetDeliver: { support: 'emulated' },
-      // Каждый ответ — свой запуск с короткой историей: держать между ходами нечего.
-      freshOnColdResume: { support: 'meaningless', note: 'economy-note-one-shot' },
-      keepWarm: { support: 'meaningless', note: 'economy-note-one-shot' },
       // Строка привычек — нейтральная часть той же строки, что у Claude.
       workHabits: { support: 'emulated' },
     },

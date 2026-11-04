@@ -77,7 +77,7 @@ whose code it touched. Nothing is uploaded before §8; each file is uploaded onc
 README keeps `file → URL` for every MR edit.
 
 BEFORE comes from your own copy before the first edit of §5 — never from the user's main checkout or
-another worktree (`own-copy-guard` refuses a dev server, build or shot script there). Missed it →
+another worktree (a dev server, build or shot script runs only from your copy). Missed it →
 the base commit unpacked inside your copy (`mkdir -p .agent/tmp/base && git archive $(git merge-base
 HEAD origin/<target>) | tar -x -C .agent/tmp/base`, its local packages built there, its dev server on
 another port). A blank shot of your own is retired with `mv` into `.agent/archive/`, never `rm`.

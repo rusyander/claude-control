@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
 import { violationReport } from './violations.ts';
 import { enterprisePlatformDriver } from '../drivers/enterprise-platform.ts';
-import { bridgeUpstreamStatus } from '../gateway/status/status.ts';
+import { bridgeUpstreamStatus } from '../status/status.ts';
 
 /**
  * Сводка проверок контура: что именно человек увидит в карточке.

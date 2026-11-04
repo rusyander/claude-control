@@ -6,7 +6,8 @@ import {
   type BufferedEvent,
   type RunLike,
 } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * Буфер кадров прогона не растёт без предела (L4b, п.7): ночной прогон льёт кадры часами.

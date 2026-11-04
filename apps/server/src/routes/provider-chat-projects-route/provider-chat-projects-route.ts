@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
-import { listAllProjects } from '../../domains/provider-chat/provider-chat.ts';
+import { listAllProjects } from '../../domains/provider-chat/projects.ts';
 import { getProvider } from '../../providers/registry.ts';
 import { sendConditional } from '../../lib/conditional-get/conditional-get.ts';
 import { projectsDir } from '../chat/paths.ts';

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import type { EstimateBody, EstimateReply } from '@agentdeck/contracts/core/estimate';
 import type { JournalDataV1, JournalLine } from '@agentdeck/contracts/core/journal';
+import { REVIEW_LINK_PRESET } from '@agentdeck/contracts/core/review-link';
 import type { ScenarioRef } from '@agentdeck/contracts/core/scenario';
 import { estimateFromHistory } from '../../economy/budget/index.ts';
 import { learnedCachePath, readLearned } from '../../economy/learned/index.ts';
@@ -9,9 +10,16 @@ import { linesAfter } from '../../journal/read-view.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
+import { joinAttachments, splitAttachments } from '@agentdeck/contracts/uploads';
 import { createExclusive } from '../../platform/safe-io/files.ts';
+import {
+  attachmentsProblems,
+  storeAttachment,
+  taskAttachmentsDir,
+} from '../attachments/attachments.ts';
 import { launchLint } from '../lint/launch-lint.ts';
 import { latestPresets, resolveScenario, scenarioPrecedence } from '../scenario/index.ts';
+import { sessionProblems } from '../task-env/index.ts';
 import type { TaskRegistry } from '../tasks.ts';
 import { BASE_PIN_SIGNAL, basePinDetail } from './base-pin.ts';
 import type {
@@ -23,6 +31,13 @@ import type {
   SplitEnv,
 } from './estimate.types.ts';
 import { grantConfirmations } from './grants.ts';
+import {
+  folderChatRoot,
+  isChatScenario,
+  journalPlacementGrant,
+  placementProblems,
+  startChatTask,
+} from './placement.ts';
 import {
   journalPreflight,
   jsonArray,
@@ -308,6 +323,9 @@ export function refuse(task: LiveTask, problems: string[] | null, cmdId: string)
   });
 }
 
+/** Ключ папки без git в чтениях оценки (сценарий, слой, предпроверка); в журнал не ложится. */
+const FOLDER_REPO_KEY = 'folder';
+
 /**
  * Единица 0 (G6): одна, в первом репозитории, своё всё — план читает и предлагает деление. Ветка —
  * своя `agentdeck/<id8>`, если создающий не назвал чужую (ответы ревьюерам — ветка MR, F11).
@@ -338,12 +356,21 @@ export async function createTask(
   seed: CreateSeed = {},
 ): Promise<EstimateOutcome> {
   const { fields, cmdId } = body;
-  const { pinned, problems } = await pinRepos(fields.repos, env);
+  // Чат в папке без git: закреплять нечего, но сценарий проекта, слой человека и предпроверка
+  // (доступ к папке) читают её, как читали бы репозиторий.
+  const asFolder = await folderChatRoot(fields, env.workTreeOf);
+  if (asFolder && 'problem' in asFolder) return { status: 422, problems: [asFolder.problem] };
+  const folder = asFolder?.root;
+  const { pinned, problems } = folder
+    ? { pinned: [], problems: [] }
+    : await pinRepos(fields.repos, env);
   if (problems.length > 0) return { status: 422, problems };
   const vetoed = seed.checkPinned ? await seed.checkPinned(pinned) : [];
   if (vetoed.length > 0) return { status: 422, problems: vetoed };
   const ref = scenarioRefOf(fields.scenario);
-  const repos = pinned.map((p) => ({ repoKey: p.repoKey, path: p.path }));
+  const repos = folder
+    ? [{ repoKey: FOLDER_REPO_KEY, path: folder }]
+    : pinned.map((p) => ({ repoKey: p.repoKey, path: p.path }));
   const scenario = await resolveScenario(ref, repos, { libraryDir: env.libraryDir });
   const routes = env.allowedRoutes();
   const layer = await readLaunchLayer(env, repos, (t) => registry.mask(t).text);
@@ -376,9 +403,27 @@ export async function createTask(
     origin: { cmdId },
     launchPolicy: fields.launchPolicy,
     ciWait: fields.ciWait,
+    ...(fields.placement?.kind === 'in-place' ? { placement: 'in-place' as const } : {}),
+    ...(folder ? { folder } : {}),
+    ...(fields.resume ? { resume: fields.resume } : {}),
+    ...(fields.lang ? { lang: fields.lang } : {}),
+    // Только имена и настройки: значения `body.env` — в книгу в памяти строкой ниже.
+    ...(fields.session ? { session: fields.session } : {}),
+    ...seed.created?.(),
   });
-  // Запрос под маской DLP, как и журнал: секрет из запроса не ложится на диск открытым.
-  createExclusive(join(task.dir, REQUEST_ARTIFACT), registry.mask(fields.request).text);
+  if (body.env && fields.session?.env) env.taskEnv?.put(task.taskId, body.env);
+  journalPlacementGrant(task, fields, cmdId);
+  // Копии вложений — до запроса: запрос называет их пути (сеанс читает только эти копии).
+  const into = taskAttachmentsDir(registry.tasksDir, task.taskId);
+  const attached = (body.attachments ?? []).map((item) => storeAttachment(into, cmdId, item));
+  const files = attached.flatMap((a) => (a.ok ? [a.stored.file] : []));
+  // Запрос под маской DLP, как и журнал: секрет из запроса не ложится на диск открытым. Пути,
+  // которые запрос уже называл, остаются в одном блоке с путями копий — маркер один.
+  const asked = splitAttachments(registry.mask(fields.request).text);
+  createExclusive(
+    join(task.dir, REQUEST_ARTIFACT),
+    joinAttachments(asked.text, [...asked.files, ...files]),
+  );
   // Причина задачи — сразу за её созданием: отказ сценария или дороги ниже её не стирает.
   seed.opened?.(task, cmdId);
   for (const p of pinned) {
@@ -446,6 +491,10 @@ export async function createTask(
       detail: JSON.stringify(numbers),
     },
   });
+  if (isChatScenario(fields.scenario)) {
+    startChatTask(task, fields, cmdId);
+    return { status: 202, reply: replyOf(registry, task.taskId, false) };
+  }
   task.append({
     kind: 'task.transition',
     actor: 'core',
@@ -481,6 +530,14 @@ export const ANSWER_PRESET_PROBLEM =
   `scenario ${ANSWER_REVIEWERS_PRESET}: opened only by the forge poller for the MR of a finished ` +
   'task (it needs the MR identity); pick another scenario';
 
+/**
+ * Ревью по ссылке (этап 10, F8) без личности MR не к чему привязать: публикатор открыл бы новый
+ * MR вместо пуша в чужой. Эту задачу создаёт только `POST /v1/review-link`, прочитав MR у форжа.
+ */
+export const REVIEW_LINK_PRESET_PROBLEM =
+  `scenario ${REVIEW_LINK_PRESET}: opened only by POST /v1/review-link (it reads the MR from the ` +
+  'forge); pick another scenario';
+
 export async function estimateTask(
   body: EstimateBody,
   registry: TaskRegistry,
@@ -493,6 +550,21 @@ export async function estimateTask(
   if (known) return { status: 200, reply: replyOf(registry, known, true) };
   if (scenarioRefOf(body.fields.scenario).id === ANSWER_REVIEWERS_PRESET)
     return { status: 422, problems: [ANSWER_PRESET_PROBLEM] };
+  if (scenarioRefOf(body.fields.scenario).id === REVIEW_LINK_PRESET)
+    return { status: 422, problems: [REVIEW_LINK_PRESET_PROBLEM] };
+  const placement = placementProblems(body.fields);
+  if (placement.length > 0) return { status: 422, problems: placement };
+  const session = sessionProblems(body);
+  if (body.fields.session?.env && !env.taskEnv)
+    session.push('session.env: this core has no task env book to hold the values');
+  if (session.length > 0) return { status: 422, problems: session };
+  // Вложения — слово человека чату; байты сверены до задачи: негодный файл не оставляет задачу.
+  if (body.attachments) {
+    const problems = isChatScenario(body.fields.scenario)
+      ? attachmentsProblems(body.attachments)
+      : ['attachments: only a chat task takes attachments'];
+    if (problems.length > 0) return { status: 422, problems };
+  }
   const work = createTask(body, registry, env);
   inflight.set(body.cmdId, work);
   try {

@@ -139,7 +139,7 @@ const CLEAN_CLAIM =
   /no\s+blocking|nothing\s+blocking|blocking\s*(?:findings\s*)?:\s*none|(?:ready|safe|ok)\s+to\s+merge|\bLGTM\b|\bapprove\b/i;
 const CLAIM_QUALIFIED =
   /in\s+what\s+was\s+read|coverage\s+incomplete|except\s+(?:zones|unread)|not\s+read/i;
-/** The hunt passes of SKILL §2, one key each — a command, `file:line`, or "n/a — <the search>". */
+/** The hunt passes of SKILL §3, one key each — a command, `file:line`, or "n/a — <the search>". */
 const PASSES_LINE = field('Passes');
 const HUNT_PASSES = [
   'promises',
@@ -453,10 +453,10 @@ export function shapeProblems(text, parsed = parseReport(text)) {
     const gone = HUNT_PASSES.filter((k) => !passes?.toLowerCase().includes(k));
     if (!passes)
       out.push(
-        `${tier} owes a "**Passes:**" line: ${HUNT_PASSES.join(' · ')}, each "— <cmd | file:line | n/a: the search>" (SKILL §2)`,
+        `${tier} owes a "**Passes:**" line: ${HUNT_PASSES.join(' · ')}, each "— <cmd | file:line | n/a: the search>" (SKILL §3)`,
       );
     else if (gone.length)
-      out.push(`"Passes" leaves out ${gone.join(', ')} — each of the eight is answered (SKILL §2)`);
+      out.push(`"Passes" leaves out ${gone.join(', ')} — each of the eight is answered (SKILL §3)`);
     const journal = JOURNAL_LINE.exec(src)?.[1];
     if (!journal || !(JOURNAL_COUNT.test(journal) || JOURNAL_NONE.test(journal)))
       out.push(

@@ -88,6 +88,8 @@ function unrecognizedApproval(
       'permission',
       'unsupported_format',
       `approval_policy = ${raw}: значение не разбирается панелью и в паспорт не едет — выдавать вместо него умолчание значило бы описать среду, которой нет`,
+      'portability-skip-codex-approval',
+      { value: raw },
     ),
   ];
 }
@@ -97,12 +99,14 @@ const UNREAD = [
   {
     key: 'agents',
     kind: 'subagent' as const,
+    detailCode: 'portability-skip-codex-agents' as const,
     detail:
       'ключ [agents] в config.toml: субагентов Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
   },
   {
     key: 'skills',
     kind: 'skill' as const,
+    detailCode: 'portability-skip-codex-skills' as const,
     detail:
       'ключ [[skills.config]] в config.toml: включение и выключение скиллов Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
   },
@@ -113,7 +117,7 @@ function unreadSections(config: Record<string, unknown>): EnvSkip[] {
 
   for (const section of UNREAD) {
     if (config[section.key] !== undefined) {
-      skips.push(envSkip(section.kind, 'unsupported_format', section.detail));
+      skips.push(envSkip(section.kind, 'unsupported_format', section.detail, section.detailCode));
     }
   }
 
@@ -124,6 +128,7 @@ function unreadSections(config: Record<string, unknown>): EnvSkip[] {
         'command',
         'unsupported_format',
         'каталог ~/.codex/prompts: команды Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
+        'portability-skip-codex-prompts',
       ),
     );
   }

@@ -50,10 +50,9 @@ export const chatEn: typeof chatRu = {
       'action. A click or Enter opens the subagent’s turn on the right: the task it was ' +
       'started with and its steps in order — read-only, Escape closes it and returns to the ' +
       'node. Arrow keys walk the tree: up and down move between neighbours, left folds or ' +
-      'goes to the parent, right unfolds or steps into the first child. A running subagent has “Stop”: the panel asks the ' +
-      'CLI to stop that one subagent and leaves the main turn alone; the CLI confirms it ' +
-      'got the request, not that the subagent stopped, so the row reads “stop requested”, ' +
-      'and later “stopped”. Chips under the main agent’s line and under each node show ' +
+      'goes to the parent, right unfolds or steps into the first child. A subagent has no ' +
+      'separate “Stop”: the core session host owns the CLI process, so only the whole turn ' +
+      'stops — “Stop” in the input. Chips under the main agent’s line and under each node show ' +
       'which skills and MCP servers it called, how many hooks fired for it and how many of ' +
       'them refused (“hooks 3”, “denied 1”); an agent with nothing fired has no chips. A ' +
       'click on the chips opens the “Skills, hooks and MCP” window: the main agent and every ' +
@@ -99,7 +98,7 @@ export const chatEn: typeof chatRu = {
     canOpenFolder: 'Open any folder as a project, even one Claude has never worked in',
     canAttach: 'Attach files by dragging them in, with the paperclip or by pasting a shot (Ctrl+V)',
     canVoice: 'Dictate a request by voice',
-    canStop: 'Stop one agent or all of them at once',
+    canStop: 'Stop the running turn',
     canEditor: 'Open the project in your code editor with one button',
     canCode: 'View and edit project code inside the panel, with a diff of the agent’s edits',
     canTests: 'See the project’s test cases, edit them and have the agent run them',
@@ -252,11 +251,12 @@ export const chatEn: typeof chatRu = {
       'The server picks the route once and names it under the menu item: the conversation agent, ' +
       'the contour as part of an ordinary answer, the contour’s own images endpoint, or your ' +
       'endpoint profile. Both contour roads — part of the answer and its own images endpoint — go ' +
-      'through the panel gateway: the request is in the journal, passes data protection, a ' +
-      'contour refusal arrives as a readable reason, and it counts toward the key’s spend when the ' +
-      'contour sent usage. The gateway never retries a paid image: a temporary contour refusal ' +
+      'through the core, the same road the CLI requests of this contour take: the request is in ' +
+      'the journal, passes data protection, a contour refusal arrives as a readable reason, and ' +
+      'it counts toward the key’s spend when the contour sent usage. The panel gateway switch is ' +
+      'not needed for this. The core never retries a paid image: a temporary contour refusal ' +
       'comes back as a refusal, not as a second charge. The endpoint profile is your own address, ' +
-      'not the corporate key, so it goes directly, bypassing the gateway: its requests are in ' +
+      'not the corporate key, so it goes directly, bypassing the core: its requests are in ' +
       'neither the journal nor the key’s spend. The agent road costs no key at all.',
     imageCard: 'The result is a card, and a file',
     imageCardText:
@@ -270,12 +270,10 @@ export const chatEn: typeof chatRu = {
       'Exactly one thing locks the mode: there is nobody to do it at all — no conversation beside ' +
       'you, no contour, no endpoint profile. Everything else takes away the raster, not the mode: ' +
       'this contour cannot, the key catalog holds no model with generation, the profile has no ' +
-      'address, the gateway is off, that API kind has no such endpoint. “The ' +
-      'gateway is off” is two different reasons and the caption tells them apart: the gateway ' +
-      'switch is off — turn it on from the contour card; the switch is on while no listener is ' +
-      'there — the panel raises the gateway itself, once, and the reason appears only if that ' +
-      'failed, in the gateway’s own words. Then the item works by the ' +
-      'agent road, and the raster’s reason stands beside it — which is what can be fixed.',
+      'address, that API kind has no such endpoint. Then the item works by the ' +
+      'agent road, and the raster’s reason stands beside it — which is what can be fixed. If the ' +
+      'core did not answer or did not accept the contour at the moment of the request, the image ' +
+      'is not drawn, and the refusal names the reason in the core’s words.',
     imagePrompt: 'The rules of both modes live in Prompts',
     imagePromptText:
       'Your own texts live in the Prompts section: «Image» is the system message of the drawing ' +
@@ -317,13 +315,9 @@ export const chatEn: typeof chatRu = {
       'transcripts across projects with search over messages and starts no agents.',
     diffForeign: 'Chat versus a foreign CLI',
     diffForeignText:
-      'This section drives claude only. Codex, Gemini, Qwen and the rest live in ' +
-      'Providers: they keep their own list of conversations, which is why a restart ' +
-      'there opens a new chat instead of clearing this one. Codex, Qwen, Goose and ' +
-      'Kimi Code keep the CLI session between turns and receive only new messages; an ' +
-      'edited or deleted message, another model or another directory opens a new ' +
-      'session with the whole transcript. The other CLIs receive the whole transcript ' +
-      'on every turn.',
+      'This section runs claude. A new conversation with another CLI (Codex, Gemini, Qwen and the rest) ' +
+      'starts in the «Core chat»: the CLI is chosen at launch. The «Providers» section keeps old ' +
+      'conversations of those CLIs read-only, with a «Continue in the core chat» button.',
     diffSandbox: 'A project versus the sandbox',
     diffSandboxText:
       'A conversation on a project tab runs in its folder and sees git. The home ' +
@@ -338,10 +332,6 @@ export const chatEn: typeof chatRu = {
     undoStopText:
       'Stop in the composer kills the current run and rejects a pending permission ' +
       'request with it. The conversation stays; the next message continues it.',
-    undoDecline: 'Decline the split',
-    undoDeclineText:
-      '"Do it here one by one" on the card is a full answer: no chats are created, ' +
-      'no copies are made, and the agent gets the refusal as an ordinary reply.',
     undoWorktree: 'Remove a copy of the repository',
     undoWorktreeText:
       'Remove sits under the copy card in the git strip. While an agent is running ' +
@@ -350,19 +340,11 @@ export const chatEn: typeof chatRu = {
     undoHandoffText:
       '"Stay here" on the stage card. Auto-continue is switched off by the "carry ' +
       'on yourself" toggle in the same place and is remembered.',
-    undoCascade: 'Turn off model routing',
+    undoCascade: 'A turn on exactly your model',
     undoCascadeText:
-      'The "pick the model for the task" toggle in the conversation menu is a ' +
-      'project rule. Off, it restores the old behaviour: every child runs on the ' +
-      'model you chose.',
-    undoReview: 'Turn off the review after work',
-    undoReviewText:
-      'The "review after work" toggle in the conversation menu, under model routing, is a project ' +
-      "rule too, on by default. Off, it drops the ceiling review after a group's work: the work goes " +
-      'straight to delivery and the group feed names the reason. Model routing, raising lowered work ' +
-      'with no changes to the ceiling, verification of fixes and delivery stay. The setting is ' +
-      'captured when a split starts, so switching it does not change groups already running. It ' +
-      'applies to groups of other CLIs as well.',
+      'The core picks the step model. To make a turn run exactly on your model, choose it in ' +
+      'the conversation header: the core never lowers a model override and never raises an ' +
+      'effort you set.',
     undoChat: 'Delete a conversation',
     undoChatText:
       'Not from the panel, and deliberately so: the transcript belongs to Claude ' +
@@ -371,50 +353,38 @@ export const chatEn: typeof chatRu = {
     guide: {
       mapTitle: 'How it works',
       mapCaption:
-        'Two diagrams answer what no state of the screen shows: where a message ' +
-        'goes, and what happens after Split.',
+        'The diagram answers what no screen state shows: where a message goes and who starts the CLI.',
       pathTextTitle: 'The same path in words',
       pathTextText:
-        'The composer hands the message to the panel server, which starts a CLI ' +
-        'process in the project folder; the CLI writes the conversation into its own ' +
-        'transcript on disk and returns the answer as frames the panel shows at ' +
-        'once. The panel keeps no database of conversations: history is read from ' +
-        'the transcript, which is why a terminal conversation shows up here and one ' +
-        'started here shows up in the terminal. There is one CLI process for the ' +
-        'whole conversation: the next message goes into the same process, and a new ' +
-        'one starts only on Stop or when the launch itself changes (model, effort, ' +
-        'permissions, group, autonomy, the light tool set setting). That is why an agent’s background ' +
-        'command survives the end of a ' +
-        'turn: when it finishes, the CLI starts a turn with its result on its own, ' +
-        'and that turn lands in this same conversation. A background subagent lives the ' +
-        'same way: the turn progress marks it “in background” with the time of its ' +
-        'last record. Under a running subagent’s row: what it is doing now and for how ' +
-        'long, next to it how long it has worked in total; a sleep or reading a ' +
-        'background task’s output is marked “only waiting”. If it asks for permission ' +
-        'after the main turn has ended, the chat ' +
-        'shows the card with a note on whose work it is; if the process closed before ' +
-        'the subagent finished, it is marked “lost” instead of an endless “thinking”. ' +
-        'On every start the agent ' +
-        'also gets a short note about its folder — where the project’s autotests ' +
-        'live and how a test becomes a case (the “Tests” section). A sandbox with ' +
-        'its own config directory takes settings from that directory only: the ' +
-        'personal CLAUDE.md in your home folder does not reach it, even though the ' +
-        'sandbox folder sits under home. The autonomy mark is its own too — set by ' +
-        'this conversation’s choice, not by the environment the panel itself was ' +
-        'started from. One exception: a run routed to a ' +
-        'contour starts with the panel’s short system prompt INSTEAD of the CLI’s ' +
-        '(a switch on the contour itself, the “Contour” section), because the large ' +
-        'prompt drowns a mid-range model. The same card also drops our layers: such ' +
-        'a run may go without your personal rules, skills and MCP servers. What ' +
-        'exactly was dropped, the conversation header says BEFORE you send a ' +
-        'message — otherwise an agent working without your rules would look broken. ' +
-        'When a run ends in an error, the feed shows the reason the CLI gave in the ' +
-        'answer itself (a contour refusal, say), not a service line from its error ' +
-        'stream. One more place the feed speaks up: the model name travels on the ' +
-        'command line and is therefore checked against the allowed characters (the ' +
-        'Windows shell would read a space, `&` or brackets as a command). A name from ' +
-        'the contour catalog passes; one that does not never reaches the CLI, and a ' +
-        'feed notice says the run went with the model the CLI picked for itself.',
+        'The input hands the message to the panel server, but the server does not start the CLI process itself: ' +
+        'the task core runs the turn. If a core step already holds the conversation, the message goes to that ' +
+        'step, and the core delivers it at the turn boundary; the turn does not end until the added words have ' +
+        'reached the CLI, so the reply to them comes in the same turn. If the step has already ended or the core ' +
+        'did not accept the message, there is no delivery to wait for and the turn closes as usual. ' +
+        'Otherwise the core gets a new «chat» task right in ' +
+        'the project folder (starting the chat is your edit grant for that root), resuming the conversation if ' +
+        'there was one, then the CLI choice, the turn model and the launch. The core session host starts claude; ' +
+        'the core holds the process, so a panel restart does not touch it. The CLI writes the conversation to its ' +
+        'transcript on disk, and the server reads the running turn from the core session view and streams it to ' +
+        'the feed. The panel has no conversation database of its own: history is read from the transcript, so a ' +
+        'conversation from the terminal shows here and one started here shows in the terminal. The core writes a ' +
+        'permission question to the task journal, the panel shows it as a card with the «Core question» badge ' +
+        'and the question text, and the step waits for the decision; a child subagent’s question stands as the ' +
+        'same card in the parent window. The model retrying the same call raises no new question: a pending one ' +
+        'stays single, and on an answered one the core applies your answer itself. Telegram only reports such a ' +
+        'question; it cannot be answered from there. The chat window itself sends the answer to the core, as a command stamped with its page: ' +
+        '«Allow» on an edit the core closed without a grant gives the task a grant for that path and answers ' +
+        '«grant», «Deny» refuses; the panel server may not answer the core. From the phone the same question ' +
+        'is answered on the «Questions» screen: the phone sends the core the grant and the answer as a command signed with ' +
+        'the device key; without a paired key no answer leaves and the card names the reason. ' +
+        'In such a chat the «Permissions auto» ' +
+        'toggle is an edit grant for the whole task repository, given by the same window, so item-5 questions ' +
+        'stop coming. Under a running subagent line: what it is doing now; beside it: how long it has worked in ' +
+        'total. Core not running: the feed shows the reason; a core refusal of the turn comes in interface ' +
+        'words: the required contour is unavailable, the route needs a model, or a general refusal with the ' +
+        'core code (its own words are in the task journal). A turn that ends with an error of the CLI itself ' +
+        'shows it in the CLI’s words — for example, that the prompt is too long; a generic phrase only when the ' +
+        'CLI gave none. There is no silent fallback to the old path.',
 
       basicsTitle: 'One conversation from start to finish',
       basicsCaption:
@@ -422,12 +392,22 @@ export const chatEn: typeof chatRu = {
         'about exporting orders to CSV.',
       bEmpty: 'Open the project and start a conversation',
       bEmptyText:
-        'The project tab, the New chat button. The header carries the model ' +
-        'Claude-opus-5 and the effort "High", and under it the git strip: ' +
-        '"feature/orders-export, 4 files changed, +128 −31, 2 ahead". The empty ' +
-        'screen says straight away that file edits are allowed and offers four ' +
-        'ready openings, from "explain the project structure" to "run the tests and ' +
-        'show what fails".',
+        'The project tab, the New chat button — it opens "Chat through the core": ' +
+        'panel project, project folder, CLI and the first message. The folder comes ' +
+        'from the open project and the CLI is Claude Code; "Start chat" creates a ' +
+        'core task, and the conversation runs right in that folder, with no copy. ' +
+        'The start reaches the core through the panel: it adds its own layer — the ' +
+        'kit and the Tests block line, plus for Claude the flags of its own layers and ' +
+        'the profile note — and sets the contour route before the CLI (“Chat” for ' +
+        'Claude, its own route for another CLI), so the “best effort” contour carries such a conversation ' +
+        'too. “New conversation here” starts the same way. If the layer cannot be ' +
+        'carried into the session, the start is refused with the reason, and a kit ' +
+        'refusal during a turn (hooks, MCP, kit missing) names the cause and the way ' +
+        'out — in the panel and on the phone. A folder without the CLI’s trust mark ' +
+        'does not switch the kit off: it lives in the panel’s directory, not in the ' +
+        'repository. ' +
+        'Earlier conversations of the project still open and continue in the ' +
+        'project tab — the rest of the path is shown on one of them.',
       bComposer: 'Write the task and attach a file',
       bComposerText:
         'The paperclip puts the attachment as a chip above the text — here ' +
@@ -457,18 +437,13 @@ export const chatEn: typeof chatRu = {
         'A, the branch picker, Pull and Push, a new-branch field and a commit ' +
         'message. Below are the parallel copies; a copy with an agent inside is ' +
         'marked as busy.',
-      bMenu: 'Set what may happen without asking',
+      bMenu: 'Permissions and actions are in the Chat settings menu',
       bMenuText:
-        'Chat settings holds the "auto permissions" and "edits allowed" toggles, ' +
-        'and below them rules for every project: commits, branches and a plain push ' +
-        'are on, while deleting files, rewriting git history and dropping database ' +
-        'data are not. A rule that is on removes the permission card; off brings it ' +
-        'back.',
-      bActions: 'Actions on the conversation are in the same menu',
-      bActionsText:
-        'Below the rules: restart the session, export, refresh and open this help. ' +
-        'Restart is greyed out while a run is going — wiping the context mid-move ' +
-        'means losing the move.',
+        '"Permissions auto": the window itself gives the core an edit grant for the task ' +
+        'repository, so no permission questions come up; "Permissions manual": every path ' +
+        'is asked with a card. "Edits allowed" switched off leaves the agent read-only. ' +
+        'Below: restart the session, export, refresh and open this help. Restart is greyed ' +
+        'out while a run is going — wiping the context mid-move means losing the move.',
       bAgents: 'Watch every agent at once',
       bAgentsText:
         'The header panel says "3 active agents", each row telling where it works ' +
@@ -501,103 +476,6 @@ export const chatEn: typeof chatRu = {
         'deploy — the panel starts no new session by itself: for a group the step ' +
         'lands under "For you to do" with that event, and the card button continues ' +
         'once it has happened.',
-
-      splitTitle: 'When one conversation becomes several',
-      splitCaption:
-        'The same project, a different entry: the agent offered to split three jobs ' +
-        'on the orders page, and from there nothing is decided in a single chat.',
-      sProposal: 'Read the offer',
-      sProposalText:
-        'The card "split the tasks: 3 groups" shows the composition: Orders export ' +
-        'on feature/orders-export, List filters on feature/orders-filters, Returns ' +
-        'report on feature/returns-report. Every group carries its kind of work, a ' +
-        'model and a "below the ceiling" mark. The line at the bottom counts the ' +
-        'price: 3 chats, 3 runs now, 2 below the ceiling, up to 16 runs including ' +
-        'triage, plans, work and reviews.',
-      sTree: 'Agree — and see what happened',
-      sTreeText:
-        'Split into 3 chats creates the links: the list on the left gains "Orders ' +
-        'export · plan", "· work", "· review" and the same for the second group, ' +
-        'each on its own branch. The offer card itself notes that 2 of 3 groups ' +
-        'have become chats.',
-      sHub: 'Follow the groups from the parent',
-      sHubText:
-        'The hub "2 split groups" with the "triage applied" chip shows, per group, a ' +
-        'top row — the title with its “waiting for” chip and under it the chain of stages ' +
-        '(“plan › work ×3 › now: review”: repeats in a row as a count, the current stage ' +
-        'as its own pill), the group’s buttons on the right. Below, across the full card ' +
-        'width: the progress indicator, trouble (failure, interruption, panel retries) on ' +
-        'a red plate, facts as separate items, the “Model”, “Before first edit”, “Time at ' +
-        'work” columns, the branch and, below a rule, the “Tokens” section: numbers in ' +
-        'labelled columns in the “Sessions” and “Warming” rows. The summary above the ' +
-        'cards shows the cache-warming result over all groups: “cache warming: saved ≈ …” ' +
-        'or “overpaid ≈ …”. Until branches are compared it says so.',
-      sGroupExt: 'See what fired across the whole group',
-      sGroupExtText:
-        'Under the chips of its agents (“Agents: 0 running · 5 finished”) the group card ' +
-        'carries a line of chips for the whole group: the reports-plan and reports-build ' +
-        'skills, the tracker server, “hooks 4” and “denied 1”. A click opens the same ' +
-        '“Skills, hooks and MCP” window, straight on the group’s main agent, with it and five ' +
-        'subagents listed on the left.',
-      sAsk: 'Answer the children without visiting them',
-      sAskText:
-        'A group’s permission request stands in the card of the group that stopped: ' +
-        '“The agent waits for permission”, the stage of the link and the start of the ' +
-        'chat key, with Allow and Deny below. The decision goes back where it is ' +
-        'awaited — there is no need to open the group chat. A request from any link ' +
-        'of the group — work, review, fixes — lands in the same card, including a ' +
-        'chat the panel has only just started.',
-      sCardAsk: 'The agent’s question sits in its group’s card too',
-      sCardAskText:
-        'A question the group’s agent asks mid-turn stands in the group’s card as a ' +
-        'separate yellow island: “The agent asks”, the stage of the link and the start ' +
-        'of the chat key (the full key is in the tooltip). The group may still be ' +
-        '“running”: the question shows at once, not after the turn ends. Answer right ' +
-        'in the card; the answer goes to the group’s chat. A question or permission ' +
-        'request from a chat with no card of its own in the hub (a nested chat of a ' +
-        'group, say) stands in the strip above the hub, signed “Requested by “…””.',
-      sOverlap: 'Compare the branches once the work is done',
-      sOverlapText:
-        'Compare branches counts the overlaps: two here. ' +
-        'src/pages/Orders/OrdersPage.tsx is touched by both groups by right, while ' +
-        'src/shared/api/client.ts is red — outside what the second group owns. The ' +
-        'merge order sits below, and merging stays with you.',
-      sPause: 'Pause the whole tree with one button',
-      sPauseText:
-        'Stop all kills the conversation together with its children: every group ' +
-        'gets a "paused" mark and the button turns into Resume all, counting the ' +
-        'links that will come back.',
-      sWorktrees: 'Look at the copies on disk',
-      sWorktreesText:
-        'In the git strip, under Parallel branches, sit the main copy and one per ' +
-        'group: feature/orders-export has its own folder ' +
-        'orders-panel-worktrees/feature-orders-export, a "dependencies installed" ' +
-        'mark linking to the install log, "refresh the local layer" and Remove.',
-      sMoveTasks: 'Move the tasks in Jira',
-      sMoveTasksText:
-        'The groups delivered their MRs — the hub header has "Move group tasks". The ' +
-        'dialog reads PROJ-41, PROJ-42 and PROJ-43 in Jira, shows where each one ' +
-        'stands and offers only statuses all three can reach. Press Move and the ' +
-        'panel moves them itself; the result per task stays in the dialog.',
-      sStatusAsk: 'Ask about group progress without waking the parent',
-      sStatusAskText:
-        'The "Ask about group progress" field under the hub sends the question not ' +
-        'to the parent but to a new light chat in the same project. Every turn of ' +
-        'that chat starts with the same group summary: branch, copy, state, outcome. ' +
-        'After an hour of silence the parent has gone cold, and one question to it ' +
-        'would rewrite its whole long history; the light chat starts from scratch. ' +
-        'An empty question cannot be sent, and a server refusal keeps the text in ' +
-        'the field. To write to the parent itself, use the input below as before.',
-      sStatusChat: 'The answer arrives in the light chat',
-      sStatusChatText:
-        'The view moves to the new chat at once: the header shows Sonnet and ' +
-        '"Medium", the label says "Sonnet is thinking". This chat has no MCP ' +
-        'servers, no edit tools and no shell, and personal and built-in skills are ' +
-        'visible by name only (project skills as usual): it answers ' +
-        'from the summary and reads files in group copies when the summary is not ' +
-        'enough, but changes nothing and writes nothing to the groups. Further ' +
-        'questions in it run on the same model until you pick another, and every ' +
-        'turn gets a fresh summary.',
 
       shotsTitle: 'The screenshots are taken on an invented project',
       shotsText:
@@ -992,18 +870,9 @@ export const chatEn: typeof chatRu = {
       'exists only on the remote — it is created with tracking (that is how you take ' +
       'apart someone else’s merge request). The directory appears next to the ' +
       'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once. The chat ' +
-      'offers a copy by itself too: when the agent is about to edit files in the main copy for ' +
-      'the first time, the feed shows a “First edit — where do we work?” card with the file the ' +
-      'agent was about to edit and a “?” leading here, to help. The branch name on it is built ' +
-      'from the person’s words — the panel’s service blocks at the start of the message (the ' +
-      'group summary and the like) never reach the name. “Create the ' +
-      'copy and continue there” moves the conversation over: the copy opens as its own tab ' +
-      'with the conversation in its list, and every later message runs there too, not back ' +
-      'in the main copy. Once the copy is removed, the conversation returns to the main ' +
-      'copy. If the previous agent process ' +
-      'could not be stopped (its number cannot be verified), the copy stays created and the ' +
-      'conversation stays in the main copy: the panel does not start a second process on the ' +
-      'same session, refuses with the reason, and the agent waits at the same card.',
+      'no longer offers a copy by itself: there is no “First edit — where do we work?” card — ' +
+      'a core task conversation works in the folder it was started in, and starting the chat ' +
+      'is the permission to edit there.',
     parallelWork: 'Working in a copy',
     parallelWorkText:
       'The copy’s tab is an ordinary project tab: its own chat list, its own agent, ' +
@@ -1015,9 +884,7 @@ export const chatEn: typeof chatRu = {
     parallelRemoveText:
       'The “Remove” button deletes the copy through git. While an agent works there ' +
       'the button is disabled and the server refuses too: deleting the directory from ' +
-      'under a live process loses its work silently. An agent that finished its turn ' +
-      'and waits for the next message does not block it: the panel closes its idle ' +
-      'process itself. Uncommitted changes inside are ' +
+      'under a live process loses its work silently. Uncommitted changes inside are ' +
       'not surrendered by git either — a second button appears, “Remove with its ' +
       'changes”. The main copy is never removed.',
     parallelNote:
@@ -1145,16 +1012,11 @@ export const chatEn: typeof chatRu = {
       'the panel does nothing. The command runs through the system shell with CI=1, ' +
       '10-minute ceiling for the whole preparation. The copy’s card shows “installing” / “dependencies ready” / ' +
       '“install failed”, the log and a “Retry install” button. A failure stops ' +
-      'nothing: the copy stays, and on task splitting the agent gets the log tail as ' +
-      'the first paragraph of its task and decides itself whether to retry or go ' +
-      'without. Copies from a split are prepared in parallel, and the start waits for ' +
-      'all of them. After the command the panel checks the lockfiles (package-lock.json, ' +
+      'nothing: the copy stays. After the command the panel checks the lockfiles (package-lock.json, ' +
       'pnpm-lock.yaml, yarn.lock, bun.lock, plus go.mod, go.sum and uv.lock that the Go and Python warm-up edits): ones rewritten by the install are reverted to ' +
       'the index version, newly created ones are removed, and the list shows on the card ' +
       'and in the log. It looks in the copy root and in first-level directories; a file ' +
-      'changed before the preparation (that is the agent’s work) is not reverted, and what ' +
-      'the preparation still left in the tree the delivery check does not count as the ' +
-      'group’s uncommitted work while the agent has not edited that file. ' +
+      'changed before the preparation (that is the agent’s work) is not reverted. ' +
       'The Node version comes from .nvmrc, .node-version, .tool-versions, volta or engines and ' +
       'the install runs on it when the machine has one (nvm, fnm, volta); when none is found the ' +
       'install runs on what exists and a line under the card says so. The same Node comes first ' +
@@ -1165,1626 +1027,178 @@ export const chatEn: typeof chatRu = {
       'preparation. A command set under “Copy settings” turns auto-detection off. The full ' +
       'log is kept in a file, and the card and the agent’s task lead with the first real ' +
       'error, not the log tail.',
-    parallelPreamble: 'The agent’s first move in a copy is the task',
-    parallelPreambleText:
-      'The task of every split group running in a copy opens with a panel preamble: what ' +
-      'was mirrored, which command installed the dependencies (a long monorepo command as a ' +
-      'step count: the agent does not repeat a finished install), which lockfiles were ' +
-      'reverted, and — if the preparation failed — the tail of its log. It ends with a ' +
-      'direct “the environment is ready — do not check or set it up, start with the task”. ' +
-      'Later sessions of the same group get it compacted: identical version lines are merged ' +
-      'into one module list, and a failed preparation keeps its reason, first error and log ' +
-      'path — without the command list. ' +
-      'Before it, an agent in a fresh copy brought up MCP itself, mirrored .claude/, ' +
-      'installed dependencies and reverted lockfiles — minutes and context on every child. ' +
-      'How much that helped shows in the parent’s group summary: the “To first edit” column ' +
-      '— from the work link’s creation to the agent’s first Edit/Write call. Next to it: the ' +
-      'model with its reasoning effort, the run time and “Step 8 of 14” from the group agent’s ' +
-      'plan, with the step name and its subagent count. The run time is how long the agent ' +
-      'actually worked, from the chain’s transcripts: model replies and tool calls. Idle time ' +
-      'between turns does not count at all, and one reply or call counts for at most 15 ' +
-      'minutes (subagents excepted), so a cut-off call never stretches over a night. ' +
-      'The «Subscription limit» column is how much of the 5-hour and weekly subscription ' +
-      'windows the group’s chain used. Claude reports the load of the windows during a run; ' +
-      'the growth between readings is split among all runs that went at the same time, ' +
-      'ordinary chats and other groups included, by their tokens, so three groups in ' +
-      'parallel do not each count the whole spend. Growth while no panel run was going ' +
-      '(terminal, another client) goes to nobody. No readings means an empty cell, not ' +
-      '«0 %»: older CLIs do not send them, and readings are kept for a week. ' +
-      'A group without a plan still gets a ' +
-      'number when the project skill writes .agent/steps.json in the copy — { "current": 8, ' +
-      '"total": 14, "title": "Run the tests" }: the file wins over the agent’s plan. Next to the ' +
-      'step every group carries an indicator: its state and how long it has lasted («working · ' +
-      '42m 10s» — since the current turn started, not since the group was created, ' +
-      '«waiting in queue · 1m 30s · 2 ahead» — a heavy command waits in the heavy-step ' +
-      'queue, «waiting for permission» — a permission card waits for you, «stopped», ' +
-      '«finished»), a bar «7 of 14 · 50 %» and the call the group is busy with right now, with ' +
-      'its time — «Bash: pnpm test · 3m 00s»; between calls, while the model is thinking, this ' +
-      'line is absent. Done is counted from the steps file (the running ' +
-      'step is not done yet) or from the closed plan items; with neither there is no bar — the ' +
-      'panel does not invent percentages. A group working ' +
-      'in the shared directory gets no preamble: that environment is yours. A group also gets ' +
-      'its own lean MCP set: the tracker, the code host and servers whose role the panel does ' +
-      'not know go into the run, design servers only when the group tasks carry a Figma link ' +
-      'or talk about a mockup or layout. The tracker’s wiki tools (Confluence) ride along ' +
-      'only when the group tasks name the wiki or the group asked for it with an mcp block ' +
-      '(server: confluence). Messengers, a second connector of the same tracker ' +
-      'and the claude.ai connectors (mail, calendar, drive) are off: their tools would ' +
-      'otherwise ride along in every model call. Chain stages narrow the set further: ' +
-      'delivery keeps only the tracker and the code host, while fixes for review findings ' +
-      'and the check of those fixes get no server at all. ' +
-      'When a switched-off server is needed after ' +
-      'all, the group agent asks for it with a block at the end of its turn, and the panel ' +
-      'continues the same session with it; when a fix stage asks, the server is connected ' +
-      'before the check starts. A group in Codex, Qwen Code and OpenCode drops the same ' +
-      'servers, stage by stage: Codex gets a switch for each one, ' +
-      'Qwen Code an exclusion list in the group ' +
-      'settings layer, OpenCode deny rules for the server tools; the other CLIs cannot switch servers off one by one, so their group ' +
-      'runs with the full set. Codex (the server’s disabled_tools) and OpenCode drop the tracker ' +
-      'wiki tools by name, by the same rule as Claude; Qwen Code has no per-tool switch, so the ' +
-      'wiki stays there. A group in Qwen Code keeps no Qwen auto-memory: what an ' +
-      'unattended run concludes stays out of your memory; and no Qwen conversation in the ' +
-      'panel asks for next-reply suggestions — the panel does not show them, and each one ' +
-      'is an extra model call. Skills work the same way: delivery and review ' +
-      'skills and the panel group’s skills keep their description, other personal and ' +
-      'built-in service skills reach the agent by name only and are invoked as before; ' +
-      'project skills are untouched, and a design plugin without a mockup in the tasks and ' +
-      'messenger plugins are off for this run. The CLI’s built-in self-help subagents ' +
-      '(claude-code-guide, statusline-setup) are not in a group’s list. ' +
-      'Chain stages narrow it further: the plan and ' +
-      'the review (fix verification included) get the tracker, the code host and the designs ' +
-      'read-only — their run has no write tools, writing is for the work, fixes and delivery; ' +
-      'the review, fixes and delivery keep descriptions only for their own stage’s skills, ' +
-      'the rest by name. The panel’s system addendum has a group edition ' +
-      'too, shorter than the chat one with the same rules: no continuation card for the human ' +
-      '(the group continues its stages itself) and no up-front question about the stand and ' +
-      'access — the group takes them from its task and the project notes. ' +
-      'It carries a spending rule instead: every model call re-reads the whole ' +
-      'conversation, so independent reads go in one batch, a file is read once before an ' +
-      'edit, code changes through edits rather than rewrites, and a running gate is awaited ' +
-      'in one call. When the conversation is compacted, the summary keeps the stages, ' +
-      'decisions with their reasons, paths and commands, stand access, open failures and an ' +
-      'extract of the current skill step, so none of it has to be re-read. ' +
-      "The owner's words verbatim, the rows already reported for the owner's points and the " +
-      "current stage's sieves go into a file in the copy's working folder, rewritten at the " +
-      'group start and at every stage start: after a compaction the group reads that file ' +
-      'instead of searching its own conversation. Review findings are kept the same way: ' +
-      'the findings the fixes were started for are numbered R-1, R-2…, and what the ' +
-      'verification pass left open is numbered V-1, V-2…; the group refers to them by these ' +
-      'numbers in its notes and in the MR description. ' +
-      'A test run through tests-cli run in a group prints the verdict, the first ' +
-      'failure lines and the path to a log holding the whole output; no check is dropped. ' +
-      'A green run is remembered against the content of the project files: the same ' +
-      'command on an unchanged tree answers from memory, without a run and without the ' +
-      'log, and any edit, new file or commit sends the run for real. An answer from memory ' +
-      'goes into the test history as a separate "from memory" record pointing at the real ' +
-      'run. A red one is never remembered, and the e2e folder runs against the stand every ' +
-      'time. Files git ignores (.env, build output, dependencies) are invisible to the ' +
-      'memory: after changing them, run with --fresh. ' +
-      'A gate through the kit’s gate-run whose command carries {junit} puts its JUnit report ' +
-      'into the copy’s Tests block: the group’s process gets the path to the panel’s tests-cli ' +
-      '(AGENTDECK_TESTS_CLI; one set in the panel’s environment wins), so the delivery check ' +
-      'sees the green gate — no need to run the same tests again through tests-cli run. A ' +
-      'report that did not reach the block is named by the gate, and such a gate is not remembered. ' +
-      'A status change, an assignment, a field edit or a comment in the tracker answers the group with a ' +
-      'short line (key, new status, assignee) instead of the whole issue; reading an issue ' +
-      'still returns all of it, and your own hooks keep running alongside. ' +
-      'Editing or opening an MR through the forge MCP answers the group just as briefly — ' +
-      'number, link, branches, state and the description’s length instead of the whole MR; ' +
-      'reading an MR still returns all of it. ' +
-      'Full gates and builds of Claude Code and Qwen Code groups run at most a quarter of the ' +
-      'machine’s cores at a time (at least two, four on 16 cores), and a stopped or crashed group ' +
-      'frees its slot at once: a group whose gate waits in the queue makes no model calls, and the command ' +
-      'and permission rules stay as they were. It waits 25 minutes at most, then runs ' +
-      'without the queue. A failed gate frees the slot at once; one your hook refused in ' +
-      'Claude Code frees it with the same group’s next command; a slot whose end the CLI ' +
-      'never reported frees after the command timeout plus half a minute. Codex groups have ' +
-      'no queue: Codex runs project hooks only after you trust them by hand in /hooks. ' +
-      'The panel recognises heavy work by name (test runners, builds, package-manager ' +
-      'checks), quoted inside a wrapper, and by experience: a command that once ran longer ' +
-      'than a minute and a half — say, the project’s gate under its own script name, which ' +
-      'the panel cannot know — joins the queue from any copy from the next run on. One that ' +
-      'became fast leaves the queue, and experience older than a month is forgotten. A run ' +
-      'narrowed to a test file or folder skips the queue. A gate the CLI moved to the ' +
-      'background on timeout keeps its slot for the expected run time (from experience, up ' +
-      'to 30 minutes): the CLI does not report when a background command ends. A Claude ' +
-      'Code group’s command timeout ceiling is 30 minutes instead of 10, and the agent ' +
-      'starts a full gate with a 30-minute timeout: it waits in one call rather than by ' +
-      'polling, each poll re-reading the whole conversation. A higher ceiling set in your ' +
-      'settings stays; a lower one is raised to 30 minutes for groups only. ' +
-      'When the project has a ready screenshot command (a qa:shot, shot or screenshot script in ' +
-      'the package.json of the root or of a folder such as e2e), a delivering group gets it in ' +
-      'its task and takes the before and after shots with it, using the login saved in the ' +
-      'main project folder, instead of a script of its own. ' +
-      'A group review runs through the deep-review skill: it cuts the diff into read-sized ' +
-      'windows for its reviewers itself, and the panel asks for no second copy of the diff. ' +
-      'Only without that skill does a delivering group build a review package before its ' +
-      'review: one file with the ' +
-      'commits, the changed files, the plan and the whole diff of the copy, uncommitted and new ' +
-      'files included (lockfiles by name only). Every reviewer gets its path and reads it once ' +
-      'instead of running git diff again and again; the number of reviewers and the depth of ' +
-      'the review stay the same. ' +
-      'Under a contour or local-model route the route itself decides the MCP set; the rest ' +
-      'of the above stays. A group in Codex or Qwen Code gets the task, the spend rule, the ' +
-      'short check output and the light MCP set; the skill list instead of descriptions, ' +
-      'short tracker replies, task lists without descriptions and the heavy-step queue rest ' +
-      'on Claude Code hooks and do not reach it. A group in Aider has no tool loop of its ' +
-      'own and runs no commands: from the spend rule it gets only the lines about the task ' +
-      'notebook and the tracker task file, and instead of being asked to run checks it is ' +
-      'told never to claim that tests, lint or a build ran.',
 
-    splitTitle: 'Splitting tasks across chats: the agent proposes, you decide',
-    splitCaption:
-      'A sequel to parallel copies: there a copy is made by hand, here the agent ' +
-      'proposes one itself. A list of independent tasks in a single message is ' +
-      'sorted into groups, and the panel shows that as a card with two answers.',
-    splitWhen: 'When the proposal appears',
-    splitWhenText:
-      'The agent proposes a split on its own once it sees three or more tasks in ' +
-      'one message that do not depend on each other. The proposal comes instead of ' +
-      'the work: until you press a button nothing is created and nothing is ' +
-      'started. A conversation is asked at most once: refuse and it will not ask ' +
-      'again, split and there is nothing left to ask. The same edit across ten ' +
-      'files stays one task and is no reason to propose anything. You can also ' +
-      'ask for it yourself — the “Split tasks across chats” button in the ' +
-      'composer, at any point in the conversation: it works after a refusal too. ' +
-      'While split proposals are on, issues from a tracker board or search reach ' +
-      'the agent as a list without descriptions — key, title, status, assignee — ' +
-      'and it reads the description only of those it puts into groups; a search ' +
-      'that names its fields explicitly arrives as is. Before, parsing a board ' +
-      'pulled every issue’s description, and every later model call re-read them ' +
-      'all. Claude Code groups get lists the same way.',
-    splitCard: 'What the card shows',
-    splitCardText:
-      'Shared context on top, then the groups: a name, the branch that will be ' +
-      'created and a numbered list of that group’s tasks. No raw JSON in the feed — ' +
-      'the decision is made from the makeup of the groups. There are two buttons ' +
-      'and both are equal: “Split into N chats” and “Do it here, one by one” — the ' +
-      'refusal goes to the agent as an ordinary reply and it carries on right here. ' +
-      'The agent need not propose a branch name at all: the panel builds one from ' +
-      'the group’s name, transliterating a Russian name into latin. If a proposal ' +
-      'block could not be read, a line under it says so — “no buttons” is never ' +
-      'left unexplained.',
-    splitWhat: 'What happens when you agree',
-    splitWhatText:
-      'Each group gets its own copy of the repository on its own branch (as in ' +
-      '“Parallel branches”), its own chat inside it and its own running agent. The ' +
-      'task opens with your own messages from this conversation, word for word: the ' +
-      'panel takes them itself rather than from the agent’s retelling, and the shared ' +
-      'context and the group’s tasks follow below. The group breaks your words into ' +
-      'points and reports on each; with delivery on, “done” does not come while a point ' +
-      'is unreported or marked not done — the panel reminds the group itself, and only ' +
-      'what is still missing after the reminders reaches the card. No new tabs ' +
-      'appear: the project stays one, and the groups’ chats stand as a tree under ' +
-      'the conversation the proposal came from. A branch name already taken gets a ' +
-      'suffix rather than a refusal — except for MR groups: their copy sits on the ' +
-      'MR branch itself. If the project is not a repository, the chats ' +
-      'are created in the same directory, with no copies. One group failing does ' +
-      'not cancel the rest: a separate toast says so, and the other chats stay. ' +
-      'Groups run in parallel and each runs the checks of its own copy; heavy checks ' +
-      'go through a shared queue, a quarter of the cores at a time but at least two (AGENTDECK_HEAVY_SLOTS in the panel’s ' +
-      'environment sets your own number). A new number reaches groups already running too: the ' +
-      'panel writes it into the queue directory at startup, and the queue rereads it every ' +
-      'second. Who holds the slots, since when, and who is waiting is shown by node ' +
-      'tools/heavy-queue-hook.mjs status <the heavy-queue directory in the panel’s data>. Vitest cores are not cut: with them cut, four ' +
-      'checks took longer than running one after another.',
-    splitDeliver: 'Up to a ready MR, and the group queue',
-    splitDeliverText:
-      'The “To MR” button in a project chat header shows how a task will end: “on”, ' +
-      '“off” or “nowhere” (the repository has no remote). Delivery is on out of the ' +
-      'box; to turn it off everywhere — “Settings” → “Models” → “Take tasks to a ready ' +
-      'MR”. Delivery follows the general `ticket-delivery-2` skill (a project delivery ' +
-      'skill, if any, is only a source of project facts; its name shows in the button panel):in a plain chat the agent takes a ' +
-      'code-change task to an MR — branch, review, live check, checks once, commit, push, MR, ' +
-      'description — while questions and reviews without edits open no MR; in a split ' +
-      'each group is one branch and one MR, and the group summary shows its link as ' +
-      '“MR !N”. A group with no changes of its own since its start closes as “nothing to ' +
-      'deliver”: an MR without changes is not an outcome, and the panel does not wait for one. ' +
-      '“Split groups at once” depends on whether copy preparation is heavy (by ' +
-      'default — more than one install, or an install plus a build). The number comes ' +
-      'from the shared rules (“Settings” → “Groups”: 8 on a light project, 4 on a heavy ' +
-      'one), and the project’s “To MR” window shows which the project was judged to be; ' +
-      'your own number goes up to 30, “Reset to shared” brings the shared one back, and ' +
-      'a raised number releases queued groups at once. In the chat of a copy or a group ' +
-      'the button shows and changes the setting of the project’s main copy — a copy has ' +
-      'none of its own. The rest ' +
-      'wait “queued” and start as slots free up. One proposal holds at most 30 groups ' +
-      'and 50 tasks per group: anything beyond is dropped, and the card says how much.',
-    splitSieves: 'Pre-MR sieves',
-    splitSievesText:
-      'The review and delivery stages get a list of sieves in their task — checks chosen ' +
-      'by the paths the branch touched (the file extension decides the path kind; a file is ' +
-      'a test by its name or by a test root outside src/ — test/, tests/, spec/, e2e/ folders and a ' +
-      'test.* file; a tests/ folder inside src/ is code): docs verified against the stand, removed names and ' +
-      'test ids found nowhere in the repository, no conflict with a fresh main, a UI edit ' +
-      'checked in a browser, a wrong value refused with a clear message. A document ' +
-      '(.md, .mdx, .rst, .adoc) is a contract only when it lies in a docs/, doc/, contract/, ' +
-      'contracts/ or api-docs/ folder or is named after an API (api, openapi, swagger, reference, spec, ' +
-      'schema): README, CHANGELOG, AGENTS.md and notes need no check against the stand. The group passes ' +
-      'each sieve with evidence — a command and its output. The task shows exactly the rows ' +
-      'and every file the report check will demand — the list is not cut, and a refused row ' +
-      'stays open in it. The project’s own checks ' +
-      '(lint, types, tests) the panel finds in its manifests, and the evidence must name ' +
-      'every one; changed code with not a single test changed in the branch is a gap too, ' +
-      'until the group names the test that covers it. Migrations and schemas get a ' +
-      'compatibility-and-rollback sieve, and a change to sign-in, permissions, money, data ' +
-      'or a very large diff also needs a rollback plan with a production failure signal. ' +
-      'Without a model, from the copy’s git, the panel checks by itself: a conflict with a ' +
-      'fresh main, removal of other people’s lines, keys and tokens in added lines, .only, ' +
-      'debugger and conflict markers, committed .env files, keys, ignored and large files, ' +
-      'a dependency manifest without its lockfile, new environment variables declared ' +
-      'neither in config nor in docs, and destructive statements in migrations. Such a ' +
-      'finding is cleared only by a report row that names every file or name — “checked, ' +
-      'all fine” does not pass; a conflict only by a rebase. A removal of foreign lines the ' +
-      'group already acknowledged on push (# sieve-ack:) is not asked again at delivery while ' +
-      'the removed lines of the file stay the same; once others are removed, the file is ' +
-      'asked about again. A Tests-section test count in a row (tests-cli … 2117 passed) ' +
-      'must cite its run as run:<id>, and the panel compares the numbers with it: “2117 ' +
-      'passed” for a run with one failed test does not pass. Consumers of removed names the ' +
-      'panel re-checks, and the group still hands in its own search. A row counts for the ' +
-      'code it was written on: if the branch changed the code the sieve covers after it (for the project-checks row, tests too), ' +
-      'the row is stale and the sieve has to be passed again; this holds for a row that ' +
-      'cleared a mechanical finding too. Freshness is judged by what the branch held at the ' +
-      'moment of the row, so a rebase without edits to the covered code does not age it, ' +
-      'and neither does an edit of code comments alone (a linter or build directive in a ' +
-      'comment is code and does age it). ' +
-      'When the copy has a Tests ' +
-      'block, live checks (browser, boundary input, a request to the stand, a migration) ' +
-      'are proved by a recorded run: the group cites run:<id>, and the panel opens that run ' +
-      'in the history itself — it must be finished, have at least one green case and no red ' +
-      'one, and be no older than ' +
-      'the last change to the covered code. Only a passed case with a live tag proves a live ' +
-      'check (live, stand, route; browser or e2e for UI, db for a migration): a run of unit ' +
-      'tests alone is refused with the reason. The run must be one the panel saw executed: a ' +
-      'hand-written record («passed» with no execution) and a live-tagged case the agent ' +
-      'created or edited after the group started prove nothing. The exception is a diff whose ' +
-      'changed code all lies under tools/ or scripts/ (a build linter, a script): such code has ' +
-      'no stand, and running the tool itself is the live check — a run the block executed in ' +
-      'which a case whose codePaths name those files passed (the group’s own case counts too). ' +
-      'One product file in the diff and a live tag is needed again. A run number named loosely (“in run ' +
-      '3f2a9c1e”) counts when that run is in the history; none named while a fitting one ' +
-      'exists — the reminder names its number, no rerun is needed. A row that was fail last ' +
-      'round and is now pass with the same evidence or with “red”, “not checked” in it does ' +
-      'not count: it needs a new run, or the earlier fail with a mark. ' +
-      'A live check cannot be reported “not applicable” ' +
-      '(n/a) when the diff changes product code — UI or backend: that is allowed only on a ' +
-      'docs-or-contract-only change, and then the reason with the sieve id goes into the MR ' +
-      'description — without it “done” does not come either. ' +
-      'A sieve not passed holds the group: “done” does not ' +
-      'come and the group gets a reminder, as with an unpushed branch; it names the format of ' +
-      'the report line, because a sieve answered in prose counts as not passed. Unresolved reviewer ' +
-      'threads on its MR hold it the same way, when the last word is neither the MR author’s ' +
-      'nor a bot’s: the reminder names each with its link, and for each the group fixes the ' +
-      'branch and replies in the same discussion thread — or replies why it does not change ' +
-      'it; the reviewer resolves the thread. The group’s reply releases the thread, a new ' +
-      'reviewer reply holds it again. With Jira connected, every ticket of the group that a ' +
-      'commit of the branch names needs a comment linking the MR (its address, «!N» or «MR N»): ' +
-      'without it the group is held too; a ticket named in no commit gets a note — the group ' +
-      'neither moves it nor marks it done. When a reviewer ' +
-      'finds a blocker in an MR thread, the group turns it into a new sieve — a proposed ' +
-      'one, with the code area where the blocker was found (from the thread’s file). It ' +
-      'reaches group tasks only once you accept it in “Settings” → “Groups” → “Pre-MR ' +
-      'sieves”, for its project or for all, and only tasks whose diff touches that area ' +
-      '(a shared one reaches all). The model writes the sieve text from ' +
-      'a commenter’s reply, so only a human can accept it, not the panel agent. The same ' +
-      'blocker in another project only suggests making the sieve shared. The blocker tally ' +
-      '(“escaped to MR” against “caught before the MR”) is there too, and a learned sieve ' +
-      'can be removed there. There are at most 40 learned sieves: at the cap a new one ' +
-      'displaces the oldest not-accepted one, and when there is nothing to displace it is not ' +
-      'recorded and the card says so. When the copy has a Tests block, it is the block that says ' +
-      '“verified” for the group: the cases its diff touches (by codePaths) must be run by a ' +
-      'run recorded after the group started and fresh for the case: the content of its ' +
-      'codePaths and test file is what the run saw. A commit, amend or rebase that leaves ' +
-      'those files alone keeps the run fresh; any edit in them makes it stale; an older run ' +
-      'without a content stamp is judged by the latest change, a commit or a working-tree ' +
-      'file, as before. Their latest result must not be red ' +
-      '(quarantine does not hold); a touched suite red word for word as before the group ' +
-      'started or on the fork point with main (a tests-cli run --base run, the red reminder ' +
-      'names its command) is a red not caused by the branch. No run, a stale run, a touched case not run, a red case, or a diff ' +
-      'covered by no case while cases are linked to files — the group gets a reminder with ' +
-      'the command that records a run, narrowed to the cases of its changed files (--case), ' +
-      'and the group row in the hub reads “Tests block: N of M green”. The list in the ' +
-      'reminder is a snapshot of the check, and the diff may have grown since, so before ' +
-      'answering the group re-checks it itself: the same command with gaps in place of run ' +
-      'prints exactly the lines the panel will check. A green run of the same automated test ' +
-      '(same file and test name) on the same tree counts for a case of another group too, ' +
-      'and run --stale runs exactly the cases gaps names. The group checks the MR description, ' +
-      'the sieve rows and the owner’s points the same way before answering: tests-cli ' +
-      'delivery --answer <file with the sieves block> prints the lines the panel will write ' +
-      'after the turn, from the same code, the Tests block included — a reminder that needs ' +
-      'it names delivery alone, not gaps as well. The command reads the MR description and the ' +
-      'reviewer threads through the panel — it holds the forge token — so the description is ' +
-      'posted to the MR once and then checked, not written to a file and then posted a second ' +
-      'time; --mr-description <file> checks a draft before posting or when the panel does ' +
-      'not answer. Before the delivery stage (while the group still has it ahead) the check ' +
-      'does not list push and MR as gaps — the delivery stage makes them, and inside it they ' +
-      'are gaps as before. An MR description with no checks section is a gap; a UI change ' +
-      'without before/after shots and without a reason why there are none is a gap too. ' +
-      'A description item left “separately” with no key of the task that takes it is a ' +
-      'gap. A branch on the remote ahead of the copy by a foreign commit (a CI bot) is a ' +
-      'gap naming that commit and “git pull --ff-only”, not “not pushed”; a commit on the ' +
-      'branch not made by the group that removed its lines, missing from the final tree as ' +
-      'well, is a gap naming the commit and files until the group restores the lines or ' +
-      'settles the file with its own commit. --answer also takes a file that is just the ' +
-      'sieves block body ({"sieves":[…]}). ' +
-      'A continuation in the middle of ' +
-      'delivery — after a pause or a panel restart — carries its current gaps, not a bare ' +
-      '“continue”: 20 seconds after a pause or a stop on the subscription limit, and on a ' +
-      'restart, the panel checks the delivery of the stopped group again instead of taking ' +
-      'the list of the check before the stop. Lines about the panel itself — why it stopped ' +
-      'reminding, when it will retry, that the group’s conversation was busy — stay on the ' +
-      'card: they do not go to the group in its continuation. ' +
-      'When the branch is ' +
-      'pushed and the MR is in place and only the report is missing — sieve rows, task ' +
-      'points or a recorded run — the reminder says so outright: leave git alone, no ' +
-      'commit, no push, no MR edit. No cases in the copy at all — nothing to check with, and it does not ' +
-      'hold the group.',
-    splitLedger: 'Verify ledger',
-    splitLedgerText:
-      'A gate or a test suite run on the same tree content a second time tells nothing ' +
-      'new: the result would be the same. The panel adds a small node module to all of ' +
-      'its launches (Claude, other CLIs, local and contour runs) that records every check ' +
-      'run together with a fingerprint of the tree — the working files, regardless of ' +
-      'line-ending settings — and notices when the same run already happened. A green run ' +
-      'on the same tree does not run twice: the ledger returns the recorded output and exit ' +
-      'code, and its first line names the run it replayed. The fingerprint includes the ' +
-      'launch environment too: variables (except service marks of the session, terminal ' +
-      'and package manager), node flags and NODE_OPTIONS, what node, npm, npx, pnpm, yarn, ' +
-      'git and the shell resolve to on PATH — the same run with a different environment ' +
-      'runs again, and the feed names the variables that differ, without values. A record ' +
-      'lives 72 hours from its last replay, and with no limit while the copy it was ' +
-      'recorded in and its branch are alive; the store cleans itself at most once an hour, ' +
-      'and above 1 GB the least recently used records go. A vite build is replayed the ' +
-      'same way and puts the whole build folder back exactly as it was — including one set ' +
-      'in the vite config by a single literal outDir inside build; an outDir given by an ' +
-      'expression, a plugin key or through root the ledger does not guess — such a build ' +
-      'runs again. After an edit, vitest runs not ' +
-      'the whole suite but only the tests related to the files changed since the last green ' +
-      'run (the “delta since green” line gives their count). The same holds for a run given ' +
-      'as files (vitest run a.test.ts b.test.ts): an edit those tests cannot see replays the ' +
-      'last green run of the same list, and an edit in code they import runs only the listed ' +
-      'tests it reaches — vitest itself computes the intersection; a test that names a ' +
-      'changed script or directory in its text runs too. Code in a neighbouring package ' +
-      'that a test reaches through an alias or a relative import counts as changed, and ' +
-      'the tests it reaches run. A test that launches a process, walks a directory or ' +
-      'imports a computed path runs on any edit: vitest’s graph cannot see its ' +
-      'dependencies. An edit to dependencies, configs, setup files and everything they ' +
-      'import, snapshots, the package’s data files (json and anything else a test reads ' +
-      'from disk), an edit to code outside every package (a script a test launches as a ' +
-      'separate process), a deleted file, a rerun after a red narrowed run, and ten ' +
-      'narrowed runs in a row or a day without a whole run bring the whole run back. Nor ' +
-      'is a run narrowed when it has its own root (root or dir in the vitest config, ' +
-      '--root, -r or --dir in the command) or a flag the ledger does not know, and a file ' +
-      'list is not narrowed on a vitest older than 4.1.10 or of another major either. A run ' +
-      'with a junit report is never narrowed but is replayed when the tests cannot see the ' +
-      'edit and the green run left its report. A folder opened through a link (junction) ' +
-      'narrows the same way: the changed files reach vitest in their real path form too. A tool launched through a node_modules/.bin link (as npm, yarn and bun install it on Linux and macOS) ' +
-      'is recognised by the package’s real file. Besides the common tools, the ledger replays ' +
-      'project checks described in a registry: inside the project (.claude/tools/verify-checks.json) ' +
-      'or, when the project must not be written to, in the ledger folder (verify-checks.json, one ' +
-      'block per repository, found by its common git directory, so every copy sees it). The ' +
-      'project registry wins on the same id. The fingerprint of such a check is the whole tree ' +
-      'plus the registry inputs git does not see: an edit to any file it reads, including one ' +
-      'in a neighbouring package, leads to a fresh run. The ledger is shared by the main folder and all its copies: a ' +
-      'green run in one copy counts for any other with the same tree. The last green run ' +
-      'for narrowing is each copy’s own, and a new copy’s first run narrows from a ' +
-      'neighbour’s. Settings → Groups → Verify ledger shows ' +
-      'how many runs were replayed, how many minutes that saved, how many times a record ' +
-      'disagreed with the real run and under which CLIs the ledger fired. Panel environment ' +
-      'variable AGENTDECK_VERIFY_LEDGER: empty or on — replays and narrowing, off or ' +
-      'shadow — recording and comparison only, disabled — no ledger at all; ' +
-      'AGENTDECK_VERIFY_LEDGER_DELTA=off keeps replays but runs tests whole. These are the ' +
-      'human’s choice in the panel’s own environment: when none is made, a model cannot ' +
-      'switch the ledger off in its command — the panel gives the CLIs it starts a lock, ' +
-      'and a split group’s command doing so is refused: the locked module ignores the ' +
-      'command’s environment variables, and an emptied NODE_OPTIONS in a group command is ' +
-      'refused too. The honest limit: a program the model wrote itself that rewrites ' +
-      'NODE_OPTIONS from inside or deletes the ledger files is not caught by the lock. ' +
-      'At start the panel installs the module from the committed version of ' +
-      'tools/verify-ledger while that folder has uncommitted edits: a half-written ledger ' +
-      'never reaches live groups, and an edit takes effect after its commit ' +
-      '(AGENTDECK_VERIFY_LEDGER_SOURCE=tree in the panel’s environment installs the files ' +
-      'on disk as they are). If the module ' +
-      'fails its self-test at panel start, nothing gets it, and the tile says “Not working” ' +
-      'with the reason.',
-    splitReview: 'Reviewing someone else’s merge requests',
-    splitReviewText:
-      'Drop MR (or PR) links into the chat and ask for a review — the split creates ' +
-      'one group per link when there are two or more; a single link is reviewed right in ' +
-      'the chat, with no split. The copy of such a group is put on ' +
-      'the MR branch itself: the panel finds it in git — by the MR ref on the remote — ' +
-      'instead of trusting the agent’s word, and needs no integration for it. If the ' +
-      'branch is already open in another copy, the new one sits on the same MR head ' +
-      'without a branch of its own (detached HEAD) rather than a “branch-2” cut from ' +
-      'main. If the branch cannot be found, the copy is cut from the base branch and ' +
-      'the card says so outright: the findings may have been read from the wrong ' +
-      'diff. Before it starts, the group gets a paragraph about the stand in its task: ' +
-      'which panel targets are already running (that is the original’s tree, not the ' +
-      'MR head), whether Docker is there and which database the project’s compose ' +
-      'describes. If a database of this version is needed, the panel raises a ' +
-      'throwaway container on 127.0.0.1 with its own password and removes it once the ' +
-      'group closes or never starts; it never touches other databases or the ' +
-      'project’s containers. If that fails, the paragraph says so, and the live-stand ' +
-      'check goes to uncovered with the reason. ' +
-      'The review runs on the ceiling model, with no plan and no fixes, through ' +
-      'the deep review skill at the full depth of its risk tier: the whole diff, docs, ' +
-      'locales and tests included. Every finding comes back at its honest severity ' +
-      '(blocker, should fix, question, optional), each as a full card: where, the ' +
-      'evidence, what it should be. Next to the findings the reviewer reports its depth — ' +
-      'the risk tier, the entry points it read from (diff, frame) and what was left ' +
-      'unread — and the panel judges that report, not the tone of the answer. No report, ' +
-      'not everything read, or a high-risk review taken from one entry point — the panel ' +
-      'itself, without you, asks the same session once to finish; still incomplete after ' +
-      'that — the card says “review incomplete” and what was missing, not “no findings”. ' +
-      'An empty, complete review of normal or high risk gets a second, independent pass: ' +
-      'a new session with the same task, starting from the frame rather than the diff — ' +
-      'its result decides the group. ' +
-      'The review session itself publishes into the MR — one thread on ' +
-      'the lines of each finding, checked against the threads already open — not the ' +
-      'panel. If your request already allowed publishing (“post the review to the ' +
-      'MR”), the session publishes at once and the card does not ask for consent a ' +
-      'second time; otherwise nothing is written into the MR and the decision is ' +
-      'yours — the card shows up both in the parent summary and in the group chat, ' +
-      'sharing one state. Four answers: “Fix in the copy” (a separate run works ' +
-      'through the list), “Post to the MR” (the same review session is asked to ' +
-      'publish; when it is busy or unavailable the card says why and the click can be ' +
-      'repeated), “Both” and “Do nothing”. What is already published is never posted ' +
-      'again. A failed publish does not cancel the fixes — the reason stays on the ' +
-      'card. No findings at all closes the group by itself, with no card. A review ' +
-      'answer without the summary block is not “no findings”: the panel itself asks the ' +
-      'same session once for the summary; if that fails, the group waits and the card ' +
-      'offers you to repeat it. With several ' +
-      'groups, the “same decision for the rest” toggle clears them at once. After ' +
-      'the fixes a separate “Commit and push to the MR” button appears — the only ' +
-      'write into someone else’s branch, and only on your click. It is absent while ' +
-      'the fixes are unfinished (the turn ended with a question), while the copy has ' +
-      'no changes, and while the MR branch is unknown; the push goes exactly to the MR ' +
-      'branch, continuing the fix session. The panel never ' +
-      'merges or closes an MR: merging stays with you. ' +
-      'When there are two or more links and something has to be DONE in those MRs — ' +
-      'resolve conflicts, merge in the fresh main branch, fix review comments — the ' +
-      'agent also offers a split first, one chat per MR. Such a group is tagged “edits ' +
-      'in the MR” on the card, a review one “review, no edits”. The copy sits on the MR ' +
-      'branch the same way, but this is ordinary work: the agent edits and commits into ' +
-      'that branch, and pushes, comments or edits the MR description only after you ' +
-      'answer its question. “Do it here, one by one” keeps every MR in this conversation.',
-    splitTree: 'Where the new chats are',
-    splitTreeText:
-      'In the list on the left, in the same tab: the chat the proposal came from, ' +
-      'and under it, indented and joined by a line, the ones it spawned. The parent ' +
-      'is clickable as usual, a child opens on a click and works inside its own ' +
-      'copy — the directory comes from the conversation itself, not from the tab. ' +
-      'The branch is not broken by the “Today” and “Earlier” headings: children ' +
-      'stay with their parent wherever its date puts it. If the parent is not in ' +
-      'the list at all (a search matched only a child), the row stays an ordinary ' +
-      'one — nothing is hidden.',
-    splitParent: 'Every child’s question and permission, answered in the parent',
-    splitParentText:
-      'A split spreads the work across several agents, but you are still one ' +
-      'person. So a question asked by a child chat also shows up in the parent, ' +
-      'labelled with who is asking. The answer goes INTO THAT CHAT as the next ' +
-      'message: if the child is busy it reads it at the next step of the same turn; ' +
-      'if it is idle it goes out at once, continuing the same session in the same ' +
-      'copy of the repository. The parent conversation spends nothing — no turn, no ' +
-      'reply — and walking six chats for one and the same choice is not needed. ' +
-      'The label survives the answer: the card says which conversation it went to, ' +
-      'so after answering six in a row you can see whom you answered. ' +
-      'A child’s permission request arrives the same way — Allow/Deny right here, ' +
-      'labelled with who is asking. It matters more than a question: on a question ' +
-      'the agent keeps working, on a permission it STOPS, and without a shared hub ' +
-      'you learn about the halt only by opening its tab. What a group allows itself ' +
-      'and what it brings to you is decided by the rows of “Settings” → “Groups” (see ' +
-      '“What a group decides on its own”); an auto-approval toggle you switched on in ' +
-      'the group’s chat yourself beats the rows, while one inherited from the parent ' +
-      'does not get in their way. A child does not ask about forks at all — neither through ' +
-      'the card nor in text: it decides itself (the recommended option, else the one that ' +
-      'goes on without you) and names the decision in its answer and the MR description; ' +
-      'an irreversible step is refused by the panel and queued under «Awaiting decision» as ' +
-      'D-n, while the group finishes the rest. A group run by another CLI works the same ' +
-      'way; an irreversible step its CLI cannot queue as D-n (gemini, continue, cursor, ' +
-      'kimi) it names in one question in the last line of its answer, ends the turn and ' +
-      'continues from the same stage once the answer arrives. Under “Group decision points: asks ' +
-      'a human and waits” a group asks about forks too: Claude only through the card (a ' +
-      'question typed at the end of its answer is invisible from the parent), another CLI ' +
-      'in the last line with options and its recommendation. Children ' +
-      'cannot strike deals with each other — the session messaging tools are closed ' +
-      'to them. The parent, in turn, knows its ' +
-      'children: every turn of it carries a summary of the groups (branch, copy, ' +
-      'state, result), and work handed to a group it does not do itself but passes ' +
-      'on — the message goes to the group’s chat when its turn ends, queued if the ' +
-      'group is busy. The parent’s first edit in the main copy also offers “Hand to a ' +
-      'group”, and a copy for work in an MR is cut from the MR branch.',
-    splitDone: 'The same proposal is not split twice',
-    splitDoneText:
-      'Once the group chats exist, the buttons in the card give way to an “Already ' +
-      'split: N of N groups became chats” line. The proposal stays the last message ' +
-      'in the feed indefinitely, and without this check a second press would create ' +
-      'the same copies again — under a suffixed branch name. The panel sees it is ' +
-      'done from the conversation’s children: their branches are matched against the ' +
-      'branches of the groups. A new split of the same conversation (after “Cancel ' +
-      'plan”, say) starts a new plan, while groups of the old one whose copy is not yet ' +
-      'removed or that carry the “accepted” mark stay in the summary — their copy can ' +
-      'be removed from there too.',
-    splitButton: 'Create the chats only',
-    splitButtonText:
-      'A toggle in the card. On, the copies, branches and chats appear but no agent ' +
-      'starts: each group’s task lands in the composer of its own chat, where you ' +
-      'can read it through and edit it before sending. This is also the rescue when ' +
-      'four agents starting at once is not what you wanted.',
-    splitOff: 'How to turn the proposals off',
-    splitOffText:
-      'Settings → “Offer to split tasks across chats”. Off, the agent no longer ' +
-      'proposes a split on its own, but the composer button works as before: the ' +
-      'setting takes away the initiative, not the ability.',
-    splitNote:
-      'No subagents appear here: every group is an ordinary chat you talk in ' +
-      'yourself, only inside its own copy of the repository. The panel will not ' +
-      'bring the branches back together — that is your step, as with copies made ' +
-      'by hand. The copy of a closed group can be removed with “Remove the copy” in its ' +
-      'summary row: the directory goes, the branch is deleted only if all its work ' +
-      'is already in the main branch, and an MR branch is never touched. Tests runs ' +
-      'the group made in the copy move into the project history first. A copy ' +
-      'still shared by an open group is not removed.',
-
-    cascadeTitle: 'Model routing: what each chat of a split runs on',
+    cascadeTitle: 'Step model and work in parts: the core runs all of it',
     cascadeCaption:
-      'The split decides how many chats there will be. Routing decides what each ' +
-      'of them works with: a rename across ten files and an architecture change do ' +
-      'not cost the same, yet one rate window pays for both.',
-    cascadeWhat: 'Who picks what',
+      'The panel chat no longer splits work into groups or picks models for them: a chat turn ' +
+      'runs as a core task with a single “Chat” step. Splitting into parts, the model of every ' +
+      'step, review and delivery up to the MR are run by the task core — see the “Core tasks” ' +
+      'document. This section covers the rules it follows and what is left of the old splits.',
+    cascadeWhat: 'Who picks the step model',
     cascadeWhatText:
-      'The agent names the KIND of work in a group — and nothing else. The model ' +
-      'for that kind comes from a table in the panel’s code: one table for every ' +
-      'run, visible and editable in a single line. Asking the model which model ' +
-      'should run it was dropped on purpose — “something weaker will do” is a ' +
-      'judgement about itself, not about the task.',
-    cascadeCeiling: 'The ceiling is your own choice in the chat header',
+      'One core function for every step of every task. Your override is strongest — a model ' +
+      'chosen for the step, the part or the whole task; the one closest to the step wins. ' +
+      'Without an override the model comes from the route: a contour row that names a model, ' +
+      'otherwise the model the CLI uses by default. The choice stays inside the routes allowed ' +
+      'for the task; a route that a limit holds or has exhausted is skipped, and the CLI’s own ' +
+      'sign-in and local routes are picked before a paid API key. The “why” line in the task ' +
+      'timeline says why this model was chosen.',
+    cascadeCeiling: 'In the chat: the model from the header',
     cascadeCeilingText:
-      'Nothing new to configure: the ceiling is the model and depth already set in ' +
-      'the conversation header (or, if that says “from settings”, the settings ' +
-      'value). Nothing rises above it, and the agent knows that: it may ask for a ' +
-      'stronger model for a group, but only within the ceiling, and it can never ' +
-      'ask for a weaker one for itself.',
-    cascadeKinds: 'Kinds of work and what each one gets',
+      'A chat turn hands the core the model and effort from the conversation header as a task ' +
+      'override. Through a contour the model name goes as the contour translates it, and the ' +
+      'effort is not sent. No model chosen in the header — the core takes the route’s model. ' +
+      'The core neither lowers nor raises the “Chat” step: its tier is the chosen model.',
+    cascadeKinds: 'A step’s tier follows its kind',
     cascadeKindsText:
-      'Mechanical work (the same edit across many files, formatting, moves), ' +
-      'implementation (a clear change with ready acceptance criteria) and tests ' +
-      'against a written spec run below the ceiling. Investigation (cause unknown), ' +
-      'design (architecture, contracts, migrations, security) and review of ' +
-      'someone else’s work always stay at the ceiling: the price of a mistake there ' +
-      'is not visible right away. A large group does not count as mechanical — the ' +
-      'panel raises its rank itself, by task count and task length, without asking ' +
-      'the agent.',
-    cascadeReview: 'Every piece of work is checked: work → review → fixes → verification',
+      'Every step kind has its tier, from one table shared by the core and the scenario ' +
+      'editor. Intake, work, review, fixes, reviewer answers, the report, the chat and custom ' +
+      'scenario steps run on the chosen model. The plan, the split and research run on the ' +
+      'same model with effort raised to xhigh, unless you set the effort. Checks, the final ' +
+      'gate, publishing and a question to the human may run one rung lower on the model ' +
+      'ladder — only when the model is not your override, the step has mid checks, the lower ' +
+      'rung fits the route pattern and this step kind has not failed on it before. A step that ' +
+      'failed on the lowered model is redone on the original one.',
+    cascadeReview: 'Checking the work: review and fixes are steps of a core task',
     cascadeReviewText:
-      'A group sent below the ceiling gets two obligations added to its task: ' +
-      'before saying “done”, run the project’s checks and match the result against ' +
-      'the task point by point — and stop if the task turns out to be harder than ' +
-      'its kind, instead of muddling through. Then the pipeline starts: as soon as ' +
-      'the work ends successfully, the panel opens a REVIEW at the ceiling — same ' +
-      'copy, same branch — told to read the diff against the task, list the ' +
-      'findings and change nothing. The review follows EVERY piece of work, the one ' +
-      'that ran at the ceiling itself too: a fresh session reads the diff without ' +
-      'the history of writing it, and on the same model that is a second pair of ' +
-      'eyes. The exception is the project rule «Review after work» switched off ' +
-      'in the conversation menu: then the work goes straight to delivery and the ' +
-      'group feed names the reason. If the branch was already on the remote when the work began (the MR ' +
-      'was sent earlier), the review reads only what the work changed — by git ' +
-      'range-diff of the old and new commit series; work that only moved the branch ' +
-      'onto a fresh main with no new edits gets no review at all. A split group ' +
-      'remembers the commit it started at (the head of its copy at launch), and its ' +
-      'review reads only what was done since: its own commits, and of a merge ' +
-      'commit only the conflict resolutions, not what main brought in. Nothing of ' +
-      'its own since the start (only a clean merge) → no review, and the feed and ' +
-      'the delivery task state the reason. What the review finds in code the group ' +
-      'did not touch is “pre-existing”: it never goes to the fixes, and delivery ' +
-      'lists it in the MR separately. ' +
-      'Findings exist → a third link, FIXES by that list, back on the work ' +
-      'model, and after them one VERIFICATION PASS on the reviewer: it re-runs the ' +
-      'evidence of every finding on the branch (attempted is not fixed) and reads ' +
-      'the fix diff for new breakage. In a split group both links get the group ' +
-      'scope from the split plan — the paths the plan gave to other groups: a new ' +
-      'baseline or exception entry is allowed only there, and a finding on the ' +
-      'group’s own pages is fixed. The fixes end their report with a “Proven:” ' +
-      'section (a mutant killed by a named test, a verify-ledger record), and the ' +
-      'pass does not repeat those runs; with more than 15 findings the fixes are ' +
-      'told to open big files by a targeted search per finding. It starts no ' +
-      'second round of fixes: what is ' +
-      'still open, delivery writes into the MR description as open, and a pass ' +
-      'without a result as “fixes not verified”. No findings → the chain is closed. In the ' +
-      'chat list the links are labelled “review” and “fixes”, each with its own ' +
-      'model, and the review feed carries a card with what was found. No new ' +
-      'parallel agents appear: the links run one after another, and the split card ' +
-      'states before the button how many runs that is at worst: up to four per group. ' +
-      'Every link after the work gets only what it needs, because a link’s task ' +
-      'stays in its context for the whole conversation: the owner’s words and the ' +
-      'group task in full, and from the plan, as text, the acceptance criteria, the ' +
-      'verification level, “do not touch” and the decisions. Analysis, references, ' +
-      'approaches and steps sit as a file in the copy’s .agent/plans/, opened only ' +
-      'when a step is unclear; a plan without sections, or a copy where git does not ' +
-      'ignore that file, gets the whole plan as before. Fixes get the findings as ' +
-      'cards, without the reviewer’s prose around them. The link’s task ends with ' +
-      'the paths of what earlier links left in the copy — before/after shots, the ' +
-      'verification ledger, recorded test runs and gate logs — so nobody searches ' +
-      'for them again. If the configuration folder holds a group rules card, ' +
-      'hooks/cards/group-rules.md, a stage gets it instead of the personal CLAUDE.md: a ' +
-      'short list of the rules that matter to a stage, and the stage opens the full file ' +
-      'itself when the card does not cover a case. Without the card the personal rules ' +
-      'load in full, as before.',
-    cascadeLevels: 'Levels: one triage for the whole split and a plan per group',
+      'The panel chat no longer opens a review or fixes by itself: there are no “review”, ' +
+      '“fixes” or verification links after the work any more. The task core does the checking, ' +
+      'as steps of the task scenario. In the ready-made bug-fix, feature, refactor and ' +
+      'tracker-ticket scenarios the order is: request intake → plan → work → review → ' +
+      'fixes after review → final check → publish. The review runs in a fresh session and only ' +
+      'reads: it may not edit files or run shell commands. It gets a pack — the work diff against ' +
+      'the base, the task requirements and a summary of the recorded runs — but never the ' +
+      'author’s conversation, and the reviewer’s model is never weaker than the author’s. ' +
+      'Findings are a list with file, line and severity. No blocking ones → the fixes step is ' +
+      'skipped and the task goes on to the final check; some → fixes by that list, then the ' +
+      'review again as the next round. There are at most two “review → fixes” rounds; at the ' +
+      'limit the core asks you and lists the open findings. In the review-only scenario a ' +
+      'report follows the review, and it is published only on request. In “Review an MR by ' +
+      'link” you decide after the review: fixes run only if you pick “fix in the copy” or ' +
+      '“both”, and sending them to the ' +
+      'MR is a separate question after the fixes. The steps and their “why” are in the task ' +
+      'feed in the «Core» section. Old conversations with “review” and “fixes” links open as ' +
+      'before, with the same labels in the chat list.',
+    cascadeLevels: 'Intake, plan and the split into parts',
     cascadeLevelsText:
-      'With model selection on, the groups do not start at once. First a TRIAGE ' +
-      'runs at the ceiling in the project root — one for the whole split, read-only: ' +
-      'who owns which files, where the groups overlap and who gets the contested ' +
-      'ones, who must wait for whom, and what to ask you before a group starts. ' +
-      'If the chat’s group is “Auto”, the triage also sees the group catalog — ' +
-      'global ones and this project’s, with their “When” — and may assign a group ' +
-      'to each part: the pick lands in the child’s own field before its first run, ' +
-      'the group is switched on at the start, and the parent’s feed gets a line ' +
-      'about it. A key missing from the catalog is dropped. When the parent (or ' +
-      'anyone above it in the tree) has an explicit group, the triage sees no ' +
-      'catalog and the children take that group from the parent. ' +
-      'On its verdict the panel creates the copies: groups with no waits right ' +
-      'away, waiting ones once their predecessor’s chain ends (the copy then ' +
-      'branches from ITS branch, not the main one), held ones after your answer ' +
-      'right in the summary under the parent. The main branch is the one ' +
-      'origin/HEAD points to, or main or master without it; the panel fetches it ' +
-      'from the remote first. A group branch never starts from whatever is checked ' +
-      'out in the project folder: the folder may sit on your own task branch, and ' +
-      'its commits do not travel into the group branch and its MR. A repository ' +
-      'without a main branch gets the copy from the current HEAD. ' +
-      'A waiting group is told in its task ' +
-      'who worked before it, on which branch and which files are already touched — ' +
-      'from the branch comparison; the comparison did not make it in time — the ' +
-      'files are simply not named, and the launch is not held up. ' +
-      'The triage searches once for everyone: each group gets a map — the files ' +
-      'and lines where the code changes, who calls it, the reference and the check ' +
-      'commands — and all of them get the shared setup: how to start and check the ' +
-      'project, ports, the stand address and the way to log in (never the password ' +
-      'itself). All of it goes into the group’s notes, and the plan and the work ' +
-      'start from the named places instead of searching for them again. ' +
-      'The panel also puts those notes into the task notebook — the file ' +
-      '.agent/run/notebook.agent.md in the group’s copy, hidden from git. The agent adds ' +
-      'what it finds along the way (no passwords) and after the conversation is ' +
-      'compacted reads the notebook instead of finding everything out again. In a project ' +
-      'without git there are no copies: the groups work in one folder and share one ' +
-      'notebook, each with its own section under its title. ' +
-      'The group’s tracker tasks (keys like PROJ-123 in its tasks, branch and title) ' +
-      'are read by the panel itself at the start, through its own Jira connection, ' +
-      'and put beside it in .agent/run/tickets.md: description, latest comments, ' +
-      'attachment names and links, with the time they were read. The group reads ' +
-      'that file and goes to the tracker only for attachment images, for a task not ' +
-      'in it, and for changes after that time. Jira not connected or no keys — no ' +
-      'file, and the group reads the tracker itself as before. A group whose work ' +
-      'runs BELOW the ceiling opens with a PLAN at ' +
-      'the ceiling: a short look at its own task in its own copy, no edits; the ' +
-      'plan goes into the work task and the work follows it step by step. A group ' +
-      'whose work runs at the ceiling anyway gets no plan: the same model plans for ' +
-      'itself, and a separate plan would only build the same context twice. Its ' +
-      'boundaries and triage notes go straight into the work task. No ' +
-      'triage or a broken one — the groups start as proposed; no plan — the work ' +
-      'goes without it, and that chat’s feed says so in one line: a level never ' +
-      'blocks the work. A triage cut short by a panel restart is its own case: no ' +
-      'verdict will come from it any more, so the groups stand on the question ' +
-      '“start as proposed?” and never start by themselves, and the summary chip ' +
-      'says exactly that — the triage was cut short by a restart and the groups are ' +
-      'waiting for your answer. That question and the notice in the parent feed are ' +
-      'written by the panel itself, not by the agent, so both are shown in the ' +
-      'interface language; a question the agent asked stays as it asked it. ' +
-      'While the triage is running no group is started — neither by a panel restart nor by a ' +
-      'pause and “Resume”, nor by “Start now”: waiting groups have no “Start now” and “Pause” ' +
-      'buttons until the triage result arrives — its block decides the order. A pause or ' +
-      '“Remove” made earlier is not undone by its block. A task lost in the triage is returned home, a circular ' +
-      'wait is cut, and the summary labels that “repaired by the panel”. In the ' +
-      'chat list the links are labelled “triage” and “plan”; “Only create the ' +
-      'chats” gets no levels.',
-    cascadeHub: 'Where to see which stage a group is on',
+      'Intake, plan, split, research, review and report are read-only: they may not edit ' +
+      'files or run shell commands. The plan runs while the task is being estimated and no ' +
+      'part has started yet, and only the plan may propose parts — each with its own paths, ' +
+      'dependencies and estimate. The split check judges the proposal. One part — the work ' +
+      'runs alone, no split. Two or more need distinct names, known dependencies without ' +
+      'cycles, and parts that are not ordered one after another must not own a shared file: a ' +
+      'shared file means merging the parts or ordering one after the other. A review of one MR ' +
+      'is not split. A refusal names every problem at once, so the plan redoes the proposal in ' +
+      'one round. Not refusals but notes: parts beyond the free slots or the window wait in the ' +
+      'queue, a part larger than three medians of the estimates gets a resplit suggestion. The ' +
+      'core shows an accepted split before launch: by default it asks you (the “launch” ' +
+      'question), with the “auto” launch policy it starts on its own, and an auto start that ' +
+      'fails the preflight turns back into the question. Every part gets its own copy and ' +
+      'branch — from the task’s pinned base or from the branch of the part it follows.',
+    cascadeHub: 'Where to watch the work',
     cascadeHubText:
-      'In the conversation you split the tasks from. Under the agent’s answer sits ' +
-      'a summary of the groups: one card per group with its branch on one line (a ' +
-      'long one is cut, the full name is in the hint), the path it has ' +
-      'walked (“work › review › fixes”) and the model of the current stage; a ' +
-      'running stage carries a pulsing dot. A click on the card opens the group’s ' +
-      'chat, and the group’s buttons sit in its top right corner. Among them is ' +
-      '“What the agent got”: a window with the verbatim input of the stage’s latest ' +
-      'runs — the message with the children summary, the panel appendix to the ' +
-      'system prompt, the contour prompt, the model and the depth — in full, ' +
-      'uncut, so you can check nothing was lost; the last 30 runs of the chat are ' +
-      'kept. Groups still in ' +
-      'progress (running, waiting for you, paused, queued) sit on top; below them, ' +
-      'delivered groups waiting for your acceptance; under those, groups you ' +
-      'accepted that are not merged yet; at the very bottom, closed ones: MR merged ' +
-      'or closed, plan cancelled, copy removed. “Accept” recolours the card violet ' +
-      'with a stripe on the left at once and moves it down to the accepted ones; ' +
-      '“Remove mark” moves it back. A merged group’s card is green, a closed one is ' +
-      'dimmed; each part keeps plan order. The panel learns by itself whether an MR is merged while ' +
-      'the hub is open: at most once every 5 minutes it asks the forge for the state ' +
-      'alone — one request per project, no discussions or pipeline; with the hub ' +
-      'closed or every MR already merged it does not ask at all. It needs the ' +
-      'GitLab or GitHub integration turned on. Next to the MR button is its place in the merge queue, ' +
-      '“merge 2nd of 3”: the group’s predecessors merge first — the ones it waited ' +
-      'for and the one whose branch its copy was cut from; the hint names them. ' +
-      'There is no number while a predecessor has nothing to merge yet, on a merged ' +
-      'or closed MR, and when the plan yields no order (a dependency loop). The chat list ' +
-      'shows CONVERSATIONS, and the pipeline adds up to four per group — twelve rows ' +
-      'do not tell you the state of three groups. So under the parent the list shows ' +
-      'only the stages where something is happening now — a green, yellow or red dot — and ' +
-      'the rest fold into one “N more” row per branch: a grey dot (silent for over five ' +
-      'minutes), a stage with no run and a stopped one. A stage moves in and out of the fold ' +
-      'by itself as its status changes; the panel remembers an unfolded branch. The agents panel (the “Agents” ' +
-      'button in the header) now also says what each running run is being driven ' +
-      'by. A group waiting for its predecessor carries a “Release” button in its ' +
-      'row: the predecessor’s chain may never end — the run was stopped, the chat ' +
-      'deleted, the panel restarted — and then the wait is lifted by hand. The ' +
-      'panel hides nothing when it happens: the copy is still branched off the ' +
-      'predecessor’s branch, and the task says outright that this work is ' +
-      'unfinished. If the group is no longer waiting, the panel answers that there ' +
-      'is nothing to release and starts nothing. A group is “done” only when its ' +
-      'chain has really ended: a turn that ended with a question, a background ' +
-      'command or awaiting your decision is labelled “waiting …”, and later groups ' +
-      'do not treat it as done. A done row states the result as facts — “checked, ' +
-      'nothing changed” or “changes made · commits: N” — plus the last line of the ' +
-      'agent’s answer. A group turn (other than plan and triage) that failed on the ' +
-      'network, a limit or a sudden ' +
-      'process death is retried by the panel itself, continuing the same session: ' +
-      'up to three times with a pause, and on a limit at the moment it resets; the ' +
-      'row says “waiting for a retry”. A real error is not retried, and a group that ' +
-      'gave up shows the reason and the number of retries. A turn that hangs without ' +
-      'failing is caught by a watchdog: a working group whose conversation (its subagents ' +
-      'included) stays silent for over an hour gets its process stopped and the same ' +
-      'session resumed with a request to rerun the interrupted checks, and the parent feed ' +
-      'gets a line “Group … was silent for N min”. A stage the panel started that has not ' +
-      'begun its turn within five minutes is started again by the watchdog, without waiting ' +
-      'the hour. A background group with a live process, ' +
-      'one waiting for your answer to a permission request, and a foreign-CLI group with no ' +
-      'conversation on disk are left alone.',
-    cascadeDelivery: 'Delivery is checked by git, “accepted” is yours to set',
+      'In the “Core tasks” section. The task timeline shows the steps per part, the model of ' +
+      'every step and the “why” of every decision; the core’s questions live there too — ' +
+      'launch, round cap, permission, model question. There is no group summary under the ' +
+      'agent’s answer for new work: the chat no longer starts children.',
+    cascadeDelivery: 'Delivery up to the MR is the core’s publish step',
     cascadeDeliveryText:
-      'With delivery on, the work (and the review with its fixes) is followed by a ' +
-      '“delivery” link: commit, fresh main branch, push of its own branch, MR. Out of ' +
-      'the box it runs on Sonnet (effort no higher than “high”): it is mechanics, and a ' +
-      'call costs almost half. Turn off “Delivery on Sonnet” in “Settings” → “Groups” ' +
-      'and delivery runs on the work model. Through a contour delivery goes on the model of ' +
-      'the “sonnet” row of its name map, and the switch names it so; with no such row there ' +
-      'is no switch, and delivery runs on the work model. For Codex and Gemini groups the ' +
-      'same lever sends delivery to the lowest model of their ladder without raising the ' +
-      'effort: no higher than medium and no higher than the work’s, and when the work had none ' +
-      'of its own — as set in the CLI itself (through a contour — only if the map translates ' +
-      'that model’s name). If ' +
-      'the account or the route does not admit that model, a line about the refusal stays in ' +
-      'the feed and delivery starts over as a new conversation on the work model. For a ' +
-      'single group it is decided on the split card: the group’s “Delivery on Sonnet” ' +
-      'switch starts as set in Settings, cleared it keeps that group’s delivery on the ' +
-      'work model, and on it sends the delivery to Sonnet even with the setting off. On the ' +
-      'work model delivery continues the last work or fix session as a fork when ' +
-      'that session ended less than 55 minutes ago, its window is under 200k and ' +
-      'under 60 % of the compact window, and the model and effort are the same: the ' +
-      'branch, the tasks and the check results are already in it, so nothing has to ' +
-      'be learned again. Otherwise delivery runs in a new session, and review always ' +
-      'does. A link does not do another link’s work: while delivery is ahead, the work ' +
-      'and fix links commit but neither push the branch nor open an MR — by command or ' +
-      'through MCP, and see the delivery skills by name only; while review is ahead, ' +
-      'review skills and subagents are closed to ' +
-      'them — the review at the ceiling would repeat that pass anyway. A link with no ' +
-      'delivery after it may push. A link learns what lies ahead from its first turn: ' +
-      'the system line names the review and the delivery with the gate and the MR. For a ' +
-      'foreign-CLI group the review there is a fresh session of the same CLI, and it is ' +
-      'promised only when the panel will schedule it: after work with a model-picking ' +
-      'header, unless “Review after work” is off, and after fixes with a findings list. ' +
-      'The panel does not take the agent’s word for it: when the link ends ' +
-      'it checks the git facts — is there a commit, was the branch pushed, is there an ' +
-      'MR whose head is the group’s copy, and which branch that MR comes from: while ' +
-      'the group has no commits of its own and shares its predecessor’s head, the MR ' +
-      'is recognised by its source branch at the connected forge (a self-hosted GitLab ' +
-      'on http or a custom port included), and without a forge it is not counted — ' +
-      'and the “MR !N” button in the card’s ' +
-      'corner opens the MR found that way in a new tab — only that button, a click ' +
-      'on the rest of the card goes to the chat. The button appears as soon as the ' +
-      'check finds the MR, even while something else is still missing for the ' +
-      'handover. Something missing — a folded “Missing for the MR: N” section sits ' +
-      'under the card, its items open as a list on a click, and from there ' +
-      'agents finish the delivery: a stage that cannot open an MR gets a new delivery ' +
-      'conversation, and stalled reminders get one diagnosis on a stronger model with the ' +
-      'round history. When that does not help either (or the reminders run out), the panel ' +
-      'stops reminding, and the card reads “Delivery stopped — N items” on a “waits for you” ' +
-      'plate: one line says why the panel stopped and what to do — continue the group with a ' +
-      'word in its chat, and the agent closes the items. A live check with no stand, a red ' +
-      'not caused by the branch, a case that cannot run here and a task item marked “not ' +
-      'checked” or “not caused by the branch” become notes in the MR ' +
-      'description, not a stop; for the security and data sieves (keys in the diff, ' +
-      'migrations, destructive statements) “not caused by the branch” ' +
-      'counts only with a run link (run:<id>; a base run, tests-cli run --base, where the same ' +
-      'red was there before the branch, also counts) or a command with its output. A mark the panel ' +
-      'did not accept (a link to a green run or to a run whose red the branch touched, “not ' +
-      'checked” on a check that runs here too) is named in the reminder with the reason and ' +
-      'what to do. The group calls a ' +
-      'human only for a merge, a deletion, a branch rewrite beyond a lease, a migration or a ' +
-      'database write, and credentials that exist nowhere: a merge gets the refusal “the ' +
-      'owner merges”, the rest becomes a D-n item in “Awaiting decision”. While at least one ' +
-      'D-n of the group waits, the MR stays a draft: the group is not allowed to take the ' +
-      'draft off, and a D-n number in a commit or MR text is refused — published text ' +
-      'describes the change only. The remote not answering — the check ' +
-      'repeats (after one minute, five, fifteen, then every fifteen minutes for up to ' +
-      'four hours) and only then gives up with the reason. The “Accept” button in a ' +
-      'group’s row is your “I looked at the delivery and agree” mark: the panel never ' +
-      'sets it by itself. For a group the conveyor did not bring to “done” (stopped, ' +
-      'stuck, failed, waiting for you) the same button reads “Mark done”: the group ' +
-      'becomes done and accepted, drops to the very bottom marked “done by hand”, and ' +
-      'groups waiting for it start. If the panel never recorded the group’s MR, it takes ' +
-      'the MR link from the group’s last answer, once the forge confirms the MR comes ' +
-      'from the group’s branch, so the hub shows it and merge tracking sees it. ' +
-      '“Remove mark” returns it to the state it was in. ' +
-      'While a group has a turn or a background command running there is no button. ' +
-      'A finished group says how long ago: “finished · 36 min ago”, older than a day — ' +
-      'the date and time. The parent’s feed remembers where you were reading: going to ' +
-      'a child and back, and reloading the page, return it to the same place, not to ' +
-      'the very bottom. ' +
-      'Defects outside the tasks that groups found along the way ' +
-      'collect in “Suggested tickets: N” — copy them, or “File in ‹project›” through ' +
-      'the tracker integration, only after you confirm. Before “File” the panel searches ' +
-      'the project’s open issues: if an issue about this defect is already open, it gets a ' +
-      'comment and no copy is filed (“already open — added as a comment”); if the search ' +
-      'fails, nothing is filed and another “File” tries again. An issue filed this way also ' +
-      'starts with the side line, carries its label and the medium priority, and gets no ' +
-      'assignee. “Resolve…” in the section ' +
-      'header takes every open ' +
-      'proposal at once. The dialog shows how many proposals are open, how many of them ' +
-      'are duplicates and how many issues will come out. Duplicates merge into one defect: ' +
-      'the same title or place, the same words in another order, a similar symptom in the ' +
-      'same file. Different defects of one file are gathered into one issue, each with its ' +
-      'own section: where, evidence, steps, expected and actual behaviour, who found it. ' +
-      'While the dialog is open, the panel searches the chosen Jira project for similar ' +
-      'open issues — by the finding’s fingerprint, by almost the same and by a similar title — ' +
-      'and shows each as a link with a choice: “Link” (the findings go into it as a comment, ' +
-      'the default), “Skip” (nothing is written, the proposal stays open) or “It is different — ' +
-      'file a new issue”. The search only reads; if it fails, publishing still matches titles ' +
-      'and fingerprints on its own. The panel keeps the fingerprints itself, beside every ' +
-      'issue it filed or commented on — they are never written to Jira, and an issue is still ' +
-      'recognised after someone renamed it. “Publish to Jira” files the issues by those decisions; ' +
-      '“Retry failed” tries again with the same ones. Every Jira issue starts with its side ' +
-      '(FRONTEND, BACKEND or FULLSTACK, from the findings’ paths and the model’s area) and ' +
-      'carries the same label, a priority from the severity taken from your Jira’s priority ' +
-      'list (medium without a severity; if Jira refuses the field, the issue is filed without ' +
-      'it and the severity goes as a label) and no assignee: if Jira assigned one on its own, ' +
-      'the result warns. No internal machine labels (a split hash, a chat id, a short sha) ' +
-      'reach Jira — they stay inside the panel. The description: context, what to do, acceptance criteria, where in the code and a ' +
-      'section per defect. The panel’s model, when available, gives titles, context, what to ' +
-      'do, criteria and severity; without it the issues are built the same way, the side from ' +
-      'the paths, the priority medium. ' +
-      '“Resolve here” opens one new project chat with the task of fixing every open ' +
-      'proposal and marks them “Taken into a chat”. Steps a group cannot take (a ' +
-      'dependency between MRs, access, someone else’s service) collect in “For you to ' +
-      'do: N” — the panel does not carry them out. A review-by-link group delivers ' +
-      'nothing: it collects no steps for you, and a defect of the MR it reviews is a ' +
-      'review finding, not a ticket. When a review group closes, its card states facts about the ' +
-      'copy: edits in a tree the review must not touch (file names), scratch copies the group ' +
-      'made (safe ones are removed, the rest are named with the reason) and the throwaway database ' +
-      'taken down. The database for migration checks is started by the panel itself, only in its own ' +
-      'container from the compose image on 127.0.0.1; the agent never gets someone’s database or a DSN ' +
-      'from .env, and without Docker or the image the item goes to “uncovered” with the reason. A ' +
-      'review of an owner request whose requirement-trace block is missing or could not be parsed is asked once more, then the report is marked ' +
-      'incomplete. A delivered group has “Recheck ' +
-      'MR”: the panel reads the MR — conflicts with the target branch, every pending ' +
-      'reviewer comment, a red pipeline with the last lines of the failed jobs’ logs ' +
-      '(GitLab: up to two jobs, 40 lines each; each with its job id, and the first step ' +
-      'the group is told to take is reading that job’s log: a local run proves no fix, and ' +
-      'a log it cannot get is said at once) — and hands that to a new conversation in ' +
-      'the same copy together with a request to check every task is done and a ' +
-      'completeness list: points the group handed to other groups whose owner the panel ' +
-      'could not confirm; what siblings handed to it — as report rows and plan notes; its ' +
-      'own notes about siblings and the merge order; the state, MR and files of every ' +
-      'sibling group. Its own open findings count as gaps of the MR too: a remark of its ' +
-      'own review left as «does not affect behaviour», or an «open after verification» item ' +
-      'of the MR description, is fixed in the same branch; only a point waiting for a human ' +
-      'decision stays open, named as such. The previous conversation stays in the group’s path. ' +
-      'The «Note» button beside it opens a field: up to 4000 characters go into the recheck ' +
-      'task verbatim, and every request in it is a point of the recheck, like a reviewer ' +
-      'comment; this is how something that is not in the MR reaches the group. A ' +
-      'delivering group reports every point of its tasks and of the tickets they link ' +
-      'as a task-N row — without that report «done» is not set. A «pass» row quotes its ' +
-      'point word for word in «…» — from the ticket, the group’s task and brief, the ' +
-      'plan’s shared context, the groups’ notes (hand-overs to this group live in the ' +
-      'neighbours’ notes), the neighbours’ «n/a» rows or the MR ' +
-      'description — and delivery checks the quote against those texts: a row with no ' +
-      'quote, with a quote found in none of them, or with evidence rewritten with no new ' +
-      'commit is a delivery gap. A list item in a ticket’s description or comments that no ' +
-      'task-N row quotes is a gap too, naming the task key and the item; a recheck does not ' +
-      'count such a task as delivered and names those items in its task. A point handed to another ' +
-      'group is accepted only when that group is alive, the named file is in its list and ' +
-      'the merge the point waited for has not happened yet — or when a filed tracker ' +
-      'ticket or an MR outside this split is named. A point of the owner’s request the ' +
-      'split itself did (picking tasks, dividing the groups) is marked with a ' +
-      '«split stage: …» row; a group task point cannot be marked that way. Otherwise the ' +
-      'point stays with the group, and it finishes it ' +
-      'itself. A recheck usually comes ' +
-      'hours later, and resuming the old session then re-reads almost its whole ' +
-      'context and picks up long-finished threads, so the new one gets the facts ' +
-      'instead: branch, copy, MR, the group’s task and the scope — the files the ' +
-      'branch changes against the MR target. The target is the branch the MR merges into, as ' +
-      'the forge names it, not the branch checked out in the project folder right now; when ' +
-      'the MR is unreadable — the branch the group was cut from, or the project’s main branch. ' +
-      'Group overlaps are counted against it too. The new conversation runs on the group’s work ' +
-      'model and effort, not the delivery step’s model: a recheck is substantive work, and ' +
-      '“Delivery on Sonnet” does not apply to it. Checks run on the scope only; files ' +
-      'outside it are named and never staged, committed or reverted. What is ' +
-      'found the group fixes and delivers again, and finding nothing it touches ' +
-      'nothing. A real conflict with the target is resolved by a rebase (git-guard refuses ' +
-      'a merge), after which the group reports its sieve rows again, and before answering ' +
-      'it runs tests-cli delivery itself — the same check the panel makes after the turn. ' +
-      'After a rebase the group runs the not-yet-run cases of the Tests block once, in ' +
-      'the same step (tests-cli run --stale): the delivery check reads only the block, ' +
-      'and the project’s own gate records nothing there. Before the word goes to the ' +
-      'group the panel re-reads its tracker tickets into the copy’s .agent/run/tickets.md ' +
-      'and names which changed since the last delivery: their points the group derives ' +
-      'anew, the rest it checks against the code only. A recheck in a new conversation is a new round: the ' +
-      'group’s start commit moves to the copy’s head at the moment of the word, and the ' +
-      'review of this round reads only what was done since; what the earlier review found ' +
-      'outside the scope stays with the earlier round. ' +
-      'The group is mid-turn or runs another CLI — the word goes to its ' +
-      'own conversation as before. The MR could not be read — the agent reads it ' +
-      'itself. The group’s ' +
-      'conversation file is gone from disk (deleted outside the panel) — the turn ' +
-      'runs as a new conversation in the same copy: it is given the branch, the MR ' +
-      'and the group’s tasks, and a note about it appears in the chat. ' +
-      'Without the button, after “done” the panel watches the MR itself: a new reviewer ' +
-      'thread or a red pipeline wakes the group with a word carrying the same facts. When ' +
-      'the group’s window is already over 60k tokens, that word starts a new conversation ' +
-      'in the same copy with a short brief of the copy’s facts (branch, MR, tasks) instead ' +
-      'of resuming the whole delivery window; your own reply in the group’s chat still ' +
-      'resumes the earlier conversation. A group that ends its turn after the red-pipeline ' +
-      'word without a fix (same branch head) is not marked “done”: it waits for you tagged ' +
-      '“MR red, no fix”, with a note in the chat. While it waits, the panel keeps looking ' +
-      'at the pipeline on the same schedule: once it turns green (a retried job passed, say) ' +
-      'the panel checks the delivery itself, with no group turn — nothing missing means ' +
-      '“done”, gaps reach the group as a reminder. A merged or ' +
-      'closed MR has nothing to recheck: the button says so with a notice, not an ' +
-      'error, and the card is marked “MR merged” or “MR closed” at once and moves ' +
-      'down. A merged one loses the button; a closed one ' +
-      'keeps it — it may be reopened. A review-by-link group has no button: it looks ' +
-      'at someone else’s MR. While the turn ' +
-      'runs the row says “Rechecking…”; once it ends in a delivery the button turns ' +
-      'green, “MR checked” with the check time beside it, and stays so until new ' +
-      'work on the group clears it. It can be clicked again while green. A group ' +
-      'with tracker tasks has “Move N tasks” — no MR needed (keys ' +
-      'from its tasks, branch and title; suggested tickets are not included) — and ' +
-      'the hub header has “Move group tasks”: every group and the splits the groups ' +
-      'made themselves. The dialog reads the tasks in Jira and shows each one’s ' +
-      'status. When they stand in different statuses, “From status” narrows the move ' +
-      'to the tasks in the chosen one right now and offers the statuses those can ' +
-      'reach; “All tasks” offers the statuses all of them can reach. A task Jira did ' +
-      'not return is shown with the reason. Pressing “Move” is the consent: the ' +
-      'panel moves them itself, with no agent turn, and reports per task — moved, ' +
-      'already in that status, no transition, an error, or left alone because it ' +
-      'stands in another status. With Jira not connected in the panel the dialog points to ' +
-      'Settings, “Integrations”.',
-    cascadeControl: 'One group and the whole plan',
+      'Only the core pushes the branch and opens the MR. The model session cannot push: the ' +
+      'copy’s push URL leads nowhere, the pre-push hook and the ssh wrapper refuse, and push, ' +
+      'MR and forge writes are denied in the session’s permissions with “platform step, the ' +
+      'core publishes”. Before publishing comes the final gate: every requirement of the task ' +
+      'is covered. Readiness is judged by one function that refuses with one list of every ' +
+      'unmet condition: a conflict with the base, a requirement without a proven change, ' +
+      'changed code without tests, findings of the outgoing sieves (a leftover debugger or ' +
+      '.only, conflict markers, a committed .env, large files, a manifest without its lock ' +
+      'file, destructive migrations, environment variables declared nowhere, removal of files ' +
+      'outside the part’s own paths), a refusal of the text sieve, an open question to the ' +
+      'human. The core pushes with its own credentials: before the MR it may rewrite the ' +
+      'branch with --force-with-lease, after it only adds new commits. The MR goes through the ' +
+      'GitLab or GitHub API; another forge gets a push and a link. The core cannot merge or ' +
+      'approve an MR: the forge adapter has no such methods. The core waits for CI only if you ' +
+      'decided so for this task on the launch screen. Reviewer comments in the MR are handled ' +
+      'by the “Reviewer answers” step.',
+    cascadeControl: 'Old splits: the summary stays',
     cascadeControlText:
-      'A group’s row has “Pause”, “Resume” in the same session and “Start now” past ' +
-      'the queue. Pausing a running group does not give away its slot: the queue moves ' +
-      'when a group finishes, not when you stop it, so stopping every group starts ' +
-      'nothing new. A pause stops the agent’s process together with its background ' +
-      'commands (a stand server, a long check); “Resume” names the killed commands to ' +
-      'the agent one by one, so it restarts the ones it needs instead of guessing from ' +
-      'a cut-off call. This holds between turns too: an agent waiting for a background ' +
-      'task is stopped as well and does not wake up after the pause. The panel agent and ' +
-      'the group watcher resume with a note: the pause reason and the first step reach ' +
-      'the group as separate lines, and it does not re-run checks already decided. A group ' +
-      'paused while it waited for you — a question, a review decision, D-n calls or a red MR — ' +
-      'goes back to that same wait on Resume: nothing is sent to it, the answer is still yours. ' +
-      'Only when the pause killed its background commands does Resume send the usual word. ' +
-      'Processes started ' +
-      'from the group’s copy (dev server, test chain) are stopped by Pause, Drop and plan ' +
-      'cancel by the copy’s path; a stand in the project itself is left alone. A queued ' +
-      'group can be paused too — it does not start until you ' +
-      '“Resume” it back into the queue. A message from the main chat to a paused group ' +
-      'does not wake it: it waits and goes out after the turn you start. The group tab’s ' +
-      'own queue works the same way: a message written while a turn ran does not go out ' +
-      'by itself after a pause — the tab says “The group is paused”, the message stays ' +
-      'queued, and “Retry” sends it as yours. Words the agent already got mid-turn are ' +
-      'not sent a second time, even if the panel’s reply never reached the tab. ' +
-      'While the panel prepares a copy (branch and ' +
-      'dependency install — minutes) the row says “preparing the copy”; a pause holds ' +
-      'during it, and “Resume” later starts the group in the ready copy. A paused ' +
-      'group holds its slot, so next to “Resume” it has “Remove” — close a group you ' +
-      'no longer need without cancelling the whole plan; the “all slots are taken” ' +
-      'refusal names such pauses separately. A group cut ' +
-      'before its chat existed (say, a panel restart mid-preparation) gets “Start ' +
-      'again” (in its copy if it has one; otherwise in a new one) and “Remove”. ' +
-      '“Remove” asks for confirmation in the same row. The summary line above the groups ' +
-      'counts them by state: running, waiting for you, queued, done, accepted, failed. ' +
-      'A group process cut off mid-turn (a panel restart, a CLI death) the panel ' +
-      'resumes by itself up to twice, first asking the agent to restore its state from ' +
-      'git and the transcript; after that — the “Resume” or “Resume interrupted (N)” ' +
-      'button. A group that gave up on a failure (say, the CLI login ran out and the ' +
-      'retries were spent) or a turn without a review verdict also gets “Continue”: ' +
-      'the same session first checks the state against git, the MR and the ' +
-      'transcript, then finishes and delivers. The button is there while the group’s ' +
-      'conversation and copy live and the plan is not cancelled; a group taken away ' +
-      'with “Remove” has none — a removed group does not come back. The group’s ' +
-      'conversation is busy — “Continue” joins its queue, and a second click adds no ' +
-      'second task. A group that gave ' +
-      'up passes the slot limit like a new one. A delivery the agents can finish by ' +
-      'themselves is not given up at once. The group conversation is busy at the moment of ' +
-      'delivery — the panel checks again in two minutes, for up to an hour in a row, and only ' +
-      'then stops with the reason “the group conversation was busy”. The copy could not be ' +
-      'read, the remote did not answer, or the delivery analysis stalled — the panel retries ' +
-      'on its own in 30 minutes, at most twice; the group row reads “the panel retries on its ' +
-      'own in 30 min (retry 1 of 2)”, and “Continue” is available at once, without waiting ' +
-      'for the retry. After the cap the group stops with “the panel retried and did not ' +
-      'finish”, but a panel restart and the remote answering again re-check such a group at ' +
-      'once. A corrupt git object store of the copy is not fixed by retrying — it is “a human ' +
-      'is needed” at once: run git fsck --full in the copy, restore the objects or recreate ' +
-      'the copy, then continue the group. For a group of another CLI, delivery runs as a new ' +
-      'conversation of that same CLI. “Cancel plan” stops every group of the split and closes the plan after ' +
-      'asking for confirmation: chats, copies and branches stay, and after cancelling ' +
-      'you can split again. A cancelled plan does not come back to life on a restart, ' +
-      'and its groups’ questions are withdrawn: the project tab stops showing “agent ' +
-      'is waiting for an answer”. Chats of groups dropped by a split relaunch are ' +
-      'collected separately — “Inactive: N”; an accepted group keeps its “accepted” ' +
-      'mark and the “Remove copy” button there.',
-    cascadeRules: 'What a group decides on its own — “Settings” → “Groups”',
+      'A conversation that tasks were split from earlier still shows the group summary under ' +
+      'the agent’s answer — from the stored state: a card per group with its branch, the ' +
+      'stages passed and the model, and “What the agent got” ' +
+      '— the verbatim input of the latest runs (the last 30 per conversation are ' +
+      'kept). Children’s questions and permission requests are answered right in the cards. ' +
+      'The panel starts no new stage, retry, delivery or branch comparison from such a summary.',
+    cascadeRules: 'What a task decides on its own — no group settings',
     cascadeRulesText:
-      'A group has no human by construction, so its permissions are decided by the tab’s ' +
-      'rows, each in one of three positions: “Itself”, “With a note” (also on its own, but ' +
-      'the parent’s summary keeps an “Allowed automatically” line you can “Dismiss”; repeats ' +
-      'in it are collapsed to “×N”, MCP calls are grouped under the server name (“atlassian: ' +
-      'jira_assign_issue ×6”), the full list is in the hover hint) and “Human”. A group gets ' +
-      'no card: a “Human” call goes to the “Awaiting decision” list under a number D-n, and ' +
-      'the group carries on with everything that does not depend on it (see “Awaiting ' +
-      'decision: calls an agent set aside” below). Only what cannot be undone goes to a ' +
-      'human: deletion (a branch locally and on the remote, tags, a git stash entry, someone ' +
-      'else’s copy, files git cannot bring back, tables and databases), merging another ' +
-      'branch into the own one, push options and a remote other than origin, database writes, ' +
-      'infrastructure, package publishing, running downloaded code and killing someone else’s ' +
-      'processes. An MR merge and a push to a main or protected branch are not asked at all: ' +
-      'the group gets an immediate refusal with the known answer “the owner merges; push your ' +
-      'own branch and deliver the MR”, and the MCP merge tool is closed to every group stage. ' +
-      'Everything else a group does by itself. Out of the box it does by itself ordinary ' +
-      'work, writes to git, temp cleanup and git history rewrites in its own copy; “With a ' +
-      'note” covers outward writes (replies in MR threads and edits of them, edits of the MR ' +
-      'description, tracker comments, attachments and status changes): the group writes on ' +
-      'its own and every such write stays as a line in the parent’s summary. Reading MRs and ' +
-      'issues calls no human, MR threads included; an MCP tool you allowed by name in ' +
-      'settings.json goes by itself too, except deleting and merging. The same rules hold in ' +
-      'the CLI’s auto mode: the panel takes push, merge, branch and file deletion, database ' +
-      'clients and hosting CLIs away from auto mode and decides them by parsing the command. ' +
-      'Routine goes by itself even as one compound command — `cd <own copy> && …`, `git -C ' +
-      '<copy> …`, `2>&1 | tail -5`, a trailing `# comment`: add, commit (the words of its ' +
-      'message are not commands), fetch and fetch --prune, stash push/pop, renaming the own ' +
-      'branch, a tag and its push, an ordinary push of a work branch (its own or a new one), ' +
-      'safe `git -c` keys (author name, disabled hooks), reading git settings, and deletion ' +
-      'of temporary things — build output and caches (dist, build, coverage, node_modules), ' +
-      '.agent/tmp, *.log and a temp directory created by the same command. A `git -c` key ' +
-      'that runs a program (an editor, an ssh command and the like) and writing global git ' +
-      'settings go to a human. A command is judged link by link and by what will actually ' +
-      'run: variables (`B=…; rm -rf $B`), wrappers (bash -c, env with -S and -C, xargs, find ' +
-      '-exec, make -C, shell aliases, PowerShell), interpreter code and heredoc drafts are ' +
-      'unfolded, and the chat rule sees only the links the parser did not recognise. A ' +
-      'PowerShell tool call is judged the same way as Bash. A human gets git or a delete run ' +
-      'where the parser cannot see: through ssh, docker or kubectl exec, sudo -D, pwsh -wd ' +
-      'outside the copy, an encoded PowerShell command (-EncodedCommand in any abbreviation); ' +
-      'so do curl | sh, a write into the main copy through an interpreter, proxy variables ' +
-      'and PAGER= before git, and core.symlinks=true. A docker subcommand is not a shell ' +
-      'command: docker rm -f "$CID" removes a container and docker exec "$CID" go test runs ' +
-      'tests, so both go by themselves, while git or rm inside docker exec still goes to a ' +
-      'human. So does what git itself or an unpack writes outward: git archive -o, git diff ' +
-      '--output, tar -x -C outside the copy and temp. git in a folder ABOVE the copy (cd .. ' +
-      'or -C .. from a subfolder — one climb too many) does not run: the agent gets a refusal ' +
-      'with the reason and a request to name its copy, not a D-n item. The clone a reviewer ' +
-      'builds by the review-plan.mjs mark is a scratch repository, like temp; git clean in it ' +
-      'while its node_modules is a link into the real copy is not. env -C into the own copy is judged in ' +
-      'place, like an ordinary command. Deleting inside the copy (rm, git rm) goes by itself ' +
-      'when the target is temporary, git-ignored, or something git brings back; a human gets ' +
-      'the copy root, .git, the local layer (.agent/, .claude/, .env…), secret-named files ' +
-      'and everything outside the copy, the system’s shared temp directory included. What ' +
-      'lies inside a folder within .agent/ (shots, logs, probes — .agent/screenshots/…) is the ' +
-      'agent’s own output, and deleting it goes by itself; top-level .agent/ files and a whole ' +
-      'folder still go to a human. A temp file outside the copy written by an earlier call of ' +
-      'the same conversation (> /tmp/x.log, cp f /tmp/x.bak) is the group’s own: deleting it ' +
-      'is cleanup. The folder after cd holds only while cd surely ran and succeeded: after || ' +
-      'and inside an if body it is unknown, and after && or when the folder is not on disk it ' +
-      'holds only to the end of the same && chain. A path ' +
-      'through a link (symlink, junction) made by the same command or found earlier in a temp ' +
-      'directory counts as foreign, and so does a C:name path (relative to the drive’s ' +
-      'current directory); a folder link made by cmd /c mklink /J (or /D) with named paths is ' +
-      'followed by its path. Also by themselves: a worktree inside the own copy (git worktree ' +
-      'add and remove in .agent/tmp), git worktree prune when the live list shows it removes ' +
-      'only the group’s own, a trial merge in a detached head, comparing through merge-base ' +
-      'and merge-tree; removing a worktree outside the own copy and git branch -d / -D go to ' +
-      'a human. Uncommitted work is not lost. Discarding in the own copy ' +
-      '(reset --hard, checkout -- file, restore, clean -fd) on a dirty tree goes by itself, ' +
-      'but first the panel saves everything git status shows into a ref ' +
-      'refs/agentdeck/backup/… (to bring it back: git restore --source=<ref> --worktree -- . ' +
-      'or git stash apply <ref>; kept up to two weeks, at most fifty per copy). When the ' +
-      'snapshot fails, the group is refused with a reason. Switching branches (checkout, ' +
-      'switch, checkout -b) on a dirty tree is refused: commit this branch’s edits first, ' +
-      'then switch. On a clean tree both go without a snapshot. git clean -x (ignored files) ' +
-      'goes to a human. A branch rewrite (--force-with-lease, --force, -f) goes by itself ' +
-      'only to the group’s OWN branch — the one checked out in the copy according to git, ' +
-      'never the one named in the command — while its MR is a draft or not open yet. ' +
-      'Reviewers read the branch of an MR taken out of draft: rewriting it goes by itself, ' +
-      'with a note, only when it conflicts with the target branch (per GitLab/GitHub or per ' +
-      'git merge-tree of origin/<branch> against origin/<target>). Without a conflict, and ' +
-      'when the conflict cannot be learned, the group is refused with a reason: an MR without ' +
-      'a conflict needs no refresh. Rewriting someone else’s branch, +branch and deleting a ' +
-      'remote branch go to a human, as do a push with a pattern or to heads/<target>, a ' +
-      'forced or pruning fetch into local branches, a fetch into refs/remotes/<r>/* from ' +
-      'anything but <r>, and a branch switch through symbolic-ref HEAD or update-ref ' +
-      '--no-deref HEAD unless the branch is the group’s own; --force-with-lease=heads/<own> ' +
-      'is the same own branch. The panel judges a group’s command from the directory its ' +
-      'shell is in; the CLI writes it to the transcript on every call. After `cd ' +
-      'sub-project`, a path like `../x` is still the group’s own copy. No record — it is ' +
-      'judged from the copy root; the shell is outside the copy, or the directory cannot be ' +
-      'known (an earlier call of the same reply is not written yet) — the directory is ' +
-      'unknown, and deleting by a relative path goes to a human. A group may stop a process ' +
-      'by itself only if the process is its own: a descendant of its CLI, a background child ' +
-      'of the same command (`$!`, `%1`), a process carrying the group’s mark in its ' +
-      'environment, or an orphan whose launch is recorded verbatim in its copy’s transcripts ' +
-      '(the group’s CLI died, its dev server stayed); a kill by port is checked against ' +
-      'whose process holds the port, and a port nobody holds has nothing to kill, so it passes. ' +
-      'Another process’s PID or port, `pkill`, `killall`, `taskkill /IM`, and kills with no ' +
-      'named target reach neither execution nor you: the agent gets a refusal naming the ' +
-      'process and how to name its own. PowerShell `Stop-Process -Id` is judged by its PIDs ' +
-      'just like `taskkill //PID`; by name (`-Name`) like `taskkill /IM`. Such a question still waiting from an earlier ' +
-      'version is re-judged by the panel itself on restart. ' +
-      'Catching up with the target branch (rebase, merge or pull of main, origin/main, ' +
-      'develop…, including by the hash of its commit and git checkout -B / switch -C from it) ' +
-      'the panel checks itself: `git merge-tree` in the group’s copy, and a trial merge in a ' +
-      'throwaway copy when git answers with an error. When the check fails, the group is ' +
-      'refused with a reason (git fetch first), never let through. No conflict — refused: you ' +
-      'update an MR that merely fell behind yourself, when you want to, and the group ' +
-      'finishes the task on its own base instead of re-running checks because main moved. A ' +
-      'tree of the target branch next to the copy (`git worktree add … origin/main`, ' +
-      '`git checkout --detach origin/main`) — to check «is this red mine» — gets the same ' +
-      'refusal with a ready command, run --case <red cases of the copy> --base: those cases ' +
-      'run on the fork point with the target in a throwaway tree, and the verdict lands where ' +
-      'the delivery check reads it. When the target branch is already wholly in the copy’s ' +
-      'history (the group rebased onto it itself), its tree next to the copy is not a ' +
-      'catch-up and goes through without a refusal. A ' +
-      'conflict — a bare catch-up as one command goes by itself, marked in the parent’s ' +
-      'summary, and the group fixes the conflict at once; a catch-up inside a compound ' +
-      'command goes through the usual parsing. In the middle of a sync already under way, taking ' +
-      'the target side for a file (`git show origin/main:a > a`, `git checkout --theirs a`) is ' +
-      'conflict resolution and passes on its own; a new sync or a history move is checked ' +
-      'again. The panel recognises a catch-up in any form the ' +
-      'shell will run it: inside a wrapper (`bash -c`, `sh -c`, `dash`, `ksh`, `mksh` — in any case ' +
-      'and with `.exe`, after `env` or `timeout`, `eval`), inside a compound command (`{ …; }`, ' +
-      '`( … )`, `if`, `for`) with a redirect, with `exec >` and `>&`, with the target taken from ' +
-      '`$(git rev-parse …)` or a variable, and as a patch export by commit hash. A target that ' +
-      'cannot be named before it runs (`git rebase "$T"`, `git pull origin $(cat ref)`) leaves ' +
-      'nothing to compare against — you decide such a catch-up. The PowerShell tool is checked ' +
-      'the same way as Bash. A shell alias is judged by its expansion together with the call’s ' +
-      "words: `grb origin/main` with `alias grb='git rebase'` is the same catch-up. A function " +
-      'from `.bashrc` is judged by its body: git, rm, mv, kill, sudo, eval, a nested shell, a ' +
-      'database client, docker, curl, ssh or `. file` in the body goes to you, anything else ' +
-      'follows the chat rules. The names of snapshot aliases and functions become ask rules of ' +
-      'the group profile, so such a call reaches the panel in the CLI’s auto mode too. The ' +
-      'profile’s ask rules and the push ban before the delivery stage cover the PowerShell tool ' +
-      'as well. A git ' +
-      'line in PowerShell with typographic quotes or dashes, a non-breaking space or a lone ' +
-      'carriage return is not read as Bash (PowerShell splits it differently) and goes to you; ' +
-      '`make` with a directory in a bundle of switches (`-sC`) or in `--dir=`/`--directory=` ' +
-      'outside the copy is judged as leaving it. ' +
-      'A group’s continuation in a clean session gets ' +
-      'the previous session’s proposal as a quote: “as the owner asked” in it is that ' +
-      'session’s words, not yours, and an outward write from it reaches you as a “For you to ' +
-      'do” line. “Group decision points”: decide by the plan itself or ask you and wait. With ' +
-      '“by the plan” the panel answers a group question at once, every question of the call ' +
-      'and a repeated one too: the recommended option (the mark anywhere, in Russian or ' +
-      'English), without a mark the first one; an option that calls you or claims you already ' +
-      'did something (“logged in via qa:login”) is never taken — the one that goes on without ' +
-      'you is, and an action the group can do itself it tries once; when none fits, the group ' +
-      'decides by the plan itself. The decision goes into the MR, the parent summary shows an ' +
-      '“answered automatically” line, and such a question never marks the group “waits for ' +
-      'you”. A turn that ends with questions in text (“I will start after your answer”) is ' +
-      'resumed by the panel at once in the same session: apply your own recommendations and ' +
-      'go on; waiting again, the decisions are spelled out, at most three times in a row (the ' +
-      'count survives a panel restart and only your word resets it), and after “Stop all” ' +
-      'such a resume waits for “Resume all”. Lines naming a waiting D-n (“Waiting for the ' +
-      'human: D-n — …”) are a legal wait for the list, not a question in text: the panel ' +
-      'does not resume the turn for them. Autonomy switched off in the group chat itself ' +
-      'is not overridden. The same tab holds how many groups run at once on a light and a ' +
-      'heavy project and what counts as heavy; a project can set its own, and a row without ' +
-      'its own is marked “as shared”. A group stopped on a question is marked “waits for you” ' +
-      'in the chat list and the summary, and the panel calls you with a toast, a sound and — ' +
-      'on a hidden tab — a system notification. A group with nothing left but waiting D-n ' +
-      'items is marked “awaiting decision: D-n”: groups that depend on it do not start, and ' +
-      'the watcher and “decide yourself” are not spent on it.',
-    cascadeEconomy: 'Group economy — “Settings” → “Groups”',
+      'The “Itself / With a note / Human” table in “Settings” → “Groups” is gone: the rules of the old ' +
+      'panel groups left together with their executor. Whom to call is decided by the core from a ' +
+      'closed list of action types, never from the question text. Merging, deleting on the remote ' +
+      'or in a foreign copy, writing to a database and changing a service address, credentials, ' +
+      'granting access and integrations always wait for a human — the model cannot lift that ' +
+      'block. The task’s own delivery — push, MR, replies in discussions — never waits for a ' +
+      'human. Everything outside the list is not a question but a fork in the final report: the ' +
+      'step carries on with the model’s recommendation. An edit to a path that requires a grant ' +
+      'does not pass until the grant is given (section “What moved to the task core” → ' +
+      '“Autonomy and permissions”).',
+    cascadeEconomy: 'Step economy — the economy section of the core config',
     cascadeEconomyText:
-      'A group is a long conversation, and every call sends the model the whole ' +
-      'accumulated window again: in a measured run of ten groups three quarters of the ' +
-      'spend was reading that window. So the “Split group economy” card keeps the ' +
-      'window smaller and the mechanics cheaper. The compaction threshold is when the ' +
-      'CLI compacts the conversation into a summary; out of the box it is the Claude ' +
-      'Code one: a lower threshold makes calls cheaper but loses detail, so it is worth ' +
-      'switching on after a comparison run. Command ' +
-      'output has a ceiling (8000 characters out of the box): longer output the CLI saves ' +
-      'to a file and shows the group a preview of the start (about 2000 characters) and ' +
-      'the path to the full output. For a failed command the CLI gives the exit code and ' +
-      'the start of the output up to the ceiling, with no file: the agent sees an error at ' +
-      'the end of long output only by narrowing the output. One file read has ' +
-      'a ceiling (10k tokens): the CLI returns the start, the rest is read in parts. The cache lifetime is ' +
-      'left to the CLI out of the box: five minutes is cheaper to write, but a longer ' +
-      'pause writes the whole window again, and groups pause like that often. Delivery ' +
-      'on Sonnet runs commit, push, MR and sieves on the cheaper model. New ' +
-      'conversation after a long pause: the group stood idle for 55 minutes or more (4 with ' +
-      'the five-minute cache lifetime; after a limit reset, any pause) and its window is 25k above the conversation base (about ' +
-      '85k) — any continuation (a panel message, a retry of a failed turn, “Resume all”, a ' +
-      'human answer) goes on as a new conversation with a brief the panel built from ' +
-      'files: the group’s tasks and its stage task, the group’s notebook and tickets, its ' +
-      'notes, commits and changes since the branch its copy was cut from, ' +
-      'where the branch is on the remote now (read from the remote itself: a commit the ' +
-      'copy lacks, say from a CI bot, is named with “git pull --ff-only”), ' +
-      'the last answer. The change list is 10 files when everything is committed, 40 ' +
-      'otherwise. The tracker copy and the gotcha notes past 1,500 characters travel as ' +
-      'an index with the file path. A note up to 8,000 characters travels whole; a longer one travels ' +
-      'as its beginning (up to 4,000 characters, cut at a line) with the line number from ' +
-      'which the group reads the rest of the file before acting. The commits the notebook ' +
-      'and PROGRESS.md name the panel checks against git: one rewritten after the note ' +
-      '(rebase, amend, reset) marks the note stale, and where it disagrees with the commits ' +
-      'and the last answer, they win; one already pushed is named in a line under the ' +
-      'note. A turn cut off mid-work ' +
-      'hands the brief what the agent found out between its calls. A feed ' +
-      'line names the size of the previous window, and the previous conversation stays ' +
-      'on disk. While the new conversation runs, the line carries a «Continue the old ' +
-      'conversation» button: the new one is stopped and the same turn goes on in the ' +
-      'previous session — for when this group’s full memory is worth more than rewriting ' +
-      'the window; the next continuation is decided by the rule again. Codex and Qwen Code ' +
-      'groups follow the same rule, with the pause set by their provider’s cache: 10 minutes ' +
-      'or more for Codex, 5 for Qwen Code; on a local model the cache costs nothing and the ' +
-      'conversation always continues — through the panel’s local contour and when a server ' +
-      'on this computer is set in the CLI’s own settings. The panel builds the brief the same way, takes the last ' +
-      'answer from the CLI’s own conversation, and the last two replies of the previous ' +
-      'conversation follow the brief; the feed line is the same, with no button back to the ' +
-      'old conversation. Warm cache while waiting: while a group waits for your answer or ' +
-      'permission, is paused or queued for a heavy step, ' +
-      'at minute 50 after its last call the panel sends its conversation one short word. ' +
-      'The ping reads the window from the cache and extends the one-hour cache, so the ' +
-      'continuation neither writes the window again nor turns into a new conversation (in ' +
-      'the measurement the ping cost a sixteenth of the rewrite). The group’s conversation ' +
-      'is not changed: the ping runs as a fork without a transcript and without tools. The ' +
-      'group card shows a “Warming” row in the “Tokens” section: how many pings reached the model, how many hit ' +
-      'the cache and how many missed, and the result in tokens at input price — “saved” (a ' +
-      'green pill next to the “Tokens” heading) or “overpaid” (a yellow one). The hub summary ' +
-      'adds the settled results of all groups into one pill, “cache warming: saved ≈ …” or ' +
-      '“overpaid ≈ …”; waits without a result are not counted. A wait is settled once its outcome is known: a saving counts only when ' +
-      'the group resumed more than an hour after its last call, while a ping still held the ' +
-      'cache, and read the window from the cache — then it is the window rewrite that did ' +
-      'not happen, minus the cost of that wait’s pings. A reply within the hour (the cache ' +
-      'would have been warm without a ping), a wait past the ping cap and a resume that ' +
-      'rewrote the window make the pings pure cost. While the outcome is unknown, a line under the row ' +
-      'names the cost of the current wait’s pings separately; the share of the subscription ' +
-      'window the pings used counts in the group’s limit share. A miss is a ping that read less than 90% of the window from the ' +
-      'cache or wrote more than 10%: the prefix diverged, and the pings of that wait stop. ' +
-      'Out of the box a wait gets three ' +
-      'pings — the cache stays warm for about three and a half hours; after that it goes ' +
-      'cold. No ping with a five-minute or unconfirmed one-hour cache, a window under the ' +
-      'watch threshold “Window from which a cold cache is a loss” or while a subscription ' +
-      'limit reset is awaited — the limit ' +
-      'would refuse the ping; none either through a contour that has already refused on its ' +
-      'budget, until that refusal is cleared on its card. Keeping ' +
-      'groups off the editor stops diagnostics of the folder the panel was started ' +
-      'from. Economical habits is a line in the task: independent reads in one step, ' +
-      'no folder changes, narrow output (a foreign CLI’s group gets it without the phrase ' +
-      'about folder changes); it does not suggest subagents. With it the CLI ' +
-      'also stops telling the agent the human has not heard from it in a while: otherwise, ' +
-      'after five turns without text, the agent spends a turn on a report nobody reads ' +
-      'inside a stage. Each lever switches off on its own. The compaction threshold and ' +
-      'a new conversation after a pause apply from the group’s next turn, the warm cache ' +
-      'from the next minute, Sonnet ' +
-      'delivery from the next delivery. The rest apply from the group’s next new ' +
-      'conversation: one already started keeps its levers, or its whole cache would be ' +
-      'rewritten. A chat without a group is not affected. The levers are shared by every CLI ' +
-      'but reach them differently, so each carries a “Where it works:” row — a mark per CLI: ' +
-      '“own setting” (green — the lever writes the CLI’s own setting), “by the panel” (blue — ' +
-      'the panel does the same), “not needed”, “no setting” and “not worth it” (muted — the ' +
-      'lever changes nothing in that CLI). The reason is in the hover hint. A working lever ' +
-      'that does not always work is marked “with a condition”, and the hint names it: for ' +
-      'example, in Qwen Code the cache lifetime works only with an Anthropic login, a new ' +
-      'conversation after a pause only on a cloud model, the compaction threshold only when ' +
-      'the model’s window is known.',
-    cascadeWatch: 'Group watch — signals on the group card',
+      'The core gives its economy levers to every task step except chat: a ceiling on shell ' +
+      'output (8000 characters out of the box), a ceiling on one file read (10 thousand tokens), ' +
+      'detaching the session from the IDE and a work-habits line in the brief. The compaction ' +
+      'threshold and the cache lifetime are left alone out of the box — the CLI decides them. ' +
+      'The levers are changed on the “Task step economy” card in “Settings” → “Groups”: it ' +
+      'writes the economy section of the core config, and the next step starts with the new ' +
+      'values. A field overrides its default; “CLI default” and a switched-off toggle turn a ' +
+      'lever off explicitly; with the core down the card says so. Each CLI carries a lever under ' +
+      'its own key and names what it cannot carry as a loss; under every lever the card shows ' +
+      'where it works.',
+    cascadeWatch: 'Observer — signals in the task feed',
     cascadeWatchText:
-      'While groups run, the panel itself watches their live stream and transcripts ' +
-      'against a set of rules — no observer agent and not a single model call. A rule ' +
-      'names the trouble in numbers: a group silent for over 20 minutes, a question ' +
-      'or a permission request waiting for an answer over 15, a cache gone cold after a pause and the window ' +
-      'rewritten, two compactions closer than 15 minutes, the same check three times ' +
-      'with no edit between (a call a guard refused does not count — only a check that ' +
-      'ran does), a review during the work stage, a push or MR before the ' +
-      'delivery stage, a copy reading the panel’s own sources, a group’s spend or the ' +
-      'five-hour window projection over the threshold, the subscription limit hit, a ' +
-      'sleep-poll loop, the same file or chunk of it read three times with no edit. A ' +
-      'paused group (its own pause or the shared “Stop all”) whose session still acts (a ' +
-      'minute after the pause or later) raises an alarm with the number of calls; while ' +
-      'paused, the group’s other signals close and do not come back once the pause is ' +
-      'lifted, and the counts of heavy checks and delivery reminders start over. Heavy ' +
-      'checks in a loop: any check longer than the threshold (3 min by default) or a full ' +
-      'gate started in the background ran across the whole group as many times as set (2 ' +
-      'by default) within six hours — edits in between do not reset the count; a single ' +
-      'chat has no such rule. A new group conversation started over a still-warm previous ' +
-      'one (a pause shorter than the cooling time, or after a warm-cache ping) that wrote ' +
-      'more than the threshold into the cache again (50k tokens by default) is a note when ' +
-      'the reason is real (handover to delivery, a fix link, review, an MR re-check, a ' +
-      'handover by block, a stage change) and “attention” when the start was needless: the ' +
-      'briefing again over a warm cache, or a model switch on a warm continuation. A new ' +
-      'conversation redoing files another conversation of the group already committed at ' +
-      'this stage (the same edit text, or a rewrite where at least 60 % of the lines were ' +
-      'already there) is “attention” from two files. A group paused for over two minutes ' +
-      'while a server its session started with a port in the command (`--port N`, ' +
-      '`PORT=N`, `-p N`) still listens is “attention” with the port number while the port stays ' +
-      'open; a server on its default port is invisible to the watcher, and the port a client ' +
-      'connects to (`psql -p`, `ssh -p`) is not counted as its own server. A single chat has ' +
-      'none of these three rules. The thresholds of the new-conversation and redo rules are ' +
-      'in the watcher card in the settings. The spend signal clears not at the ' +
-      'threshold itself but once spend falls below 85 % of it, so it does not flicker ' +
-      'around the threshold. Seven ' +
-      'more rules catch leaks and delays: a subagent fan-out — six launches within an ' +
-      'hour (a skill call is not a launch) or their spend from 20 window units (an estimate of the share of the subscription window at model prices, not money); a huge tool result ' +
-      'in the window — from 20K ' +
-      'characters, a re-read of saved CLI output from 8K; a call that hit its own ' +
-      'timeout (timeouts under two minutes are deliberate probes and do not count); a ' +
-      'call open for over 12 minutes while its timeout has not run out (for a check whose ' +
-      'usual time the panel knows from the heavy-step queue — longer than usual with a ' +
-      'quarter to spare; a background call does not hold the turn and does not count); a wait in the ' +
-      'heavy-step queue over 10 minutes; five refusals by guards and access rules within ' +
-      '15 minutes; the first request of a new conversation heavier than 90K tokens (only ' +
-      'for a conversation started while the panel watches, a resume does not count) or ' +
-      'the conversation window grown more than 100K tokens over its first request (the ' +
-      '“Session window grew above its first request by” threshold; after a compaction the ' +
-      'count starts from the first call after it). The fan-out, the timeout and the queue ' +
-      'wait are “attention”, the other ' +
-      'four are a “note”: they stay on the card and do not go out. A ' +
-      'signal lands as the “Group watch” island on the group’s card (a calm background, a coloured stripe on the left and a label on the row — by the most important signal) in the ' +
-      'parent’s hub, and the number of active ones as a chip in the hub summary; ' +
-      '“Open chat” leads to the conversation where the rule fired. When the condition ' +
-      'ends, the signal closes by itself and stays as a folded row; a signal nobody ' +
-      'watches after a panel restart closes when the group ends or its conversation ' +
-      'stays silent long enough. The watch itself stops ' +
-      'nothing: it shows the trouble and reports it. Spend is counted for the whole group — all its ' +
-      'conversations and subagents together — and the five-hour window projection is ' +
-      'one per account: it shows on the card of every running group but goes out as a ' +
-      'single message. The window is reported in whole percents, so the projection takes ' +
-      'the lower bound of the slope: a single step in the first minutes of a window raises ' +
-      'no alarm. One cause, one signal: when subagents carry more than half of the ' +
-      'group’s spend, the fan-out already names the cause and there is no separate spend ' +
-      'signal; spend of the conversation itself stays a spend signal, next to the fan-out ' +
-      'too. Likewise a long call does not duplicate the group’s silence, the fan-out does ' +
-      'not duplicate a review at the work stage (those are its own subagents), and a polling ' +
-      'loop started after a timeout does not duplicate the timeout itself. ' +
-      '“Attention” and “alarm” signals go to the webhook wherever the “Group watch ' +
-      'signal” event is ticked in integrations — the rule, the numbers, the stage and the ' +
-      'project folder name; Telegram gets only an “alarm”, in words (“группа молчит”), ' +
-      'with the project, the chat and the group, the rule and numbers folded into a quote. ' +
-      'The same signal goes at most once per 30 minutes. ' +
-      'Whoever got signals in Telegram before this event existed had it ticked ' +
-      'by the panel itself, once, on the update; the webhook is ticked by hand. ' +
-      'Thresholds and the watch switch are on the “Split-group watch” card under ' +
-      '“Settings” → “Groups”; a threshold change applies at once, without restarting ' +
-      'groups. A watch switched off closes the active signals; the history stays on ' +
-      'the cards, and while it is off the thresholds on the card are locked — it does ' +
-      'not read them. Only the cold-cache window stays open while the warm cache is on: ' +
-      'the ping decides by it. Codex and Qwen Code groups are read by the watch from their ' +
-      'own conversation files, and the “Tokens” section of their card is counted the same ' +
-      'way; the subagent rules do not apply to them — these CLIs have no Claude subagents. ' +
-      'Refusals in their files count as they do for Claude — a hook refusal and the panel ' +
-      'judge’s refusal in Qwen Code, a declined command in Codex: five in 15 minutes is a ' +
-      'note, and the same action done another way is a bypass. ' +
-      'A cold cache there is judged by their provider’s pause — from 5 minutes for Qwen ' +
-      'Code, from 10 for Codex. These CLIs do not report cache writes, so the signal comes ' +
-      'only when the cache read dropped after the pause and the full-price input exceeds the ' +
-      'conversation base with a margin; the loss in the signal is only what dropped out of ' +
-      'the cache, not the whole input of the turn. A compaction resets that trace — a read drop right ' +
-      'after it is not cooling. On a local model the rule is off: the cache costs nothing ' +
-      'there. Twelve more rules catch what only a human used to notice. A group stands: ' +
-      'no turn, no question, no queue, and it will not continue by itself (20 minutes by ' +
-      'default, three times longer — an alarm; after your decision the count starts at the ' +
-      'decision). The same call hits its timeout, hangs longer than usual or fails with the ' +
-      'same error in two groups of a plan within an hour — the cause is shared, and there ' +
-      'is one signal, one message per plan; a repeated check with no edit does not count ' +
-      'here, and a paused group is left out. The same ' +
-      'call fails three times with the same error, no edits in between. An action a guard ' +
-      'refused is done another way within 30 minutes — an alarm; a corrected retry after a ' +
-      'refusal is not a bypass. The agent stops ' +
-      'processes it did not start itself. The turn ended with a question in the text, ' +
-      'without a card, and there has been no answer for 10 minutes. Two delivery ' +
-      'reminders went nowhere — the same things are still missing — or a reminder went to ' +
-      'the work, review or plan stage while delivery is still ahead; and when every new ' +
-      'round finds something new missing — delivery is redone round after round — a ' +
-      '“note” naming what was missing for the first time. A tool that does not ' +
-      'exist in the session was called. An external service — the model, an MCP server or ' +
-      'the web (search and page fetches) — does not answer: three failures within 15 ' +
-      'minutes; a 4xx answer is a refusal, not an outage. Edits outside its own copy. ' +
-      'CLI service inserts above 20K chars within 15 minutes — a “note”. The review ' +
-      'verdict is written as text, without a review block — the pipeline will not see ' +
-      'it. A signal grows while the trouble lasts: an unanswered question — as a card or ' +
-      'as text — is “attention” first and an “alarm” after an hour (the “An unanswered ' +
-      'question turns into an alarm after” threshold); a signal raised to an alarm goes to Telegram ' +
-      'and the webhook once more, even inside the quiet period, and is never lowered. ' +
-      'The watch also follows single chats started in the panel without a group (the ' +
-      '“Watch single chats too” switch, on by default): the rules that fit one ' +
-      'conversation apply there — no stages, no plan, no own copy. A signal shows as a ' +
-      'chip on the chat row and a “Chat watch” island above its feed; only an alarm goes ' +
-      'out. Two different loops in one turn — a check repeated without an edit, polling ' +
-      'with sleep, heavy group checks, failures in a row — mean the turn burns the window ' +
-      'for nothing: the newer of them becomes an alarm at once. The panel’s own journals ' +
-      'count too: a group’s edit holds a pending restart of the panel server (with the ' +
-      'minutes it has already waited: while it waits, the panel runs old code); the server ' +
-      'already restarted because of a group’s edits — for half an hour the note names its ' +
-      'files, the minutes of waiting and how many other live groups were running at that ' +
-      'minute (the watch keeps group edits on disk, a restart does not wipe them); the server ' +
-      'restarted three times in an hour with a live group (only restarts since its start or ' +
-      'its pressed recheck and outside its pauses count — earlier ones and those during a pause ' +
-      'did not touch it); the check ledger in the group’s ' +
-      'copy does not work as promised (a green key run again, the ledger off, a result ' +
-      'that disagrees with the record); a group’s check went past the ledger — each one a ' +
-      'note. Subscription window: the five-hour or weekly window reached 80, 90 and 95 % — ' +
-      'a note with the level; the weekly forecast to the reset is above 90 %; a group run ' +
-      'moved the five-hour window by 5 % or the weekly one by 2 %, or ate more than 3 M ' +
-      'tokens — a “heavy run”. Every finished group run gets a “run summary” note: tokens, ' +
-      'minutes, the window shift and the share wasted, weighted by calls — repeats (a ' +
-      'check with no edit, a re-read, the same failure, a sleep poll), guard refusals and ' +
-      'rework: a run after a delivery reminder counts as rework in full. ' +
-      'Watch pause (the “Pause the group at the end of a turn” ' +
-      'switch, off by default): a spending-in-circles rule is burning (R4, R8, R11, R12, ' +
-      'R21, R24, R41, R42) — the next link is not started, the group pauses with a ' +
-      '“watch pause: R4” chip instead of “paused”. Work in the middle of a turn is not cut; ' +
-      'a group where a person has something to decide (D-n waiting) is not stopped; only a ' +
-      'person lifts the pause, with “Resume”. A group paused for more than an hour with ' +
-      'nothing to decide gets a reminder; after a watch pause, four times sooner and with ' +
-      'the rule. On the phone a group chat row carries one line with its most important ' +
-      'signal. Continue groups are read from the `cn` session document — each answer is a ' +
-      'separate run with its own file; denials, errors and timeouts count the same there. ' +
-      'Gemini CLI groups are read from the rows of the turn stream — the same rows the ' +
-      'panel builds the answer from: calls, hook and policy refusals, a tool outside the ' +
-      'set, errors and the turn’s spend. Gemini reports no window of a single request, ' +
-      'only the turn total, so window growth, cold cache and a new conversation over a ' +
-      'warm one (R19, R2, R34) stay silent for these groups; Gemini reports a non-zero ' +
-      'command exit with output as a success — only an exit code without output counts ' +
-      'as a failure. ' +
-      'OpenCode groups are read from the CLI’s session database (opencode.db), read-only, ' +
-      'including the write journal not yet merged into it: every model request is its own ' +
-      'call with its window, a subagent (the task tool) is a child session, and denials by ' +
-      'a person, a rule or a plugin count the same as for Claude. Without the node:sqlite ' +
-      'module in Node the group’s coverage honestly reads “text only”. ' +
-      'Groups of the other CLIs (Goose, Kimi Code, Cursor, Aider) are seen only by the start ' +
-      'and end of a turn: rules that need the transcript stay silent for them. Coverage ' +
-      'shows how a group is seen: when it is incomplete, a chip on the group card names the ' +
-      'missing sources; the watch card in settings counts live groups by source (stream, ' +
-      'transcript, text only) and lists the panel’s gaps (check ledger, dev-watch, limit ' +
-      'journal) with the rules that stay silent without them.',
-    cascadeOverlap: 'Branch overlap after the work',
+      'The panel’s group watch is gone: the core’s observer watches the steps and writes signals ' +
+      'into the task feed without calling a model. Every catalogued signal has a severity and an ' +
+      'action: “stop” takes the step down, the rest are only shown, and a signal never calls a ' +
+      'human by itself. The observer catches an idle or stuck step, wasted work (a failed check or ' +
+      'a refusal repeated, a file re-read, an oversized read, a polling loop) and integrity ' +
+      '(context growth, a rejected journal write, abandoned processes, the rate window). The ' +
+      'watch thresholds card is gone from the settings: the core observer has its own signal ' +
+      'catalog.',
+    cascadeOverlap: 'Foreign files: ownership instead of branch comparison',
     cascadeOverlapText:
-      'Triage splits the groups by ownership IN ADVANCE — and gets it wrong in ' +
-      'advance too: an agent edits a neighbouring file because otherwise nothing ' +
-      'builds. Finding that out at merge time is expensive, so the panel compares ' +
-      'the branches itself as soon as any group chain ends, and on the “Check ' +
-      'branches” button in the summary. One row is one file touched by more than ' +
-      'one group: the path on the left, the groups on the right. Red means the file ' +
-      'is OUTSIDE the group declared ownership — a boundary triage had agreed ' +
-      'otherwise. Two rightful owners of one file are not painted red: you will ' +
-      'still have to merge them, but nothing was violated. The merge order from the ' +
-      'triage waits is shown next to it. The section is always folded to its heading ' +
-      'with the number of files: the rows, the count of files outside ownership and ' +
-      'the merge order open on a click on the heading. “For you to do: N”, the ' +
-      'proposed tickets and “Inactive: N” are folded the same way, so the group ' +
-      'cards stay in view. The same count goes into the task as well: ' +
-      'a group branched from its predecessor’s branch receives the list of files ' +
-      'that predecessor touched — up to twenty names, the rest as a number. ' +
-      'A new overlap is announced once: a ' +
-      'recount after every chain does not repeat what was already said. While ' +
-      'groups work the count also repeats by itself — at most once every ten minutes ' +
-      'per split, by the commit the copy stands on rather than the branch name. It is ' +
-      'checked against the main branch too: if that rewrote the same file while the ' +
-      'group worked, the group gets a mark and the parent a note, once per set of ' +
-      'files. The panel does not rebuild a branch mid-work: catching up with main is ' +
-      'the job of the “delivery” link. A branch ' +
-      'that could not be read is named separately — “no overlap” in place of ' +
-      'something unread would be a lie. Before the first check the section says so.',
-    cascadePause: 'Stop the whole tree at once',
+      'The after-work branch comparison and the overlap section are gone. The core checks the ' +
+      'parts’ boundaries twice. Before launch the split check keeps two independent parts away ' +
+      'from one file. After every step the part’s changed files are compared with its paths: ' +
+      'going outside them raises an “ownership” signal in the timeline, and the part’s next ' +
+      'brief names those files (up to twenty names, then a count). The core does not roll the ' +
+      'edit back and does not stop the step: a neighbouring file is often edited because ' +
+      'nothing builds otherwise. Removing a file outside its own paths is blocked by the ' +
+      'publish readiness check.',
+    cascadePause: 'Stop an old tree at once',
     cascadePauseText:
-      'The same summary carries a “Stop all (N)” button. It stops every running run of ' +
-      'the tree — the children, their review and fix stages, clean-session continuations ' +
-      '— and remembers how to restart each one. It also stops groups idle between turns ' +
-      'that have a background task running, together with the processes of their copies: ' +
-      'such a group would otherwise wake by itself when the task ends. Processes are stopped ' +
-      'in the copies of every group of the tree, but only those agents started: your IDE and ' +
-      'your terminal on a copy are left alone. While the tree is paused the panel starts ' +
-      'nothing in it on its own: continuations (a group resumed after questions in text ' +
-      'too), stages and new children are queued. ' +
-      '“Resume all (N)” restarts the stopped runs in their own sessions (the agent keeps ' +
-      'its context and is only told it was interrupted and the last tool may not have run) ' +
-      'and releases the queue in order. Pressed on a child it stops the same whole tree: ' +
-      'stages are started from the top, so everything has to stand still. Paused chats ' +
-      'carry a “paused” chip in the summary and in the list. Anything you type into a ' +
-      'paused chat yourself is sent as usual — the pause mutes only the panel’s auto-starts. ' +
-      'The pause survives a panel restart. If the panel could not verify the process number of ' +
-      'some run at that moment, it leaves that process alone and says so: “Runs not stopped: N” ' +
-      '— such a run finishes its turn; stop it from its chat again. The group pause and “Cancel ' +
-      'plan” answer the same way.',
-    cascadeManual: 'Changing a group’s model',
-    cascadeManualText:
-      'Each group on the split card carries two dropdowns — model and depth. Your ' +
-      'choice beats the routing and works in both directions, haiku included, which ' +
-      'the panel never assigns on its own: you have seen that group’s tasks. The ' +
-      'ceiling still holds for you too. Next to them is the summary line: how many ' +
-      'chats will be created, how many runs start right now and how many there ' +
-      'will be in total with reviews and fixes — the price before the button.',
-    cascadeLimits: 'What the panel will never assign',
+      'The summary of an old split has a “Stop all (N)” button. It stops every running run of ' +
+      'the tree — the parent and all descendants — remembers how to restart each, and takes ' +
+      'their auto-approval off. While the tree stands, continuations in a clean session that ' +
+      'the panel would start on its own wait in a queue. “Resume all (N)” restarts what was ' +
+      'stopped in the same sessions with a note that the turn was interrupted, puts ' +
+      'auto-approval back and releases the queue in order. A message you type into a stopped ' +
+      'conversation goes out as usual. The pause survives a panel restart. The panel agent can ' +
+      'do the same.',
+    cascadeLimits: 'What the core never picks by itself',
     cascadeLimitsText:
-      'Depth max — to nobody, under any ceiling: that level is for your own ' +
-      'decision, not for a fan of automatically created chats. And no outdated ' +
-      'model: only levels can be assigned (haiku, sonnet, opus, fable), and the ' +
-      'panel itself expands a level into a concrete name — the newest of that ' +
-      'family in the model catalog. This used to be left to the CLI, but there ' +
-      '“sonnet”, for one, means not “the current Sonnet” but “the recommended one”, ' +
-      'so lowering the rank quietly took a group to the previous generation. A ' +
-      'concrete name from the agent’s answer is not accepted at all — otherwise the ' +
-      'first model to “remember” last year’s version would take a whole group there.',
-    cascadeForeign: 'Other CLIs: codex and gemini only, and downward only',
+      'The max effort — never: only your override gives it, and a max picked by the core is ' +
+      'replaced by the highest allowed rung, no higher than xhigh. A reviewer weaker than the ' +
+      'author: the review’s model and effort are raised to the author’s, and a route that does ' +
+      'not allow the author’s model refuses the step with the reason; your override below the ' +
+      'author goes through, with a warning. The core never lowers a reviewer at all. A route ' +
+      'outside the task’s allowed set never reaches a step, even if the scenario names it.',
+    cascadeForeign: 'Other CLIs',
     cascadeForeignText:
-      'When the active provider is not Claude, the conversation has no ceiling at ' +
-      'all: the panel knows neither the model configured in that CLI nor what your ' +
-      'plan allows. So it only LOWERS, and only where passing a model is ' +
-      'documented: Codex gets `-m` plus a reasoning level, Gemini gets `-m` (it has ' +
-      'no depth analogue). Mechanical work runs on the lower model of the line, ' +
-      'plain implementation and tests on the higher one; for architecture, ' +
-      'investigation and review the panel passes nothing, so they run on whatever ' +
-      'you configured. The other CLIs have no model routing on purpose: for Qwen ' +
-      '“newest in the family” may mean a different tier, for OpenCode choosing a ' +
-      'tier would choose a vendor for you, Kimi’s `-m` takes a name from your own ' +
-      'model table, and Aider, Goose and Continue are shells over any model at all. ' +
-      'The chosen model is shown in the conversation header and applies to every ' +
-      'message in it, not just the first. The levels — one triage for the whole ' +
-      'split and a plan per group — run here as well: for a foreign CLI the ' +
-      'ceiling means a run WITHOUT the chosen tier, that is, the model it would ' +
-      'have used without the panel. Triage reads the repository at its root and ' +
-      'edits nothing, the plan runs in the group’s own worktree, and the work ' +
-      'starts after it on the chosen tier carrying the plan in full. No level ' +
-      'blocks: if the block is missing or the run failed, the group goes as ' +
-      'before and a line in its feed says what did not come through. ' +
-      'The work → review → fixes pipeline runs ' +
-      'here too, but the reviewer is the CLI itself: the panel starts the check ' +
-      'WITHOUT the chosen tier, that is, on the model the work would have run on ' +
-      'without the panel at all. The links show up in the provider’s conversation ' +
-      'list as “‹group› · ревью” and “‹group› · правки”, and the parent’s feed ' +
-      'carries the same group summary as Claude’s: branch, stages passed in order ' +
-      'and whether a run is going. The panel keeps links for other CLIs too — ' +
-      'under a key prefixed with the provider (`codex:…`), so a foreign ' +
-      'conversation’s address never collides with a Claude session. A group row ' +
-      'opens its conversation right here: a foreign chat has no worktree tabs. The same ' +
-      'summary compares the groups’ branches (“Сверить ветки”): the count is the same as ' +
-      'Claude’s and runs by itself when a group’s chain ends — red marks only a file ' +
-      'outside the declared ownership, and a new overlap is stated as a line in the ' +
-      'parent’s own feed. The whole ' +
-      'tree is stopped and resumed from there too (“Остановить всё” / “Продолжить всё”): ' +
-      'the pause lives on the server and mutes auto-starts, so a stage created while it ' +
-      'holds waits in the queue. One difference is stated on the button itself: a stopped ' +
-      'turn of a foreign CLI does not keep its session, so continuing means asking the same thing again rather than ' +
-      'returning to the same place. Clean-session continuation follows from that: ' +
-      'with a foreign CLI the panel reads “restart the session” in the tail of an ' +
-      'answer just as it reads the block (for a group too), and opens a ' +
-      'NEW conversation in the same ' +
-      'directory — with the checkpoint file and the original task of the whole run. ' +
-      'The limits are Claude’s: eight continuations in a row, a stop when the ' +
-      'checkpoint file has not changed, no continuation after a failed run; the ' +
-      'notice in the feed names both the step number and the reason for a refusal. ' +
-      'The “Перезапустить” button in the header does the same on your word: a fresh ' +
-      'checkpoint starts the continuation at once, a stale one asks the agent to write ' +
-      'it and the panel carries the end of that turn through to the continuation.',
-    cascadeOff: 'How to turn it off',
-    cascadeOffText:
-      'Chat menu (the “···” button in the header) → “Match the model to the task”. ' +
-      'The setting is remembered per PROJECT, not per conversation, and it is on by ' +
-      'default. Turn it off and every child of a split runs on the model you chose, ' +
-      'with no kinds and no additions to the task: exactly how the panel worked ' +
-      'before routing existed.',
+      'The same rules hold for any CLI the core runs a step with. The core can lower the model ' +
+      'and raise the effort only where its adapter has a model ladder — Claude and Qwen Code. ' +
+      'Other CLIs run on the chosen model or the CLI’s default. A new conversation with ' +
+      'another CLI starts in “Core chat” (see “What moved to the task core” above).',
     cascadeNote:
-      'The panel has to recognise the ceiling, or there is no routing at all: an ' +
-      'unfamiliar vendor or model name and everything runs at the ceiling, as ' +
-      'before. The same holds for a ceiling weaker than opus: there is nothing to ' +
-      'save there, and the risk remains.',
+      'Old conversations with split stages — “triage”, “plan”, “review”, “fixes”, “delivery” — ' +
+      'open and are labelled in the chat list as before, but the panel starts no stage on its ' +
+      'own any more.',
 
     handoffTitle: 'Continuing in a clean session: the stage closes, the context stays behind',
     handoffCaption:
@@ -2847,7 +1261,7 @@ export const chatEn: typeof chatRu = {
       'look in the morning. Every continuation gets the original task of the whole ' +
       'job along with the checkpoint — in full; a task longer than 200,000 characters is ' +
       'cut with a visible label, never silently — so the third session in a row still knows ' +
-      'the bounds of its group. A conversation continues at most eight times in a ' +
+      'the bounds of its work. A conversation continues at most eight times in a ' +
       'row (review and fix stages do not count), and if the checkpoint is word for ' +
       'word the same as at the previous move — or as when this work was carried to ' +
       'another CLI on the "Environment passport" page, the memory here is one — the ' +
@@ -2856,32 +1270,13 @@ export const chatEn: typeof chatRu = {
       'run failed, the checkpoint was not updated or did not change, the chain ran ' +
       'out. Turn it off per conversation with the toggle, or everywhere in Settings ' +
       '→ “Continue on its own in every conversation”; one switched off by hand ' +
-      'stays off. Neither of them waives the safeguards. A split group has its own ' +
-      'order: its continuation (except for plan and triage) the panel carries out ' +
-      'without the toggle — a group has no human — its cap is three continuations, and ' +
-      'the task in the continuation prompt is a boundary for it rather than a guide. ' +
-      'Past the cap the turn ends, and the pipeline takes the group from there. ' +
-      'A group does not always get a new session either: a proposal in words (“/clear”, ' +
-      '“restart the session”) always continues THE SAME session for a group, and a ' +
-      'block leads to a clean session only once the last turn’s window has reached ' +
-      '60 % of the compact window (the window comes from the Claude Code settings or ' +
-      'the group threshold in “Settings” → “Groups”). Below that it is the ' +
-      'same session too, with a “continue here, the CLI compacts the context itself” ' +
-      'task, and a line in the feed says so: a new session would re-read everything ' +
-      'this one already holds. ' +
-      'The window threshold from the settings — the human’s reason, not the agent’s — ' +
-      'always leads a group to a clean session: in the same one the window would not ' +
-      'shrink, and the threshold would fire on every turn up to the chain cap. ' +
-      'For a group on a foreign CLI both a block and words still lead to a new ' +
-      'conversation: that CLI gives the panel neither the window size nor a session ' +
-      'to continue. ' +
+      'stays off. Neither of them waives the safeguards. ' +
       'Work the agent itself marked closed and verified (“nothing to continue”) is not ' +
-      'continued by the panel at all — neither in a chat nor in a group: a new session ' +
+      'continued by the panel at all: a new session ' +
       'would only read the checkpoint file and say everything is done. The card stays, ' +
       'and the button still continues it. If a Stop hook returned a remark to the agent ' +
       'after its summary, the panel judges the summary together with the reply to the ' +
-      'remark, not the reply alone. The next group stage gets the summary before the ' +
-      'first remark as the previous outcome, not the reply to it.',
+      'remark, not the reply alone.',
     handoffTidy: 'Tidying the working files — half the point',
     handoffTidyText:
       'A clean session reads exactly the checkpoint file (.agent/PROGRESS.md by ' +
@@ -2909,140 +1304,88 @@ export const chatEn: typeof chatRu = {
       'A chain nobody came back to for a day is forgotten. The “every ' +
       'conversation” setting is the toggle’s default value, not an order.',
 
-    autonomyTitle: 'Chat group and autonomy',
-    autonomyCaption:
-      'Every conversation has its own group (a set of rules and skills) and its own ' +
-      'autonomy. Split children take both from the parent until they are given their own.',
-    autonomyMenu: 'Where to change it',
-    autonomyMenuText:
-      'The “Chat settings” menu → “Group and autonomy”. “Group” is the group switched ' +
-      'on for this chat’s runs: “Auto” leaves the choice to task triage, a specific ' +
-      'group is switched on when any run starts — split children and conveyor ' +
-      'stages included — and switches nothing else off. Project ' +
-      'groups show only in a chat of their own project. Under a child’s field it ' +
-      'says “from parent: …” while the value is inherited; a click in the child ' +
-      'changes only its own field, and “Same as parent” brings inheritance back. ' +
-      'For a group pair the menu offers only the side active in the project; the server ' +
-      'refuses the inactive side too (409) and says where to switch the pair side. A branch ' +
-      'made by editing a message takes the group and autonomy along. Switched autonomy while ' +
-      'the agent’s background commands are running? The process is not restarted so they are ' +
-      'not killed: the feed says how many are still running, and the new marker takes effect ' +
-      'once they finish. In a Qwen Code or Codex chat the “Group” field sits right in the ' +
-      'conversation header: the chosen group rides to the CLI as a layer on every answer, ' +
-      'the Claude files do not change, and “Auto” takes those bound to the project and ' +
-      'switched on for this CLI. Other CLIs have no group layer — and no field either.',
-    autonomyPick: 'An automatic pick instead of a question',
-    autonomyPickText:
-      'With “Autonomous — pick the recommended option” on (the default), an agent ' +
-      'question with a recommended option does not wait for you: that option is ' +
-      'taken, and a muted “Auto-pick: …” line stays where the question card would ' +
-      'be. Recommended means marked “(Recommended)” or “рекомендую” in the label or ' +
-      'the description, with no negation next to it. A run with full access, where ' +
-      'the question never passes through the panel, makes the same pick. ' +
-      'The line cannot be clicked — the answer has already gone; if you disagree, tell ' +
-      'the agent in an ordinary message. A question without a recommended option ' +
-      'waits for you as usual, and so does an option nobody but you can carry out ' +
-      '(“I’ll sign in myself”, “session refreshed — continue”), even when recommended — except in a split group under “Group decision ' +
-      'points: by the plan”, where every question is answered. The switch takes ' +
-      'effect from the next turn: the CLI ' +
-      'process restarts with the new value.',
-    autonomyEscalation: 'Critical goes to the main chat',
-    autonomyEscalationText:
-      'A group that runs into something it must not decide without a human writes ' +
-      'it in a special block; its own feed hides the block, and the MAIN chat of the ' +
-      'tree shows a “Critical from group …” card with an “Open the group chat” ' +
-      'button. The card also appears when autonomy picked for you in a question ' +
-      'marked critical. The main chat carries a “! N” mark in the list on the left — ' +
-      'the number of unread notes. Opening the chat is not reading it: the card and ' +
-      'the mark stay until you press “Mark as read”.',
-    autonomyWhere: 'Where it is kept',
-    autonomyWhereText:
-      'In the panel’s state, per conversation: split children’s runs are started by ' +
-      'the panel itself, with no browser tab, and a choice kept only in the browser ' +
-      'would never reach them. Claude Code’s files are not changed; switching a group ' +
-      'on is the same write the Groups section makes.',
-    autonomyNote:
-      'Autonomy answers only questions with an explicitly recommended option and ' +
-      'never approves actions for you: permission cards still wait for you or for ' +
-      'the “Approve without asking” rules, and without you they move to “Awaiting decision”.',
+    coreMovedTitle: 'What moved to the task core',
+    coreMovedCaption:
+      'Splitting, group trees, autonomy and the chat of other CLIs no longer live in the panel chat: the ' +
+      'task core runs them. Here: where each one is now and what the core does not have.',
+    coreMovedSplit: '«Split» and group trees',
+    coreMovedSplitText:
+      'The «Split tasks» button and the buttons on the proposal card are gone from the chat; the chat starts ' +
+      'no new trees or parent summaries, and old splits keep their summary read-only (section below). ' +
+      'Work in parts is a core task: the «Core tasks» section, launch with an estimate, a task feed with ' +
+      'the «why». Answers to MR comments, part boundaries and the tracker status are steps and checks of ' +
+      'the core scenario, not chat buttons.',
+    coreMovedAutonomy: 'Autonomy and permissions',
+    coreMovedAutonomyText:
+      'The chat menu has no «Autonomous — pick the recommended» item. The chat runs right in the project ' +
+      'folder, and starting the chat is your edit grant for that root; outside it the core refuses. The core ' +
+      'writes a permission question to the task journal, the panel shows a card; the «Permissions» toggle ' +
+      'in the chat menu, when on, removes such questions with an edit grant the window gives the core itself.',
+    coreMovedWatch: 'Group watcher and verify ledger',
+    coreMovedWatchText:
+      'Group signals and narrowing of repeated runs are done by the core: the observer writes signals to the ' +
+      'task feed, the verifier decides which checks to repeat. The chat card no longer shows them.',
+    coreMovedContinue: 'Continuing after a long pause',
+    coreMovedContinueText:
+      'A new conversation with a brief after a long pause and the «warm cache» ping left the chat. Whether ' +
+      'to continue the session or start a new one with a brief is decided by the core from the cache age.',
+    coreMovedForeign: 'Chat of other CLIs',
+    coreMovedForeignText:
+      'A new conversation with Codex, Qwen, Gemini and other CLIs starts in the «Core chat». Old ' +
+      'conversations in the «Providers» section open read-only: rename and delete work, sending does not; ' +
+      '«Continue in the core chat» opens a new core chat in the same folder. The core does not continue an ' +
+      'old panel conversation: the panel held its history, and the core continues only a conversation whose ' +
+      'transcript the CLI itself confirmed. On the phone these conversations are read-only too.',
+    coreMovedRefused: 'What the core does not have for the chat',
+    coreMovedRefusedText:
+      'Three turns are refused by name instead of being lost silently: editing a sent message with a fork ' +
+      '(the claude adapter has no --fork-session), the one-off warm cache ping, and a turn the CLI started ' +
+      'itself, since the core session host holds the CLI, not the panel.',
+    coreMovedNote:
+      'The old routes for sending to another CLI conversation answer with the «provider-chat-core» refusal ' +
+      'and its reason: an old phone build shows the explanation, not an empty screen.',
 
-    deferredTitle: 'Awaiting decision: calls an agent set aside',
+    deferredTitle: 'Awaiting decision: former D-n calls',
     deferredCaption:
-      'A call only a human decides does not hold the work: the agent puts it on a list under ' +
-      'a number D-n and does everything that does not depend on it. The answer resumes the ' +
-      'work with exactly that call.',
-    deferredWhen: 'When a call becomes D-n',
+      'The D-n list is left over from the panel before the core: back then an agent set a ' +
+      'call only a human decides aside under a number D-n and kept working. No new items ' +
+      'appear any more. Old ones stay visible until they expire, and a decision on them is ' +
+      'only recorded — it does not resume any work.',
+    deferredWhen: 'Where new questions went',
     deferredWhenText:
-      'A split group — at once: a group has no card, nobody is at its screen. An autonomous ' +
-      'chat nobody opened in a tab or on the phone — at once too. A chat you are watching ' +
-      'first shows the usual “Allow / Deny” card; not answered within «Minutes before an ' +
-      'unanswered permission card moves to «Awaiting decision»» («Settings» → «Models», 10 ' +
-      'minutes by default, 0 — the card waits as long as it takes), the card turns into a ' +
-      '“Deferred as D-n — the agent keeps working” line, and answering it decides the same ' +
-      'item. An MR merge and a push to the main or a protected branch are not deferred at ' +
-      'all: the agent gets the refusal “the owner merges; push your own branch and deliver ' +
-      'the MR” at once. A push whose target the panel cannot prove (a branch in a variable, ' +
-      '--all, a pattern) is refused the same way, asking for the branch to be named ' +
-      'explicitly.',
+      'A chat turn runs as a core task, and its permission question is not set aside: the ' +
+      '«Core question» card stays in the chat window and the step waits for the answer (above, ' +
+      'and the «Permissions» document). Telegram only reports such a question. The agent does ' +
+      'not push, open MRs or write to the forge itself: only the core publishes, and it ' +
+      'refuses such an agent command.',
     deferredList: 'Where you see them',
     deferredListText:
-      'Above every panel page — an “Awaiting decision (N)” plate with a hint and a “Show” ' +
-      'button: the list of everything waiting, filterable by group or chat — the number, ' +
-      'project, group or chat, the reason (“The group’s permission rows send this call to ' +
-      'a human”, “The call is not covered by the auto-approve rules”, “An edit in the main ' +
-      'copy of the project: you decide where it writes”, “Backend guard: …”), the command ' +
-      'itself (for an edit in the main copy — “What gets written”) and the time. When the agent repeats the same call there is no new item; the ' +
-      'old one shows “the agent repeated the call N times”. The parent’s group summary has ' +
-      'an “Awaiting decision in groups (N)” block, and a group with no other work left is ' +
-      'marked “awaiting decision: D-n”: groups that depend on it do not start until you ' +
-      'decide. On the phone waiting items come first in “Questions”, and with Telegram ' +
-      'answers on, a D-n reaches Telegram at once (the “Integrations” document).',
+      'While old items exist, every panel page has an “Awaiting decision (N)” plate with a ' +
+      'hint and a “Show” button: the list of waiting items, filterable by group or chat — the ' +
+      'number, project, group or chat, the reason (“The group’s permission rows send this ' +
+      'call to a human”, “The call is not covered by the auto-approve rules”, “An edit in the ' +
+      'main copy of the project: you decide where it writes”, “Backend guard: …”), the ' +
+      'command itself and the time. On the phone waiting items come first in “Questions”, ' +
+      'and with Telegram answers on an item reaches Telegram too (the “Integrations” document).',
     deferredDecide: 'The decision',
     deferredDecideText:
-      '“Allow” issues a one-time permission for exactly this call with the same arguments — ' +
-      'for two hours and one execution — and the panel resumes the conversation: at once, ' +
-      'after the tree pause, or when the running turn ends, and with nothing to resume the ' +
-      'agent sees the answer at its next call; the line under the button says which. “Deny” hands the agent a refusal, and a repeated call gets the same answer. ' +
-      '“Open chat” goes to the conversation the call came from. Only a human answers: an ' +
-      'agent call that reaches the panel’s decision endpoints, the phone signing mode or ' +
-      'its key is refused before every rule — an agent cannot decide its own D-n. One ' +
-      'exception: a group’s waiting process kill is judged again by today’s rules when ' +
-      'the panel restarts — its own process is allowed, another’s or an unnamed one is ' +
-      'refused with the reason — and the record is closed; the agent hears that the panel ' +
-      'decided, not you. With “decisions only with the phone’s signature” on (the ' +
+      '“Allow” and “Deny” record the decision in the item — and nothing more: the conversation ' +
+      'the call came from is not resumed and nothing reaches the agent — the panel no longer ' +
+      'runs the session that waited for the answer. If the work is still needed, open the ' +
+      'conversation with “Open chat” and ask in words; the turn runs as a core task. Only a ' +
+      'human answers: an agent call that reaches the panel’s decision endpoints, the phone ' +
+      'signing mode or its key is refused before every rule. With “decisions only with the phone’s signature” on (the ' +
       '“Phone” document), “Allow” is accepted only from a paired phone, while “Deny” ' +
       'works from anywhere.',
     deferredLimits: 'Lifetime and limits',
     deferredLimitsText:
       'An item waits «Days a D-n ask waits for an answer» (7 by default, up to ' +
-      '90), then expires; an expired one keeps “Allow again”, which issues the permission ' +
-      'anew; the same call made again after expiry reopens the old number rather than a new ' +
-      'one. When a group’s item expires and nothing of the group waits any more, the panel ' +
-      'continues the group (unless you paused it): the agent finishes without that call and ' +
-      'names what stays blocked in the MR description. A continuation after a decision ' +
-      'tells the stage that owns the MR to take it out of draft once no item waits; a review ' +
-      'stage with delivery ahead is told to finish its stage and name what stays blocked in ' +
-      'its report. The word goes to the group’s current conversation, and while the ' +
-      'conversation still runs background subagents it waits for them to finish instead of ' +
-      'restarting the process. An item whose stage has already ended, or whose folder is ' +
-      'gone, is refused by the panel itself with the reason. Several outcomes at ' +
-      'once (three refusals, three expiries, an allow and a refusal) reach the group as one ' +
-      'continuation naming every number. A pause or a panel restart does not lose the word: ' +
-      'after “Resume” or once the panel is back up, the group still learns how its D-n ' +
-      'ended. The same call repeated by the agent within one reply is one call: answering ' +
-      'one of its cards closes the other too, and it does not run twice. Cancelling the ' +
-      'plan withdraws the waiting items of all its groups, and “Remove” on a group withdraws ' +
-      'that group’s items: a withdrawn item cannot be allowed, an unused grant is gone, no ' +
-      'D-n word wakes the closed group, and the Telegram message is closed as “⌛ Уже не ' +
-      'актуально” (no longer relevant). The withdrawal survives a panel restart. Decided items ' +
-      'stay visible for a day. The list lives in the panel’s data directory and survives a ' +
-      'panel restart. While at least one D-n of a group waits, its MR stays a draft: the ' +
-      'panel refuses a call that takes the draft off. A commit or an MR whose text names a ' +
-      'D-n of its own is refused too: published text describes the change only.',
+      '90), then expires. Decided items stay visible for a day. The list lives in the panel’s ' +
+      'data directory and survives a panel restart; an item left by an earlier panel version ' +
+      'is decided the same way — the decision is recorded and starts nothing.',
     deferredNote:
-      'A D-n is not a default permission: nothing runs until you press “Allow”. The agent ' +
-      'gets the number in the refusal with an instruction not to work around the call with ' +
-      'another command; a workaround is caught by the group watcher.',
+      'A D-n is neither a default permission nor a work queue: neither “Allow” nor “Deny” runs ' +
+      'anything.',
 
     codeTitle: 'Project code: what the agent changed, and editing on the spot',
     codeCaption:
@@ -3234,17 +1577,20 @@ export const chatEn: typeof chatRu = {
       'model choice. Handy for sweeps like “check every repository for X”.',
     panelParallelModel: 'The fan-out model is chosen in the window itself',
     panelParallelModelText:
-      'Next to the task sits the same model + effort pair as on the split card, with ' +
-      'no rung above the model of the conversation itself. It defaults to that pair, ' +
+      'Next to the task sits a model + effort pair with no rung above the model of ' +
+      'the conversation itself. It defaults to that pair, ' +
       'and lowering it is a deliberate act: five agents starting at once at the ' +
       'ceiling eat the rate window faster than anything else the panel does, while ' +
       'fan-out work is usually the same and well understood. One rung covers the ' +
       'whole launch — different models per project would give different results for ' +
-      'one and the same task. Lowering is paid for with a delivery bar: the task ' +
+      'one and the same task. A rung like “Sonnet” is expanded by the panel into the newest ' +
+      'model of that family in the catalog: at the CLI such an alias leads to the recommended ' +
+      'model, not the latest one. Lowering is paid for with a delivery bar: the task ' +
       'gains the duty to run the project checks, verify the result point by point ' +
       'and stop when the work turns out to be of another class. No review at the ' +
-      'ceiling is started here — the stage pipeline only runs for split children, in ' +
-      'their own copy of the branch, and promising it to the fan-out would be a lie.',
+      'ceiling is started here — review and delivery steps exist only for core ' +
+      'tasks, the fan-out starts plain conversations, and promising review to it ' +
+      'would be a lie.',
     panelParallelCost: 'From the third agent the window names the price',
     panelParallelCostText:
       'Pick three projects or more and leave the ceiling in place — a warning appears ' +
@@ -3263,7 +1609,7 @@ export const chatEn: typeof chatRu = {
     panelParallelTree: 'What you launch becomes a tree, not tabs',
     panelParallelTreeText:
       'The launched agents’ conversations hang as branches under the chat they were ' +
-      'started from — exactly as with task splitting. No separate project tabs ' +
+      'started from. No separate project tabs ' +
       'appear: three ticked projects used to mean three tabs, while an agent’s ' +
       'question or permission request lived only in ITS OWN, which from the outside ' +
       'looked like a stalled run. Now everything the agent is stuck on shows up in ' +
@@ -3289,7 +1635,9 @@ export const chatEn: typeof chatRu = {
       'a screenshot without a name becomes a pasted-<date>-<time>.png chip, and ' +
       'clipboard text is pasted as usual. Up to 20 MB per file; images, PDF, ' +
       'markdown, text, tables, code. The file is stored in a panel folder, and ' +
-      'Claude gets the path and reads it from disk itself. An unsuitable file is ' +
+      'the turn carries it to the task core: the core puts a copy into the task ' +
+      'attachments folder, Claude gets the path of that copy and reads it from disk itself — ' +
+      'the core session does not read the panel folder. An unsuitable file is ' +
       'refused right away, at attach time, and never becomes a chip: a type the ' +
       'panel does not pass (an .exe, say) gets a message listing the allowed ' +
       'extensions; a file over the limit gets a message with its size next to the ' +
@@ -3302,15 +1650,13 @@ export const chatEn: typeof chatRu = {
       'editor” chip — not about the conversation, it just opens the project.',
     composerStop: 'Stop',
     composerStopText:
-      'While an answer is streaming, “Stop” sits next to send (in another CLI’s chat — in ' +
-      'the conversation header). Sending is not locked meanwhile: Claude gets the message ' +
-      'mid-turn. So do Codex, Qwen, Goose, Kimi Code and OpenCode: the field reads “the CLI gets it ' +
-      'mid-answer”, the button “Pass on”, and in the feed the message is marked ' +
-      '“mid-answer” and is covered by the same answer. Other CLIs (and a CLI whose server ' +
-      'mode did not start) get it as a queue that goes out by itself as soon as the ' +
-      'answer ends; a queued message can be removed with the cross on its bubble. If the ' +
-      'answer was stopped or the panel restarted, the queue does not go out by itself: it is ' +
-      'kept, the bubble reads “Waiting to be sent”, and its “Send” button sends it.',
+      'While an answer is streaming, “Stop” sits next to send: it cancels the core task ' +
+      'running the turn, and the next message starts a new one that continues the ' +
+      'conversation. Sending is not locked meanwhile: a message written during the answer ' +
+      'is handed by the core to the same step at the nearest turn boundary — the same for ' +
+      'Claude and for Codex, Qwen, Goose, Kimi Code and OpenCode. “Stop” stays until the turn ' +
+      'has answered the added message too: the reply to it comes in the same turn. Old conversations of other ' +
+      'CLIs, open read-only, have neither sending nor a queue.',
 
     editsTitle: 'Edit mode: what the agent may change',
     editsCaption:
@@ -3339,109 +1685,30 @@ export const chatEn: typeof chatRu = {
       'and it opens on “edits allowed”, the same as a normal chat.',
     editsForeignTitle: 'Edits in another CLI’s chat',
     editsForeignText:
-      'Codex, Qwen, Goose, Kimi Code and OpenCode have their own switch in the conversation header: ' +
-      '«Ask before edits» (the default) or «Edits without asking». While it is off, every ' +
-      'request from the CLI to change something — a command, a file edit — arrives in the ' +
-      'feed as the same «Allow / Deny» card Claude uses, plus a phone notification; the ' +
-      'card survives leaving the page and F5. «Deny» reaches the CLI as a refusal, and ' +
-      '«Stop» or the end of the reply declines everything still waiting. With the switch ' +
-      'on, the panel answers «yes» to file edits itself, while shell commands from Codex, ' +
-      'Qwen, Goose and OpenCode pass the same boundary as Claude with «Permissions auto»: ' +
-      'reversible work (a build, a commit, a push of your own branch) goes through, while ' +
-      'deleting a branch or tag, a merge and a command matched by the CLI’s own «ask» rule ' +
-      '(Qwen permissions.ask, OpenCode permission.bash) arrive as a card. A command the CLI ' +
-      'runs in PowerShell is read as PowerShell; when the CLI does not name its shell (Qwen ' +
-      'and Goose on Windows), the command is judged both as Bash and as PowerShell and the ' +
-      'stricter answer wins. In a split group the rows of the «Groups» tab decide a foreign ' +
-      'CLI’s commands, as they do for a Claude group: a push to main and a merge are refused ' +
-      'with the reason, and whatever the human decides becomes a D-n item in the decision ' +
-      'list; the group keeps working, and «Allow» on the item lets exactly that call through ' +
-      'once. The model gets the panel’s refusal with its reason — inserted into the running ' +
-      'answer before the CLI hears «no» (OpenCode: in the refusal itself) — and does not ' +
-      'retry the same command blindly; the conversation keeps a note «The panel refused the ' +
-      'command … The agent was told: …». A foreign CLI group may stop a process itself by the ' +
-      'same rules as a Claude group: its own is a descendant of the CLI process (the panel ' +
-      'knows its number for Codex and Qwen) or a process carrying the group mark in its ' +
-      'environment; someone else’s or an unnamed one is refused to the agent with the reason, ' +
-      'no D-n item. A Codex or Qwen group also deletes its own copy of a file in the temp ' +
-      'folder itself, as a Claude group does: the panel recognises it by the kit’s session ' +
-      'log, where an earlier finished call of the same session made that copy; a glob delete ' +
-      'or someone else’s file becomes a D-n item. So that commands reach this boundary, Codex on Linux and macOS asks about every ' +
-      'command (untrusted) in the same workspace-write sandbox when the switch is on, and ' +
-      'Goose is moved to approve. Kimi Code with the switch on still answers «yes» to ' +
-      'everything. The position ' +
-      'is stored in the conversation; cascade stages, a clean session and parallel-launch ' +
-      'tasks take it from the conversation they started from, while task triage and ' +
-      'review by link run with edits allowed, as with Claude. If the server mode did not ' +
-      'come up and the reply goes through a one-shot run, nobody can be asked midway: ' +
-      'there the switch being off means «no edits» (Codex read-only, Qwen default mode, ' +
-      'Goose chat mode: tools are not run, the reply still arrives). Goose’s default auto ' +
-      'mode never asks at all, so with the switch off the panel moves its session to ' +
-      'approve for the length of the reply — your config.yaml is not changed. Gemini CLI, ' +
-      'Continue and Aider only answer through a one-shot run, with nobody to ask midway, so ' +
-      'there the switch being off reads «Edits blocked»: Gemini default mode, Continue ' +
-      'without its write and command tools, Aider a dry run (edits shown, not written). ' +
-      'Where the switch does not reach the CLI at all, a note stands in its place: the CLI ' +
-      'decides on edits itself, by its own settings. The phone has no switch — a line above ' +
-      'the conversation feed says what the CLI will do with a request to write.',
+      'A new conversation with Codex, Qwen, Goose, Kimi Code or OpenCode runs as a core task ' +
+      '(the «Chat through the core» form), and its header has no edits switch. A launch from ' +
+      'the chat is itself the right to edit inside the project folder: there the CLI writes ' +
+      'without asking. A request outside it arrives as a core question card: grant the right ' +
+      '(project, paths, actions) or refuse; the card lives in the task journal and survives ' +
+      'leaving the page and F5. A CLI the core has no adapter for gets the core’s refusal ' +
+      'with its code — there is no silent fallback to the old runner. Old conversations of ' +
+      'these CLIs open read-only: you can rename or delete them, and «Continue in the core ' +
+      'chat» opens a new core chat in the same folder.',
 
     autoApproveTitle: 'Auto-approving permissions',
     autoApproveText:
-      'The «Permissions auto» toggle lives in the «Chat settings» menu on the right ' +
-      'of the header, and it is ON by default. It takes the routine ' +
-      'away: a reversible request is approved by the panel itself, and no ' +
-      '«Allow/Deny» card appears. Reading files is always allowed, whatever this ' +
-      'toggle says: opening a file, searching the code and listing a directory ' +
-      'leave nothing to undo, while a card on every file the agent opened stalled ' +
-      'runs more often than everything else combined. For the rest of the tools ' +
-      'the border is irreversibility, not «writing»: a ' +
-      'commit, a push, a branch, moving a file, restarting a process and an API ' +
-      'call go to the agent, because there is something to undo them with. What ' +
-      'still asks is what leaves nothing to roll back to: deleting files (rm, ' +
-      'Remove-Item), wiping work and history (git reset --hard, clean, restore, ' +
-      'a force push beyond a lease, deleting a branch, a tag or a stash entry), any git ' +
-      'merge, tearing down data (DROP, TRUNCATE, DELETE ' +
-      'FROM, rolling migrations back), tearing down containers and infrastructure ' +
-      '(docker rm and prune, kubectl delete, helm uninstall, terraform destroy), ' +
-      'publishing to someone else’s registry (npm publish), deleting and merging ' +
-      'on a repository host, running downloaded code (curl … | bash), shutting the ' +
-      'machine down — and deleting MCP calls. Push --force-with-lease is an ordinary ' +
-      'write: git itself refuses when someone else’s work appeared on the remote. Deleting ' +
-      'git data and merging ask whatever the toggle and the rules say, in the CLI’s auto ' +
-      'mode too: the panel takes such commands away from its classifier with its own ask ' +
-      'rules. PowerShell tool commands are judged by the same rules as Bash commands. ' +
-      'On top of that your own ask and deny rules from settings.json still ask: ' +
-      'where you wrote «ask me», the toggle does not decide for you. The reverse holds ' +
-      'too: a call you allowed yourself with an allow rule in settings.json is let through ' +
-      'by the CLI in the default and edit modes without asking the panel — there is no ' +
-      'card for it, even when it is irreversible. A card nobody decided the panel sets ' +
-      'aside as a D-n item after «Minutes before an unanswered permission card moves to ' +
-      '«Awaiting decision»» («Settings» → «Models», 10 minutes by default; 0 — the card ' +
-      'waits as long as it takes): the agent keeps working, and the call waits for you in ' +
-      'the “Awaiting decision” list. An autonomous chat nobody opened in a tab or on the ' +
-      'phone sets it aside at once, and a merge or a push to the main branch gets the ' +
-      'refusal “the owner merges” there. An unclear ' +
-      'case goes to a human too: a command the panel could not parse counts as ' +
-      'irreversible. With edits switched off, file edits stay yours even when ' +
-      'auto-approval is on. The toggle takes effect immediately, mid-run included, ' +
-      'its position is remembered, and split chats inherit it from the parent. ' +
-      'The border itself is not carved in stone: permission rules place it, see below.',
-
-    rulesTitle: 'Permission rules: what the panel approves itself',
-    rulesText:
-      'In the same «Chat settings» menu, below the toggles, sits a list of rules — ' +
-      'one per kind of action. A rule that is on the panel approves itself; a rule ' +
-      'that is off brings back the «Allow/Deny» card. Out of the box WRITES are ' +
-      'allowed (merge request comments and threads, Jira tickets, wiki pages, ' +
-      'commits, branches and a plain push), while TEARDOWN asks: deleting files, ' +
-      'wiping git history and force-pushing beyond a lease, tearing down database data, ' +
-      'containers and infrastructure, publishing packages, deleting and merging in ' +
-      'external services, running what was downloaded from the network. The rules ' +
-      'are shared: switched on in one project, they hold in every project and on ' +
-      'the phone — they live in the panel settings, not in a conversation. What ' +
-      'they do not override: your own ask and deny rules from settings.json (they ' +
-      'beat any rule you switch on), read-only mode, a question to a human, and deleting ' +
-      'git data and merging — those ask whatever the rules say.',
+      'The «Auto-approve permissions» toggle («Permissions auto» / «Permissions manual») ' +
+      'lives in the «Chat settings» menu on the right of the header, and it is ON by ' +
+      'default. A chat turn runs as a core task, and the core judges the step’s permissions: ' +
+      'whatever it does not forbid goes through with no card — exactly as it would outside ' +
+      'AgentDeck. The core forbids publishing by the agent (push, MRs, forge writes — only the ' +
+      'core publishes), the writing tools of your GitLab or GitHub MCP server, and an edit of ' +
+      'a path the task needs a grant for. The last one is the only question to a human, the ' +
+      '«Core question» card. The toggle on is an edit grant on the task’s whole repository, ' +
+      'which the window hands the core with its own command: no such questions, between turns ' +
+      'too. Off — every such path asks with a card, and Allow grants that path. The answer ' +
+      'goes to the core from the window itself or from a phone with a bound key: the panel ' +
+      'server may not answer for you. The toggle position is remembered per chat.',
 
     historyTitle: 'How a conversation continues',
     historyCaption:
@@ -3661,69 +1928,37 @@ export const chatEn: typeof chatRu = {
       'watches transcript files and reports changes, and the panel additionally asks ' +
       'for the fingerprint of the open conversation every few seconds — in case file ' +
       'watching is switched off in settings or the stream broke. No page reload needed.',
-    noteProviderTitle: 'Other providers have a chat of their own',
+    noteProviderTitle: 'Other providers: earlier conversations and the core chat',
     noteProviderText:
-      'With a non-Claude provider active, the Chat section shows its own chat: a list of ' +
-      'conversations, memory between questions, the reply as the CLI prints it, a working ' +
-      'directory and file attachments by path. Next to the conversations sits a Projects tab: ' +
+      'With a non-Claude provider active, the Chat section shows its conversations that the old ' +
+      'panel ran — read-only: they can be renamed and deleted but not sent to, and “Continue in ' +
+      'the core chat” opens a new core chat in the same folder. Next to them sits a Projects tab: ' +
       'every folder where any CLI has worked, Claude projects included, each with badges of who ' +
-      'worked in it and a "New conversation here" button that starts a conversation of the ' +
-      'ACTIVE provider in that folder. A folder that no longer exists on disk stays in the list ' +
-      'with the button disabled and the reason shown. The panel keeps the transcript there — these ' +
-      'CLIs have no readable history of their own — and the context of the next question is ' +
-      'assembled from it. Every answer carries its time: how long the run took and the sum ' +
-      'over the conversation. The panel measures it on its own process, so it is there for ' +
-      'every CLI — unlike spend, which not all of them report and never the same way. ' +
-      'What is missing: parsed steps and tools, cost, branching, voice and ' +
-      'parallel agents — all of that is read out of the claude streaming protocol, and no ' +
-      'other CLI publishes such a format. OpenCode holds a session (opencode serve) instead ' +
-      'of a run per question: the answer arrives in pieces as the model writes it, and a ' +
-      'failed turn shows the reason in OpenCode’s own words — for instance, that the named ' +
-      'model does not exist. OpenCode, Continue, Aider and Goose have been exercised live on a local ' +
-      'model: the answer is recorded and the second question remembers the first. Continue ' +
-      'hands over its answer whole once it finishes — it does not write it in pieces. The ' +
-      'Kimi Code chat is built from the docs and has not been exercised live. ' +
-      'Cursor has neither a non-interactive entry point nor a model API of its own.',
+      'worked in it and a “New conversation here” button that opens a core chat in that folder. ' +
+      'A folder that no longer exists on disk stays in the list with the button disabled and the ' +
+      'reason shown. A new conversation runs the same way as with Claude: as a core task, with the ' +
+      'panel layer and the contour route (step “Open the project and start a conversation” ' +
+      'above). What a CLI can do in a core turn is up to its adapter; a CLI without an adapter ' +
+      'gets a core refusal with a code (section “Edits in another CLI’s chat”).',
   },
   shots: {
     basics: {
       '01-project-empty':
-        'An empty conversation in the project folder: header, git strip and prompts at hand',
+        'A new project chat is a core task: folder from the open project, CLI, first message',
       '02-composer': 'A question with a file attached — the attachment shows as a chip',
       '03-answer': 'The answer as it is generated: thinking, tool calls, spend, text',
       '04-permission': 'The agent stands on a call and waits for a decision: deny or allow',
       '05-question': 'The agent asks: three questions in a row, the next opens after an answer',
       '06-branch': 'The git strip expanded: changed files, pull and push, branches and copies',
-      '07-menu': 'The conversation menu: permission toggles and the rules that skip the card',
-      '08-menu-actions': 'The bottom of the same menu: session restart, export, refresh, help',
+      '07-menu': 'The conversation menu: permission toggles and actions on the conversation',
       '09-agents': 'The agents panel: who is running, whose spend, and one stop button',
       '10-handoff': 'A stage is closed: an offer to continue in a clean session from a file',
-    },
-    split: {
-      '01-proposal': 'An offer to split: three groups, branches, kind of work and model',
-      '02-tree': 'After the split: links in the list on the left and the hub in the parent feed',
-      '03-hub': 'The hub: chain stages, model, time at work and the branch comparison button',
-      '04-child-ask': 'A group’s permission request in its card: stage, chat, Allow and Deny',
-      '04b-card-ask': 'The group agent’s question as a yellow island in its card: stage and chat',
-      '05-overlap': 'Branch overlap: a shared file and a file taken outside the group it owns',
-      '06-paused': 'The tree on pause: a mark on every group and the resume button',
-      '07-worktrees': 'Parallel copies of the repository: path, install trace and removal',
-      '08-move-tasks': 'Moving the group tasks in Jira: each status and the statuses all share',
-      '09-status-ask':
-        'The “Ask about the groups’ progress” field in the hub: the question goes to a light chat, not the parent',
-      '10-status-chat': 'A separate light chat answers from the groups’ summary',
-    },
-    autonomy: {
-      '01-escalation': 'The main chat: a critical card from a group and the button to it',
-      '02-auto-pick': 'The group’s feed: an “Auto-pick: …” line in place of the question',
-      '03-menu': 'The child’s menu: group and autonomy “from parent”',
     },
     agents: {
       '01-tree':
         'The agent’s plan: the main agent’s line and the subagent tree with skill, MCP and hook chips',
       '02-extensions':
         'The “Skills, hooks and MCP” window: agents on the left, the selected one’s runs in time order',
-      '03-group': 'A group card: chips for its agents and a line of chips for the whole group',
     },
     economy: {
       '01-where':
@@ -3735,19 +1970,12 @@ export const chatEn: typeof chatRu = {
       '01-banner':
         'The “Awaiting decision (3)” strip expanded: D-n items of two groups and a single ' +
         'chat, the owner filter, and the reason and answers on each',
-      '02-hub':
-        'The parent’s group summary: “Awaiting decision in groups” holds only this split’s calls',
-      '03-card':
-        'A permission card in a group’s feed that got no answer: “Deferred as D-4 — the ' +
-        'agent keeps working”',
     },
   },
   diagrams: {
     'message-path':
       'The path of one message: composer to panel server to CLI process to the transcript on disk, and the answer back as a stream. The panel has no database of its own.',
-    'split-conveyor':
-      'What happens after Split: triage, plan, work and review by stage — and where the human decides.',
     'deferred-asks':
-      'The path of a call only a human decides: a refusal with a D-n number, work goes on, an answer from the panel, the phone or Telegram, and the work resumes with exactly that call.',
+      'The former path of a call only a human decides (before the core): a refusal with a D-n number, work goes on, an answer from the panel, the phone or Telegram. Now the answer is only recorded and does not resume the work.',
   },
 };

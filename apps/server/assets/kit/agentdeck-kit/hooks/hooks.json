@@ -39,7 +39,7 @@
         ]
       },
       {
-        "matcher": "Bash|PowerShell|Write|Edit|NotebookEdit|Read|Grep|Glob|TodoWrite|Agent|Task|SendMessage|Workflow|AskUserQuestion|mcp__.*(gitlab|github|atlassian|jira|confluence).*",
+        "matcher": "Bash|PowerShell|Write|Edit|NotebookEdit|Read|Grep|Glob|TodoWrite|Agent|Task|SendMessage|Workflow|mcp__.*(gitlab|github|atlassian|jira|confluence).*",
         "hooks": [
           {
             "type": "command",

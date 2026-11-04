@@ -35,7 +35,6 @@ function seed(id: string): void {
     thinking: '',
     tools: [],
     permissions: [],
-    branchGates: [],
     queued: [],
     tokens: 0,
     startedAt: Date.now(),

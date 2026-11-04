@@ -318,3 +318,23 @@ export interface BuiltinGroupsRecord {
 export interface BuiltinGroupsRestoreResult {
   restored: string[];
 }
+
+/**
+ * Прежний запуск групп (план разделения панели) на странице групп над ядром (этап 10, F1): только
+ * чтение. Ядро прежние запуски не подхватывает (Q10, спека 10:8) — недоведённый (`half-run`)
+ * показан остановленным для ядра, без действий; его копия, ветка и запрос в задачу ядра не идут.
+ */
+export type LegacyGroupRunState = 'finished' | 'cancelled' | 'half-run';
+
+export interface LegacyGroupRun {
+  /** Разговор, в котором человек согласился на разделение, — ключ записи. */
+  parentChatId: string;
+  projectPath: string;
+  createdAt: string;
+  state: LegacyGroupRunState;
+  groups: { title: string; branch: string; status: string }[];
+}
+
+export interface LegacyGroupRunsReply {
+  runs: LegacyGroupRun[];
+}

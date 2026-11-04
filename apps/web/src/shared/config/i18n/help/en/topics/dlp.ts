@@ -7,8 +7,9 @@ export const dlpEn: typeof dlpRu = {
     summary:
       'A local proxy between the CLI and the model: it sees the request body and rewrites it by rules',
     lead:
-      'The panel raises a listener on 127.0.0.1. Point a CLI at that address instead of the ' +
-      'model address and all its traffic goes through the panel, which then sees the BODY of ' +
+      'The listener on 127.0.0.1 is held by the core — its hop host — from the settings of this ' +
+      'section, so a panel restart does not cut the proxy. Point a CLI at that address instead ' +
+      'of the model address and all its traffic goes through the proxy, which then sees the BODY of ' +
       'every request: the prompt, the contents of files the agent read, tool output, call ' +
       'arguments. Whatever the rules match is either replaced by a placeholder or stops the ' +
       'request entirely. This is the deepest of the three mechanisms in this area — and the ' +
@@ -74,8 +75,9 @@ export const dlpEn: typeof dlpRu = {
     step4Text:
       'The “Proxy” tab. Say where to forward: the vendor cloud, a local model or an endpoint profile. With no ' +
       'address the proxy will not start — it will not guess the vendor cloud for you. Port and ' +
-      'address are saved on Enter or when the field loses focus; any settings change restarts ' +
-      'a running proxy, and placeholder numbering starts over.',
+      'address are saved on Enter or when the field loses focus. New rules apply from the next ' +
+      'request; changing the forward address or the port of a running proxy resets the vault — ' +
+      'placeholder numbering starts over.',
     step5: 'Point the CLI at the proxy',
     step5Text:
       'An address like http://127.0.0.1:5179 goes into the CLI as the model address — most ' +
@@ -162,8 +164,9 @@ export const dlpEn: typeof dlpRu = {
     filesMemoryTitle: 'In memory only',
     fileVault: 'Placeholder vault',
     fileVaultText:
-      'The value → [LABEL_N] mapping lives in process memory and is never written to disk. ' +
-      'Restart the panel and numbering starts over.',
+      'The value → [LABEL_N] mapping lives in the memory of the core hop host and is never ' +
+      'written to disk. A panel restart leaves it alone; turning the proxy off, changing the ' +
+      'forward address or port, or stopping the hop host starts numbering over.',
 
     limitsTitle: 'Limits — what the proxy does not do',
     limitRulesTitle: 'It finds only what is described',

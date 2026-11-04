@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { AdapterRegistry } from '../adapters/index.ts';
 import type { CommandEnv } from '../conductor/commands.ts';
 import type { TaskRegistry } from '../conductor/tasks.ts';
 import type { NonceStore } from '../policy/authority/nonce.ts';
@@ -26,4 +27,6 @@ export interface RouteContext {
     seen: { claim(key: string): boolean };
   };
   now: () => number;
+  /** Реестр переходников загрузки (вид сеанса, этап 10); нет — `…/stream` отвечает 501. */
+  adapters?: AdapterRegistry;
 }

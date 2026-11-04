@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { ledgerCliMarker, spawnCliProcess } from './cli-spawn.ts';
+import { spawnCliProcess } from './cli-spawn.ts';
 
 /**
  * Окружение прогона — там, где его читает сам процесс.
@@ -65,110 +65,46 @@ describe('lib/cli-spawn: окружение доходит до процесса
   });
 });
 
-/** Метка CLI, которую видит сам процесс, при журнале в окружении сервера и без него. */
-async function ledgerMarker(home: string | undefined, inheritEnv?: boolean): Promise<string> {
-  const before = process.env.AGENTDECK_VERIFY_LEDGER_HOME;
-  // Запуск из сессии CLI с глобальным журналом приносит его метку в окружение — тест видел бы её, а не нашу.
-  const inherited = process.env.AGENTDECK_VERIFY_LEDGER_CLI;
-  delete process.env.AGENTDECK_VERIFY_LEDGER_CLI;
-  if (home === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
-  else process.env.AGENTDECK_VERIFY_LEDGER_HOME = home;
-  try {
-    const spawned = spawnCliProcess(
-      process.execPath,
-      ['-e', 'process.stdout.write(process.env.AGENTDECK_VERIFY_LEDGER_CLI ?? "")'],
-      inheritEnv === false ? { inheritEnv: false, env: { PATH: process.env.PATH ?? '' } } : {},
-    );
-    if (spawned.error) throw spawned.error;
-    let out = '';
-    spawned.child.stdout.on('data', (chunk: Buffer) => {
-      out += chunk.toString('utf8');
-    });
-    await new Promise((resolve) => spawned.child.on('close', resolve));
-    return out;
-  } finally {
-    if (before === undefined) delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
-    else process.env.AGENTDECK_VERIFY_LEDGER_HOME = before;
-    if (inherited !== undefined) process.env.AGENTDECK_VERIFY_LEDGER_CLI = inherited;
-  }
+/** Окружение журнала проверок, которое видит сам процесс: метки, замок, NODE_OPTIONS. */
+async function ledgerEnvSeen(): Promise<Record<string, string>> {
+  const code =
+    'process.stdout.write(JSON.stringify({' +
+    'lock: process.env.AGENTDECK_VERIFY_LEDGER_LOCK ?? "", ' +
+    'cli: process.env.AGENTDECK_VERIFY_LEDGER_CLI ?? "", ' +
+    'nodeOptions: process.env.NODE_OPTIONS ?? ""}))';
+  const spawned = spawnCliProcess(process.execPath, ['-e', code], { env: { CC_PROBE: '1' } });
+  if (spawned.error) throw spawned.error;
+  let out = '';
+  spawned.child.stdout.on('data', (chunk: Buffer) => {
+    out += chunk.toString('utf8');
+  });
+  await new Promise((resolve) => spawned.child.on('close', resolve));
+  return JSON.parse(out.trim()) as Record<string, string>;
 }
 
-describe('lib/cli-spawn: метка CLI для пульса журнала проверок', () => {
-  it('журнал подмешан — процесс видит имя своего CLI без пути и расширения', async () => {
-    expect(await ledgerMarker('/tmp/ledger-home')).toBe('node');
-  });
-
-  it('журнала нет — метки нет', async () => {
-    expect(await ledgerMarker(undefined)).toBe('');
-  });
-
-  it('агент панели (inheritEnv: false) метку не получает', async () => {
-    expect(await ledgerMarker('/tmp/ledger-home', false)).toBe('');
-  });
-
-  it('журнал подмешан — CLI получает замок: off в команде модели повтор не выключает', () => {
+describe('lib/cli-spawn: журнал проверок панели снят (этап 10, F1)', () => {
+  it('журнал в окружении сервера — запуск не получает ни метки CLI, ни замка, ни входа с замком', async () => {
     const names = [
       'AGENTDECK_VERIFY_LEDGER_HOME',
       'AGENTDECK_VERIFY_LEDGER',
       'AGENTDECK_VERIFY_LEDGER_DELTA',
-      'NODE_OPTIONS',
-    ] as const;
-    const before = names.map((name) => process.env[name]);
-    try {
-      process.env.AGENTDECK_VERIFY_LEDGER_HOME = '/tmp/ledger-home';
-      delete process.env.AGENTDECK_VERIFY_LEDGER;
-      delete process.env.AGENTDECK_VERIFY_LEDGER_DELTA;
-      delete process.env.NODE_OPTIONS;
-      expect(ledgerCliMarker('C:/bin/claude.exe')).toEqual({
-        AGENTDECK_VERIFY_LEDGER_LOCK: '1',
-        AGENTDECK_VERIFY_LEDGER_CLI: 'claude',
-      });
-      // Имя не разобрано — метки нет, замок есть.
-      expect(ledgerCliMarker('weird name!')).toEqual({ AGENTDECK_VERIFY_LEDGER_LOCK: '1' });
-      // Человек выключил повтор или сужение в окружении самой панели — его выбор, замка нет.
-      process.env.AGENTDECK_VERIFY_LEDGER = 'off';
-      expect(ledgerCliMarker('claude')).toEqual({ AGENTDECK_VERIFY_LEDGER_CLI: 'claude' });
-      process.env.AGENTDECK_VERIFY_LEDGER = 'on';
-      process.env.AGENTDECK_VERIFY_LEDGER_DELTA = 'off';
-      expect(ledgerCliMarker('claude')).toEqual({ AGENTDECK_VERIFY_LEDGER_CLI: 'claude' });
-      delete process.env.AGENTDECK_VERIFY_LEDGER_HOME;
-      expect(ledgerCliMarker('claude')).toEqual({});
-    } finally {
-      names.forEach((name, i) => {
-        const value = before[i];
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      });
-    }
-  });
-
-  it('замок во входе (F-30): NODE_OPTIONS ведёт на preload-locked.cjs, только если файл есть', () => {
-    const names = [
-      'AGENTDECK_VERIFY_LEDGER_HOME',
-      'AGENTDECK_VERIFY_LEDGER',
-      'AGENTDECK_VERIFY_LEDGER_DELTA',
+      'AGENTDECK_VERIFY_LEDGER_CLI',
+      'AGENTDECK_VERIFY_LEDGER_LOCK',
       'NODE_OPTIONS',
     ] as const;
     const before = names.map((name) => process.env[name]);
     const home = mkdtempSync(join(tmpdir(), 'ledger-home-')).replace(/\\/g, '/');
     const bin = `${home}/bin`;
     mkdirSync(bin);
+    // Оба входа есть: прежняя панель подменила бы preload.cjs на preload-locked.cjs.
+    writeFileSync(`${bin}/preload.cjs`, '');
+    writeFileSync(`${bin}/preload-locked.cjs`, '');
     try {
-      process.env.AGENTDECK_VERIFY_LEDGER_HOME = '/tmp/ledger-home';
-      delete process.env.AGENTDECK_VERIFY_LEDGER;
-      delete process.env.AGENTDECK_VERIFY_LEDGER_DELTA;
-      process.env.NODE_OPTIONS = `--max-old-space-size=4096 --require "${bin}/preload.cjs"`;
-      // Входа с замком ещё нет (старая установка) — NODE_OPTIONS не трогается.
-      expect(ledgerCliMarker('claude').NODE_OPTIONS).toBeUndefined();
-      writeFileSync(`${bin}/preload-locked.cjs`, '');
-      expect(ledgerCliMarker('claude')).toEqual({
-        AGENTDECK_VERIFY_LEDGER_LOCK: '1',
-        NODE_OPTIONS: `--max-old-space-size=4096 --require "${bin}/preload-locked.cjs"`,
-        AGENTDECK_VERIFY_LEDGER_CLI: 'claude',
-      });
-      // Выбор человека (off в окружении панели) — обычный вход, без замка.
-      process.env.AGENTDECK_VERIFY_LEDGER = 'off';
-      expect(ledgerCliMarker('claude').NODE_OPTIONS).toBeUndefined();
+      process.env.AGENTDECK_VERIFY_LEDGER_HOME = home;
+      for (const name of names.slice(1, 5)) delete process.env[name];
+      const own = `--require "${bin}/preload.cjs"`;
+      process.env.NODE_OPTIONS = own;
+      expect(await ledgerEnvSeen()).toEqual({ lock: '', cli: '', nodeOptions: own });
     } finally {
       rmSync(home, { recursive: true, force: true });
       names.forEach((name, i) => {

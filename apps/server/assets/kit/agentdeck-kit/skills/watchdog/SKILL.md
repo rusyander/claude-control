@@ -1,6 +1,6 @@
 ---
 name: watchdog
-description: "Use when watching running agent work live and fixing every deviation at once: "watch it live", "fix everything", "be the watchdog"; panel groups → agentdeck-watchdog."
+description: "Use when watching running agent work live and fixing every deviation at once: "watch it live", "watch the group", "fix everything", "be the watchdog"; AgentDeck task steps too."
 ---
 
 # watchdog — live watch, every deviation fixed at once
@@ -12,8 +12,8 @@ Zero tokens while nothing moves; the turn stays open for the whole watch — the
 `S=<kit>/skills/watchdog/scripts` (`watch.mjs`, `show.mjs`, `selftest.mjs`). `P` = root of the repo
 whose layers get fixed. Flags, footer, refs, tunables → [references/flags.md](references/flags.md). Ledger,
 inbox, parity feed, final report → [references/ledger.md](references/ledger.md). Pause/resume/restart per
-unit kind, long proofs, token levers → [references/levers.md](references/levers.md). AgentDeck split
-groups → skill `agentdeck-watchdog`, which runs this loop with group units on top.
+unit kind, long proofs, token levers → [references/levers.md](references/levers.md). An AgentDeck core
+task step is a Claude Code session like any other: watch its transcript as a unit.
 
 ## 1. Set up (once per watch)
 

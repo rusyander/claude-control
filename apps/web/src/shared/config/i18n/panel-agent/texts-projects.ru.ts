@@ -23,7 +23,6 @@ export const panelTextsProjectsRu = {
   'journal-project-claude-md-read': 'Файл инструкций проекта',
   'journal-project-mcp-list': 'MCP-серверы проекта',
   'journal-project-permissions-list': 'Права проекта',
-  'journal-project-group-choice': 'Какая группа действует в проекте',
   'journal-project-copy-settings': 'Настройки копий и разделения проекта',
   'journal-project-runner': 'Dev-серверы проекта',
   'journal-project-files': 'Файлы проекта',
@@ -48,10 +47,6 @@ export const panelTextsProjectsRu = {
   'value-project-decision-allow': 'разрешить без вопроса',
   'value-project-decision-ask': 'спрашивать',
   'value-project-decision-deny': 'запретить',
-  'journal-project-group-choice-set': 'Смена группы в проекте',
-  'summary-project-group-choice': 'Сделать действующей в проекте «{{project}}» группу «{{group}}»',
-  'summary-project-group-choice-reset':
-    'Вернуть все пары групп проекта «{{project}}» к проектным группам',
   'journal-project-git-checkout': 'Переключение ветки git',
   'summary-project-git-checkout': 'Переключить «{{project}}» на ветку {{branch}}',
   'journal-project-git-branch': 'Новая ветка git',

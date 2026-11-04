@@ -1,4 +1,5 @@
 import { object, string, boolean, number, array, enum as zodEnum, type infer as Infer } from 'zod';
+import type { ServerMessageCode, ServerMessageNestedParams } from './server-messages';
 
 /**
  * Защита данных — локальный прокси между CLI и моделью.
@@ -135,6 +136,9 @@ export interface DlpStatus {
   upstream: string;
   /** Почему не поднялся, если не поднялся. */
   error?: string;
+  /** Код причины для перевода на клиенте; `error` — запасной русский текст. */
+  messageCode?: ServerMessageCode;
+  params?: ServerMessageNestedParams;
   /** Сколько запросов прошло с момента запуска. */
   requests: number;
   masked: number;

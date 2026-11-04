@@ -12,8 +12,6 @@ export const CHAT_ROUTE: string = '/chat';
 export const DLP_ROUTE: string = '/dlp';
 /** Локальные модели — на них ссылается подсказка под чатом. */
 export const LOCAL_MODELS_ROUTE: string = '/local-models';
-/** Страница наблюдателя — на неё ведёт строка «Наблюдатель» в боковой панели. */
-export const WATCHER_ROUTE: string = '/watcher';
 /**
  * Задачи ядра: список, одна задача — `/core?id=<taskId>`. На него ссылаются лента задачи
  * («назад») и карточка запуска (`/core/launch`) после старта.

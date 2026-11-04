@@ -23,6 +23,7 @@ import { localPaths, readState, updateState } from '../../domains/local-models/p
 import { loadRelease } from '../../domains/local-models/runtime.ts';
 import { KitService } from '../../domains/kit/service.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
+import { fakeCoreHold } from '../../domains/local-models/__fixtures__/fake-core-hold.ts';
 
 /**
  * Выбор квантования и окна и «Любая модель» поверх настоящего сокета: настоящие
@@ -220,25 +221,19 @@ beforeAll(async () => {
       return `NVIDIA GeForce RTX 4090, 24564, ${20_000 - held}
 `;
     },
-    spawnServer: ((_binary: string, args: string[]) => {
-      spawned.push({ args });
-      void stubs
-        .startStubLlama({ port: Number(argOf(args, '--port')), tokensPerSec: 42 })
-        .then((started) => {
-          server = started;
-        });
-      return {
-        pid: 888_000 + spawned.length,
-        once: () => undefined,
-        on: () => undefined,
-        unref: () => undefined,
-      };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: () => {
-      void server?.close();
-      server = undefined;
-    },
-    testLoad: async () => ({ ok: true }),
+    // Ядро держит сервер: заглушка встаёт на постоянный порт, освобождение закрывает её.
+    hold: fakeCoreHold({
+      hold: async ({ flags }) => {
+        spawned.push({ args: flags });
+        server = await stubs.startStubLlama({ port, tokensPerSec: 42 });
+        return 888_000 + spawned.length;
+      },
+      release: async () => {
+        const old = server;
+        server = undefined;
+        await old?.close();
+      },
+    }),
   });
 
   app = Fastify();

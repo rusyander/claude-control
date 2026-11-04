@@ -29,8 +29,6 @@ import { registerProjectRoutes } from '../project-routes/project-routes.ts';
 import { registerProjectGitRoutes } from '../project-git-routes/project-git-routes.ts';
 import { registerProjectRunnerRoutes } from '../project-runner-routes/project-runner-routes.ts';
 import { registerProjectFilesRoutes } from '../project-files-routes/project-files-routes.ts';
-import { registerGroupRoutes } from '../group-routes/group-routes.ts';
-import { registerGroupSourcesRoutes } from '../group-sources-routes/group-sources-routes.ts';
 import { registerPanelAgentRoutes } from './panel-agent-routes/panel-agent-routes.ts';
 
 /**
@@ -162,11 +160,6 @@ export async function openProjectStand(): Promise<ProjectStand> {
   registerProjectGitRoutes(app, ctx, new ChatRunRegistry());
   registerProjectRunnerRoutes(app, ctx, runners);
   registerProjectFilesRoutes(app, ctx);
-  registerGroupRoutes(app, ctx);
-  // Модели на стенде нет: разбор групп и совет слияния сюда не ходят.
-  registerGroupSourcesRoutes(app, ctx, () => {
-    throw new Error('no model on the test stand');
-  });
   registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
   await app.ready();
 

@@ -16,7 +16,6 @@ import { adviseCopy, applyAdvice } from './advice/advice.ts';
 import { copyGroupToGlobal } from './copy.ts';
 import { copyGroupToProvider } from './copy-foreign/copy-foreign.ts';
 import { groupKnobsLine, KNOBS_EXTRACTION_VERSION } from './knobs/knobs.ts';
-import { promotePathStep } from './promote/promote.ts';
 import { readRules, saveRule } from '../rules/rules.ts';
 import { readHooks, readHooksFromFiles } from '../hooks/hooks.ts';
 import { maskSecretsInText, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
@@ -336,36 +335,6 @@ describe('заголовки правил в копии, совете и про�
     const copied = readRules(join(root, 'CLAUDE.md'), store).find((r) => r.title === 'Build (2)');
     expect(group.members).toEqual([{ kind: 'rule', id: copied?.id }]);
     expect(copied?.body).toBe('project body');
-  });
-
-  it('продвижение шага в правило с занятым заголовком — отказ 409', () => {
-    rule('Build', 'existing body');
-    const text = { ru: 'Build', en: 'Build' };
-    const group = store.saveGroup({
-      ...projectGroup(),
-      id: 'glob-2',
-      scope: { kind: 'global' },
-      members: [],
-      knobs: {},
-      path: {
-        steps: [
-          {
-            id: 's1',
-            order: 0,
-            kind: 'prompt',
-            anchor: 'work',
-            title: text,
-            prompt: text,
-            source: 'ru',
-            createdAt: '2026-09-28T00:00:00.000Z',
-          },
-        ],
-      },
-    });
-    expect(() =>
-      promotePathStep(deps(), group, { stepId: 's1', type: 'rule', draft: 'x' }),
-    ).toThrow(expect.objectContaining({ statusCode: 409 }));
-    expect(titles()).toEqual(['Build']);
   });
 });
 

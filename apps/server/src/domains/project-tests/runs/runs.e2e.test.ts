@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatRun, type ChatEvent } from '../../chat/ChatRunner/ChatRunner.ts';
+import type { TestsAgentEvent } from '../agent/agent-run.types.ts';
+import { TestsCoreRun } from '../agent/core-run.ts';
 import { draftFile } from '../drafts/drafts.ts';
 import { chooseE2eFolder, e2eFolderView } from '../e2e-folder/e2e-folder.ts';
 import { ProjectTestRunRegistry } from './runs.ts';
@@ -13,7 +14,7 @@ import { readRuns } from '../runs-store/runs-store.ts';
  * Генерация с кодом тестов доводится до конца сама: черновик применяется без
  * галочки, тесты папки сводятся с кейсами, отчёт junit ставит статусы.
  *
- * Подменён только процесс CLI (`ChatRun.start`) — граница, за которой модель.
+ * Подменён только процесс CLI (`TestsCoreRun.start`, за которым ядро) — граница, за которой модель.
  * Всё, что после неё (черновик, сверка, разбор junit, запись групп), работает
  * по-настоящему на временном каталоге. Агент «пишет» ровно то, что велит ему
  * задание: черновик, спеку с меткой `[id]` и отчёт.
@@ -61,7 +62,7 @@ describe('project-tests/runs: генерация с e2e', () => {
   it('черновик применён, спеки сведены, результаты junit легли на кейсы', async () => {
     let runId = '';
     let prompt = '';
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
       prompt = options.prompt;
       const file = join(root, draftFile(runId));
       mkdirSync(join(file, '..'), { recursive: true });
@@ -87,7 +88,10 @@ describe('project-tests/runs: генерация с e2e', () => {
       mkdirSync(join(root, 'e2e', 'results'));
       // Отчёт пишет раннер туда, куда его направила команда из задания.
       writeFileSync(reportOf(prompt), JUNIT);
-      (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+      (onEvent as (event: TestsAgentEvent) => void)({
+        kind: 'done',
+        sessionId: 's1',
+      } as TestsAgentEvent);
     });
     // Конфиг Playwright в папке — как у заготовки панели: по нему узнаётся каркас.
     writeFileSync(join(root, 'e2e', 'playwright.config.ts'), 'export default {};\n');
@@ -154,9 +158,12 @@ describe('project-tests/runs: генерация с e2e', () => {
       expect(e2eFolderView(root, appData).dir).toBe('apps/admin/tests');
       chooseE2eFolder(appData, root, 'apps/shop/tests');
       let prompt = '';
-      vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
+      vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
         prompt = options.prompt;
-        (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+        (onEvent as (event: TestsAgentEvent) => void)({
+          kind: 'done',
+          sessionId: 's1',
+        } as TestsAgentEvent);
       });
 
       registry.start(
@@ -183,13 +190,16 @@ describe('project-tests/runs: генерация с e2e', () => {
    */
   it('свежий отчёт соседней копии в общей папке не выдаётся за результаты этого', async () => {
     let prompt = '';
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (options, onEvent) => {
       prompt = options.prompt;
       writeFileSync(join(root, 'e2e', 'auth.spec.ts'), SPEC);
       mkdirSync(join(root, 'e2e', 'results'));
       // Соседняя копия прогнала те же тесты и записала общий отчёт.
       writeFileSync(join(root, 'e2e', 'results', 'junit.xml'), JUNIT);
-      (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+      (onEvent as (event: TestsAgentEvent) => void)({
+        kind: 'done',
+        sessionId: 's1',
+      } as TestsAgentEvent);
     });
     writeFileSync(join(root, 'e2e', 'playwright.config.ts'), 'export default {};\n');
 
@@ -208,9 +218,12 @@ describe('project-tests/runs: генерация с e2e', () => {
     const old = new Date('2026-01-01T00:00:00.000Z');
     const { utimesSync } = await import('node:fs');
     utimesSync(join(root, 'e2e', 'results', 'junit.xml'), old, old);
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
       writeFileSync(join(root, 'e2e', 'auth.spec.ts'), SPEC);
-      (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+      (onEvent as (event: TestsAgentEvent) => void)({
+        kind: 'done',
+        sessionId: 's1',
+      } as TestsAgentEvent);
     });
 
     registry.start({ projectPath: root, mode: 'generate', e2e: true }, new Date().toISOString());

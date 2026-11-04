@@ -274,6 +274,25 @@ describe('выбор модели одного прогона', () => {
     expect(chooseRunModel(rules, 'magnum-opus-7')).toMatchObject({ source: 'default' });
   });
 
+  it('цель строки карты — слово человека: уходит как есть и без каталога', () => {
+    // Панель переводит выбор картой и шлёт ядру уже ПЕРЕВЕДЁННОЕ имя, а ядро выбирает модель тем
+    // же правилом ещё раз. Каталог контура не прочитан (или модели в нём нет) — и перевод
+    // `claude-sonnet-5` → `qwen2.5:14b` заменялся моделью по умолчанию (свип run-env, 03.11).
+    const uncatalogued = { ...rules, map: { sonnet: 'qwen2.5:14b' }, catalog: [] };
+    expect(chooseRunModel(uncatalogued, 'qwen2.5:14b')).toEqual({
+      model: 'qwen2.5:14b',
+      asked: 'qwen2.5:14b',
+      source: 'mapped',
+      replaced: false,
+    });
+    expect(chooseRunModel(uncatalogued, 'QWEN2.5:14B')).toMatchObject({ model: 'qwen2.5:14b' });
+    // Незнакомое имя без карты по-прежнему заменяется, и замена названа.
+    expect(chooseRunModel(uncatalogued, 'qwen2.5:32b')).toMatchObject({
+      model: 'company-mid',
+      replaced: true,
+    });
+  });
+
   it('имя из каталога контура уходит как есть', () => {
     expect(chooseRunModel(rules, 'company-large')).toEqual({
       model: 'company-large',

@@ -19,9 +19,7 @@ import { HOOKS_ENV_ACTIONS } from './actions-hooks-env/actions-hooks-env.ts';
 import { APP_STATE_ACTIONS } from './actions-app/actions-app.ts';
 import { PANEL_READ_ACTIONS } from './actions-panel/actions-panel.ts';
 import { WORK_ACTIONS } from './actions-work/actions-work.ts';
-import { GROUP_ACTIONS } from './actions-groups/actions-groups.ts';
 import { TESTS_BLOCK_ACTIONS } from './actions-tests-block/actions-tests-block.ts';
-import { GROUP_SOURCES_ACTIONS } from './actions-groups-sources/actions-groups-sources.ts';
 import { ENTITY_EXTRA_ACTIONS } from './actions-entities-extra/actions-entities-extra.ts';
 import { SETTINGS_EXTRA_ACTIONS } from './actions-settings-extra/actions-settings-extra.ts';
 import { SIEVE_ACTIONS } from './actions-sieves/actions-sieves.ts';
@@ -251,13 +249,11 @@ export const PANEL_ACTIONS: readonly AnyPanelAction[] = [
   ...CONFIG_ACTIONS,
   ...HOOKS_ENV_ACTIONS,
   ...APP_STATE_ACTIONS,
-  ...GROUP_ACTIONS,
   ...WORK_ACTIONS,
   ...PANEL_READ_ACTIONS,
   ...LOCAL_MODELS_ACTIONS,
   ...KIT_ACTIONS,
   ...TESTS_BLOCK_ACTIONS,
-  ...GROUP_SOURCES_ACTIONS,
   ...ENTITY_EXTRA_ACTIONS,
   ...SETTINGS_EXTRA_ACTIONS,
   ...SIEVE_ACTIONS,

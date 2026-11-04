@@ -2,12 +2,7 @@ import type { CursorPermissionDraft } from '@agentdeck/contracts';
 import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
-import {
-  objectSection,
-  parseToolList,
-  readStringList,
-  stripManagedSectionKeys,
-} from './normalize.ts';
+import { objectSection, readStringList, stripManagedSectionKeys } from './normalize.ts';
 import { backupNameOf } from './target.ts';
 import type { CursorPermissionsValues, ProviderPermissionsTarget } from './types.ts';
 
@@ -35,20 +30,6 @@ const CURSOR_MANAGED_KEYS = ['allow', 'deny'] as const;
 interface RawCursorConfig {
   permissions?: unknown;
   [key: string]: unknown;
-}
-
-/**
- * Разобрать черновик прав Cursor: ровно два списка правил. Формы правил
- * (`Shell(...)`, `Read(...)`, …) панель НЕ проверяет: документация допускает
- * шаблоны и синтаксис `команда:аргументы`, и отсев «непонятного» вырезал бы
- * рабочие правила пользователя. Проверяется ровно то, что можно проверить не
- * гадая, — что это непустые однострочные строки (см. `parseToolList`).
- */
-export function parseCursorDraft(rec: Record<string, unknown>): CursorPermissionDraft | undefined {
-  const allow = parseToolList(rec.allow);
-  const deny = parseToolList(rec.deny);
-  if (!allow || !deny) return undefined;
-  return { allow, deny };
 }
 
 /**

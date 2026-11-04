@@ -5,6 +5,7 @@ import { Badge } from '@shared/ui/badge';
 import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { TruncatedText } from '@shared/ui/truncated-text';
+import { serverFieldText } from '@shared/config/i18n';
 import { sharedNeeds } from '../model/passport-view';
 import styles from './PassportSection.module.scss';
 import type { PassportSectionProps } from './PassportSection.types';
@@ -72,7 +73,7 @@ export function PassportSection({
           <Stack gap="var(--spacing-sm)" id={bodyId}>
             {sectionState && !sectionState.enabled && (
               <Typography variant="caption" color="muted">
-                {sectionState.detail}
+                {serverFieldText(sectionState, 'detail', t)}
               </Typography>
             )}
 
@@ -91,7 +92,7 @@ export function PassportSection({
               {items.map((item) => (
                 <div key={item.id} className={styles.row}>
                   <div className={styles.intent}>
-                    <Typography variant="body-sm">{item.intent}</Typography>
+                    <Typography variant="body-sm">{serverFieldText(item, 'intent', t)}</Typography>
                     {/* Файла нет у записи, которой нет на диске: скилл из аккаунта,
                         умолчание самого CLI. Показать вместо него путь, которого
                         не существует, — та же выдумка, только в подписи. */}
@@ -135,7 +136,7 @@ export function PassportSection({
                   >
                     <div className={styles.intent}>
                       <Typography variant="body-sm" color="muted">
-                        {skip.detail}
+                        {serverFieldText(skip, 'detail', t)}
                       </Typography>
                     </div>
                     <div className={styles.needs}>

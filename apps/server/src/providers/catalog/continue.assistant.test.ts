@@ -3,10 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canHoldKey, getRawKey, resolveRunner } from '../../domains/provider-keys/provider-keys.ts';
-import {
-  ProviderChatRun,
-  type ProviderChatRunEvent,
-} from '../../domains/provider-chat/ProviderChatRun/ProviderChatRun.ts';
 import { getProvider } from '../registry.ts';
 
 /**
@@ -43,25 +39,5 @@ describe('continue: без cn — честный отказ, а не Claude', ()
 
   it('раннер: cn найден — режим `cli` (подписка/конфиг Continue)', () => {
     expect(resolveRunner(provider, dir, () => true).mode).toBe('cli');
-  });
-
-  it('чат без cn: отказ `no_key_no_cli`, ни одного сетевого запроса', async () => {
-    const fetchImpl = vi.fn(async () => new Response('{}'));
-    const events: ProviderChatRunEvent[] = [];
-    await new ProviderChatRun().start(
-      {
-        provider,
-        history: [{ id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' }],
-        chatId: 'chat',
-        appDataDir: dir,
-        detect: () => false,
-        fetchImpl: fetchImpl as unknown as typeof fetch,
-      } as Parameters<ProviderChatRun['start']>[0],
-      (event) => events.push(event),
-    );
-    expect(fetchImpl).not.toHaveBeenCalled();
-    const error = events.find((event) => event.type === 'error');
-    expect(error).toMatchObject({ type: 'error', reason: 'no_key_no_cli' });
-    expect(events.some((event) => event.type === 'done')).toBe(false);
   });
 });

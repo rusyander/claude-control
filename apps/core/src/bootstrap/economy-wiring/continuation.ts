@@ -29,8 +29,11 @@ export interface RunEconomyDeps {
   /** Книга окон ядра — одна на процесс (её же читают судьи и `/v1/health`). */
   windows: WindowBook;
   now: () => number;
-  /** Активный контур загрузки (уровень 1) — вход суда `tier` каждого шага; нет — без контура. */
-  contour?: ContourPolicy;
+  /**
+   * Активный контур панели (уровень 1) — вход суда `tier` каждого шага, читается на каждый шаг
+   * (s10 G7); нет или `undefined` — без контура.
+   */
+  contour?: () => ContourPolicy | undefined;
   /** Проводка контекста (C): бриф, дельта, отказ брифа сверх бюджета. Нет — бриф этапа 4. */
   context?: ContextWiring;
   /** Значения секретов окружения сессии — бриф и пакет ревью их маскируют (C: `known`, P61). */
@@ -48,7 +51,12 @@ export interface RunEconomyDeps {
    * Транскрипт разговора кончившейся сессии на месте (корень `conversationOf`, переходник сессии);
    * `undefined` — неизвестно: судья не форсирует новый сеанс и не продолжает кончившийся.
    */
-  transcriptPresent?(adapter: string, conversationId: string): boolean | undefined;
+  transcriptPresent?(
+    adapter: string,
+    conversationId: string,
+    /** Задача и сессия кандидата: переходник со своим домом у сеанса ищет транскрипт в её каталоге. */
+    where: { task: LiveTask; sessionId: string },
+  ): boolean | undefined;
   /**
    * Лестницы переходников загрузки (`laddersOf`) — вход суда `tier` каждого шага. Нет — уровень
    * сценария не понижает и не поднимает, пол ревьюера сравнивает только имена.
@@ -141,13 +149,14 @@ export function createRunEconomy(deps: RunEconomyDeps): RunEconomy {
     // Набор сейчас — `routes.set` команды поверх `task.created` (`allowedRoutesOf`).
     const routes = [...new Set(allowedRoutesOf(task.state).map((r) => r.route.id))];
     let lines: JournalLine[] | null = null;
+    const contour = deps.contour?.();
     return {
       windows: routes.flatMap((id) => deps.windows.decide(id, now)),
-      ...(deps.contour ? { contour: deps.contour } : {}),
+      ...(contour ? { contour } : {}),
       ...(deps.ladders ? { tier: { ladders: deps.ladders } } : {}),
       continuation: (candidate) => {
         const read = (lines ??= linesOf(task));
-        const present = transcriptOf(candidate, read);
+        const present = transcriptOf(task, candidate, read);
         return {
           facts: continuationFacts(task, read, candidate, now, deps.windowOf),
           ...(present === undefined ? {} : { transcriptPresent: present }),
@@ -161,12 +170,16 @@ export function createRunEconomy(deps: RunEconomyDeps): RunEconomy {
    * разговор сама (не спрашивается); у кончившейся — файл по корню разговора (`--resume`).
    */
   const transcriptOf = (
+    task: LiveTask,
     candidate: ContinuationSession,
     lines: readonly JournalLine[],
   ): boolean | undefined => {
     if (deps.resumes && !deps.resumes(candidate.adapter)) return false;
     if (OPEN_STATES.has(candidate.state)) return undefined;
-    return deps.transcriptPresent?.(candidate.adapter, conversationOf(lines, candidate.sessionId));
+    return deps.transcriptPresent?.(candidate.adapter, conversationOf(lines, candidate.sessionId), {
+      task,
+      sessionId: candidate.sessionId,
+    });
   };
 
   /** Пакет ревью единицы в ту же сессию (C `pack`): только изменённые его секции. */

@@ -78,16 +78,6 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             options={effortOptions}
             hint={t('settings.chatEffortHint')}
           />
-          {/* Инициатива разделения задач по чатам. Тумблер здесь, а не в
-              «безопасности»: это привычка агента в разговоре, а не право на
-              запись. Кнопка «Разделить задачи» в поле ввода работает и при
-              выключенном — просьбу всегда можно высказать вручную. */}
-          <SettingToggleRow
-            label={t('settings.taskSplitInitiative')}
-            hint={t('settings.taskSplitInitiativeHint')}
-            checked={settings.taskSplitInitiative}
-            onChange={(taskSplitInitiative) => patch({ taskSplitInitiative })}
-          />
           {/* Главный выключатель доставки до MR. Сама настройка — на проекте,
               кнопкой «До MR» в шапке чата: у репозиториев разный путь до MR, а
               здесь решается одно — есть ли эта кнопка вообще. */}
@@ -141,18 +131,6 @@ export function ModelsTab({ settings, patch }: SettingsTabProps) {
             hint={t('settings.chatLeanToolsHint')}
             checked={settings.chatLeanTools}
             onChange={(chatLeanTools) => patch({ chatLeanTools })}
-          />
-          {/* Неотвеченная карточка прав сама становится вопросом D-n в списке
-              «Ждёт решения»: человек ушёл — агент не стоит на ней часами. */}
-          <NumberSettingRow
-            label={t('settings.deferAfterMinutes')}
-            hint={t('settings.deferAfterMinutesHint')}
-            value={settings.deferAfterMinutes}
-            min={0}
-            max={1440}
-            inputClassName={styles.numberInput}
-            hintClassName={styles.hint}
-            onChange={(deferAfterMinutes) => patch({ deferAfterMinutes })}
           />
           <NumberSettingRow
             label={t('settings.deferredTtlDays')}

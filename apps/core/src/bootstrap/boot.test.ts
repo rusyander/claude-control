@@ -80,10 +80,10 @@ describe('core boot', () => {
       const log = events(layout.logs);
       expect(log.find((e) => e.event === 'tasks.opened')).toMatchObject({ opened: 1, refused: [] });
       expect(log.find((e) => e.event === 'port')).toMatchObject({ port: core.port });
-      // Дирижёр запущен загрузкой один раз: шесть зон этапа 4, две этапа 6 (страж, публикатор)
-      // слой пользователя этапа 7 и наблюдатель этапа 8.
+      // Дирижёр запущен загрузкой один раз: шесть зон этапа 4, две этапа 6 (страж, публикатор),
+      // слой пользователя этапа 7, наблюдатель этапа 8 и ревью по ссылке этапа 10 (F8).
       expect(log.filter((e) => e.event === 'conductor.started')).toEqual([
-        expect.objectContaining({ zones: 10 }),
+        expect.objectContaining({ zones: 11 }),
       ]);
       expect(readFileSync(join(layout.root, 'machine-id'), 'utf8')).toMatch(/^[0-9a-f-]{36}\n$/);
 

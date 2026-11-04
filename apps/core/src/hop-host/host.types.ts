@@ -29,6 +29,12 @@ export interface TagEntry {
   spec: HopRegistration;
   placeholderHash: string;
   registeredAt: number;
+  /** Раздел панели из адреса шлюза человека (`/_s/<раздел>`) — в след запроса. */
+  section?: string;
+  /** Название контура для текстов отказа (шлюз человека); нет — `routeId`. */
+  title?: string;
+  /** Метка прогона из адреса шлюза человека (`/_run/<метка>`) — в след запроса контура. */
+  runTag?: string;
 }
 
 /** Исход чтения ключа маршрута: значение уходит только в заголовок запроса наверх. */
@@ -56,4 +62,10 @@ export interface HopTraceEntry {
   tokens?: number;
   retried?: boolean;
   error?: string;
+  /** Раздел панели, от которого пришёл запрос шлюза человека (`chat`, `foreign:codex`). */
+  section?: string;
+  /** Ручка картинок: размер картинок ответа в байтах — только число, ни байта самой картинки. */
+  imageBytes?: number;
+  /** Ответ ушёл, а расхода ручка не прислала: ноль в `tokens` — «не отчиталась», не «бесплатно». */
+  usageUnreported?: true;
 }

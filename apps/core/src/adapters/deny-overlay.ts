@@ -39,6 +39,7 @@ export function platformDenySet(facts: PlatformDenyFacts): DenySet {
     commands: PUBLISH_COMMANDS.map((argv) => [...argv]),
     mcpTools: unique([...(facts.forgeMcpTools ?? [])]),
     tools: [],
+    ...(facts.forgeMcpServers?.length ? { forgeMcpServers: unique(facts.forgeMcpServers) } : {}),
   };
 }
 
@@ -117,6 +118,8 @@ export function cliProjectDirs(cwd: string): string[] {
 export function withPlatformDeny(facts: PlatformDenyFacts, step: DenySet, cwd?: string): DenySet {
   const base = platformDenySet(facts);
   const paths = unique([...base.paths, ...step.paths]);
+  // Сервер форжа шаг снять не может, как и любой запрет платформы (`forge-mcp-read-only`).
+  const forge = unique([...(base.forgeMcpServers ?? []), ...(step.forgeMcpServers ?? [])]);
   const editPaths = unique([
     ...(cwd ? copyGitDirs(cwd) : []),
     ...(cwd ? cliProjectDirs(cwd) : []),
@@ -128,6 +131,7 @@ export function withPlatformDeny(facts: PlatformDenyFacts, step: DenySet, cwd?: 
     commands: unique([...base.commands, ...step.commands], key),
     mcpTools: unique([...base.mcpTools, ...step.mcpTools]),
     tools: unique([...base.tools, ...step.tools]),
+    ...(forge.length > 0 ? { forgeMcpServers: forge } : {}),
   };
 }
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   CANON_VERSION,
   canonFingerprintInput,
+  envItemFingerprintInput,
   checkCanonVersion,
   envItemKinds,
   envNeeds,
@@ -411,6 +412,41 @@ describe('идентичность записи канона', () => {
     expect(first).not.toBe(second);
     // Хвост детерминирован: тот же дом даёт тот же отпечаток среды.
     expect(envItemId('permission', 'Bash(echo "exit=$?")')).toBe(first);
+  });
+
+  // Коды текстов — подача для перевода, а не содержимое среды: паспорт, снятый до
+  // их появления, обязан дать тот же отпечаток, иначе подписка объявила бы
+  // изменившейся каждую запись.
+  it('коды текстов (intentCode, needs.whyCode) не меняют отпечаток записи', () => {
+    const plain: InstructionsItem = {
+      ...common,
+      id: 'instructions:CLAUDE.md',
+      kind: 'instructions',
+      trigger: always,
+      needs: { resolution: 'none', why: 'текст инструкций читает модель' },
+      raw: '# rules',
+      fileName: 'CLAUDE.md',
+      text: '# rules',
+      includes: [],
+      legacy: false,
+      enabled: true,
+    };
+    const coded: InstructionsItem = {
+      ...plain,
+      intentCode: 'portability-intent-instructions',
+      intentParams: { name: 'CLAUDE.md' },
+      needs: {
+        ...plain.needs,
+        whyCode: 'portability-needs-instructions',
+      } as InstructionsItem['needs'],
+    };
+    expect(envItemFingerprintInput(coded)).toBe(envItemFingerprintInput(plain));
+    // А смена самого текста причины — по-прежнему смена записи.
+    const reworded = { ...plain, needs: { resolution: 'none', why: 'другая причина' } } as const;
+    expect(envItemFingerprintInput(reworded)).not.toBe(envItemFingerprintInput(plain));
+    expect(envItemSchema.parse(coded)).toMatchObject({
+      intentCode: 'portability-intent-instructions',
+    });
   });
 
   it('обычное имя остаётся читаемым и хвоста не получает', () => {

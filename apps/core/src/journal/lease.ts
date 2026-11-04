@@ -1,3 +1,4 @@
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { newId } from '../lib/ids/uuidv7.ts';
 import {
@@ -14,8 +15,10 @@ import { TASK_FILES, type CoreIdentity, type IsAlive } from './journal.types.ts'
 /**
  * Аренда задачи — один писатель (01 §Lease, R:S2-22). Владелец — ядро, чей `owner.json` лежит в
  * каталоге задачи; удары сердца — дописыванием в `beats.log` каждые 5 с (горячий файл никогда
- * не переписывается). Устаревшая = нет удара 15 с И процесс по pid + старту мёртв; `unknown`
- * про жизнь — не устаревшая. Перехват — заявкой `wx` (`platform/exclusive-lock.ts`).
+ * не переписывается). Устаревшая: держатель этой машины доказанно мёртв (pid исчез или занят
+ * заново) — сразу; иначе (другая машина, запись без машины) — нет удара 15 с И процесс по pid +
+ * старту мёртв. `unknown` и `alive` про жизнь — не устаревшая никогда. Перехват — заявкой `wx`
+ * (`platform/exclusive-lock.ts`).
  * Владелец сверяет `owner.json` на каждом ударе и перед каждой записью: перехваченный — больше
  * не пишет (`LeaseLostError`).
  */
@@ -50,6 +53,28 @@ export interface LeaseDeps {
   now: () => number;
   /** Пауза между повторами отпуска; по умолчанию — удар сердца. Тесты укорачивают. */
   releaseRetryMs?: number;
+  /** Машина этого ядра; по умолчанию `os.hostname()`. Тесты подставляют «другую машину». */
+  host?: string;
+}
+
+/**
+ * Запись `owner.json`: держатель + машина, на которой его pid что-то значит. Записи до 03.11
+ * машины не несут — для них доказанной смерти нет, решает правило молчания.
+ */
+export interface LeaseHolder extends LockHolder {
+  host?: string;
+}
+
+const THIS_HOST = hostname();
+
+/**
+ * Держатель доказанно мёртв (решение координатора 03.11, 01 §Lease): та же машина И зонд ОС
+ * говорит `dead` — pid исчез или занят другим процессом (старт не тот, что в записи). Другая
+ * машина, запись без машины, `unknown` или `alive` — не доказано.
+ */
+async function provenDead(holder: LeaseHolder, host: string, deps: LeaseDeps): Promise<boolean> {
+  if (holder.host === undefined || holder.host !== host) return false;
+  return (await deps.isAlive({ pid: holder.pid, start: holder.pidStart })) === 'dead';
 }
 
 function lastBeatOf(dir: string, leaseId: string): number | undefined {
@@ -80,7 +105,8 @@ export async function acquireTaskLease(
   deps: LeaseDeps,
 ): Promise<LeaseOutcome> {
   const owner = join(dir, TASK_FILES.owner);
-  const record: LockHolder = { leaseId: newId(), ...me, acquiredAt: deps.now() };
+  const host = deps.host ?? THIS_HOST;
+  const record: LeaseHolder = { leaseId: newId(), ...me, host, acquiredAt: deps.now() };
   const got = await acquireExclusive(owner, record, {
     isAlive: deps.isAlive,
     now: deps.now,
@@ -89,8 +115,11 @@ export async function acquireTaskLease(
       holder.pidStart === me.pidStart &&
       holder.bootId === me.bootId &&
       !heldHere.has(holder.leaseId),
-    isSilent: (holder, fileAgeMs) => {
+    isSilent: async (holder, fileAgeMs) => {
       if (!holder) return fileAgeMs > STALE_MS;
+      // Доказанно мёртвый держатель этой машины молчанием не ждётся: окно 15 с отдавало чату
+      // убитого ядра сырой 409 «held». Последнее слово всё равно за зондом (`holderIsStale`).
+      if (await provenDead(holder, host, deps)) return true;
       const last = lastBeatOf(dir, holder.leaseId) ?? holder.acquiredAt;
       return deps.now() - last > STALE_MS;
     },

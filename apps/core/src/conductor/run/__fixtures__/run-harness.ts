@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CommandEnvelope } from '@agentdeck/contracts/core/commands';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 import type { Scenario, ScenarioRef } from '@agentdeck/contracts/core/scenario';
@@ -58,6 +60,10 @@ export interface Script {
    * крючка нет (шаг кончается `publisher-unwired`).
    */
   publish?: Record<string, PublishOutcome | null>;
+  /** Текст задачи (`request.md` рядом с журналом, как его кладёт оценка); по умолчанию файла нет. */
+  request?: string;
+  /** Язык панели, с которой задача запущена (`task.created.lang`); по умолчанию поля нет. */
+  lang?: 'ru' | 'en';
 }
 
 export const ROUTE: JournalDataV1['task.created']['allowedRoutes'][number] = {
@@ -323,6 +329,7 @@ export async function stand(
   const clock = fakeClock();
   const d = journalDeps({ clock, now: () => clock.stamp().at });
   const { task, dir, taskId } = await openFresh(undefined, d);
+  if (script.request !== undefined) writeFileSync(join(dir, 'request.md'), script.request);
   task.append({
     kind: 'task.created',
     actor: 'core',
@@ -330,6 +337,8 @@ export async function stand(
       ...CREATED,
       scenario: { id: sc.id, version: sc.version },
       allowedRoutes: script.routes ?? [ROUTE],
+      ...(script.request !== undefined ? { requirementsSource: 'request.md' } : {}),
+      ...(script.lang ? { lang: script.lang } : {}),
     },
   });
   task.append({

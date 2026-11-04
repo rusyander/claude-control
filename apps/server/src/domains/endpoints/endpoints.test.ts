@@ -12,7 +12,6 @@ import {
   endpointModelsUrl,
   probeEndpoint,
   resolveEndpointVars,
-  resolveAssistantEndpoint,
   saveEndpointToken,
   readEndpointToken,
   clearEndpointToken,
@@ -466,27 +465,5 @@ describe('токен профиля: зашифрованное хранилищ
     // Ключ провайдера `claude` лежит под своим id, токен профиля — под
     // префиксом: одно не перетирает другое.
     expect(readEndpointToken(dir, 'claude')).toBe('endpoint-token-value');
-  });
-});
-
-describe('resolveAssistantEndpoint: ассистент панели идёт туда только по выбору', () => {
-  const store = (assistantEndpointId: string, profiles: EndpointProfile[]) => ({
-    getSettings: () => ({ endpointProfiles: profiles, assistantEndpointId, claudeDirOverride: '' }),
-  });
-
-  it('не выбран — undefined (всё как раньше)', () => {
-    expect(resolveAssistantEndpoint(store('', [profileOf()]), '/tmp')).toBeUndefined();
-  });
-
-  it('выбранный профиль удалён — возвращаемся в облако, а не на соседний адрес', () => {
-    expect(resolveAssistantEndpoint(store('ep-404', [profileOf()]), '/tmp')).toBeUndefined();
-  });
-
-  it('выбран — отдаём адрес, вид API и модель', () => {
-    expect(resolveAssistantEndpoint(store('ep-1', [profileOf()]), '/tmp')).toMatchObject({
-      baseUrl: 'http://127.0.0.1:11434/v1',
-      apiKind: 'openai-compat',
-      model: 'qwen3-coder',
-    });
   });
 });

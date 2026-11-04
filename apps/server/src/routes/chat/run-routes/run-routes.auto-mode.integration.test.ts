@@ -1,17 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ChatAutoModeView } from '@agentdeck/contracts';
-import type { ChatAwaitingView, ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import {
   ChatRunRegistry,
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { RunOptions } from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../../../domains/chat/run-options/run-options.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { sandboxRoot } from '../../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
 import { TreePause } from '../../../domains/chat/tree-pause/tree-pause.ts';
@@ -25,10 +24,10 @@ import { registerChatTreeRoutes } from '../tree-routes/tree-routes.ts';
 
 /**
  * Авторежим прав во всех чатах (владелец, 24.09.2026) поверх НАСТОЯЩИХ
- * маршрутов: отправка, тумблер чата, запрос прав, дерево. Подменён только CLI —
- * прогон, который называет сессию и живёт, пока тест его не закончит. Вопрос
- * ровно в том, с каким `--permission-mode` уйдёт прогон и что панель ответит на
- * запрос прав, поэтому ни то ни другое не заглушено. «Перезапуск панели» —
+ * маршрутов: отправка, тумблер чата, дерево. Подменён только CLI — прогон, который
+ * называет сессию и живёт, пока тест его не закончит. Вопрос ровно в том, с каким
+ * `--permission-mode` уйдёт прогон, поэтому он не заглушён. Свой ответ панели на запрос
+ * прав был мостом `--permission-prompt-tool` — его больше нет, права задачи решает ядро. «Перезапуск панели» —
  * новые реестр, состояние чата и приложение над тем же каталогом данных.
  */
 describe('авторежим прав чата', () => {
@@ -137,62 +136,13 @@ describe('авторежим прав чата', () => {
   const toggle = (chatId: string, enabled: boolean) =>
     app.inject({ method: 'POST', url: `/api/chat/${chatId}/auto-approve`, payload: { enabled } });
 
-  /**
-   * Что панель ответит на запрос прав: `allow` сама или карточка человеку.
-   * Карточку снимаем отказом — иначе запрос висел бы до конца теста.
-   */
-  const decide = async (runId: string, command: string): Promise<string> => {
-    const toolUseId = `toolu_${Math.random().toString(36).slice(2)}`;
-    const pending = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: { runId, toolName: 'Bash', input: { command }, toolUseId },
-    });
-    const result = await Promise.race([
-      pending.then((response) => response.json<{ behavior: string }>().behavior),
-      tick(80).then(() => 'card'),
-    ]);
-    if (result === 'card') {
-      await app.inject({
-        method: 'POST',
-        url: `/api/chat/${runId}/permission-decision`,
-        payload: { toolUseId, behavior: 'deny' },
-      });
-      await pending;
-    }
-    return result;
-  };
-
-  it('по умолчанию: CLI в авторежиме, рутину панель подтверждает сама', async () => {
+  it('по умолчанию: CLI в авторежиме', async () => {
     expect((await send(PLAIN)).permissionMode).toBe('auto');
-    expect(await decide(PLAIN, 'npm test')).toBe('allow');
   });
 
-  it('защита бэкенда проекта: узнанное уходит человеку мимо авторежима, прочее — как было', async () => {
-    await send(PLAIN);
-    const commands = [
-      'kubectl apply -f deploy.yaml',
-      'psql -h db.prod.internal -c "select 1"',
-      'alembic downgrade -1',
-    ];
-    // Без защиты эти команды авторежим пропускает: ни одно правило панели их не держит.
-    for (const command of commands) expect(await decide(PLAIN, command)).toBe('allow');
-
-    mkdirSync(join(work, '.claude'), { recursive: true });
-    writeFileSync(
-      join(work, '.claude', 'backend-guard.json'),
-      JSON.stringify({ version: 1, prodMarkers: ['db.prod.internal'], disabled: [] }),
-    );
-    for (const command of commands) expect(await decide(PLAIN, command)).toBe('card');
-    // Обычная работа с защитой не спотыкается.
-    expect(await decide(PLAIN, 'npm test')).toBe('allow');
-    expect(await decide(PLAIN, 'kubectl get pods')).toBe('allow');
-  });
-
-  it('глобально выключен — acceptEdits, рутина спрашивает человека', async () => {
+  it('глобально выключен — acceptEdits', async () => {
     store.updateSettings({ chatAutoMode: false });
     expect((await send(PLAIN)).permissionMode).toBe('acceptEdits');
-    expect(await decide(PLAIN, 'npm test')).toBe('card');
   });
 
   it('выключенный в чате сильнее включённого глобально — и переживает перезапуск', async () => {
@@ -203,7 +153,6 @@ describe('авторежим прав чата', () => {
     expect(view).toEqual({ enabled: false, override: false, global: true, allowEdits: false });
 
     expect((await send(PLAIN)).permissionMode).toBe('acceptEdits');
-    expect(await decide(PLAIN, 'npm test')).toBe('card');
 
     // Перезапуск: выбор чата — на диске, а не в памяти прогона.
     await restart();
@@ -214,12 +163,10 @@ describe('авторежим прав чата', () => {
     store.updateSettings({ chatAutoMode: false });
     await toggle(PLAIN, true);
     expect((await send(PLAIN)).permissionMode).toBe('auto');
-    expect(await decide(PLAIN, 'npm test')).toBe('allow');
   });
 
-  it('haiku: CLI опустил бы авторежим до default — acceptEdits и автоподтверждение панели', async () => {
+  it('haiku: CLI опустил бы авторежим до default — acceptEdits', async () => {
     expect((await send(PLAIN, { model: 'haiku' })).permissionMode).toBe('acceptEdits');
-    expect(await decide(PLAIN, 'npm test')).toBe('allow');
   });
 
   // Раньше здесь проверялось, что прогон чужого CLI идёт в `acceptEdits`, — но
@@ -237,44 +184,5 @@ describe('авторежим прав чата', () => {
     expect(reply.statusCode).toBe(409);
     expect(reply.json()).toMatchObject({ messageCode: 'chat-send-foreign-provider' });
     expect(runs.some((item) => item.options.permissionPrompt?.runId === PLAIN)).toBe(false);
-  });
-
-  it('безвозвратное в авторежиме уходит человеку, и чат из родителя показывает запрос в его хабе', async () => {
-    // Чат, заведённый из родителя вручную, — не группа разделения: связь ему
-    // ставит сама отправка (`parentChatId`).
-    await send(CHILD, { parentChatId: 'parent' });
-    const toolUseId = 'toolu_rollback';
-    const pending = app.inject({
-      method: 'POST',
-      url: '/api/chat/permission-request',
-      payload: {
-        runId: CHILD,
-        toolName: 'Bash',
-        input: { command: 'git checkout -- package-lock.json && git status' },
-        toolUseId,
-      },
-    });
-    await tick();
-
-    const tree = (
-      await app.inject({ method: 'GET', url: '/api/chat/parent/tree' })
-    ).json<ChatTreeView>();
-    const node = tree.nodes.find((item) => item.chatId === `sess-${CHILD}`);
-    expect(node?.asks).toEqual([
-      expect.objectContaining({ kind: 'permission', runId: CHILD, toolUseId }),
-    ]);
-    const awaiting = (
-      await app.inject({ method: 'GET', url: '/api/chat/awaiting' })
-    ).json<ChatAwaitingView>();
-    expect(awaiting.chats).toEqual([
-      expect.objectContaining({ parentChatId: 'parent', kind: 'permission' }),
-    ]);
-
-    await app.inject({
-      method: 'POST',
-      url: `/api/chat/${CHILD}/permission-decision`,
-      payload: { toolUseId, behavior: 'deny' },
-    });
-    expect((await pending).json()).toMatchObject({ behavior: 'deny' });
   });
 });

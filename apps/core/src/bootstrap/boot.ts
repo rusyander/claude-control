@@ -5,4 +5,5 @@
  */
 export { bootCore } from './boot/boot-core.ts';
 export { BACKUP_EVERY_MS } from './boot/timers.ts';
+export { CoreHomeBusy } from './boot/home-lock.ts';
 export type { BootedCore, BootOptions } from './boot/boot.types.ts';

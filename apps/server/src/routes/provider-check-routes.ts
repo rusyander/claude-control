@@ -6,6 +6,8 @@ import type {
 } from '@agentdeck/contracts';
 import type { ServerContext } from '../context.ts';
 import { checkProvider, createCoreRoutesReader } from '../domains/provider-check/provider-check.ts';
+import { createCoreAskPort } from '../domains/core-ask/core-ask.ts';
+import { askOneShot } from '../domains/core-ask/one-shot.ts';
 import { getProvider, isKnownProviderId } from '../providers/registry.ts';
 import { coreHomeOf } from '../lib/hop-recorder.mjs';
 import { createCoreIdentityDeps } from '../lib/listen-identity/listen-identity.ts';
@@ -30,6 +32,8 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
     home: () => coreHomeOf(),
     identity: createCoreIdentityDeps(),
   });
+  // Шаг ассистента — вопрос ядра «ask» проверяемым CLI (без профиля «Ассистент панели»).
+  const askPort = createCoreAskPort(() => coreHomeOf());
 
   app.get(
     '/api/providers/checks',
@@ -65,6 +69,13 @@ export function registerProviderCheckRoutes(app: FastifyInstance, ctx: ServerCon
         // Только кэш каталога: проверка не должна ждать сеть ради имени модели.
         models: ctx.models.current(provider.modelVendors ?? []).models,
         coreRoutes,
+        ask: (providerId, prompt, timeoutMs) =>
+          askOneShot(askPort, ctx.store, ctx.location.paths.appData, {
+            title: `provider check · ${providerId}`,
+            adapter: providerId,
+            messages: [{ role: 'user', content: prompt }],
+            timeoutMs,
+          }),
       });
 
       ctx.store.saveProviderCheck(result);

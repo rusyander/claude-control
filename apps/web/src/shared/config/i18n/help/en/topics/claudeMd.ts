@@ -39,7 +39,7 @@ export const claudeMdEn: typeof claudeMdRu = {
       'confused with most often.',
     diffRules: 'Not the “Rules” section',
     diffRulesText:
-      'There you get a card per rule: a toggle, groups, the assistant, a link to ' +
+      'There you get a card per rule: a toggle, the assistant, a link to ' +
       'one rule. Here there is one field for the whole file, and the text goes to ' +
       'disk as is. Take this section when the structure of the file matters, not ' +
       'one rule.',
@@ -149,7 +149,7 @@ export const claudeMdEn: typeof claudeMdRu = {
         'out of the session — it is read in full.',
       orderMarks: 'The panel’s marks are not a level of instructions',
       orderMarksText:
-        'What is switched off and which groups hold what, the panel keeps in its own ' +
+        'Which rules are switched off, the panel keeps in its own ' +
         'state.json. Claude Code never reads that file: it decides one thing only — ' +
         'how the panel assembles the personal CLAUDE.md on the next write.',
       orderWhen: 'When an edit arrives',
@@ -174,8 +174,7 @@ export const claudeMdEn: typeof claudeMdRu = {
     cantRename:
       'Rename the file or create a second one: the name is the CLI’s decision, and the panel does not change it',
     cantPreview: 'Get a markdown preview or syntax highlighting: this is a plain text field',
-    cantToggle:
-      'Switch a single rule off with a toggle or build a group out of rules — that is the “Rules” section',
+    cantToggle: 'Switch a single rule off with a toggle — that is the “Rules” section',
     cantHistory:
       'See an edit history right here: copies go to backups, and the rollback lives in “Settings”',
     cantMerge:

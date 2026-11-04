@@ -47,7 +47,7 @@ const SITE = { enabled: false, baseUrl: '', email: '', deployment: '' };
 const FORGE_SITE = { enabled: false, baseUrl: '', repo: '' };
 const TMS = { enabled: false, baseUrl: '', projectKey: '', groupId: '' };
 /** Подписка по умолчанию (`app-settings.ts`): снимок показывает те галочки, что увидит человек. */
-const DEFAULT_EVENTS = ['runError', 'testFailed', 'budget', 'groupSignal'];
+const DEFAULT_EVENTS = ['runError', 'testFailed', 'budget'];
 const TELEGRAM = card('Telegram');
 
 export async function shootAtlassian(browser, web, scenario, { panel, upstream }) {

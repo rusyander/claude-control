@@ -31,7 +31,7 @@ export const phoneEn: typeof phoneRu = {
       'a notification arrives when the work is done, has failed or has hit a question.',
     whyAnswer: 'Answer, not just find out',
     whyAnswerText:
-      'An agent question, a permission request and «first edit in the main copy» are answered ' +
+      'An agent question and a permission request are answered ' +
       'right from the phone. The answer goes out as the same message the desk chat would send ' +
       '— the agent carries on without waiting for you to get back to the desk.',
     whySame: 'One set of data, nothing is copied',
@@ -50,9 +50,10 @@ export const phoneEn: typeof phoneRu = {
       'network. On that same machine tailscale serve accepts it and passes it to ' +
       '127.0.0.1:5178 — the panel server. The server lets the request in only if its token is ' +
       'in the Authorization header (with «Require a token» on). From there everything is as ' +
-      'from the browser: the server reads the Claude Code files, starts the CLI for a chat turn ' +
-      'and streams the events back. Notifications take a different road: the panel sends the ' +
-      'Expo service only the event kind and the project folder name, and Expo wakes the phone.',
+      'from the browser: the server reads the Claude Code files, hands a chat turn to the task ' +
+      'core and streams the events back. Notifications take a different road: the panel sends ' +
+      'the Expo service only the event kind and the project folder name (for a core question — ' +
+      'the task title), and Expo wakes the phone.',
 
     screensTitle: 'What each screen holds',
     screensCaption:
@@ -71,7 +72,10 @@ export const phoneEn: typeof phoneRu = {
       'CLI signed in with an API key has no subscription limits, and then there is no line. ' +
       'On top, a summary: how many conversations are running, ' +
       'how many need you (a tap leads to «Questions») and in how many projects. Under «New ' +
-      'chat» you see the project it will start in, and «change» leads to the projects. ' +
+      'chat» you see the project it will start in, and «change» leads to the projects. The ' +
+      '«Core tasks» button opens the task core’s tasks: running ones on top, each marked ' +
+      '«running», «ended» or «needs a human»; inside a task are its open questions, and an ' +
+      'answer goes out signed with the phone’s key. ' +
       'Conversations of a project copy sit under their main ' +
       'project. Refreshes every 5 seconds; the number on the tab is how many answers are ' +
       'waiting for you. A conversation running in a terminal or VS Code is «working» too: its ' +
@@ -87,17 +91,25 @@ export const phoneEn: typeof phoneRu = {
     screenQuestions: 'Home → «Questions»',
     screenQuestionsText:
       'Everything that waits for a human, one card per chat: agent questions with options, ' +
-      'permission requests and «first edit in the main copy». Cards come oldest first; the ' +
+      'permission requests. Cards come oldest first; the ' +
       'answers of one chat are collected and sent as one message. When a group is restarted and ' +
       'the panel starts a new conversation instead of the old one, the old one’s questions leave ' +
       'the screen: nobody is waiting for them any more. Under the card title is whose ' +
       'question it is: the CLI, the panel or «outside the panel», whether it is a background ' +
-      'turn, and for a split group its number, title, stage and parent conversation. A ' +
+      'turn, and for a group its number, title, stage and parent conversation. A ' +
       'request to launch an agent names what it is asked to do, which agent, which model, ' +
       'which effort and whether it runs in the background. At the top of the tab sits an ' +
       '«Awaiting decision (N)» block: D-n calls the agents set aside while they keep working ' +
       '(the «Chat» document), with the reason and «Deny» and «Allow» buttons; an expired ' +
-      'item can be «Allowed again». The badge on the «Questions» tab counts them too.',
+      'item can be «Allowed again». The badge on the «Questions» tab counts them too. A chat ' +
+      'turn runs as a core task, and its permission request arrives as a «Core question» card — ' +
+      'with the core’s question text, as in the panel window. The answer goes to the core ' +
+      'itself as a command signed with the phone’s key: «Allow» gives an edit grant and answers ' +
+      '«grant» (for a service-endpoint question — «allow»), «Deny» answers «refuse». With no ' +
+      'signing key for this panel nothing leaves and the card names the reason: bind the phone ' +
+      'in «Decision signing» and press «Copy keys to the core». A core refusal is shown in ' +
+      'the core’s words too; only an answer the core has recorded removes the card. The same ' +
+      'card and the same answer appear in the chat itself.',
     screenChat: 'Chat',
     screenChatText:
       'The same conversation as in the panel: the messages, the agent turn live, which agents ' +
@@ -242,11 +254,18 @@ export const phoneEn: typeof phoneRu = {
       'In the panel window — «Revoke» on a key. Revoking only tightens, so it needs no ' +
       'signature. A revoked key is never bound again — the phone creates a new one. Revoking ' +
       'the last key while the mode is on gets its own warning: after it nobody can «Allow».',
+    signingCore: '5. Copy keys to the task core',
+    signingCoreText:
+      'The task core checks phone signatures with its own keys. On the «Phone signing» card ' +
+      'press «Copy keys to the core»: the core receives the bound keys and this machine’s ' +
+      'number, and answers to core questions from the phone are accepted. Repeat after ' +
+      'binding or revoking a key.',
     signingColumn: 'What',
     signingMeaningColumn: 'With the mode on',
     signingAllow: '«Allow»',
     signingAllowText:
-      'Chat permissions, D-n asks, branch gates, panel-agent cards, turning auto-approve on, ' +
+      'Chat permissions (on a «Core question» card the core itself checks the signature), D-n ' +
+      'asks, panel-agent cards, turning auto-approve on, ' +
       'sending with full access or auto-approve — only with a signature. The phone signs by ' +
       'itself: there is nothing extra to press.',
     signingDeny: '«Deny» and «Stop»',
@@ -258,11 +277,13 @@ export const phoneEn: typeof phoneRu = {
     signingTelegram: 'Telegram',
     signingTelegramText:
       '«Allow» from Telegram is refused: modified window code can rewrite the bot settings, so ' +
-      'an answer from the chat proves nothing.',
+      'an answer from the chat proves nothing. A task core question arrives by push and in ' +
+      'Telegram once, with a link to the task; with no channel set up it waits and goes out ' +
+      'as soon as a channel is turned on. It cannot be answered in Telegram.',
     signingLevers: 'Loosening rights',
     signingLeversText:
       'Changes that loosen the rights of every future decision — auto mode in every chat, ' +
-      'auto-approve rules, group permissions, settings import — are refused. Turn the mode off ' +
+      'group permissions, settings import — are refused. Turn the mode off ' +
       'on the phone, make the change, then turn it back on.',
     signingRefusal: 'Signature refused',
     signingRefusalText:
@@ -299,8 +320,8 @@ export const phoneEn: typeof phoneRu = {
       'from the server. There is no need to reopen the app.',
     offlineAgent: 'A panel agent turn',
     offlineAgentText:
-      'Sending the app to the background or losing the connection does not stop the turn: the ' +
-      'agent finishes what it started on the computer, and the phone, back on screen, attaches ' +
+      'Sending the app to the background or losing the connection does not stop the turn: a ' +
+      'task core session on the computer runs it, the agent finishes what it started, and the phone, back on screen, attaches ' +
       'to the turn again and draws what happened meanwhile. A turn with no phone waits ten ' +
       'minutes for it, then is stopped; what was said stays in «History». A finished turn hands ' +
       'its ending to the phone for one more minute, after that only «History» has it.',
@@ -325,7 +346,8 @@ export const phoneEn: typeof phoneRu = {
     offlinePushText:
       'The panel sends them. If the panel is asleep nothing arrives, even if an agent is ' +
       'waiting somewhere. Tapping a notification opens its conversation: a Claude chat in its ' +
-      'project, another CLI’s conversation on its own screen; a notification from another ' +
+      'project, another CLI’s conversation on its own screen, a task core question its task ' +
+      '(the same tasks are under «Core tasks» on the home screen); a notification from another ' +
       'computer selects that computer first. The phone itself polls the ' +
       'computer in the background in one case only: you left an open conversation of another ' +
       'CLI in the middle of an answer — then the end of the answer and a permission request ' +
@@ -355,7 +377,8 @@ export const phoneEn: typeof phoneRu = {
       'No: requests travel over your Tailscale network straight to your machine. Only ' +
       'notifications leave it, to the Expo service — the event kind, the project folder name ' +
       'and a random machine number (the phone tells by it which computer the notification is ' +
-      'from; the machine name does not leave).',
+      'from; the machine name does not leave). A notification about a task core question ' +
+      'carries the task title and its number instead of the folder.',
     notKeys: 'A place for keys',
     notKeysText:
       'No: the contour key, MCP secrets and integration tokens are entered only in the panel ' +
@@ -462,7 +485,10 @@ export const phoneEn: typeof phoneRu = {
       pairOn: 'Turn on «Require a token»',
       pairOnText:
         'From now on every request must carry the token — from the phone and from the browser ' +
-        'on this same computer (the panel hands the token to the browser itself, nothing to do).',
+        'on this same computer (the panel hands the token to the browser itself, nothing to do). ' +
+        'Only the panel agent comes with a token of its own instead, and only to its own actions: ' +
+        'that token lives while its turn runs, and one that has expired or came to the wrong ' +
+        'place gets 401 whatever the toggle says.',
       pairCode: 'Show the pairing code',
       pairCodeText:
         'The QR code carries the address and the token; under it is the same token as text in ' +

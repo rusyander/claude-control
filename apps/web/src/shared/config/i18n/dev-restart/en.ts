@@ -4,7 +4,7 @@ import type { devRestartRu } from './ru.ts';
 export const devRestartEn: typeof devRestartRu = {
   title: 'Server edits are waiting for a restart',
   waitingRuns: 'The server restarts on its own once the running chat turns finish.',
-  waitingSetup: 'The server restarts on its own once split groups finish preparing their copies.',
+  waitingSetup: 'The server restarts on its own once tasks finish preparing their copies.',
   waitingChecks:
     'The server restarts on its own once the running project autotests and mutation checks finish.',
   waitingBoth:

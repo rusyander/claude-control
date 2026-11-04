@@ -10,7 +10,13 @@ import { compat } from '../compat/compat.ts';
 
 const adapter: CompatAdapter = {
   id: 'claude',
-  caps: { login: 'account', channels: [], limitsChannel: null },
+  caps: {
+    login: 'account',
+    channels: [],
+    limitsChannel: null,
+    preToolHooks: true,
+    denyOverlay: true,
+  },
   bypassActive: {},
 };
 const policy = (required: boolean): CompatPolicy => ({

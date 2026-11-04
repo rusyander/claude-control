@@ -26,6 +26,11 @@ export interface SentEntry {
   kind: 'bot' | 'owner';
   /** Куда уйдёт ответ-reply на это сообщение (уведомление о чате). */
   route?: ChatRoute;
+  /**
+   * Сообщение о вопросе ядра задач (`domains/core-relay`): reply на него ответом НЕ становится —
+   * ответ ядру доказывает только панель или подпись телефона, владелец получает отказ со ссылкой.
+   */
+  coreAsk?: { taskId: string; askId: string; deepLink: string };
 }
 
 export class SentLog {

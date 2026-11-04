@@ -15,8 +15,6 @@ export const panelActionsProjectsRu = {
   add_project_permission: 'Добавить право проекта',
   edit_project_permission: 'Изменить право проекта',
   remove_project_permission: 'Удалить право проекта',
-  read_project_group_choice: 'Выбор групп в проекте',
-  set_project_group_choice: 'Сменить сторону пары групп в проекте',
   git_checkout: 'Переключить ветку',
   git_create_branch: 'Создать ветку',
   git_commit: 'Закоммитить изменения',

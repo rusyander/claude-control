@@ -191,6 +191,8 @@ describe('proxy refusal codes', () => {
       'core-unverified',
     );
     expect(coreRefusalOf({ code: 'core-absent' })).toBe('core-absent');
+    expect(coreRefusalOf({ code: 'core-starting' })).toBe('core-starting');
+    expect(coreRefusalOf({ response: { data: { code: 'core-fault' } } })).toBe('core-fault');
     expect(coreRefusalOf({ response: { data: { code: 'no-task' } } })).toBeUndefined();
     expect(coreRefusalOf('core-absent')).toBeUndefined();
   });

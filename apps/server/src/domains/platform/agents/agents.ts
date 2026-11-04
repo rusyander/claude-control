@@ -7,7 +7,7 @@ import type {
 } from '@agentdeck/contracts';
 import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
 import { foreignTail } from '../redact/redact.ts';
-import { callUpstream, UpstreamError } from '../gateway/upstream/upstream.ts';
+import { callUpstream, UpstreamError } from '../upstream/upstream.ts';
 import { driverOf } from '../drivers/index.ts';
 import type { DriverAgents } from '../drivers/driver.ts';
 import { agentsNotDeclared } from '../errors.ts';

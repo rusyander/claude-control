@@ -1,5 +1,6 @@
 import type { CommandEnvelope, CommandOutcome } from '@agentdeck/contracts/core/commands';
 import type { HopControlReply, HopControlRequest } from '@agentdeck/contracts/core/hops';
+import type { DeliveryReply } from '@agentdeck/contracts/core/publish';
 import type { RouteId, RouteKind } from '@agentdeck/contracts/core/routes';
 import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { ModelRank } from '../../policy/resolve/risky.ts';
@@ -31,6 +32,16 @@ export interface CommandEnv {
    * лестницам переходников (`bootEconomy.ladders`). Нет — ранг неизвестен, и предупреждение `set-model` называет это, а не молчит.
    */
   modelRank?: ModelRank;
+  /**
+   * Сверка загрузки (`bootstrap/boot-reconcile.ts`) для ответа «повторить сверку» на точку 4: нет —
+   * действие всё равно снова начатое в журнале, его прочтёт следующая загрузка ядра.
+   */
+  reconcile?(): ReconcileRecheckPort | undefined;
+}
+
+/** Повторная сверка по таймеру загрузки: названное действие идёт в ближайший проход. */
+export interface ReconcileRecheckPort {
+  recheck(taskId: string, actionId: string): void;
 }
 
 export interface CleanRemoteReport {
@@ -50,6 +61,11 @@ export interface PublisherCommandPort {
     task: LiveTask,
     input: { refs: string[]; remote: string | null },
   ): Promise<CleanRemoteReport | { unknown: string }>;
+  /**
+   * Проба сдачи копии единицы тем же судом, что шаг публикации (`GET /v1/delivery`,
+   * `tests-cli delivery`); копия не единицы ядра — `missing`.
+   */
+  delivery(copy: string): Promise<DeliveryReply | { missing: string }>;
 }
 
 /** Что `set-route` нужно знать о маршрутах загрузки: реестр и активный контур. */

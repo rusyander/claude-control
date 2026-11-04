@@ -5,14 +5,14 @@ import {
   type CascadeStage,
 } from '@agentdeck/contracts/model-cascade';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
-import type { PathStep } from '@agentdeck/contracts/group-path';
 import { groupKeyOf } from '@agentdeck/contracts/group-sources';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
 import { leverWorks } from '@agentdeck/contracts/group-economy-support';
 import { getProvider } from '../../../providers/registry.ts';
 import { knobsLineForChoice } from '../../groups/knobs/knobs.ts';
 import { readChat } from '../../provider-chat/store/store.ts';
-import { chatPathSteps, scenarioLine, skillInsertsLine } from '../path-steps/path-steps.ts';
+import { scenarioLine, skillInsertsLine } from '../path-steps/path-steps.ts';
 import { childAppendPrompt, stageOf } from '../ChatCascadeStages/ChatCascadeStages.ts';
 import { chatGroupSettingsView, storeTreeReader } from '../chat-autonomy/chat-autonomy.ts';
 import { pinnedChoiceAt } from '../group-auto-pick/group-auto-pick.ts';
@@ -29,15 +29,15 @@ import { WORK_HABITS_SHARED_NOTE } from '../group-profile/group-profile.ts';
  * (с учётом дерева — ребёнок разделения наследует выбор родителя), и для звена
  * работы — как поднять критическое в главный чат.
  *
- * Дописку звена собирают три места — старт ребёнка (`split-launch.ts`), ответ
- * человека в него (`childAppendPrompt`) и переход стадии (`handoff-routes.ts`),
- * — и все берут дополнение ОТСЮДА: разойдись они хоть словом, ход не совпал бы
- * подписью с живым процессом и пошёл бы холодным `--resume`.
+ * Дописку звена собирают два места — ответ человека в него (`childAppendPrompt`)
+ * и переход стадии (`handoff-routes.ts`) — и оба берут дополнение ОТСЮДА:
+ * разойдись они хоть словом, ход не совпал бы подписью с прежним и пошёл бы
+ * холодным `--resume`.
  */
 
 type GroupStore = Pick<
   AppStore,
-  'getGroups' | 'getChatGroupSettings' | 'getChatLink' | 'canonicalChatKey' | 'getSettings'
+  'getGroups' | 'getChatGroupSettings' | 'getChatLink' | 'canonicalChatKey'
 >;
 
 /**
@@ -69,7 +69,7 @@ function chatGroupChoice(
  * вёл бы прогон по шагам и строкам неактивной половины пары — той, что
  * включение на старте уже не включает.
  */
-export function runGroupChoice(
+function runGroupChoice(
   store: GroupStore,
   appData: string,
   keys: readonly string[],
@@ -78,17 +78,6 @@ export function runGroupChoice(
 ): string {
   const choice = chatGroupChoice(store, keys, pendingParent);
   return pinnedChoiceAt(store.getGroups(), appData, choice, cwd);
-}
-
-/** Свои шаги «Пути» группы прогона после стадии (`chatPathSteps`) — по `runGroupChoice`. */
-export function runPathSteps(
-  store: GroupStore,
-  appData: string,
-  aliases: readonly string[],
-  stage: CascadeStage,
-  cwd: string | undefined,
-): PathStep[] {
-  return chatPathSteps(store.getGroups(), runGroupChoice(store, appData, aliases, cwd), stage);
 }
 
 /**
@@ -159,13 +148,13 @@ export function linkedChildAppend(
 
 /**
  * Строка привычек группы чужого CLI (рычаг `workHabits`) — общая часть строки
- * Claude, без фразы про `cd`. Рычаг — закреплённый на первом старте разговора
- * (`linkEconomy` в runtime): строка едет в начале переписки, и смена посреди тёплой сессии
- * переписала бы её кэш, как у Claude. Рычагов в настройках нет — строки нет.
+ * Claude, без фразы про `cd`. Рычага в настройках панели больше нет (этап 10, G15:
+ * рычаги экономии шагов задачи — раздел `economy` ядра), строка идёт по умолчанию
+ * рычага — включена. Звено, стартовавшее с выключенным рычагом, помнит его в
+ * связи (`ChatLink.economy`): строка едет в начале переписки, и смена посреди
+ * тёплой сессии переписала бы её кэш.
  */
 function foreignHabits(store: GroupStore, chatKey: string): string | undefined {
-  const current = store.getSettings().groupEconomy;
-  if (!current) return undefined;
   // Каталог CLI говорит, что строке у него нечего менять (aider: инструментов нет) —
   // строки нет: отметка «не нужен» и токены каждого хода не должны расходиться.
   const providerId = parseForeignChatKey(chatKey)?.providerId;
@@ -173,11 +162,8 @@ function foreignHabits(store: GroupStore, chatKey: string): string | undefined {
     ? getProvider(providerId).groupEconomy?.support.workHabits
     : undefined;
   if (declared && !leverWorks(declared)) return undefined;
-  // Только смотрит: закрепляет рычаги старт прогона (`setChildRun` в runtime), как
-  // у Claude. Дополнение строится и при заведении звена, задолго до его хода
-  // (отложенный старт) — закрепление здесь брало бы рычаги того момента.
-  const economy = store.getChatLink(chatKey)?.economy ?? current;
-  return economy.workHabits ? WORK_HABITS_SHARED_NOTE : undefined;
+  const pinned = store.getChatLink(chatKey)?.economy?.workHabits;
+  return (pinned ?? GROUP_ECONOMY_DEFAULTS.workHabits) ? WORK_HABITS_SHARED_NOTE : undefined;
 }
 
 /**

@@ -58,7 +58,7 @@ export const contourEn: Record<ContourMessageCode, string> = {
   'contour-probe-not-json': 'the answer does not parse as JSON',
   'contour-probe-no-models-field':
     'the answer holds no model list (neither a data field nor an array)',
-  'contour-probe-ok': 'The contour answered: {{count}} models.',
+  'contour-probe-ok': 'The contour answered, models: {{count}}.',
   'contour-probe-timeout': 'The contour did not answer within {{seconds}} s.',
   'contour-address-admin':
     'This looks like the admin address: the public API lives on a separate host (usually api.<domain>).',
@@ -124,6 +124,7 @@ export const contourEn: Record<ContourMessageCode, string> = {
   'contour-required-cli-config':
     'The contour «{{title}}» is required, and the CLI config has {{setting}} — with it the run or part of it would bypass the contour, and the CLI offers no environment variable to override it. The run was not started. Fix that setting in the CLI config or switch the provider back to the default one.',
   'contour-target-assistant': 'Panel assistant',
+  'contour-profile-name': 'Contour · {{title}}',
   'contour-bridge-script-missing':
     'The bridge script tools/mcp/platform.mjs was not found — the panel was started outside its own repository.',
 };

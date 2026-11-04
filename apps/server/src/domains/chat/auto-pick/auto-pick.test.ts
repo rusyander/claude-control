@@ -90,7 +90,6 @@ describe('recommendedPicks — что автономия выбирает сам
       expect(recommendedPicks(input)).toBeNull();
   });
 });
-import { translate } from '../ChatRunner/ChatRunner.ts';
 
 /**
  * Автовыбор узнаётся по результату вызова — одному на оба пути (хук и брокер).
@@ -140,22 +139,6 @@ describe('автовыбор по результату вызова', () => {
   it('тела нет — разбор текста, критичность неизвестна', () => {
     expect(picksFor(undefined, MESSAGE)).toEqual([
       { question: 'Какой путь?', label: 'Надёжный (Recommended)', critical: false },
-    ]);
-  });
-
-  it('поток CLI: строка `user` с результатом-меткой → событие autoPick', () => {
-    const events = translate({
-      type: 'user',
-      message: { content: [{ type: 'tool_result', tool_use_id: 'q1', content: MESSAGE }] },
-    } as Parameters<typeof translate>[0]);
-    expect(events).toEqual([
-      {
-        kind: 'autoPick',
-        toolUseId: 'q1',
-        picks: [{ question: 'Какой путь?', label: 'Надёжный (Recommended)', critical: false }],
-      },
-      // Тот же результат — и реестру: запрос прав по нему, если висит, мёртв.
-      { kind: 'toolResult', toolUseId: 'q1', chars: MESSAGE.length },
     ]);
   });
 

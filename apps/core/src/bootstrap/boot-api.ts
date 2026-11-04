@@ -6,6 +6,7 @@ import { registerSessionTools } from '../api/session-tools.ts';
 import type {
   ClearExhaustedPort,
   PublisherCommandPort,
+  ReconcileRecheckPort,
   SetRoutePorts,
 } from '../conductor/commands/commands.types.ts';
 import { ladderRank } from '../conductor/commands/set-model.ts';
@@ -20,6 +21,8 @@ import { createNonceStore } from '../policy/authority/nonce.ts';
 import type { SessionTokens } from '../policy/session-tokens/session-tokens.ts';
 import { devicesPortOf, loadSigningDevices, machineIdOf, type DevicesNote } from './devices.ts';
 import { humanPolicyOf } from './human-policy.ts';
+import { processPin } from './conductor-wiring/session-start.ts';
+import { createMcpOffersPort } from './mcp-offers.ts';
 import type { SessionRuntime } from './session-runtime.ts';
 import type { TrustedHops } from './trusted-hops.ts';
 import { createSessionPeerCheck, sessionRootsOf } from './session-peers.ts';
@@ -63,6 +66,8 @@ export interface BootApiDeps {
   routes?: () => SetRoutePorts | undefined;
   /** Клиент хоста звеньев для команды `clear-exhausted`; без него — отказ `hop-unwired`. */
   hops?: () => ClearExhaustedPort | undefined;
+  /** Таймер сверки загрузки для ответа «повторить сверку»; нет — сверит следующая загрузка. */
+  reconcile?: () => ReconcileRecheckPort | undefined;
   /** Публикатор дирижёра для `publish-now` / `clean-remote`; без него — отказ `publisher-unwired`. */
   publisher?: () => PublisherCommandPort | undefined;
   /** Настройка ядра для `/v1/config` (этап 7); нет — 501 «не подключена». */
@@ -80,11 +85,27 @@ export interface BootApiDeps {
   routeList?: ApiDeps['routes'];
   /** Доверенные звенья пересылки, записанные надзором (P131); нет — звеньев нет. */
   trustedHops?: Pick<TrustedHops, 'pids' | 'view'>;
+  /** Реестр переходников загрузки для вида сеанса (этап 10); нет — `…/stream` отвечает 501. */
+  adapters?: ApiDeps['adapters'];
+  /** Удержание своей модели панелью (этап 10, зона C); нет — `/v1/local/*` отвечает 501. */
+  localHold?: ApiDeps['localHold'];
+  /** Учёт контуров звена (этап 10, C3b); нет — `/v1/contours*` отвечает 501. */
+  contours?: ApiDeps['contours'];
+  /** Прокси защиты данных человека (C3c); нет — `/v1/dlp-proxy*` отвечает 501. */
+  dlpProxy?: ApiDeps['dlpProxy'];
+  /** Лёгкая сессия панели `/v1/ask` (этап 10, F2): дирижёр + книга токенов моста. */
+  ask?: ApiDeps['ask'];
+  /** Ревью MR по ссылке (этап 10, F8): проводка дирижёра, пока он жив. */
+  reviewLink?: ApiDeps['reviewLink'];
 }
 
 export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
   const { registry, sessionTokens, verifier } = deps;
   const devicesPort = devicesPortOf(deps.layout, deps.note);
+  // Номер машины создаётся загрузкой (как прежде), читается — на каждой подписи (ниже).
+  machineIdOf(deps.layout);
+  // Пин — тот же, что получают сеансы задач (`processPin`): экран видит серверы, которые увидит CLI.
+  const offers = deps.adapters ? createMcpOffersPort(deps.adapters, processPin()) : undefined;
   const app = buildApi({
     registry,
     env: {
@@ -92,6 +113,7 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       split: () => deps.split(),
       ...(deps.routes ? { routes: deps.routes } : {}),
       ...(deps.hops ? { hops: deps.hops } : {}),
+      ...(deps.reconcile ? { reconcile: deps.reconcile } : {}),
       ...(deps.publisher ? { publisher: deps.publisher } : {}),
       ...(deps.ladders ? { modelRank: ladderRank(deps.ladders) } : {}),
     },
@@ -112,7 +134,11 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       trustedHopPids: deps.trustedHops?.pids ?? new Set(),
     },
     signature: {
-      machineId: machineIdOf(deps.layout),
+      // Читается на каждой подписи, а не при загрузке: перенос устройств меняет номер на номер
+      // машины панели (этап 10, Q5), и следующая же подпись телефона судится уже им.
+      get machineId() {
+        return machineIdOf(deps.layout);
+      },
       devices: () => loadSigningDevices(deps.layout, deps.note),
       now: Date.now,
     },
@@ -123,6 +149,14 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
     ...(deps.routePrice ? { routePrice: deps.routePrice } : {}),
     ...(deps.routeList ? { routes: deps.routeList } : {}),
     ...(deps.trustedHops ? { trustedHops: deps.trustedHops.view } : {}),
+    ...(deps.adapters ? { adapters: deps.adapters } : {}),
+    // Предложения MCP читаются на каждом запросе: правка конфига CLI видна без перезапуска ядра.
+    ...(offers ? { mcpOffers: () => offers } : {}),
+    ...(deps.localHold ? { localHold: deps.localHold } : {}),
+    ...(deps.contours ? { contours: deps.contours } : {}),
+    ...(deps.dlpProxy ? { dlpProxy: deps.dlpProxy } : {}),
+    ...(deps.ask ? { ask: deps.ask } : {}),
+    ...(deps.reviewLink ? { reviewLink: deps.reviewLink } : {}),
     // Ключи телефона в устройства ядра (G9): тот же дом и журнал, что у чтения списка выше.
     devices: () => devicesPort,
   });

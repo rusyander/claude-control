@@ -4,8 +4,6 @@ import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'nod
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { AppSettings } from '@agentdeck/contracts';
-import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
-import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import { getStoredKey, setStoredKey } from '../../lib/provider-keys/provider-keys.ts';
 import type { ServerContext } from '../../context.ts';
@@ -80,24 +78,11 @@ describe('config-routes: валидация настроек и импорта',
   const importState = (payload: unknown) =>
     app.inject({ method: 'POST', url: '/api/settings/import', payload: payload as object });
 
-  // F-19 ревью П1: переменная сильнее рычага, и карточка обязана это знать.
-  it('/api/system называет порог сжатия групп из переменной панели, без неё — null', async () => {
-    const saved = process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
-    const windowEnv = async () =>
-      (await app.inject({ url: '/api/system' })).json<{ groupCompactWindowEnv: number | null }>()
-        .groupCompactWindowEnv;
-    try {
-      process.env.AGENTDECK_GROUP_COMPACT_WINDOW = '160k';
-      expect(await windowEnv()).toBe(160_000);
-      // Вне границ CLI переменная не действует — и карточка её не называет.
-      process.env.AGENTDECK_GROUP_COMPACT_WINDOW = '50k';
-      expect(await windowEnv()).toBeNull();
-      delete process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
-      expect(await windowEnv()).toBeNull();
-    } finally {
-      if (saved === undefined) delete process.env.AGENTDECK_GROUP_COMPACT_WINDOW;
-      else process.env.AGENTDECK_GROUP_COMPACT_WINDOW = saved;
-    }
+  // Карточка экономии групп снята (этап 10, G15): порог из переменной панели больше некому показать.
+  it('/api/system не называет порог сжатия групп — его читала только снятая карточка', async () => {
+    const system = (await app.inject({ url: '/api/system' })).json<Record<string, unknown>>();
+    expect(system).not.toHaveProperty('groupCompactWindowEnv');
+    expect(system).toHaveProperty('machineId');
   });
 
   describe('PATCH /api/settings', () => {
@@ -109,65 +94,112 @@ describe('config-routes: валидация настроек и импорта',
       expect((await getSettings()).theme).toBe('dark');
     });
 
-    // F-03: блок целиком в state.json замораживал все умолчания — их будущая
-    // смена в коде до этого пользователя не доходила.
-    it('рычаг экономии групп: на диске только отличия от умолчаний, в ответе — слитый блок', async () => {
-      const res = await patch({ groupEconomy: { bashOutputChars: 4000 } });
+    /**
+     * «Добавить профиль» шлёт черновик с пустым адресом: адрес человек впишет
+     * следующим шагом. Схема с обязательным адресом отвечала 400, и кнопка не
+     * добавляла профиль вовсе. Пустой адрес — незаполненный профиль: применить
+     * и проверить связь его не дают сами эти ручки (`endpoint-base-url-invalid`).
+     */
+    it('черновик профиля эндпоинта с пустым адресом сохраняется', async () => {
+      const draft = {
+        id: 'ep-new',
+        name: 'Эндпоинт 1',
+        baseUrl: '',
+        apiKind: 'openai-compat',
+        model: '',
+        writeToken: false,
+        imagesUrl: '',
+        ownerPlatformId: '',
+      };
+      const res = await patch({ endpointProfiles: [draft] });
       expect(res.statusCode).toBe(200);
-      expect((await getSettings()).groupEconomy).toEqual({
-        ...GROUP_ECONOMY_DEFAULTS,
-        bashOutputChars: 4000,
-      });
-      const disk = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
-      expect(disk.settings.groupEconomy).toEqual({ bashOutputChars: 4000 });
-      const snapshot = JSON.parse(
-        readFileSync(join(root, 'agentdeck', 'settings-snapshot.json'), 'utf8'),
-      );
-      expect(snapshot.state.settings.groupEconomy).toEqual({ bashOutputChars: 4000 });
-      // Значение, равное умолчанию, снова следует за ним.
-      await patch({ groupEconomy: { bashOutputChars: GROUP_ECONOMY_DEFAULTS.bashOutputChars } });
-      const after = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
-      expect(after.settings.groupEconomy).toEqual({});
+      expect((await getSettings()).endpointProfiles).toEqual([draft]);
     });
 
-    it('частичный блок экономии с диска дополняется умолчаниями текущего кода', async () => {
+    /**
+     * Блоки экономии и сторожа групп сняты (этап 10, G15). Старый state.json с ними обязан
+     * читаться: остальные настройки на месте, снятых полей нет ни в ответе, ни на диске после
+     * первой записи. Без снятия при чтении блоки жили бы в ответе панели и в файле вечно.
+     */
+    it('старый state.json с блоками экономии и сторожа групп читается, блоки сняты', async () => {
+      const file = join(root, 'agentdeck', 'state.json');
       writeFileSync(
-        join(root, 'agentdeck', 'state.json'),
-        JSON.stringify({ settings: { groupEconomy: { compactWindow: 160_000 } } }),
+        file,
+        JSON.stringify({
+          settings: {
+            theme: 'dark',
+            groupEconomy: { bashOutputChars: 4000, sonnetDeliver: false },
+            groupWatch: { stallMinutes: 30, enabled: false },
+          },
+        }),
       );
-      expect(new AppStore(join(root, 'agentdeck')).getSettings().groupEconomy).toEqual({
-        ...GROUP_ECONOMY_DEFAULTS,
-        compactWindow: 160_000,
-      });
+      const old = new AppStore(join(root, 'agentdeck'));
+      const settings = old.getSettings() as unknown as Record<string, unknown>;
+      expect(settings.theme).toBe('dark');
+      expect(settings).not.toHaveProperty('groupEconomy');
+      expect(settings).not.toHaveProperty('groupWatch');
+      old.updateSettings({ backupKeep: 5 });
+      const disk = JSON.parse(readFileSync(file, 'utf8'));
+      expect(disk.settings.theme).toBe('dark');
+      expect(disk.settings).not.toHaveProperty('groupEconomy');
+      expect(disk.settings).not.toHaveProperty('groupWatch');
     });
 
-    it('сторож групп: правка порога сливается с сохранённым, на диске только отличия', async () => {
-      expect((await getSettings()).groupWatch).toEqual(GROUP_WATCH_DEFAULTS);
-      expect((await patch({ groupWatch: { stallMinutes: 30 } })).statusCode).toBe(200);
-      // Второй ключ не возвращает первый к заводскому.
-      expect((await patch({ groupWatch: { enabled: false } })).statusCode).toBe(200);
-      expect((await getSettings()).groupWatch).toEqual({
-        ...GROUP_WATCH_DEFAULTS,
-        stallMinutes: 30,
-        enabled: false,
-      });
-      const disk = JSON.parse(readFileSync(join(root, 'agentdeck', 'state.json'), 'utf8'));
-      expect(disk.settings.groupWatch).toEqual({ stallMinutes: 30, enabled: false });
-      expect((await patch({ groupWatch: { stallMinutes: 0 } })).statusCode).toBe(400);
-    });
-
-    it('снимок с одними отличиями рычагов импортируется и дополняется умолчаниями', async () => {
-      // Снимок настроек для git пишется так же, как state.json, — отличиями.
-      const res = await app.inject({
-        method: 'POST',
-        url: '/api/settings/import',
-        payload: { settings: { groupEconomy: { sonnetDeliver: false } } },
+    it('PATCH со снятыми блоками отвечает 200 и их не сохраняет', async () => {
+      const res = await patch({
+        theme: 'dark',
+        groupEconomy: { bashOutputChars: 4000 },
+        groupWatch: { stallMinutes: 30 },
       });
       expect(res.statusCode).toBe(200);
-      expect((await getSettings()).groupEconomy).toEqual({
-        ...GROUP_ECONOMY_DEFAULTS,
-        sonnetDeliver: false,
+      const after = (await getSettings()) as unknown as Record<string, unknown>;
+      expect(after.theme).toBe('dark');
+      expect(after).not.toHaveProperty('groupEconomy');
+      expect(after).not.toHaveProperty('groupWatch');
+    });
+
+    it('правила автоподтверждения и срок откладывания карточки сняты: старое читается, PATCH их не хранит', async () => {
+      // Ни ядро, ни сервер их не читают: о правах шага судит ядро (06 §Human points),
+      // карточка прав в D-n больше не уходит. Тумблер, который ничего не решает, — ложь.
+      const file = join(root, 'agentdeck', 'state.json');
+      writeFileSync(
+        file,
+        JSON.stringify({
+          settings: {
+            theme: 'dark',
+            autoApproveRules: { filesDelete: true },
+            deferAfterMinutes: 3,
+            deferredTtlDays: 9,
+          },
+        }),
+      );
+      const old = new AppStore(join(root, 'agentdeck'));
+      const settings = old.getSettings() as unknown as Record<string, unknown>;
+      expect(settings.theme).toBe('dark');
+      expect(settings.deferredTtlDays).toBe(9);
+      expect(settings).not.toHaveProperty('autoApproveRules');
+      expect(settings).not.toHaveProperty('deferAfterMinutes');
+
+      const res = await patch({ autoApproveRules: { gitHistory: true }, deferAfterMinutes: 5 });
+      expect(res.statusCode).toBe(200);
+      const after = (await getSettings()) as unknown as Record<string, unknown>;
+      expect(after).not.toHaveProperty('autoApproveRules');
+      expect(after).not.toHaveProperty('deferAfterMinutes');
+    });
+
+    it('снимок прежней версии с блоками групп импортируется без них', async () => {
+      const res = await importState({
+        settings: {
+          theme: 'dark',
+          groupEconomy: { sonnetDeliver: false },
+          groupWatch: { stallMinutes: 30, telegram: true },
+        },
       });
+      expect(res.statusCode).toBe(200);
+      const after = (await getSettings()) as unknown as Record<string, unknown>;
+      expect(after.theme).toBe('dark');
+      expect(after).not.toHaveProperty('groupEconomy');
+      expect(after).not.toHaveProperty('groupWatch');
     });
 
     it('смена языка сразу пересобирает свой гейт на промпте на новом языке', async () => {
@@ -297,7 +329,6 @@ describe('config-routes: валидация настроек и импорта',
       const state = store.getState();
       state.chatGroupSettings = { 'chat-local': { autonomous: true } } as never;
       state.chatKeyAliases = { 'new-1': 'session-local' };
-      state.chatEscalations = { 'chat-local': [] } as never;
       state.secretBackupVerifier = 'local-verifier';
       state.disabledRules = [rule('Local', 'only here')];
 
@@ -310,7 +341,6 @@ describe('config-routes: валидация настроек и импорта',
       const after = store.getState();
       expect(after.chatGroupSettings).toEqual({ 'chat-local': { autonomous: true } });
       expect(after.chatKeyAliases).toEqual({ 'new-1': 'session-local' });
-      expect(after.chatEscalations).toEqual({ 'chat-local': [] });
       expect(after.secretBackupVerifier).toBe('local-verifier');
       expect(after.disabledRules?.map((item) => [item.title, item.body])).toEqual([
         ['Local', 'only here'],
@@ -402,7 +432,7 @@ describe('config-routes: валидация настроек и импорта',
      */
     const managed = {
       id: 'contour-company-dev',
-      name: 'Контур · Company · dev',
+      name: 'Company · dev',
       baseUrl: 'http://127.0.0.1:5179/company-dev/v1',
       apiKind: 'openai-compat',
       model: 'gpt-4o',

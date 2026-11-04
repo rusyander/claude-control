@@ -17,6 +17,11 @@ export const serverTextTemplates = {
     en: 'The task core did not prove its identity: the request was not sent',
   },
   'core-unreachable': { ru: 'Ядро задач не отвечает', en: 'The task core does not answer' },
+  'core-starting': { ru: 'Ядро задач поднимается', en: 'The task core is starting' },
+  'core-fault': {
+    ru: 'Ядро задач не запускается: нужен перезапуск',
+    en: 'The task core keeps failing to start: restart needed',
+  },
   'gateway-joined': { ru: '{{message}}: {{detail}}', en: '{{message}}: {{detail}}' },
   'gateway-upstream-400': {
     ru: 'Контур не принял запрос',
@@ -106,21 +111,13 @@ export const serverTextTemplates = {
     ru: 'Контур «{{id}}» в панели не заведён',
     en: 'Contour “{{id}}” is not set up in the panel',
   },
-  'gateway-contour-disabled': {
-    ru: 'Контур «{{title}}» выключен в панели',
-    en: 'Contour “{{title}}” is turned off in the panel',
-  },
-  'gateway-contour-no-key': {
-    ru: 'У контура «{{title}}» не сохранён ключ',
-    en: 'Contour “{{title}}” has no saved key',
-  },
   'gateway-section-closed-chat': {
     ru: 'Раздел «Чат» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
     en: 'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
   },
   'gateway-section-closed-groups': {
-    ru: 'Раздел «Группы разделения» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
-    en: 'The Split groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+    ru: 'Раздел «Группы» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
   },
   'gateway-section-closed-tests': {
     ru: 'Раздел «Агент тестов» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
@@ -230,10 +227,6 @@ export const serverTextTemplates = {
     ru: 'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
     en: "The contour's answer is over 8 MB — the gateway does not assemble it whole. The same request as a stream comes without this ceiling",
   },
-  'gateway-not-anthropic': {
-    ru: 'Платформа ответила не сообщением диалекта Anthropic',
-    en: 'The platform did not answer with an Anthropic dialect message',
-  },
   'gateway-mask-rules-broken': {
     ru: 'Защита данных включена, а правила не читаются ({{error}})',
     en: 'Data protection is on, but its rules cannot be read ({{error}})',
@@ -258,15 +251,15 @@ export const serverTextTemplates = {
     ru: 'Ответ ручки картинок больше 16 МБ — шлюз его не собирает',
     en: 'The images endpoint answer is over 16 MB — the gateway does not assemble it',
   },
-  'gateway-failed': {
-    ru: 'AgentDeck: шлюз не смог обработать запрос',
-    en: 'AgentDeck: the gateway could not handle the request',
-  },
-  'gateway-ports-busy': {
-    ru: 'порты {{from}}–{{to}} заняты: {{reason}}',
-    en: 'ports {{from}}–{{to}} are busy: {{reason}}',
-  },
   'gateway-ports-busy-unknown': { ru: 'причина неизвестна', en: 'reason unknown' },
+  'gateway-core-unknown': {
+    ru: 'ядро ещё не сказало, слушает ли шлюз контуров',
+    en: 'the core has not said yet whether the contour gateway is listening',
+  },
+  'gateway-core-waiting': {
+    ru: 'шлюз контуров у ядра ждёт порт {{port}}: {{reason}}',
+    en: 'the core contour gateway is waiting for port {{port}}: {{reason}}',
+  },
   'gateway-ceiling-cut': {
     ru: 'Ответ контура оборвался на {{seconds}}-й секунде — это потолок самой платформы на любой ответ, поток тоже. Сеть здесь ни при чём: сократите ход (меньше размышлений, короче ответ) или попросите владельца контура поднять потолок',
     en: "The contour's answer broke off at second {{seconds}} — that is the platform's own ceiling for any answer, streams included. The network is not to blame: shorten the turn (less thinking, a shorter answer) or ask the contour owner to raise the ceiling",
@@ -290,38 +283,6 @@ export const serverTextTemplates = {
   'gateway-headers-timeout-local': {
     ru: 'Локальная модель не начала отвечать за {{seconds}} с: длинный запрос обрабатывается дольше, чем отведено. Сожмите историю (/compact) или начните новый чат',
     en: 'The local model did not start answering within {{seconds}} s: a long prompt takes longer to process than allowed. Compact the history (/compact) or start a new chat',
-  },
-  'gateway-local-restarting': {
-    ru: 'Сервер моделей перезапускается после сбоя — запрос повторится сам',
-    en: 'The model server is restarting after a failure — the request will be retried automatically',
-  },
-  'gateway-local-stopped': {
-    ru: 'Сервер моделей остановлен — запустите его в разделе «Локальные модели», прогон продолжится сам',
-    en: 'The model server is stopped — start it in the “Local models” section and the run will continue on its own',
-  },
-  'gateway-local-down': {
-    ru: 'Сервер моделей не отвечает: {{reason}}. Запустите его в разделе «Локальные модели» — прогон продолжится сам',
-    en: 'The model server is not answering: {{reason}}. Start it in the “Local models” section — the run will continue on its own',
-  },
-  'gateway-local-down-unknown': {
-    ru: 'причина не названа',
-    en: 'no reason given',
-  },
-  'local-stalled': {
-    ru: 'сервер моделей {{seconds}} с не двигался с запросом — запрос оборван и уйдёт заново',
-    en: 'the model server made no progress on the request for {{seconds}} s — the request was dropped and goes again',
-  },
-  'local-supervisor-gave-up': {
-    ru: 'сервер упал и не поднялся после {{restarts}} попыток подряд; панель пробует снова раз в 10 минут',
-    en: 'the server crashed and did not come back after {{restarts}} attempts in a row; the panel tries again every 10 minutes',
-  },
-  'local-on-demand-backoff': {
-    ru: 'сервер моделей не поднялся ({{attempts}} из {{max}} попыток): {{cause}}; следующая попытка через {{seconds}} с',
-    en: 'the model server did not come up ({{attempts}} of {{max}} attempts): {{cause}}; next attempt in {{seconds}} s',
-  },
-  'local-on-demand-failed': {
-    ru: 'сервер моделей не поднялся {{attempts}} раза подряд, и панель больше не запускает его по запросу чата: {{cause}}',
-    en: 'the model server did not come up {{attempts}} times in a row, and the panel no longer starts it on a chat request: {{cause}}',
   },
   'gateway-cert-failed': {
     ru: 'Сертификат контура не проверился: {{reason}}. Укажите корневой сертификат компании в настройках контура',
@@ -402,7 +363,6 @@ export const serverTextTemplates = {
     ru: 'прокси не смог обработать запрос',
     en: 'the proxy could not handle the request',
   },
-  'proxy-not-configured': { ru: 'прокси не настроен', en: 'the proxy is not configured' },
   'proxy-body-too-large': {
     ru: 'тело запроса слишком велико',
     en: 'the request body is too large',
@@ -421,8 +381,8 @@ export const serverTextTemplates = {
     en: 'Run not started: the panel kit failed to build. Switch the kit mode to «Yours only» or retry',
   },
   'kit-codex-too-large': {
-    ru: 'Прогон не запущен: правила и навыки набора панели для Codex — {{size}} знаков, а командная строка Codex вмещает не больше {{limit}}. Ничего не обрезано: выключите часть элементов набора или переключите режим набора на «Только ваши»',
-    en: 'Run not started: the panel kit rules and skills for Codex take {{size}} characters, and the Codex command line holds no more than {{limit}}. Nothing was trimmed: switch some kit items off or switch the kit mode to «Yours only»',
+    ru: 'Прогон не запущен: правила и навыки набора панели для Codex — {{size}} знаков, а поле инструкций сеанса Codex вмещает не больше {{limit}}. Ничего не обрезано: выключите часть элементов набора или переключите режим набора на «Только ваши»',
+    en: 'Run not started: the panel kit rules and skills for Codex take {{size}} characters, and the Codex session instructions field holds no more than {{limit}}. Nothing was trimmed: switch some kit items off or switch the kit mode to «Yours only»',
   },
   'proxy-upstream-unreachable': {
     ru: 'AgentDeck: адрес модели не отвечает ({{reason}})',
@@ -585,7 +545,7 @@ export const serverTextTemplates = {
   },
   'contour-probe-ok': {
     ru: 'Контур ответил: моделей {{count}}.',
-    en: 'The contour answered: {{count}} models.',
+    en: 'The contour answered, models: {{count}}.',
   },
   'contour-probe-timeout': {
     ru: 'Контур не ответил за {{seconds}} с.',
@@ -1145,6 +1105,62 @@ export const serverTextTemplates = {
     ru: 'Процесс чата потерян: его завершили вне панели. Разговор сохранён — отправьте сообщение, и он продолжится с того же места.',
     en: 'The chat process was lost: it was ended outside the panel. The conversation is saved — send a message and it continues where it stopped.',
   },
+  'core-chat-contour-down': {
+    ru: 'Ход не отправлен: обязательный контур {{contour}} недоступен — у шлюза нет маршрута или ключа. В облако вендора ход не уходит. Проверьте контур в разделе «Контуры».',
+    en: 'The turn was not sent: the required contour {{contour}} is unavailable — its gateway has no route or key. The turn never goes to the vendor cloud instead. Check the contour in «Contours».',
+  },
+  'core-chat-model-needed': {
+    ru: 'Ход не отправлен: маршруту {{route}} нужна конкретная модель. Выберите модель чата или задайте модель контура по умолчанию.',
+    en: 'The turn was not sent: route {{route}} needs a concrete model. Pick a chat model or set the contour default model.',
+  },
+  'core-chat-contour-model': {
+    ru: 'Ход не отправлен: модель {{model}} недоступна в контуре {{contour}} — ключ контура её не разрешает. В облако вендора ход не уходит. Выберите в чате модель, которую контур открывает ключу (список — в разделе «Контуры»), или попросите администратора платформы разрешить ключу эту модель.',
+    en: 'The turn was not sent: model {{model}} is not available in contour {{contour}} — the contour key does not allow it. The turn never goes to the vendor cloud instead. Pick a chat model the contour opens to its key (listed in «Contours»), or ask the platform administrator to allow this model for the key.',
+  },
+  'core-chat-estimate-refused': {
+    ru: 'Ход не отправлен: ядро задач его не приняло (код {{code}}). Причина ядра: {{reason}}',
+    en: 'The turn was not sent: the task core did not accept it (code {{code}}). Core reason: {{reason}}',
+  },
+  'core-chat-refused': {
+    ru: 'Ядро задач отказало в ходе чата (код {{code}}). Причина записана в журнале задачи ядра.',
+    en: 'The task core refused the chat turn (code {{code}}). The reason is in the core task journal.',
+  },
+  'core-chat-kit-hooks': {
+    ru: 'Ход не начат: у этого шага хуки вашего слоя в режиме «{{mode}}» (сужены сценарием или правилом контура), а набор панели ставит свои хуки только при включённых. Снимите сужение хуков в правиле контура или переключите набор для этого CLI на «Только ваши» и выключите его стражи на странице «Набор панели».',
+    en: 'The turn did not start: this step runs your layer’s hooks as «{{mode}}» (narrowed by the scenario or a contour rule), and the panel kit adds its hooks only while they are on. Remove the hook narrowing from the contour rule, or switch the kit for this CLI to «Yours only» and turn its guards off on the «Panel kit» page.',
+  },
+  'core-chat-kit-mcp': {
+    ru: 'Ход не начат: каталог набора {{path}} объявляет MCP-серверы (.mcp.json или mcpServers в plugin.json) — они обошли бы список MCP сеанса ядра. Уберите их из своих файлов набора на странице «Набор панели»; серверы MCP подключаются в разделе «MCP-серверы».',
+    en: 'The turn did not start: the kit folder {{path}} declares MCP servers (.mcp.json or mcpServers in plugin.json) — they would bypass the core session’s MCP list. Remove them from your kit files on the «Panel kit» page; MCP servers are connected in the «MCP servers» section.',
+  },
+  'core-chat-kit-missing': {
+    ru: 'Ход не начат: ядро не нашло или не прочло каталог набора {{path}}. Панель собирает набор заново на каждом ходе — отправьте сообщение ещё раз; повторится — проверьте, что папка доступна для чтения.',
+    en: 'The turn did not start: the core could not find or read the kit folder {{path}}. The panel rebuilds the kit on every turn — send the message again; if it repeats, check that the folder is readable.',
+  },
+  'core-chat-layer-untrusted': {
+    ru: 'Ход не начат: в этой папке включён локальный слой проекта, а Claude Code папке не доверяет. Слой собран из файлов репозитория, и без доверия ядро его не запускает. Доверьте папку: откройте в ней claude в терминале и ответьте «да» на вопрос о доверии, затем отправьте сообщение ещё раз. Или выключите слой: «Проекты» → проект → «Из проекта» → «Локальный слой» → режим «Выключен»; тогда чат пойдёт без файлов репозитория, пока папке нет доверия.',
+    en: 'The turn did not start: the project local layer is on in this folder, and Claude Code does not trust the folder. The layer is built from repository files, and the core does not run it without trust. Trust the folder: open claude in it in a terminal and answer «yes» to the trust question, then send the message again. Or turn the layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off»; the chat then runs without the repository files until the folder is trusted.',
+  },
+  'core-chat-layer-mode': {
+    ru: 'Ход не начат: у этого шага слой вашей конфигурации в режиме «{{mode}}» (сужен сценарием или правилом контура), а локальный слой проекта едет только при полном. Снимите сужение в правиле контура или выключите локальный слой: «Проекты» → проект → «Из проекта» → «Локальный слой» → режим «Выключен».',
+    en: 'The turn did not start: this step runs your configuration layer as «{{mode}}» (narrowed by the scenario or a contour rule), and the project local layer rides only with the full one. Remove the narrowing from the contour rule, or turn the local layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off».',
+  },
+  'core-chat-layer-sources': {
+    ru: 'Ход не начат: панель собрала сеанс с командными файлами проекта рядом с локальным слоем — слой задвоил бы их. Это ошибка панели, а не вашей настройки: отправьте сообщение ещё раз; повторится — выключите локальный слой («Проекты» → проект → «Из проекта» → «Локальный слой» → «Выключен») и сообщите об ошибке.',
+    en: 'The turn did not start: the panel assembled the session with the project team files beside the local layer — the layer would duplicate them. This is a panel fault, not your setting: send the message again; if it repeats, turn the local layer off («Projects» → the project → «From the project» → «Local layer» → «Off») and report the fault.',
+  },
+  'core-chat-layer-build': {
+    ru: 'Ход не начат: ядро не смогло взять сборку локального слоя {{path}} — каталога нет, он не читается или объявляет MCP-серверы. Панель пересобирает слой на каждом ходе — отправьте сообщение ещё раз; повторится — откройте карточку «Локальный слой» («Проекты» → проект → «Из проекта»): там видна ошибка сборки, — или выключите слой.',
+    en: 'The turn did not start: the core could not use the local layer build {{path}} — the folder is missing, unreadable or declares MCP servers. The panel rebuilds the layer on every turn — send the message again; if it repeats, open the «Local layer» card («Projects» → the project → «From the project»): the build error is shown there — or turn the layer off.',
+  },
+  'core-chat-layer-fit': {
+    ru: 'Ход не начат: локальный слой проекта не помещается в сеанс ядра (часть «{{field}}»: инструкции длиннее 200 000 знаков или хук чужой формы). Сожмите инструкции слоя или выключите слой: «Проекты» → проект → «Из проекта» → «Локальный слой» → режим «Выключен».',
+    en: 'The turn did not start: the project local layer does not fit the core session (part «{{field}}»: instructions over 200,000 characters or a hook of a foreign shape). Compress the layer instructions or turn the layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off».',
+  },
+  'core-chat-carry-unsupported': {
+    ru: 'Ход не начат: CLI {{adapter}} не умеет взять в сеанс ядра часть слоя панели ({{fields}}: набор, локальный слой или сужение настроек). Начните чат в Claude Code или выключите эту часть для этого CLI.',
+    en: 'The turn did not start: the {{adapter}} CLI cannot take part of the panel layer into the core session ({{fields}}: the kit, the local layer or a settings narrowing). Start the chat in Claude Code, or turn that part off for this CLI.',
+  },
   'chat-run-not-in-ledger': {
     ru: 'Панель перезапускалась, прогон не в реестре — отправьте сообщение заново.',
     en: 'The panel was restarted and the run is not in the ledger — send the message again.',
@@ -1280,26 +1296,6 @@ export const serverTextTemplates = {
     ru: 'Разбор оборвался перезапуском панели — итога не будет. Групп ждёт вашего ответа: {{groups}}; сами они не стартуют.',
     en: 'The triage was cut short by a panel restart — there will be no result. Groups waiting for your answer: {{groups}}; they will not start by themselves.',
   },
-  'split-groups-interrupted-notice': {
-    ru: 'Процессы групп оборвались посреди хода: {{groups}}. Панель сама продолжит их с восстановлением состояния (продолжено: {{resumed}}); остальные ждут кнопки «Продолжить» в хабе.',
-    en: 'Group processes were cut short mid-turn: {{groups}}. The panel resumes them itself with a state rebuild (resumed: {{resumed}}); the rest wait for the «Resume» button in the hub.',
-  },
-  'split-group-stalled-notice': {
-    ru: 'Группа «{{group}}» молчала {{minutes}} мин — дольше любого вызова, её ход повис. Панель сняла процесс и продолжает группу с восстановлением состояния (продолжено: {{resumed}}); не продолженная ждёт кнопки «Продолжить» в хабе.',
-    en: 'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub.',
-  },
-  'split-group-stalled-log-notice': {
-    ru: 'Группа «{{group}}» молчала {{minutes}} мин — дольше любого вызова, её ход повис. Панель сняла процесс и продолжает группу с восстановлением состояния (продолжено: {{resumed}}); не продолженная ждёт кнопки «Продолжить» в хабе. Что держало вызов (дерево процессов до снятия): {{log}}',
-    en: 'Group «{{group}}» was silent for {{minutes}} min — longer than any call, its turn hung. The panel stopped the process and resumes the group with a state rebuild (resumed: {{resumed}}); one not resumed waits for the «Resume» button in the hub. What held the call (process tree before the stop): {{log}}',
-  },
-  'child-tell-notice': {
-    ru: 'Родитель написал группам. Передано: {{sent}} · в очереди до конца их хода: {{queued}} · не доставлено (у группы нет чата или копии): {{refused}}.',
-    en: 'The parent wrote to its groups. Delivered: {{sent}} · queued until their turn ends: {{queued}} · not delivered (the group has no chat or copy): {{refused}}.',
-  },
-  'split-triage-groups-picked-notice': {
-    ru: 'Разбор выбрал группы панели: {{picks}}.',
-    en: 'The triage picked panel groups: {{picks}}.',
-  },
   'path-step-started-notice': {
     ru: 'Шаг пути группы «{{step}}» идёт в этом чате.',
     en: 'Group path step “{{step}}” runs in this chat.',
@@ -1320,45 +1316,9 @@ export const serverTextTemplates = {
     ru: 'Ревью не заводилось: с коммита {{from}} своих изменений у работы нет — ни новых коммитов, ни разрешённых конфликтов в слияниях, ни отличий после rebase.',
     en: 'No review was started: since commit {{from}} the work has no changes of its own — no new commits, no conflict resolutions in merges, no differences after a rebase.',
   },
-  'review-off-notice': {
-    ru: 'Ревью не заводилось: в этом проекте выключено «Ревью после работы» — работа идёт сразу в доставку.',
-    en: 'No review was started: «Review after work» is off for this project — the work goes straight to delivery.',
-  },
   'split-limit-wait-notice': {
     ru: 'Группы разделения упёрлись в лимит подписки и ждут его сброса до {{until}}: продолжатся сами, очередь до сброса не стартует.',
     en: 'Split groups hit the subscription limit and wait for its reset at {{until}}: they resume by themselves, and the queue does not start until then.',
-  },
-  'split-limit-warning-notice': {
-    ru: 'Лимит подписки на исходе: новые группы разделения не стартуют до его сброса в {{until}}, идущие продолжают работу.',
-    en: 'The subscription limit is running low: new split groups do not start until its reset at {{until}}, running groups keep working.',
-  },
-  'split-delivery-description-unchecked-notice': {
-    ru: 'Группа «{{group}}»: описание MR {{mr}} панель не проверила — MR не читается (интеграция с форджем выключена или нет токена). Проверьте описание сами.',
-    en: 'Group «{{group}}»: the panel did not check the description of MR {{mr}} — the MR cannot be read (the forge integration is off or there is no token). Check the description yourself.',
-  },
-  'split-delivery-notes-notice': {
-    ru: 'Группа «{{group}}» доставлена с заметками — MR они не держат, но знать их стоит: {{notes}}',
-    en: 'Group «{{group}}» was delivered with notes — they do not hold the MR, but are worth knowing: {{notes}}',
-  },
-  'split-mr-watch-limit-notice': {
-    ru: 'Группа «{{group}}»: наблюдатель MR {{mr}} продолжал её уже {{resumes}} раз и больше сам не продолжает — новые ветки ревьюера и падения конвейера ждут вас.',
-    en: 'Group «{{group}}»: the MR watcher for {{mr}} has resumed it {{resumes}} times and stops resuming it by itself — new reviewer threads and pipeline failures wait for you.',
-  },
-  'split-mr-watch-infra-retry-notice': {
-    ru: 'Группа «{{group}}»: конвейер MR {{mr}} упал на инфраструктуре CI, а не на коде — {{jobs}}. Панель сама повторила эти задания один раз и группу не будила.',
-    en: 'Group «{{group}}»: the MR {{mr}} pipeline failed on CI infrastructure, not on the code — {{jobs}}. The panel retried those jobs once by itself and did not wake the group.',
-  },
-  'split-mr-watch-infra-again-notice': {
-    ru: 'Группа «{{group}}»: после повтора конвейер MR {{mr}} снова упал на инфраструктуре CI — {{jobs}}. Больше панель не повторяет и группу не будит: посмотрите раннер.',
-    en: 'Group «{{group}}»: after the retry the MR {{mr}} pipeline failed on CI infrastructure again — {{jobs}}. The panel retries no more and does not wake the group: check the runner.',
-  },
-  'split-mr-watch-red-unfixed-notice': {
-    ru: 'Группа «{{group}}»: конвейер MR {{mr}} (#{{pipeline}}) красный, а ход кончился без правки — голова ветки та же. Панель не ставит группе «готово» и ждёт вас. Ответ группы: {{answer}}',
-    en: "Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) is red and the turn ended without a fix — the branch head did not move. The panel does not mark the group done and waits for you. The group's answer: {{answer}}",
-  },
-  'split-mr-watch-green-notice': {
-    ru: 'Группа «{{group}}»: конвейер MR {{mr}} (#{{pipeline}}) позеленел, пока группа ждала вас из-за красного. Панель сама сверяет доставку: всё на месте — группа «готово», есть пробелы — получит напоминание.',
-    en: 'Group «{{group}}»: the MR {{mr}} pipeline (#{{pipeline}}) turned green while the group waited for you over the red one. The panel checks the delivery itself: nothing missing — the group is done; gaps — it gets a reminder.',
   },
   'chat-conversation-lost-notice': {
     ru: 'Прежний разговор группы продолжить нельзя: его файла ({{lost}}) на диске нет. Ход пошёл новым разговором в той же копии — ветка, MR и задачи переданы ему вводной.',
@@ -1371,14 +1331,6 @@ export const serverTextTemplates = {
   'chat-mr-relay-fresh-notice': {
     ru: 'Слово панели доставленной группе (конвейер или обсуждения MR) пошло новым разговором в той же копии: окно прежнего уже {{tokens}} тыс. токенов, и каждый запрос хода перечитывал бы всю доставку. Вводную панель собрала из файлов — ветка, MR, задачи, заметки группы, git, последний ответ. Прежний разговор ({{previous}}) остаётся на диске: вернуть ход в него — кнопкой «Продолжить старый разговор», пока новый идёт. Выключается в настройках: «Группы», экономия групп.',
     en: "The panel's word to a delivered group (MR pipeline or discussions) went on as a new conversation in the same copy: the previous window is already {{tokens}}k tokens, and every request of the turn would re-read the whole delivery. The panel built the brief from files — branch, MR, tasks, the group's notes, git, the last answer. The previous conversation ({{previous}}) stays on disk: to move the turn back into it, press «Continue the old conversation» while the new one runs. Switch off in settings: Groups, group economy.",
-  },
-  'split-default-drift-notice': {
-    ru: 'Группа «{{group}}»: {{target}} ушла вперёд и задела её файлы ({{count}}): {{files}}. Ветку посреди работы панель не трогает — при доставке группа сверит конфликт и сделает rebase, только если он настоящий.',
-    en: 'Group «{{group}}»: {{target}} moved ahead and touched its files ({{count}}): {{files}}. The panel leaves the branch alone mid-work — at delivery the group checks for a conflict and rebases only on a real one.',
-  },
-  'chat-autonomy-deferred-notice': {
-    ru: 'Фоновые команды агента ещё идут ({{count}}): процесс чата перезапустится с новой настройкой автономии, когда они кончатся, — перезапуск сейчас оборвал бы их. До тех пор у самого процесса прежняя метка автономии.',
-    en: "The agent's background commands are still running ({{count}}): the chat process restarts with the new autonomy setting once they finish — restarting now would kill them. Until then the process itself keeps its previous autonomy marker.",
   },
   'chat-auto-continue-notice': {
     ru: 'Ход оборвался: {{reason}}. Чат продолжит сам через {{seconds}} с (попытка {{attempt}} из {{max}}).',
@@ -1401,54 +1353,6 @@ export const serverTextTemplates = {
     en: "The agent process ({{pid}}) could not be stopped: without a process snapshot the panel cannot verify that this number is still the agent's, and it never touches a foreign process. The run stays running — press Stop again; after a panel restart it is picked up again.",
   },
   'split-group-run-not-started': { ru: 'прогон не запустился', en: 'the run did not start' },
-  'split-group-copy-not-ready': {
-    ru: 'копия неполная, группа не запущена: {{gaps}}',
-    en: 'the copy is incomplete, the group did not start: {{gaps}}',
-  },
-  'split-group-dropped': {
-    ru: 'группа убрана человеком',
-    en: 'the group was removed by a human',
-  },
-  'split-group-plan-cancelled': {
-    ru: 'план отменён человеком',
-    en: 'the plan was cancelled by a human',
-  },
-  'split-group-chain-failed': {
-    ru: 'цепочка кончилась ошибкой или остановкой',
-    en: 'the chain ended with an error or a stop',
-  },
-  'split-delivery-unverifiable': {
-    ru: 'доставку не проверить: удалённый не ответил {{checks}} раз подряд ({{reason}})',
-    en: 'delivery cannot be checked: the remote did not answer {{checks}} times in a row ({{reason}})',
-  },
-  'split-delivery-local-failed': {
-    ru: 'доставку не проверить: копия группы не читается ({{reason}})',
-    en: 'delivery cannot be checked: the group copy cannot be read ({{reason}})',
-  },
-  'split-delivery-incomplete': {
-    ru: 'доставка не доведена: {{missing}}',
-    en: 'delivery not completed: {{missing}}',
-  },
-  'split-delivery-incomplete-2': {
-    ru: 'доставка не доведена: {{first}}; {{second}}',
-    en: 'delivery not completed: {{first}}; {{second}}',
-  },
-  'split-delivery-incomplete-3': {
-    ru: 'доставка не доведена: {{first}}; {{second}}; {{third}}',
-    en: 'delivery not completed: {{first}}; {{second}}; {{third}}',
-  },
-  'split-delivery-stalled': {
-    ru: 'напоминание {{nudges}} ничего не изменило: та же голова ветки и те же пробелы — посмотрите, что держит группу, и продолжите её словом',
-    en: 'reminder {{nudges}} changed nothing: the same branch head and the same gaps — see what holds the group and continue it with a word',
-  },
-  'split-delivery-nudge-cap': {
-    ru: 'панель напомнила группе {{nudges}} раз — это потолок напоминаний; группа двигалась, но не дошла — продолжите её словом',
-    en: 'the panel reminded the group {{nudges}} times — the reminder cap; the group was moving but did not finish — continue it with a word',
-  },
-  'split-delivery-escalation-stalled': {
-    ru: 'разбор доставки на усиленной модели тоже ничего не изменил (напоминаний до него: {{nudges}}): та же голова ветки и те же пробелы — нужен человек',
-    en: 'the delivery diagnosis on a stronger model changed nothing either (reminders before it: {{nudges}}): the same branch head and the same gaps — a human is needed',
-  },
   'delivery-human-merge': {
     ru: 'нужен человек — слияние: {{what}}',
     en: 'a human is needed — merge: {{what}}',
@@ -1461,183 +1365,6 @@ export const serverTextTemplates = {
     ru: 'нужен человек — доступа нет нигде в проекте: {{what}}',
     en: 'a human is needed — credentials that exist nowhere in the project: {{what}}',
   },
-  'delivery-human-corrupt-store': {
-    ru: 'нужен человек — хранилище объектов git копии {{path}} повреждено: выполните в ней git fsck --full, восстановите объекты или пересоздайте копию, затем продолжите группу ({{what}})',
-    en: 'a human is needed — the git object store of the copy {{path}} is corrupt: run git fsck --full in it, restore the objects or recreate the copy, then continue the group ({{what}})',
-  },
-  'split-delivery-retry': {
-    ru: 'панель повторит сама через {{minutes}} мин (повтор {{attempt}} из {{max}})',
-    en: 'the panel retries on its own in {{minutes}} min (retry {{attempt}} of {{max}})',
-  },
-  'split-delivery-retry-cap': {
-    ru: 'панель повторила доставку сама (повторов: {{retries}}) и не довела — продолжите группу словом',
-    en: 'the panel retried {{retries}} times and did not finish — continue the group with a word',
-  },
-  'split-delivery-busy': {
-    ru: 'новая доставка не ушла: разговор группы был занят {{checks}} сверок подряд',
-    en: 'the new delivery did not go out: the group conversation was busy for {{checks}} checks in a row',
-  },
-  'split-delivery-remote-down': {
-    ru: 'удалённый недоступен с {{since}}: панель проверяет его раз в {{minutes}} мин и продолжит группу, когда он ответит ({{reason}})',
-    en: 'the remote is unreachable since {{since}}: the panel checks it every {{minutes}} min and resumes the group once it answers ({{reason}})',
-  },
-  'split-delivery-remote-silent': {
-    ru: 'удалённый не ответил: {{reason}}',
-    en: 'the remote did not answer: {{reason}}',
-  },
-  'delivery-gap-dirty': {
-    ru: 'незакоммиченные правки: {{files}}',
-    en: 'uncommitted changes: {{files}}',
-  },
-  'delivery-gap-dirty-more': {
-    ru: 'незакоммиченные правки: {{files}} и ещё {{more}}',
-    en: 'uncommitted changes: {{files}} and {{more}} more',
-  },
-  'delivery-gap-not-pushed': {
-    ru: 'ветка {{branch}} не отправлена на удалённый (или отстаёт от HEAD копии)',
-    en: 'branch {{branch}} is not pushed to the remote (or lags behind the copy HEAD)',
-  },
-  'delivery-gap-remote-ahead': {
-    ru: 'ветка {{branch}} на удалённом впереди копии — туда дописаны коммиты не из копии: {{commits}}. Подтяните их одной командой `git pull --ff-only origin {{branch}}` (не merge, не reset, не rebase), проверьте, не откатили ли они ваши правки, и в том же круге сдайте заново строки сит, которые новый коммит откроет',
-    en: 'branch {{branch}} on the remote is ahead of the copy — commits not made in the copy were added there: {{commits}}. Bring them in with one `git pull --ff-only origin {{branch}}` (not merge, reset or rebase), check they did not revert your changes, and in the same round report again the sieve rows the new commit reopens',
-  },
-  'delivery-gap-foreign-revert': {
-    ru: 'коммит {{commit}} на ветке сделан не группой и убрал строки, которые группа добавила, — их нет и в HEAD: {{files}}. Если файл генерируется, правьте его источник и перегенерируйте; затем закрепите файл своим коммитом (или верните строки)',
-    en: 'commit {{commit}} on the branch was not made by the group and removed lines the group added — they are not in HEAD either: {{files}}. If the file is generated, fix its source and regenerate; then settle the file with a commit of your own (or restore the lines)',
-  },
-  'delivery-gap-no-mr': {
-    ru: 'нет MR, чья голова — HEAD копии (ветка {{branch}}) — отправьте ветку и откройте MR или обновите свой',
-    en: 'no MR whose head is the copy HEAD (branch {{branch}}) — push the branch and open the MR, or update yours',
-  },
-  'delivery-gap-review-unfinished': {
-    ru: 'ревью работы не закончено: вердикта ревьюера нет — последний ответ этапа ревью заканчивается блоком ```agentdeck:review``` с {"findings":[…]} ([] — замечаний нет)',
-    en: 'the work review is not finished: there is no reviewer verdict — the final answer of the review stage ends with an ```agentdeck:review``` block {"findings":[…]} ([] = approved)',
-  },
-  'delivery-gap-fix-missing': {
-    ru: 'замечания ревью ({{count}}) не исправлены: звено правок после ревью не проходило',
-    en: 'review findings ({{count}}) are not fixed: the fix stage did not run after the review',
-  },
-  'delivery-gap-owner-unreported': {
-    ru: 'нет отчёта по пунктам задания владельца: нужны строки owner-1, owner-2, … в блоке {{lang}} — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"пункт в двух словах — файл:строка, команда и строка её вывода или причина"}]}',
-    en: 'the points of the owner’s request are not reported: rows owner-1, owner-2, … are needed in a {{lang}} block — {"sieves":[{"id":"owner-1","status":"pass|fail|n/a","evidence":"the point in a few words — file:line, the command and a line of its output, or the reason"}]}',
-  },
-  'delivery-gap-owner-failed': {
-    ru: 'пункт задания владельца {{point}} не выполнен: {{evidence}}',
-    en: 'owner’s point {{point}} is not done: {{evidence}}',
-  },
-  'delivery-gap-owner-no-evidence': {
-    ru: 'пункт задания владельца {{point}} отмечен без доказательства: нужен файл:строка, команда и строка её вывода или причина',
-    en: 'owner’s point {{point}} is marked without evidence: file:line, the command and a line of its output, or the reason, are needed',
-  },
-  'delivery-gap-task-unreported': {
-    ru: 'нет отчёта по пунктам задач группы: нужны строки task-1, task-2, … в блоке {{lang}} — каждый критерий приёмки, пункт, пример и хвост задачи и тикетов, на которые она ссылается: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"КЛЮЧ «пункт слово в слово из тикета или задания» — файл:строка или команда и строка её вывода"}]}',
-    en: 'the points of the group’s tasks are not reported: rows task-1, task-2, … are needed in a {{lang}} block — each acceptance criterion, listed item, example and tail of the task and of the tickets it links: {"sieves":[{"id":"task-1","status":"pass|fail|n/a","evidence":"KEY «the point, copied word for word from the ticket or task» — file:line, or the command and a line of its output"}]}',
-  },
-  'delivery-gap-task-failed': {
-    ru: 'пункт задач группы {{point}} не выполнен: {{evidence}}',
-    en: 'task point {{point}} is not done: {{evidence}}',
-  },
-  'delivery-gap-task-no-evidence': {
-    ru: 'пункт задач группы {{point}} отмечен без доказательства: нужен файл:строка или команда и строка её вывода',
-    en: 'task point {{point}} is marked without evidence: file:line, or the command and a line of its output, is needed',
-  },
-  'delivery-gap-task-flip': {
-    ru: 'пункт задач группы {{point}}: строка стала pass без нового доказательства — {{why}}',
-    en: 'task point {{point}}: the row turned pass with no new proof — {{why}}',
-  },
-  'delivery-gap-task-unsourced': {
-    ru: 'пункт задач группы {{point}} сдан pass без источника: процитируйте в «…» слово в слово сам пункт — из тикета (файл .agent/run/tickets.md или трекер, с ключом задачи), из задания группы или строку описания MR («MR description: …») — и затем доказательство: файл:строка или команда и строка её вывода',
-    en: 'task point {{point}} is pass with no source: quote the point itself word for word in «…» — from the ticket (the file .agent/run/tickets.md or the tracker, with the ticket key), from the group’s task, or a line of the MR description («MR description: …») — then the proof: file:line, or the command and a line of its output',
-  },
-  'delivery-gap-task-quote-unfound': {
-    ru: 'пункт задач группы {{point}}: цитаты «{{quote}}» нет ни в тикетах (.agent/run/tickets.md), ни в задании группы, ни в описании MR — процитируйте пункт слово в слово оттуда, откуда он взят; задача, которой нет в файле, — с её ключом',
-    en: 'task point {{point}}: the quote «{{quote}}» is in none of the tickets (.agent/run/tickets.md), the group’s task or the MR description — quote the point word for word from where it comes; a ticket missing from the file — with its key',
-  },
-  'delivery-gap-task-quote-label': {
-    ru: 'пункт задач группы {{point}}: «{{quote}}» — метка (имя инструмента, кнопки, файла), а не пункт: в цитате меньше трёх слов. Процитируйте сам пункт задачи слово в слово — фразу из раздела её тикета, задания группы или описания MR',
-    en: 'task point {{point}}: «{{quote}}» is a label (a tool, button or file name), not the point: the quote has fewer than three words. Quote the point itself word for word — a phrase from its ticket section, the group’s task or the MR description',
-  },
-  'delivery-gap-task-point-unmapped': {
-    ru: 'задача {{key}}: пунктов тикета без строки task-N, которая их цитирует, — {{count}}: {{points}}. На каждый — строка task-N с цитатой пункта в «…» и ключом задачи: pass с доказательством, если сделан; fail с причиной, если не сделан (и он назван в описании MR); n/a с причиной, если это не требование. Полный текст — раздел ## {{key}} файла .agent/run/tickets.md',
-    en: 'ticket {{key}}: points of the ticket that no task-N row quotes — {{count}}: {{points}}. For each, a task-N row quoting the point in «…» with the ticket key: pass with the proof if done; fail with the reason if not done (and named in the MR description); n/a with the reason if it is no requirement. Full text — the ## {{key}} section of .agent/run/tickets.md',
-  },
-  'delivery-gap-point-id-shape': {
-    ru: 'строки {{ids}} — не строки пунктов: id пункта — task-<число> или owner-<число> (task-1, task-2, …); под другим id строка не покрывает ни одного пункта. Перенумеруйте их, цитаты и доказательства оставьте',
-    en: 'rows {{ids}} are no point rows: a point id is task-<number> or owner-<number> (task-1, task-2, …); under another id a row covers no point. Renumber them and keep their quotes and proof',
-  },
-  'delivery-gap-task-rewritten': {
-    ru: 'пункт задач группы {{point}}: доказательство переписано без нового коммита — было «{{was}}», стало «{{now}}»; верно только одно. Прежнее уже сдано: если верно оно, уберите эту строку из ответа — панель хранит прежнюю, и пробел снимется в этом же ходе. Если верно новое — сверьте его с тикетом и кодом; та же строка, повторённая следующим ответом, снимает этот пробел',
-    en: 'task point {{point}}: the evidence was rewritten with no new commit — it was «{{was}}», now «{{now}}»; only one can be true. The earlier one is already reported: if it holds, drop this row from your answer — the panel keeps the earlier one, and the gap closes in this same turn. If the new one is true, check it against the ticket and the code; the same row repeated in a later answer closes this gap',
-  },
-  'delivery-gap-task-note-rejected': {
-    ru: 'пункт задач группы {{point}} не выполнен: {{evidence}} — пометка не принята: {{why}}',
-    en: 'task point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
-  },
-  'delivery-gap-defer-unowned': {
-    ru: 'пункт {{point}} отдан мимо группы, но владелец не назван: {{evidence}} — сделайте его в этой ветке или назовите владельца: «other group: group N «название» — файл или папка из её списка» или «tracker: КЛЮЧ» заведённой задачи; пункт не из задач группы — «does not apply: почему»',
-    en: 'point {{point}} is handed off with no owner named: {{evidence}} — do it in this branch, or name the owner: "other group: group N «title» — a file or folder from its owned list" or "tracker: KEY" of a filed ticket; a point outside the group’s tasks — "does not apply: why"',
-  },
-  'delivery-gap-defer-self': {
-    ru: 'пункт {{point}} отдан группе {{group}}, а это ваша группа — сделайте его в этой ветке',
-    en: 'point {{point}} is handed to group {{group}}, which is your own group — do it in this branch',
-  },
-  'delivery-gap-defer-closed': {
-    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}», но её работа закрыта без доставки (убрана или упала) — его никто не сделает: сделайте его в этой ветке или назовите заведённую задачу трекера',
-    en: 'point {{point}} is handed to group {{group}} «{{title}}», but that group closed without delivering (dropped or failed) — nobody will do it: do it in this branch, or name a filed tracker ticket',
-  },
-  'delivery-gap-defer-no-path': {
-    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}» без пути — назовите файл или папку из её списка ({{owns}}), иначе отданное не проверить; нет такого пути — пункт ваш',
-    en: 'point {{point}} is handed to group {{group}} «{{title}}» without a path — name a file or folder from its owned list ({{owns}}), or the hand-off cannot be checked; no such path — the point is yours',
-  },
-  'delivery-gap-defer-not-owned': {
-    ru: 'пункт {{point}} отдан группе {{group}} «{{title}}», но {{paths}} нет в её списке ({{owns}}) — его никто не сделает: сделайте его в этой ветке или назовите группу, в чьём списке этот путь, или заведённую задачу трекера',
-    en: 'point {{point}} is handed to group {{group}} «{{title}}», but {{paths}} is not in its owned list ({{owns}}) — nobody will do it: do it in this branch, or name the group whose list holds that path, or a filed tracker ticket',
-  },
-  'delivery-gap-defer-merged': {
-    ru: 'пункт {{point}} ждал слияния группы {{group}} «{{title}}» — её MR уже влит: пункт теперь ваш, сделайте его в этой ветке',
-    en: 'point {{point}} waited for group {{group}} «{{title}}» to merge — its MR is merged now: the point is yours, do it in this branch',
-  },
-  'delivery-gap-mr-description': {
-    ru: 'у MR {{mr}} пустое описание — опишите в нём, что изменено, зачем и как проверено',
-    en: 'MR {{mr}} has an empty description — describe what changed, why, and how it was checked',
-  },
-  'delivery-gap-mr-notes': {
-    ru: 'описание MR {{mr}}: не названы заметки доставки ({{items}}) — впишите каждую в описание: что не проверено или красное не из-за ветки и почему',
-    en: 'MR {{mr}} description: the delivery notes ({{items}}) are not named — add each to the description: what was not checked or is red not because of the branch, and why',
-  },
-  'delivery-gap-mr-unhomed': {
-    ru: 'описание MR {{mr}}: оставлено «отдельно» без ключа задачи, которая это возьмёт ({{items}}) — впишите ключ задачи (PROJ-123), исправьте в этой ветке или спросите человека',
-    en: 'MR {{mr}} description: left «separately» with no key of the task that takes it ({{items}}) — add the task key (PROJ-123), fix it in this branch, or ask the human',
-  },
-  'delivery-gap-mr-checks': {
-    ru: 'описание MR {{mr}}: нет раздела проверок на финальном дереве — добавьте заголовок «Проверки»: какие проверки проекта прошли на итоговом коммите и с каким результатом',
-    en: 'MR {{mr}} description: no section with the checks on the final tree — add a «Checks» heading: which project checks ran on the final commit and with what result',
-  },
-  'delivery-gap-mr-shots': {
-    ru: 'описание MR {{mr}}: ветка меняет интерфейс ({{files}}), а в описании нет снимков до/после — приложите их или напишите строку «Скриншоты: нет — причина»',
-    en: 'MR {{mr}} description: the branch changes the UI ({{files}}) but the description has no before/after shots — attach them or write a line «Screenshots: none — reason»',
-  },
-  'delivery-gap-mr-na-reason': {
-    ru: 'в описании MR {{mr}} нет причины n/a живой проверки ({{sieves}}) — впишите в описание id сита и почему оно не применимо',
-    en: 'the description of MR {{mr}} does not give the n/a reason of the live check ({{sieves}}) — add the sieve id and why it does not apply',
-  },
-  'delivery-gap-review-threads': {
-    ru: 'MR {{mr}}: ветки ревьюера без ответа ({{count}}) — на каждую правка в ветке и ответ в той же ветке обсуждения, или ответ, почему не меняете: {{threads}}',
-    en: 'MR {{mr}}: reviewer threads with no answer ({{count}}) — for each, a fix in the branch and a reply in the same discussion thread, or a reply why you do not change it: {{threads}}',
-  },
-  'delivery-gap-tracker-comment': {
-    ru: 'в задачах {{keys}} нет комментария со ссылкой на MR {{mr}} — напишите в каждую, что сделано и как проверить, со ссылкой на MR',
-    en: 'tickets {{keys}} have no comment linking MR {{mr}} — write in each what was done and how to check it, with the MR link',
-  },
-  'delivery-note-tickets-skipped': {
-    ru: 'задачи {{keys}} не названы ни в одном коммите ветки — их работа в этом MR не доставлена: не переводите их и не пишите в них «сделано»',
-    en: 'tickets {{keys}} are named in no commit of the branch — their work is not delivered by this MR: do not move them and do not write «done» in them',
-  },
-  'delivery-note-tracker-unread': {
-    ru: 'комментарии задач {{keys}} не прочитаны: трекер не ответил, ссылку на MR в них панель не проверила',
-    en: 'the comments of tickets {{keys}} were not read: the tracker did not answer, the panel did not check them for the MR link',
-  },
-  'delivery-gap-no-copy': { ru: 'нет копии группы', en: 'the group has no copy' },
   'sieve-gap-conflicts': {
     ru: 'сито «интеграция»: слияние со свежей основной веткой даёт конфликт в {{files}} — перенесите ветку на свежую основную (rebase) и разрешите конфликт',
     en: 'integration sieve: merging with fresh main conflicts in {{files}} — rebase the branch onto fresh main and resolve the conflict',
@@ -1714,22 +1441,6 @@ export const serverTextTemplates = {
     ru: 'сито {{sieve}}: строка стала pass без нового доказательства — {{why}}',
     en: 'sieve {{sieve}}: the row turned pass with no new proof — {{why}}',
   },
-  'delivery-gap-owner-flip': {
-    ru: 'пункт задания владельца {{point}}: строка стала pass без нового доказательства — {{why}}',
-    en: 'owner’s point {{point}}: the row turned pass with no new proof — {{why}}',
-  },
-  'sieve-flip-mark': {
-    ru: 'метки «not checked:» и «not caused by the branch:» ставятся только у fail — сдайте строку fail с этой меткой',
-    en: 'the marks "not checked:" and "not caused by the branch:" belong to a fail row only — report the row as fail with that mark',
-  },
-  'sieve-flip-red': {
-    ru: 'прошлым кругом строка была fail, а доказательство и сейчас говорит «красный» или «не проверено» — почините и сошлитесь на новый прогон или оставьте fail с меткой',
-    en: 'it was fail last round and the evidence still says red or not checked — fix the cause and cite a new run, or keep it fail with a mark',
-  },
-  'sieve-flip-same': {
-    ru: 'прошлым кругом строка была fail с тем же доказательством («{{was}}»), нового прогона нет — почините и сошлитесь на новый прогон или оставьте fail с меткой',
-    en: 'it was fail last round with the same evidence («{{was}}») and no new run is cited — fix the cause and cite a new run, or keep it fail with a mark',
-  },
   'sieve-gap-run-missing': {
     ru: 'сито {{sieve}}: прогона {{run}} нет в истории блока «Тесты» копии или он не закончен — запишите прогон и укажите его номер',
     en: 'sieve {{sieve}}: run {{run}} is not in the Tests history of the copy or did not finish — record the run and cite its id',
@@ -1794,93 +1505,25 @@ export const serverTextTemplates = {
     ru: 'блок «Тесты» копии: не выполнились (blocked) или красные от окружения (таймаут, сеть, стенд, платформа) там, где дифф их не задел: {{cases}} — не из-за ветки, группу не держат; назовите их в описании MR',
     en: 'Tests block of the copy: could not run (blocked), or red from the environment (timeout, network, stand, platform) where the diff does not touch them: {{cases}} — not caused by the branch, they do not hold the group; name them in the MR description',
   },
-  'sieve-note-unchecked': {
-    ru: 'сито {{sieve}}: не проверено: {{reason}} — группу не держит; причина — в описании MR',
-    en: 'sieve {{sieve}}: not checked: {{reason}} — does not hold the group; the reason goes into the MR description',
-  },
-  'sieve-note-not-branch': {
-    ru: 'сито {{sieve}}: красное не из-за ветки: {{reason}} — группу не держит; назовите его в описании MR',
-    en: 'sieve {{sieve}}: red not caused by the branch: {{reason}} — does not hold the group; name it in the MR description',
-  },
-  'sieve-note-run-red': {
-    ru: 'прогон {{run}}: красные не из-за ветки (были красными до старта группы или упали от окружения, дифф их не задел): {{cases}} — группу не держат; назовите их в описании MR',
-    en: 'run {{run}}: red not caused by the branch (red before the group started or failed on the environment, untouched by the diff): {{cases}} — they do not hold the group; name them in the MR description',
-  },
-  'sieve-gap-note-rejected': {
-    ru: 'сито {{sieve}} не пройдено: {{evidence}} — пометка не принята: {{why}}',
-    en: 'sieve {{sieve}} failed: {{evidence}} — the mark is not accepted: {{why}}',
-  },
-  'delivery-gap-owner-note-rejected': {
-    ru: 'пункт задания владельца {{point}} не выполнен: {{evidence}} — пометка не принята: {{why}}',
-    en: 'owner’s point {{point}} is not done: {{evidence}} — the mark is not accepted: {{why}}',
-  },
-  'note-rejected-run-green': {
-    ru: 'в прогоне {{run}} нет красного, он не показывает красное не из-за ветки; если строка теперь проходит, сдайте строку pass с этим прогоном в доказательстве, иначе сошлитесь на прогон, где кейс красный',
-    en: 'run {{run}} has no red, so it cannot show a red not caused by the branch; if the row passes now, report it pass with that run as evidence, otherwise cite the run where the case is red',
-  },
-  'note-rejected-run-missing': {
-    ru: 'прогона {{run}} нет в истории блока «Тесты» копии — сошлитесь на записанный прогон, где кейс красный',
-    en: 'run {{run}} is not in the Tests history of the copy — cite a recorded run where the case is red',
-  },
-  'note-rejected-run-ours': {
-    ru: 'в прогоне {{run}} красные кейсы {{cases}} покрывают код, который ветка меняла, — это красное могла дать ветка: почините его или оставьте fail',
-    en: 'in run {{run}} the red cases {{cases}} cover code the branch changed, so the branch may have caused them — fix them or keep the fail',
-  },
-  'note-rejected-cite-required': {
-    ru: 'у сита безопасности и данных слов мало — сошлитесь на красное на основной: run:<id> или `<команда>` → `<строка вывода>`',
-    en: 'a security or data sieve needs more than words — cite the red on the target branch: run:<id> or `<command>` → `<output line>`',
-  },
-  'note-rejected-not-baseline': {
-    ru: 'прогоны {{runs}} не показывают красного, бывшего до старта группы, — у сита безопасности и данных сошлитесь на прогон с красным на основной',
-    en: 'runs {{runs}} show no red that was there before the group started — for a security or data sieve, cite a run with the red on the target branch',
-  },
-  'note-rejected-not-live': {
-    ru: '«not checked» снимает только живую проверку (стенд, браузер, сеть), а это сито запускается здесь — прогоните его; красное не из-за ветки сдайте «not caused by the branch: <почему>»',
-    en: '«not checked» clears only a live check (stand, browser, network), and this sieve runs here — run it; a red not caused by the branch is reported «not caused by the branch: <why>»',
-  },
-  'note-rejected-no-reason': {
-    ru: 'после пометки нет причины — допишите, почему',
-    en: 'the mark has no reason after it — add why',
-  },
   'assistant-route-refused': {
     ru: 'Помощник не запущен: {{reason}}',
     en: 'The helper did not start: {{reason}}',
   },
   'assistant-provider-unsupported': {
-    ru: 'У {{provider}} нет ни неинтерактивного запуска, ни API — помощнику нечем ответить. Переключите активный CLI или выберите профиль «Ассистент панели»',
-    en: '{{provider}} has neither a non-interactive mode nor an API — the helper has nothing to answer with. Switch the active CLI or pick a «Panel assistant» profile',
+    ru: 'У {{provider}} нет судьи ядра, который отказал бы встроенному инструменту на каждом вызове, — служебный вопрос без инструментов ему не доверить. Переключите активный CLI на другой, например Claude или Qwen Code',
+    en: '{{provider}} has no core judge that would refuse a built-in tool on every call — a service question without tools cannot be trusted to it. Switch the active CLI to another one, for example Claude or Qwen Code',
   },
-  'assistant-provider-unavailable': {
-    ru: '{{provider}} не найден в PATH процесса панели, а ключа API нет — помощнику нечем ответить. Установите CLI или сохраните ключ',
-    en: '{{provider}} is not on the panel process PATH and there is no API key — the helper has nothing to answer with. Install the CLI or save a key',
-  },
-  'assistant-contour-cli-missing': {
-    ru: '{{provider}} идёт через контур, а CLI не найден в PATH процесса панели — помощник не запущен, чтобы не уйти в облако вендора мимо контура',
-    en: '{{provider}} goes through the contour, but the CLI is not on the panel process PATH — the helper did not start, so as not to reach the vendor cloud past the contour',
-  },
-  'assistant-contour-gateway-down': {
-    ru: 'Ассистент панели идёт через контур «{{title}}», а шлюз панели не поднят — запрос не отправлен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура',
-    en: 'The panel assistant goes through the contour «{{title}}», but the panel gateway is not running — the request was not sent, so as not to reach the vendor cloud. Press «Start gateway» on the contour card',
-  },
-  'assistant-contour-no-token': {
-    ru: 'Ассистент панели идёт через контур «{{title}}», а ключ контура не сохранён — шлюзу нечего подставить. Сохраните ключ на карточке контура',
-    en: 'The panel assistant goes through the contour «{{title}}», but the contour key is not saved — the gateway has nothing to insert. Save the key on the contour card',
-  },
-  'watcher-cli-missing': {
-    ru: '{{provider}} не найден в PATH процесса панели — разбор вести нечем. Установите CLI. Разбор не запущен',
-    en: '{{provider}} is not on the panel process PATH — there is nothing to run the analysis with. Install the CLI. Analysis did not start',
-  },
-  'watcher-provider-unsupported': {
-    ru: 'Активный CLI — {{provider}}: запуска без правок, которым наблюдатель разбирает проблемы, у него нет, а подставлять Claude вместо выбранного CLI наблюдатель не станет. Разбор идёт, когда ассистент на контуре или на локальной модели. Разбор не запущен',
-    en: 'The active CLI is {{provider}}: it has no run without edits, which the watcher analyses problems with, and the watcher will not substitute Claude for the chosen CLI. Analysis runs when the assistant is on a contour or a local model. Analysis did not start',
-  },
-  'watcher-endpoint-unsupported': {
-    ru: 'Ассистенту панели выбран свой эндпоинт «{{name}}» — наблюдателю пришлось бы отдать его токен процессу CLI, этого панель не делает. Разбор не запущен',
-    en: 'The panel assistant uses its own endpoint «{{name}}» — the watcher would have to hand its token to a CLI process, which the panel does not do. Analysis did not start',
+  'assistant-extra-tool': {
+    ru: 'Модель позвала встроенный инструмент ({{tool}}), а у служебного вопроса инструментов нет — ход остановлен, ответа нет.',
+    en: 'The model called a built-in tool ({{tool}}), but a service question has no tools — the turn was stopped, there is no answer.',
   },
   'provider-chat-unsupported': {
     ru: 'У {{provider}} нет неинтерактивного запуска — чат панели с ним не работает. Разговор не создан: переключите активный CLI',
     en: '{{provider}} has no non-interactive mode — the panel chat cannot work with it. The conversation was not created: switch the active CLI',
+  },
+  'provider-chat-core': {
+    ru: 'Чат чужого CLI идёт через ядро: старый разговор панели только читается — ход, остановка, перезапуск, очередь и ответ на запрос прав здесь больше не принимаются. Продолжите в чате ядра: раздел «Чат», кнопка «Новый»',
+    en: 'A foreign CLI chat runs on the core: an old panel conversation is read-only — turns, stop, restart, queue and permission answers are no longer taken here. Continue in the core chat: section «Chat», button «New»',
   },
   'analytics-provider-unsupported': {
     ru: 'Аналитика читает журналы только Claude Code, Codex и Qwen Code, а активный CLI — {{provider}}. Данные Claude под ним не показываются',
@@ -1890,10 +1533,6 @@ export const serverTextTemplates = {
     ru: 'Процессы на машине панель опознаёт только у Claude Code, а активный CLI — {{provider}}. Список пуст, чтобы не выдавать процессы claude за его собственные',
     en: 'The panel recognises running processes of Claude Code only, and the active CLI is {{provider}}. The list stays empty rather than pass claude processes off as its own',
   },
-  'groups-foreign-not-delivered': {
-    ru: 'Группы панели живут в настройках Claude Code, а {{provider}} их не читает — до его запусков группа не доходит',
-    en: 'Panel groups live in the Claude Code settings, and {{provider}} does not read them — the group does not reach its runs',
-  },
   'plugins-provider-unsupported': {
     ru: 'Раздел плагинов Claude Code работает только через claude, а активный CLI — {{provider}}. Команда не запущена',
     en: 'The Claude Code plugins section works through claude only, and the active CLI is {{provider}}. The command did not run',
@@ -1902,109 +1541,9 @@ export const serverTextTemplates = {
     ru: 'Песочница запускает только Claude Code, а активный CLI — {{provider}}. Прогон не запущен',
     en: 'The sandbox runs Claude Code only, and the active CLI is {{provider}}. The run did not start',
   },
-  'assistant-reply-truncated': {
-    ru: 'Ответ модели оборвался на пределе длины — ничего не применено. Разбейте задачу на части.',
-    en: "The model's answer was cut off at the length limit — nothing was applied. Split the task into parts.",
-  },
   'assistant-api-base-unknown': {
     ru: 'Адрес модельного API {{provider}} панели не известен — ключ никуда не отправлен, чтобы не уйти к чужому вендору. Установите CLI или выберите свой эндпоинт',
     en: 'The panel does not know the model API address of {{provider}} — the key was sent nowhere, so as not to reach another vendor. Install the CLI or pick your own endpoint',
-  },
-  'group-layer-permission': {
-    ru: 'Разрешения группы в {{cli}} не переносятся: у {{cli}} своя схема прав, и перевод вслепую выдал бы права, которых не просили. Задайте их в разделе «Разрешения» {{cli}}.',
-    en: "Group permissions are not carried to {{cli}}: it has its own permission model, and a blind translation could grant rights nobody asked for. Set them in {{cli}}'s Permissions section.",
-  },
-  'group-layer-mcp-sse': {
-    ru: 'MCP «{{id}}» работает через SSE — Codex такой транспорт не поддерживает.',
-    en: 'MCP "{{id}}" uses SSE, a transport Codex does not support.',
-  },
-  'group-layer-mcp-name': {
-    ru: 'Имя MCP «{{id}}» содержит точку — Codex читает её как вложенный ключ настроек.',
-    en: 'MCP name "{{id}}" contains a dot, which Codex reads as a nested settings key.',
-  },
-  'group-layer-mcp-secret-header': {
-    ru: 'Заголовки MCP «{{id}}» несут секрет, а передать его Codex можно только в командной строке — панель этого не делает.',
-    en: 'MCP "{{id}}" headers carry a secret that could only reach Codex on the command line; the panel will not do that.',
-  },
-  'group-layer-mcp-shape': {
-    ru: 'Запись MCP «{{id}}» в файлах Claude незнакомой формы — переносить нечего.',
-    en: 'The entry of MCP "{{id}}" in Claude\'s files has an unknown shape; nothing to carry.',
-  },
-  'group-layer-skill-name': {
-    ru: 'Имя скилла «{{id}}» длиннее 64 знаков — Codex его не загрузит.',
-    en: 'Skill name "{{id}}" is longer than 64 characters; Codex will not load it.',
-  },
-  'group-layer-hook-event': {
-    ru: 'Хук на событие {{event}} в {{cli}} не срабатывает: панель проигрывает только начало сессии, отправку сообщения и конец ответа.',
-    en: 'A hook on {{event}} does not fire in {{cli}}: the panel plays only session start, prompt submit and stop.',
-  },
-  'group-layer-hook-event-native': {
-    ru: 'Хук на событие {{event}} в {{cli}} не срабатывает: у {{cli}} такого события нет.',
-    en: 'A hook on {{event}} does not fire in {{cli}}: {{cli}} has no such event.',
-  },
-  'group-layer-missing': {
-    ru: 'Участник «{{id}}» не найден в файлах Claude — перенести нечего.',
-    en: 'Member "{{id}}" was not found in Claude\'s files; nothing to carry.',
-  },
-  'group-layer-duplicate': {
-    ru: '«{{id}}» уже едет с группой «{{group}}» — вторая копия не подаётся.',
-    en: '"{{id}}" already rides with group "{{group}}"; the second copy is not delivered.',
-  },
-  'group-layer-none': {
-    ru: '{{cli}} файлы Claude не читает, а слоя группы для него у панели нет — группа на этот прогон не действует.',
-    en: "{{cli}} does not read Claude's files and the panel has no group layer for it; the group does not apply to this run.",
-  },
-  'group-layer-too-large': {
-    ru: 'Правила группы и набора вместе длиннее предела Codex ({{limit}} знаков) — прогон не запущен, ничего не обрезано.',
-    en: "Group and kit rules together exceed Codex's limit ({{limit}} chars); the run was refused, nothing was truncated.",
-  },
-  'group-layer-notice': {
-    ru: 'Группы на этом прогоне {{cli}}: {{groups}}.',
-    en: 'Groups on this {{cli}} run: {{groups}}.',
-  },
-  'group-layer-notice-delivered': {
-    ru: 'Едет слоем на прогон — {{members}}.',
-    en: 'Delivered to the run as a layer — {{members}}.',
-  },
-  'group-layer-notice-nothing': {
-    ru: 'Ни один участник до прогона не доехал.',
-    en: 'No member reached the run.',
-  },
-  'group-layer-notice-refused': {
-    ru: 'Не едет:',
-    en: 'Not delivered:',
-  },
-  'foreign-shell-denied': {
-    ru: 'Панель не пропустила команду `{{command}}`. Агенту ушло: {{reason}}',
-    en: 'The panel refused the command `{{command}}`. The agent was told: {{reason}}',
-  },
-  'group-layer-kind-rule': {
-    ru: 'правила: {{names}}',
-    en: 'rules: {{names}}',
-  },
-  'group-layer-kind-skill': {
-    ru: 'скиллы: {{names}}',
-    en: 'skills: {{names}}',
-  },
-  'group-layer-kind-mcp': {
-    ru: 'MCP: {{names}}',
-    en: 'MCP: {{names}}',
-  },
-  'group-layer-kind-hook': {
-    ru: 'хуки: {{names}}',
-    en: 'hooks: {{names}}',
-  },
-  'group-layer-kind-env': {
-    ru: 'переменные: {{names}}',
-    en: 'variables: {{names}}',
-  },
-  'group-layer-enabled-for': {
-    ru: 'Группа включена для прогонов {{cli}} — едет слоем на каждый, файлы Claude не менялись.',
-    en: "The group is on for {{cli}} runs — it rides as a layer on each, Claude's files did not change.",
-  },
-  'group-layer-disabled-for': {
-    ru: 'Группа выключена для прогонов {{cli}}; файлы Claude не менялись.',
-    en: "The group is off for {{cli}} runs; Claude's files did not change.",
   },
   'provider-unknown': {
     ru: 'Провайдер «{{id}}» неизвестен панели.',
@@ -2013,10 +1552,6 @@ export const serverTextTemplates = {
   'panel-agent-stopped': {
     ru: 'Ход остановлен.',
     en: 'The turn was stopped.',
-  },
-  'panel-agent-extra-tools-qwen': {
-    ru: 'Qwen Code предложил агенту инструменты сверх переходника панели ({{tools}}) — ход остановлен, чтобы у агента не было лишних рук.',
-    en: 'Qwen Code offered the agent tools beyond the panel bridge ({{tools}}) — the turn was stopped so that the agent has no extra hands.',
   },
   'panel-agent-extra-tool': {
     ru: 'CLI дал агенту инструмент сверх переходника панели ({{tool}}) — ход остановлен, чтобы у агента не было лишних рук.',
@@ -2034,20 +1569,92 @@ export const serverTextTemplates = {
     ru: 'CLI завершился с кодом {{code}} без ответа.',
     en: 'The CLI exited with code {{code}} without an answer.',
   },
-  'panel-agent-images-gemini': {
-    ru: 'Агент панели на Gemini CLI не принимает картинки: CLI читает их только своим инструментом файлов, которого у агента нет. Отправьте вопрос без картинки.',
-    en: 'The panel agent on Gemini CLI takes no images: the CLI reads them only with its own file tool, which the agent does not have. Send the question without the image.',
+  'panel-agent-model-error': {
+    ru: 'Ход модели кончился ошибкой, а CLI её не назвал.',
+    en: 'The model turn ended with an error and the CLI gave no words for it.',
   },
-  'panel-agent-images-goose': {
-    ru: 'Агент панели на Goose не принимает картинки: в одиночном запуске Goose не передаёт их модели. Отправьте вопрос без картинки.',
-    en: 'The panel agent on Goose takes no images: in a one-shot run Goose does not pass them to the model. Send the question without the image.',
+  'dlp-core-missing': {
+    ru: 'ядро не найдено ({{reason}})',
+    en: 'the core was not found ({{reason}})',
   },
-  'panel-agent-images-kimi': {
-    ru: 'Агент панели на Kimi Code не принимает картинки: одиночный запуск Kimi берёт только текст. Отправьте вопрос без картинки.',
-    en: 'The panel agent on Kimi Code takes no images: a one-shot Kimi run takes text only. Send the question without the image.',
+  'dlp-core-unverified': {
+    ru: 'строка ядра не сверена ({{reason}})',
+    en: 'the core entry did not verify ({{reason}})',
   },
-  'panel-agent-kimi-long': {
-    ru: 'Сообщение длиннее {{max}} знаков: Kimi Code принимает его только строкой запуска. Сократите сообщение или разбейте его на части.',
-    en: 'The message is longer than {{max}} characters: Kimi Code takes it only on the launch line. Shorten the message or split it into parts.',
+  'dlp-core-unverified-bare': {
+    ru: 'строка ядра не сверена',
+    en: 'the core entry did not verify',
+  },
+  'dlp-core-http': {
+    ru: 'ядро ответило {{status}} на {{path}}',
+    en: 'the core answered {{status}} to {{path}}',
+  },
+  'dlp-core-down': {
+    ru: 'Защиту данных держит ядро, а оно не отвечает: {{reason}}',
+    en: 'Data protection is held by the core, and it does not answer: {{reason}}',
+  },
+  'dlp-core-port-waiting': {
+    ru: 'порт занят',
+    en: 'the port is busy',
+  },
+  'dlp-core-port-busy': {
+    ru: 'порт {{port}} занят ({{reason}})',
+    en: 'port {{port}} is busy ({{reason}})',
+  },
+  'dlp-core-listener-silent': {
+    ru: 'нет ответа слушателя',
+    en: 'no answer from the listener',
+  },
+  'core-link-missing': {
+    ru: 'Ядро не найдено: {{reason}}',
+    en: 'The core was not found: {{reason}}',
+  },
+  'core-link-unreachable': {
+    ru: 'Ядро не ответило: {{reason}}',
+    en: 'The core did not answer: {{reason}}',
+  },
+  'media-image-blocked-no-route': {
+    ru: 'Рисовать некому: ни активного контура, ни своего эндпоинта.',
+    en: 'Nobody to draw: no active contour and no endpoint of your own.',
+  },
+  'media-image-blocked-driver-none': {
+    ru: 'У этого контура генерации картинок нет.',
+    en: 'This contour has no image generation.',
+  },
+  'media-image-blocked-no-model': {
+    ru: 'Ни одна модель ключа не объявила рисование.',
+    en: 'No model of the key declared drawing.',
+  },
+  'media-image-blocked-endpoint-no-url': {
+    ru: 'У профиля эндпоинта не задан адрес генерации картинок.',
+    en: 'The endpoint profile has no image generation address.',
+  },
+  'media-image-blocked-endpoint-api-kind': {
+    ru: 'Картинки умеет только эндпоинт OpenAI-вида.',
+    en: 'Only an OpenAI-kind endpoint can make images.',
+  },
+  'media-image-blocked-no-agent': {
+    ru: 'Рисовать некому: нет ни растровой дороги, ни разговора с агентом.',
+    en: 'Nobody to draw: no raster road and no conversation with an agent.',
+  },
+  'media-upstream-timeout-image': {
+    ru: 'Картинка не пришла за {{seconds}} с — панель не ждёт дольше',
+    en: 'The image did not arrive within {{seconds}} s — the panel does not wait longer',
+  },
+  'media-upstream-timeout-deck': {
+    ru: 'Колода не пришла за {{seconds}} с — панель не ждёт дольше',
+    en: 'The deck did not arrive within {{seconds}} s — the panel does not wait longer',
+  },
+  'media-core-not-connected': {
+    ru: 'Запрос в контур идёт через звено ядра, а ядро панели не подключено.',
+    en: "The request to the contour goes through a core hop, and the panel's core is not connected.",
+  },
+  'media-contour-link-failed': {
+    ru: 'Звено ядра не дало адрес контура «{{contour}}»: {{reason}}',
+    en: 'The core hop gave no address for contour «{{contour}}»: {{reason}}',
+  },
+  'kimi-mode-stale': {
+    ru: '{{key}} = "{{mode}}" Kimi Code не принимает (допустимо: {{allowed}}) и при запуске молча его выбрасывает, работая в manual. Раздел только для чтения: исправьте значение в файле (kimi doctor config покажет ошибку), и правка снова откроется.',
+    en: 'Kimi Code does not accept {{key}} = "{{mode}}" (allowed: {{allowed}}) and silently drops it at launch, running in manual. The section is read-only: fix the value in the file (kimi doctor config shows the error), and editing opens again.',
   },
 } as const satisfies Record<string, { ru: string; en: string }>;

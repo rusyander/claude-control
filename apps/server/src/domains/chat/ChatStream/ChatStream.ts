@@ -95,8 +95,6 @@ export const streamRun = (
         }
       },
       close: finish,
-      // Открытый поток — человек может смотреть: брокер прав покажет ему карточку.
-      viewer: true,
     };
 
     const unsubscribe = registry.attach(chatId, fromSeq, subscriber, startedAt);

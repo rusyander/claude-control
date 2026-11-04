@@ -1,14 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { i18n } from '@shared/config/i18n';
-import { mergeSplitGroups } from '../../lib/mergeSplitGroups';
 import { cardQuestions } from '../../lib/cardQuestions';
 import type { ChildQuestion } from '../ChildQuestion.types';
 import type { ChildStageGroup } from '../ChildStages.types';
 import { ChildBlocks } from './ChildBlocks';
-import { splitGroupKey } from '../../lib/splitGroupKey';
 
 /**
  * Карточки 4 и 27 прогона 20.10: группа 3 спросила посреди хода, узел оставался
@@ -18,15 +15,12 @@ import { splitGroupKey } from '../../lib/splitGroupKey';
  * полосе, как раньше.
  */
 
-type Group = SplitPlanView['groups'][number];
-
-const group = (index: number, chatId: string): Group => ({
-  index,
+const group = (index: number, chatId: string): ChildStageGroup => ({
+  chatId,
   title: `Группа ${index}`,
   branch: `agent/g${index}`,
-  after: [],
-  status: 'started',
-  chatId,
+  stages: ['plan', 'work'],
+  isRunning: true,
 });
 
 const ask = (chatId: string, question: string, isRunning = true): ChildQuestion => ({
@@ -51,31 +45,11 @@ const ask = (chatId: string, question: string, isRunning = true): ChildQuestion 
 
 const GROUP_CHAT = '3f9a1c2e-7b44-4d0e-9a51-0c6d2b1e8f10';
 
-function stagesOf(groups: Group[]): ChildStageGroup[] {
-  const rows = new Map<string, ChildStageGroup>(
-    groups.map((item) => [
-      splitGroupKey({ groupIndex: item.index, id: '' }),
-      {
-        chatId: item.chatId ?? '',
-        title: item.title,
-        stages: ['plan', 'work'],
-        isRunning: true,
-      },
-    ]),
-  );
-  return mergeSplitGroups(rows, {
-    parentChatId: 'parent',
-    triage: { at: '2026-10-20T19:00:00.000Z', received: true, repairs: [], conflicts: [] },
-    order: groups.map((item) => item.index),
-    groups,
-  });
-}
-
 function render(questions: ChildQuestion[], answerable = true): string {
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
       <ChildBlocks
-        stages={stagesOf([group(0, 'c0'), group(3, GROUP_CHAT)])}
+        stages={[group(0, 'c0'), group(3, GROUP_CHAT)]}
         onOpenChild={() => {}}
         questions={questions}
         {...(answerable ? { onAnswer: () => {} } : {})}
@@ -127,7 +101,7 @@ describe('вопрос агента группы — в её карточке', 
 
 describe('cardQuestions — чей вопрос куда', () => {
   it('по ключу карточки — в карточку, прочие — в полосу, неразборчивые — никуда', () => {
-    const groups = stagesOf([group(0, 'c0'), group(3, GROUP_CHAT)]);
+    const groups = [group(0, 'c0'), group(3, GROUP_CHAT)];
     const broken: ChildQuestion = { chatId: 'c0', title: 'чат c0', input: '{oops' };
     const text: ChildQuestion = { chatId: 'c0', title: 'чат c0', input: '', text: 'Куда дальше?' };
     const { inCards, strip } = cardQuestions(groups, [
@@ -142,7 +116,7 @@ describe('cardQuestions — чей вопрос куда', () => {
   });
 
   it('карточка снятой группы вопрос не забирает', () => {
-    const groups = stagesOf([group(3, GROUP_CHAT)]).map((item) => ({ ...item, retired: true }));
+    const groups = [{ ...group(3, GROUP_CHAT), retired: true }];
     const { inCards, strip } = cardQuestions(groups, [ask(GROUP_CHAT, 'один')]);
     expect(inCards.size).toBe(0);
     expect(strip).toHaveLength(1);

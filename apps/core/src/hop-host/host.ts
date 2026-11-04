@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { join } from 'node:path';
 import { newId } from '../lib/ids/uuidv7.ts';
 import { layoutOf } from '../platform/core-home.ts';
 import { acquireExclusive, releaseExclusive, type LockHolder } from '../platform/exclusive-lock.ts';
@@ -9,6 +10,9 @@ import { createLivenessProbe, identityOfPid } from '../platform/process-identity
 import { registerServer, unregisterServer } from '../platform/procs-file.ts';
 import { ensureTokenFile } from '../platform/token-file.ts';
 import { rulesFrom, type HopContext } from './context.ts';
+import { CONTOUR_SPEND_FILE, ContourBook } from './contour-book/contour-book.ts';
+import { panelContours } from './contour-book/panel-state.ts';
+import { adoptPanelSummarized } from './gateway/summarized-ledger/summarized-ledger.ts';
 import { handleControlRequest } from './control.ts';
 import { handleDlpRequest } from './dlp/dlp-hop.ts';
 import { handleGatewayRequest } from './gateway/handler.ts';
@@ -22,6 +26,8 @@ import { SpendBook, type PriceOf } from './spend.ts';
 import { TagRegistry } from './tags.ts';
 import { HopTrace } from './trace.ts';
 import { UPSTREAM_RETRY_PAUSE_MS } from './upstream.ts';
+import { startDlpProxy, type DlpProxy } from './dlp-proxy/dlp-proxy.ts';
+import { startUserGateway, type UserGateway } from './user-gateway/user-gateway.ts';
 
 /**
  * Хост звеньев (11 §Hop chain, план §2 H): отдельный процесс, один на дом ядра. Держит три
@@ -153,14 +159,22 @@ export async function startHopHost(
   const servers: Server[] = [];
   let flushTimer: NodeJS.Timeout | undefined;
   let registered = false;
+  let userGateway: UserGateway | undefined;
+  let dlpProxy: DlpProxy | undefined;
   const procs = layoutOf(config.home).procs;
   const procsDeps = { isAlive, me };
   try {
     const token = ensureTokenFile(layout.token).token;
     const stateDir = layout.dir;
+    adoptPanelSummarized(stateDir, config.panelAppData ?? undefined);
     const ctx: HopContext = {
       tags: new TagRegistry(layout.tags),
       spend: new SpendBook(layout.spendDir, layout.exhausted, deps.price),
+      contours: new ContourBook(
+        join(stateDir, CONTOUR_SPEND_FILE),
+        panelContours(config.panelAppData ?? undefined),
+        now(),
+      ),
       trace: new HopTrace(layout.trace),
       keys: createKeySource(config.panelAppData ?? undefined),
       rules: rulesFrom(config.panelAppData ?? undefined),
@@ -180,6 +194,13 @@ export async function startHopHost(
     }
     const substitutions: PortSubstitution[] = [];
     const ports = { control: 0, dlp: 0, gateway: 0 } as HopPorts;
+    userGateway = startUserGateway({ ctx });
+    dlpProxy = startDlpProxy({
+      panelAppData: config.panelAppData ?? null,
+      language: ctx.language,
+      now,
+      ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+    });
     const controlDeps = {
       ctx,
       token,
@@ -187,6 +208,8 @@ export async function startHopHost(
       substitutions,
       pid: process.pid,
       panelAppData: config.panelAppData ?? null,
+      userGateway,
+      dlpProxy,
     };
     const handlers: Record<keyof HopPorts, Handler> = {
       control: (request, response) => handleControlRequest(controlDeps, request, response),
@@ -221,7 +244,10 @@ export async function startHopHost(
       procsDeps,
     );
     registered = true;
-    flushTimer = setInterval(() => ctx.spend.flush(), config.flushMs ?? DEFAULT_FLUSH_MS);
+    flushTimer = setInterval(() => {
+      ctx.spend.flush();
+      ctx.contours.flush();
+    }, config.flushMs ?? DEFAULT_FLUSH_MS);
     flushTimer.unref();
 
     let closed: Promise<void> | undefined;
@@ -229,6 +255,9 @@ export async function startHopHost(
       (closed ??= (async () => {
         clearInterval(flushTimer);
         ctx.spend.flush();
+        ctx.contours.flush();
+        await userGateway?.stop();
+        await dlpProxy?.stop();
         await Promise.all(servers.map(closeServer));
         await unregisterServer(
           procs,
@@ -241,6 +270,8 @@ export async function startHopHost(
     return { ports, substitutions, ctx, close };
   } catch (error) {
     clearInterval(flushTimer);
+    await userGateway?.stop();
+    await dlpProxy?.stop();
     await Promise.all(servers.filter((s) => s.listening).map(closeServer));
     if (registered)
       await unregisterServer(

@@ -13,28 +13,6 @@ const SHOTS = process.env.SHOTS || '';
 // Ядру нужен найденный CLI, чтобы дорога `cli` предпроверки прошла; сама модель стенду не нужна.
 const FAKE_CLAUDE = `process.stderr.write('stand: no model here\\n'); process.exit(1);\n`;
 
-/** Обёртка формы npm cmd-shim: на Windows ядро разбирает только её (как в check-core-launch). */
-const CMD_SHIM = [
-  '@ECHO off',
-  'GOTO start',
-  ':find_dp0',
-  'SET dp0=%~dp0',
-  'EXIT /b',
-  ':start',
-  'SETLOCAL',
-  'CALL :find_dp0',
-  '',
-  'IF EXIST "%dp0%\\node.exe" (',
-  '  SET "_prog=%dp0%\\node.exe"',
-  ') ELSE (',
-  '  SET "_prog=node"',
-  '  SET PATHEXT=%PATHEXT:;.JS;=;%',
-  ')',
-  '',
-  'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\claude.mjs" %*',
-  '',
-].join('\r\n');
-
 /** UUIDv7 для `cmdId` и страницы числа: время в старших битах, версия 7, вариант 10xx. */
 export function uuidv7() {
   const time = Date.now().toString(16).padStart(12, '0');
@@ -98,7 +76,7 @@ export function standOptions(label, holder) {
 
 /** Засев прямо в ядро стенда и чтение его библиотеки с диска. */
 export function coreDirect(stand) {
-  if (process.platform === 'win32') writeFileSync(join(stand.bin, 'claude.cmd'), CMD_SHIM);
+  // `claude.cmd` формы npm cmd-shim (её одну ядро разбирает на Windows) пишет сам стенд.
   const library = join(stand.coreHome, 'scenarios');
   const token = readFileSync(join(stand.coreHome, 'token'), 'utf8').trim();
   const core = JSON.parse(readFileSync(join(stand.coreHome, 'procs.json'), 'utf8')).cores.at(-1);

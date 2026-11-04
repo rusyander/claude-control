@@ -42,6 +42,29 @@ describe('R:PR-04 fit decision — VRAM fact before load', () => {
     expect(decideFit({ model, gpu: exact, ram, overheadBytes: GIB }).kind).toBe('fits');
   });
 
+  it("fit: the caller's layout need replaces file + overhead; 0 (server fits itself / cpu) loads beside a small card", () => {
+    const small = nvidia([
+      { id: '0', totalBytes: 8 * GIB, usedBytes: 6 * GIB, freeBytes: 2 * GIB },
+    ]);
+    // Панель посчитала окно и кеш: нужно 7 ГиБ при файле 4 — свободных 2 не хватит.
+    const stated = decideFit({
+      model: { ...model, needBytes: 7 * GIB },
+      gpu: small,
+      ram,
+      overheadBytes: GIB,
+    });
+    expect(stated).toMatchObject({ kind: 'short', needBytes: 7 * GIB });
+    // Слои раскладывает сам сервер (`fit = on`) или считает процессор — карте ничего не обещано.
+    const spill = decideFit({
+      model: { ...model, needBytes: 0 },
+      gpu: small,
+      ram,
+      overheadBytes: GIB,
+    });
+    expect(spill).toMatchObject({ kind: 'fits', needBytes: 0, baselineUsedBytes: 6 * GIB });
+    expect(spill.reasons.join(' ')).toContain('server places layers itself or runs on cpu');
+  });
+
   it('R:PR-04 fit: WDDM (used without capacity) and unknown GPU → estimate, named; unified memory → target unified', () => {
     const wddm = decideFit({
       model,

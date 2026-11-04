@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type {
   ProjectGitInfo,
@@ -282,8 +282,6 @@ describe('project-git-routes: рабочие копии', () => {
   /** Кого конвейер просили подтолкнуть после смены настроек разделения. */
   let kicked: string[] = [];
   /** Простаивающий процесс CLI, чей cwd — копия: его держит пул живых сессий. */
-  let idle: ChildProcess | undefined;
-  let idleAsked: string[] = [];
 
   const gitIn = (cwd: string, ...args: string[]): void => {
     execFileSync('git', args, { cwd, stdio: 'ignore', windowsHide: true });
@@ -297,8 +295,6 @@ describe('project-git-routes: рабочие копии', () => {
     busyPath = undefined;
     busyRunning = true;
     kicked = [];
-    idle = undefined;
-    idleAsked = [];
     app = Fastify();
     // Двойник реестра повторяет его существенное свойство: `active()` держит
     // прогон ещё минуту ПОСЛЕ завершения (буфер догона), и «занято» решает не
@@ -309,16 +305,6 @@ describe('project-git-routes: рабочие копии', () => {
       {
         active: () => (busyPath ? [{ chatId: 'run-1', projectPath: busyPath }] : []),
         isRunning: () => busyRunning,
-        livePool: {
-          closeIdleIn: (path: string) => {
-            idleAsked.push(path);
-            const child = idle;
-            if (!child || child.exitCode !== null) return { busy: 0, closed: Promise.resolve() };
-            const closed = new Promise<void>((done) => child.once('exit', () => done()));
-            child.kill();
-            return { busy: 0, closed };
-          },
-        },
       },
       (path) => void kicked.push(path),
     );
@@ -326,7 +312,6 @@ describe('project-git-routes: рабочие копии', () => {
   });
 
   afterEach(async () => {
-    idle?.kill();
     await app.close();
     dropTemp(siblings);
     dropTemp(dir);
@@ -483,37 +468,6 @@ describe('project-git-routes: рабочие копии', () => {
   // живёт простаивающий процесс CLI с cwd в копии. Он панели свой, а Windows не
   // отдаёт папку, пока она чей-то cwd: «Убрать» отвечало «папку держит
   // запущенный процесс — закройте его», а закрыть человеку было нечего.
-  it('удаление копии сперва гасит простаивающий процесс панели в ней', async () => {
-    gitIn(dir, 'init', '-b', 'main');
-    gitIn(dir, 'config', 'user.email', 'probe@example.com');
-    gitIn(dir, 'config', 'user.name', 'probe');
-    writeFileSync(join(dir, 'a.txt'), 'a');
-    gitIn(dir, 'add', '.');
-    gitIn(dir, 'commit', '-m', 'init');
-    const added = await app.inject({
-      method: 'POST',
-      url: '/api/project-git/worktrees/add',
-      payload: { path: dir, name: 'feature/idle' },
-    });
-    const copy = added.json<{ createdPath: string }>().createdPath;
-    idle = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
-      cwd: copy,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    await new Promise((done) => setTimeout(done, 300));
-
-    const removed = await app.inject({
-      method: 'POST',
-      url: '/api/project-git/worktrees/remove',
-      payload: { path: dir, worktreePath: copy },
-    });
-    expect(removed.statusCode, removed.body).toBe(200);
-    expect(idleAsked.map((path) => resolve(path))).toEqual([resolve(copy)]);
-    expect(idle.exitCode !== null || idle.signalCode !== null).toBe(true);
-    expect(existsSync(join(copy, 'a.txt'))).toBe(false);
-  }, 60_000);
-
   it('битое тело записи — 400 с именем поля, до git дело не доходит', async () => {
     const checkout = await app.inject({
       method: 'POST',

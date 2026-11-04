@@ -42,7 +42,7 @@ git(copy, 'add', '-A');
 git(copy, 'commit', '-qm', 'c');
 git(copy, 'worktree', 'add', '-q', '-b', 'side', wt);
 
-const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
 type HookOut = {
   hookSpecificOutput?: {
     additionalContext?: string;
@@ -69,7 +69,7 @@ function pre(session: string, tool: string, input: object, cwd = copy, child = f
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: STATE,
       ...(child ? CHILD : {}),
     },

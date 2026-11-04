@@ -1,28 +1,10 @@
 import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 
 /**
- * Общая нормализация для всех форматов раздела: разбор списков черновика,
- * чтение списков и секций из файла и вычитание ведомых ключей из проекции
- * «всё, кроме нашего».
+ * Общая нормализация файлов раздела: чтение списков и секций из файла и
+ * вычитание ведомых ключей из проекции «всё, кроме нашего». Разбор списков
+ * черновика (`parseToolList`) — в `@agentdeck/contracts/permissions`.
  */
-
-/**
- * Список имён инструментов: массив непустых строк. Пробелы по краям срезаются,
- * повторы схлопываются (порядок первого вхождения сохраняется). Не массив или
- * элемент не строка → `undefined` (черновик целиком отклоняется).
- */
-export function parseToolList(value: unknown): string[] | undefined {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) return undefined;
-  const list: string[] = [];
-  for (const item of value) {
-    if (typeof item !== 'string') return undefined;
-    const name = item.trim();
-    if (!name) continue;
-    if (!list.includes(name)) list.push(name);
-  }
-  return list;
-}
 
 /**
  * Список строк ИЗ ФАЙЛА (имена инструментов Gemini, правила Qwen и Cursor). Не

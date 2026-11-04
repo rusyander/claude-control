@@ -7,7 +7,7 @@ import { LOCAL_ID_PREFIX } from '../../lib/settings-source.ts';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { generateHookScript, hookScriptPath } from '../hook-scripts/hook-scripts.ts';
 import { compiledHookOrigin } from '../compiled-markers.ts';
-import { readScriptDescription } from '../../lib/script-description/script-description.ts';
+import { readScriptDescriptionCoded } from '../../lib/script-description/script-description.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
 
 /**
@@ -209,7 +209,7 @@ function parseHooksFile(
           isEnabled: source === 'settings-local' || overlay.isEnabled(id, legacyId),
           scriptPath,
           scriptExists: scriptFile ? existsSync(scriptFile) : undefined,
-          description: scriptFile ? readScriptDescription(scriptFile) : undefined,
+          ...(scriptFile ? readScriptDescriptionCoded(scriptFile) : {}),
           groupIds: overlay.groupIds(id, legacyId, command),
           source,
         });

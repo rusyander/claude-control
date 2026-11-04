@@ -301,6 +301,25 @@ export async function perform(ctx: PerformCtx, a: NextAction): Promise<void> {
       stepMove(task, a.stepId, 'checked-green');
       stepEnded(task, a.stepId, 'done', 'human', `${END_REASON.human}: answered ${a.askId}`);
       return;
+    case 'close-chat':
+      // Мягко: ход, идущий сейчас, доходит до границы — разговор не обрывается посреди ответа.
+      // Переходы, недопустимые из текущего состояния, машина пропускает (`stepMove` → false).
+      await endSession(ctx, a.stepId, 'soft');
+      stepMove(task, a.stepId, 'start');
+      stepMove(task, a.stepId, 'answered');
+      stepMove(task, a.stepId, 'check');
+      stepMove(task, a.stepId, 'checked-green');
+      stepEnded(task, a.stepId, 'done', 'human', `${END_REASON.endChat}: ${a.cmdId}`);
+      return;
+    case 'close-ask':
+      // Ход уже на границе (`turnEnd`): сессия снимается мягко, шаг — сделан ядром.
+      await endSession(ctx, a.stepId, 'soft');
+      stepMove(task, a.stepId, 'start');
+      stepMove(task, a.stepId, 'answered');
+      stepMove(task, a.stepId, 'check');
+      stepMove(task, a.stepId, 'checked-green');
+      stepEnded(task, a.stepId, 'done', 'core', END_REASON.askAnswered);
+      return;
     case 'raise': {
       if (a.capStep) {
         await endSession(ctx, a.stepId, 'tree');

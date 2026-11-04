@@ -9,7 +9,6 @@ import {
   readContinuePermissions as readContinueLists,
   writeContinuePermissions,
 } from '../../lib/continue-yaml.ts';
-import { parseToolList } from './normalize.ts';
 import { backupNameOf } from './target.ts';
 import type { ContinuePermissionsValues, ProviderPermissionsTarget } from './types.ts';
 
@@ -22,25 +21,6 @@ import type { ContinuePermissionsValues, ProviderPermissionsTarget } from './typ
  * путей). Правка идёт Document API пакета `yaml`: комментарии и прочие ключи
  * файла целы, пустой список УДАЛЯЕТ свой ключ, а не пишет `[]`.
  */
-
-/**
- * Разобрать черновик прав Continue: три списка правил и НИКАКОГО режима. Правила
- * — непрозрачные строки (панель их синтаксис не толкует, только хранит), поэтому
- * проверяем ровно форму: массив непустых строк без повторов (`parseToolList`).
- */
-export function parseContinueDraft(
-  rec: Record<string, unknown>,
-): ContinuePermissionDraft | undefined {
-  // У Continue нет режима, по которому тело опознаётся как черновик прав, поэтому
-  // хотя бы один из трёх списков обязан присутствовать: иначе любое постороннее
-  // тело (`{}`, чужой черновик) читалось бы как «всё пусто» и стирало файл.
-  if (!('allow' in rec) && !('ask' in rec) && !('exclude' in rec)) return undefined;
-  const allow = parseToolList(rec.allow);
-  const ask = parseToolList(rec.ask);
-  const exclude = parseToolList(rec.exclude);
-  if (!allow || !ask || !exclude) return undefined;
-  return { allow, ask, exclude };
-}
 
 /**
  * Прочитать права Continue. Файла нет → дефолты CLI (чтение разрешено, запись

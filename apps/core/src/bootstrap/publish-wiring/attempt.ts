@@ -72,11 +72,61 @@ function waitForge(task: LiveTask, s: StepCtx, cause: string): PublishOutcome {
 const refused = (
   next: 'fix-step' | 'resolve-conflict' | 'regate',
   unmet: string,
-): PublishOutcome => ({
+): Extract<PublishOutcome, { kind: 'refused' }> => ({
   kind: 'refused',
   next,
   unmet: [unmet],
 });
+
+/**
+ * Суд единицы шага публикации — условия до пуша и `decideReady`, без записей в журнал и без
+ * пуша. ОДИН суд сдачи на две дороги: попытка публикации (`publishAttempt`) и проба сдачи копии
+ * (`delivery-probe.ts`, `tests-cli delivery`). `probe` — проба: состав берётся свой у единицы, а
+ * конфликт с базой не перебазируется (копия не меняется), он называется отказом.
+ */
+export type UnitJudgement =
+  | { kind: 'wait'; cause: string }
+  | Extract<PublishOutcome, { kind: 'refused' }>
+  | { kind: 'allowed'; view: UnitView; route: PushRoute; access: ForgeAccess; head: string };
+
+export async function judgeUnit(
+  deps: AttemptDeps,
+  task: LiveTask,
+  unitId: string,
+  compositionId: string | null,
+  probe = false,
+): Promise<UnitJudgement> {
+  const wait = (cause: string): UnitJudgement => ({ kind: 'wait', cause });
+  const own = openActions(task).filter((a) => task.state.actions[a.actionId]?.unitId === unitId);
+  if (own.length > 0)
+    return wait(`action ${own[0]!.kind} ${own[0]!.target} started, not reconciled`);
+  const pub = publicationOf(task.state, unitId);
+  const composed = pub.composed;
+  if (!compositionId || !composed || composed.compositionId !== compositionId)
+    return refused('regate', 'composition-mismatch no composed commits for the passed final gate');
+  const viewed = await unitViewOf(task, unitId, deps.git);
+  if (!('value' in viewed)) return wait(viewed.unknown);
+  const view = viewed.value;
+  const access = deps.forgeFor(view.url);
+  if (!access) return wait(`no forge configured for the remote of ${view.repoKey}`);
+  const hooks = await repoHooksPath(view.copyDir, deps.git);
+  if (!('value' in hooks)) return wait(`hooks path: ${why(hooks)}`);
+  const route: PushRoute = publisherPushSpec({
+    url: view.url,
+    repoHooksPath: hooks.value,
+    credential: access.credential,
+  });
+  // `mrExists` у пробы — всегда: так `syncWithBase` не перебазирует, а называет конфликт.
+  const mrExists = probe || !!pub.mr;
+  const ctx = await readyInput(deps, task, view, route, compositionId, composed.treeFp, mrExists);
+  if ('unknown' in ctx) return wait(ctx.unknown);
+  const decision = deps.judge.decide(ctx.input);
+  if (decision.kind === 'refuse') {
+    if (decision.next === 'wait-forge') return wait(refusalUnmet(decision).join('; '));
+    return { kind: 'refused', next: decision.next, unmet: refusalUnmet(decision) };
+  }
+  return { kind: 'allowed', view, route, access, head: ctx.head };
+}
 
 export async function publishAttempt(
   deps: AttemptDeps,
@@ -84,35 +134,10 @@ export async function publishAttempt(
   s: StepCtx,
   compositionId: string | null,
 ): Promise<PublishOutcome> {
-  const unitId = s.unitId;
-  const own = openActions(task).filter((a) => task.state.actions[a.actionId]?.unitId === unitId);
-  if (own.length > 0)
-    return waitForge(task, s, `action ${own[0]!.kind} ${own[0]!.target} started, not reconciled`);
-  const pub = publicationOf(task.state, unitId);
-  const composed = pub.composed;
-  if (!compositionId || !composed || composed.compositionId !== compositionId)
-    return refused('regate', 'composition-mismatch no composed commits for the passed final gate');
-  const viewed = await unitViewOf(task, unitId, deps.git);
-  if (!('value' in viewed)) return waitForge(task, s, viewed.unknown);
-  const view = viewed.value;
-  const access = deps.forgeFor(view.url);
-  if (!access) return waitForge(task, s, `no forge configured for the remote of ${view.repoKey}`);
-  const hooks = await repoHooksPath(view.copyDir, deps.git);
-  if (!('value' in hooks)) return waitForge(task, s, `hooks path: ${why(hooks)}`);
-  const route: PushRoute = publisherPushSpec({
-    url: view.url,
-    repoHooksPath: hooks.value,
-    credential: access.credential,
-  });
-  const ctx = await readyInput(deps, task, view, route, compositionId, composed.treeFp, !!pub.mr);
-  if ('unknown' in ctx) return waitForge(task, s, ctx.unknown);
-  const decision = deps.judge.decide(ctx.input);
-  if (decision.kind === 'refuse') {
-    if (decision.next === 'wait-forge')
-      return waitForge(task, s, refusalUnmet(decision).join('; '));
-    return { kind: 'refused', next: decision.next, unmet: refusalUnmet(decision) };
-  }
-  return publishAllowed(deps, task, s, view, route, access.port, ctx.head);
+  const judged = await judgeUnit(deps, task, s.unitId, compositionId);
+  if (judged.kind === 'wait') return waitForge(task, s, judged.cause);
+  if (judged.kind === 'refused') return judged;
+  return publishAllowed(deps, task, s, judged.view, judged.route, judged.access.port, judged.head);
 }
 
 async function readyInput(

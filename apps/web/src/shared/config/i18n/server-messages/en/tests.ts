@@ -258,7 +258,7 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'tests-environment-used-by-plans':
     'These plans refer to this environment: {{plans}}. Delete anyway — the plan will be left without an environment.',
   'orphan-run-stopped':
-    'The panel restarted while the run was going, and the agent stopped with it. What it had written stays in the files; a draft, if one appeared, is waiting for review.',
+    'The panel restarted while the run was going, and the agent is stopped: its core task was cancelled. What it had written stays in the files; a draft, if one appeared, is waiting for review.',
   'e2e-run-not-installed':
     'The autotest runner is not installed, and the panel does not install it itself — it will not download hundreds of megabytes unasked. Run in {{dir}}: {{install}}',
   'e2e-not-created':

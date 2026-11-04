@@ -19,9 +19,12 @@ import type {
   HookVerdict,
   StepCtx,
 } from '../../conductor/run/run.types.ts';
+import { inPlaceRootOf, isScratchTask } from '../../conductor/estimate/index.ts';
+import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { diskFree, diskVerdict } from '../../platform/machine.ts';
+import { makeScratchDir } from '../../platform/scratch.ts';
 import { profileMoved } from '../../verifier/profile/index.ts';
 import { copyWiring, type CopyWiring } from '../copy-wiring.ts';
 import { snapshotPinnedProfile } from '../verifier-wiring/pinned-profile.ts';
@@ -72,6 +75,46 @@ function repoOfUnit(task: LiveTask, unitId: string): UnitRepoView | undefined {
   const repoKey = task.state.units[unitId]?.repoKey;
   const repos = task.state.created?.repos ?? [];
   return repos.find((r) => r.repoKey === repoKey) ?? (repoKey ? undefined : repos[0]);
+}
+
+/** Сигнал места работы чата: корень назван раз на единицу, человек видит, что копии нет. */
+export const IN_PLACE_SIGNAL = 'chat-in-place';
+
+function journalInPlace(task: LiveTask, unitId: string, root: string): void {
+  const seen = readJournalLines(task.dir, task.taskId).lines.some(
+    (l) =>
+      l.kind === 'signal' &&
+      l.unitId === unitId &&
+      (l.data as { signal?: string }).signal === IN_PLACE_SIGNAL,
+  );
+  if (seen) return;
+  task.append({
+    kind: 'signal',
+    actor: 'core',
+    unitId,
+    data: { signal: IN_PLACE_SIGNAL, severity: 'info', subject: root, detail: 'grant: chat start' },
+  });
+}
+
+/**
+ * Каталог вопроса — создан и записан ресурсом ядра раз на задачу: перезапуск ядра посреди хода
+ * второй строки не пишет, а каталог, снятый кем-то снаружи, создаётся заново.
+ */
+function journalScratch(task: LiveTask, unitId: string): void {
+  const dir = makeScratchDir(task.taskId);
+  const seen = readJournalLines(task.dir, task.taskId).lines.some(
+    (l) =>
+      l.kind === 'resource.created' &&
+      (l.data as { kind?: string; ref?: string }).kind === 'tmpdir' &&
+      (l.data as { ref?: string }).ref === dir,
+  );
+  if (seen) return;
+  task.append({
+    kind: 'resource.created',
+    actor: 'core',
+    unitId,
+    data: { rid: newId(), kind: 'tmpdir', owner: 'core', release: 'task-end', ref: dir },
+  });
 }
 
 /** Шаг правит копию: встроенные инструменты не только чтения (оценка и разбор задачи — чтение). */
@@ -309,6 +352,20 @@ export function createWiringHooks(
       const task = deps.registry.live(u.taskId);
       if (!task)
         return { verdict: stop('unit', 'task-unknown', `no live task ${u.taskId}`), sections: [] };
+      // Лёгкая сессия «ask»: репозитория нет, место — временный каталог ядра; его снимает
+      // уборка конца задачи по строке ресурса (`tmpdir`, `task-end`), как любой каталог ядра.
+      if (isScratchTask(task)) {
+        journalScratch(task, u.unitId);
+        return { verdict: ok, sections: [] };
+      }
+      // Чат из панели на месте (грант человека на корень): копии нет и не будет — её не
+      // выкладывают, не ставят зависимости и не снимают на конце; сам корень — рабочее место.
+      // До поиска репозитория: у чата в папке без git (G12 p7) репозитория нет вовсе.
+      const inPlace = inPlaceRootOf(task, u.unitId);
+      if (inPlace) {
+        journalInPlace(task, u.unitId, inPlace);
+        return { verdict: ok, sections: [] };
+      }
       const repo = repoOfUnit(task, u.unitId);
       if (!repo)
         return {
@@ -409,6 +466,10 @@ export function createWiringHooks(
 
     async onFinalGate(u) {
       const task = deps.registry.live(u.taskId);
+      // Чат на месте ничего не сдаёт: итога над копией у него нет (разговор, не поставка).
+      if (task && inPlaceRootOf(task, u.unitId)) return { verdict: ok, compositionId: null };
+      // Вопрос модели тоже ничего не сдаёт: копии и итога нет, ответ — сам ход.
+      if (task && isScratchTask(task)) return { verdict: ok, compositionId: null };
       const placed = task ? unitCopyOf(task, u.unitId) : undefined;
       const repo = task ? repoOfUnit(task, u.unitId) : undefined;
       if (!task || !placed || !repo)
@@ -451,6 +512,14 @@ export function createWiringHooks(
         };
       await caseRunsOf(task, od.value, repo.repoKey, placed.dir, decision.units);
       return { verdict: ok, compositionId };
+    },
+
+    // Токен моста панели не переживает задачу: конец задачи снимает его из книги, и сессия, которую
+    // кто-то попробовал бы поднять после, без токена отказывает с причиной.
+    async onTaskEnd(taskId) {
+      deps.askBridges?.drop(taskId);
+      // Значения окружения задачи (каталог песочницы, секреты стенда) — тот же срок жизни.
+      deps.taskEnv?.drop(taskId);
     },
 
     async onUnitEnd(u) {

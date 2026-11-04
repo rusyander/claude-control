@@ -252,13 +252,22 @@ export async function shootBasics(browser, web, scenario, home) {
 
     await openProject(page, web);
 
-    // ── 01. Пустой чат проекта ───────────────────────────────────────────────
+    // ── 01. Новый чат проекта — форма чата ядра ──────────────────────────────
+    // «Новый чат» ведёт на `/core/chat` (задача ядра в папке проекта); прежние разговоры
+    // открываются во вкладке проекта — за ними путь возвращается туда.
     await page
       .getByRole('button', { name: /^(Новый чат|New chat)/ })
       .first()
       .click();
+    await page.waitForURL(/\/core\/chat/);
     await page.waitForTimeout(1500);
     await scenario.shot(page, '01-project-empty');
+    // Проект уже открыт (рабочая область помнит его) — вкладка проекта встаёт сразу.
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await page
+      .getByRole('button', { name: /Экспорт заказов в CSV/ })
+      .first()
+      .waitFor();
 
     // ── 02. Вопрос и вложение в поле ввода ───────────────────────────────────
     await openChat(page, 'Экспорт заказов в CSV');
@@ -314,22 +323,16 @@ export async function shootBasics(browser, web, scenario, home) {
     await closeOverlay(page);
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    // ── 07. Меню чата: тумблеры прав и правила ───────────────────────────────
+    // ── 07. Меню чата: тумблеры прав и действия над разговором ───────────────
     await page.setViewportSize({ width: 1440, height: 1240 });
-    const menu = page.locator('[role="dialog"]').first();
     await page
       .getByRole('button', { name: /^(Настройки чата|Chat settings)$/ })
       .first()
       .click();
     await page.waitForTimeout(1200);
+    // Правил под тумблерами больше нет (этап 10, G12), и меню целиком помещается
+    // в один кадр — прежний второй кадр «низ меню» снят.
     await scenario.shot(page, '07-menu', { clip: '[role="dialog"]', padding: 220 });
-
-    // ── 08. Низ того же меню: действия над разговором ────────────────────────
-    // Меню прокручивается внутри себя (max-height), поэтому «Перезапустить
-    // сессию» человек видит только опустив список — и кадр обязан это повторить.
-    await menu.evaluate((node) => node.scrollTo(0, node.scrollHeight));
-    await page.waitForTimeout(800);
-    await scenario.shot(page, '08-menu-actions', { clip: '[role="dialog"]', padding: 220 });
     await closeOverlay(page);
 
     // ── 09. Пульт агентов ────────────────────────────────────────────────────

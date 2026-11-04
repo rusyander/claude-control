@@ -70,10 +70,6 @@ const PANEL_TEXT_FILES = [
   'texts-gaps.ru.ts',
   'texts-gaps.en.ts',
 ];
-/** Тексты сторожа групп (строка списка чатов телефона, F7): копия панельного словаря, файл в файл. */
-const WEB_GROUP_WATCH = 'apps/web/src/shared/config/i18n/group-watch';
-const MOBILE_GROUP_WATCH = 'apps/mobile/src/shared/config/i18n/group-watch';
-const GROUP_WATCH_FILES = ['ru.ts', 'en.ts'];
 
 /** Список VALUE_MODULES читается из самого конфига — второй копии быть не должно. */
 function readValueModules(metroText) {
@@ -242,10 +238,6 @@ function check() {
     ...PANEL_TEXT_FILES.map((name) => [
       join(WEB_PANEL_TEXTS, name),
       join(MOBILE_PANEL_TEXTS, name),
-    ]),
-    ...GROUP_WATCH_FILES.map((name) => [
-      join(WEB_GROUP_WATCH, name),
-      join(MOBILE_GROUP_WATCH, name),
     ]),
   ];
   for (const [webFile, mobileFile] of copies) {

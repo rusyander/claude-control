@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { DEFAULT_STATE } from './app-store.constants.ts';
 import type { AppState } from './app-store.types.ts';
 import { applyPortable, portableOf, PORTABLE_KEYS } from './settings-snapshot.ts';
+import { mergeState } from './state-file.ts';
 
 /**
  * Снимок настроек для git: что уезжает на другую машину, а что остаётся здесь.
@@ -95,6 +96,20 @@ describe('settings snapshot', () => {
     expect(back.projects[0]?.path).toBe('C:\\Users\\alice/src/app');
   });
 
+  /**
+   * Снятое правило «Подбирать модель под задачу» (этап 10, G14): снимок, записанный
+   * прежней версией, применяется — соседние поля доезжают, прежний ключ нет.
+   */
+  it('снимок прежней версии с projectCascade применяется без него', () => {
+    const brought = {
+      projectCascade: { 'c:/work/project': false },
+      runnerCommands: { 'c:/work/project': ['pnpm test'] },
+    } as unknown as Partial<AppState>;
+    const next = applyPortable(stateWith({}), brought, WIN) as unknown as Record<string, unknown>;
+    expect(next).not.toHaveProperty('projectCascade');
+    expect(next.runnerCommands).toEqual({ 'c:/work/project': ['pnpm test'] });
+  });
+
   it('применение не трогает здешнее и дополняет выключенные правила', () => {
     const local = stateWith({
       chatLinks: { k: { sessionId: 's' } } as unknown as AppState['chatLinks'],
@@ -121,38 +136,22 @@ describe('settings snapshot', () => {
     ]);
   });
 
-  it('сторож групп уезжает только правками: без умолчаний, чужих ключей и битых значений', () => {
-    // Блок прочитан с диска без схемы; полный блок заморозил бы умолчания на
-    // другой машине, а чужой ключ — отказ всего снимка там.
-    const state = stateWith({
+  // Блоки экономии и сторожа групп сняты (этап 10, G15): снимок прежней версии с ними
+  // применяется, а блоки в состояние не попадают — их снимает чтение (`mergeState`).
+  it('снимок прежней версии с блоками групп применяется без них', () => {
+    const local = stateWith({ settings: { ...DEFAULT_STATE.settings, backupKeep: 7 } });
+    const old = {
       settings: {
-        ...DEFAULT_STATE.settings,
-        groupWatch: {
-          ...DEFAULT_STATE.settings.groupWatch,
-          askMinutes: 40,
-          checkRepeats: 'x',
-          legacy: 7,
-        } as unknown as AppState['settings']['groupWatch'],
+        backupKeep: 3,
+        groupEconomy: { sonnetDeliver: false },
+        groupWatch: { stallMinutes: 45 },
       },
-    });
-    const settings = portableOf(state, WIN).settings as Record<string, unknown>;
-    expect(settings.groupWatch).toEqual({ askMinutes: 40 });
-  });
-
-  // F-41 (решение владельца): пороги сторожа — переносимые предпочтения, как экономия групп.
-  it('снимок с блоком сторожа (даже пустым) принимается, без блока — пороги машины остаются', () => {
-    const local = stateWith({
-      settings: { ...DEFAULT_STATE.settings, groupWatch: { stallMinutes: 45 } as never },
-    });
-    const empty = applyPortable(local, { settings: { groupWatch: {} } } as never, WIN);
-    expect(empty.settings.groupWatch).toEqual({});
-    const brought = applyPortable(
-      local,
-      { settings: { groupWatch: { askMinutes: 40 } } } as never,
-      WIN,
-    );
-    expect(brought.settings.groupWatch).toEqual({ askMinutes: 40 });
-    const without = applyPortable(local, { settings: { backupKeep: 3 } } as never, WIN);
-    expect(without.settings.groupWatch).toEqual({ stallMinutes: 45 });
+    } as unknown as Partial<AppState>;
+    const next = mergeState(applyPortable(local, old, WIN));
+    const settings = next.settings as unknown as Record<string, unknown>;
+    expect(settings.backupKeep).toBe(3);
+    expect(settings).not.toHaveProperty('groupEconomy');
+    expect(settings).not.toHaveProperty('groupWatch');
+    expect(portableOf(next, WIN).settings).not.toHaveProperty('groupWatch');
   });
 });

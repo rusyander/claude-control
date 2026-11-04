@@ -35,7 +35,8 @@ import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { buildFixture, breakHook, healHook } from './watching-fixture.mjs';
 import { shootTour, shootTrouble } from './watching-overview.mjs';
 import { shootFind } from './watching-search.mjs';
@@ -88,15 +89,18 @@ const fixture = buildFixture(HOME);
 process.env.GUIDE_FIXTURE_HOME = HOME;
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: fixture.root,
-    // Чужой CLI уводится в свой каталог: перенос в сравнении ПИШЕТ файл, и без
-    // этого он писал бы в настоящий ~/.codex человека.
-    CODEX_HOME: fixture.codexHome,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: fixture.root,
+      // Чужой CLI уводится в свой каталог: перенос в сравнении ПИШЕТ файл, и без
+      // этого он писал бы в настоящий ~/.codex человека.
+      CODEX_HOME: fixture.codexHome,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-watching' },
+  );
 
   started.push(
     spawn(
@@ -138,6 +142,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   const only = process.env.GUIDE_ONLY ?? '';
   try {
     for (const item of SCENARIOS) {
@@ -157,5 +162,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(HOME, { recursive: true, force: true });
 }

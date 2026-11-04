@@ -13,6 +13,7 @@
     "src",
     "vitest.config.ts",
     "vitest.temp-sandbox.ts",
+    "vitest.temp-sandbox.test.ts",
     "vitest.coverage-dir.ts",
     "vitest.whole-suite.ts",
     "vitest.whole-suite.test.ts",

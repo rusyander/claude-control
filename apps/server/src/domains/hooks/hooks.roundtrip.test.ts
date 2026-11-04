@@ -2,10 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Group } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import { applyEntityState, rewriteHooks } from '../entity-toggle.ts';
-import { promotePathStep } from '../groups/promote/promote.ts';
 import { moveHook, readHooks, upsertHook } from './hooks.ts';
 
 /**
@@ -65,53 +63,6 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-});
-
-describe('F-120: «Сделать ресурсом» хук проектной группы', () => {
-  it('prompt-хук и поля команды в проектном settings.json остаются как были', () => {
-    const project = join(dir, 'proj');
-    mkdirSync(join(project, '.claude'), { recursive: true });
-    const settings = join(project, '.claude', 'settings.json');
-    seed(settings);
-    const text = { ru: 'Проверка', en: 'Check' };
-    const group: Group = store.saveGroup({
-      id: 'proj-1',
-      name: 'Flow',
-      description: '',
-      color: 'accent',
-      icon: 'folder',
-      members: [],
-      env: {},
-      projectPaths: [],
-      scope: { kind: 'project', path: project, provider: 'claude' },
-      isEnabled: true,
-      order: 0,
-      path: {
-        steps: [
-          {
-            id: 's1',
-            order: 0,
-            kind: 'prompt',
-            anchor: 'work',
-            title: text,
-            prompt: text,
-            source: 'ru',
-            createdAt: '2026-09-28T00:00:00.000Z',
-          },
-        ],
-      },
-    });
-    const draft = JSON.stringify({ event: 'PostToolUse', matcher: 'Edit', command: 'node x.mjs' });
-    promotePathStep(deps(), group, { stepId: 's1', type: 'hook', draft });
-
-    const saved = readFile(settings);
-    expect(saved.hooks.Stop).toEqual([{ hooks: [PROMPT_STOP] }]);
-    expect(saved.hooks.PreToolUse).toEqual([{ matcher: 'Bash', hooks: [GUARD] }]);
-    expect(saved.hooks.PostToolUse).toEqual([
-      { matcher: 'Edit', hooks: [{ type: 'command', command: 'node x.mjs' }] },
-    ]);
-    expect((saved as unknown as { model: string }).model).toBe('opus');
-  });
 });
 
 describe('F-120: тот же писатель на общем settings.json (временном)', () => {

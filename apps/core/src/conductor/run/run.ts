@@ -1,6 +1,7 @@
 import type { LiveTask } from '../../journal/resume.ts';
 import { WORKING, type TaskFoldState } from '../../journal/reduce/reduce.types.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
+import { chatImagesOf, chatOpeningOf } from '../estimate/placement.ts';
 import { decideNext } from '../next/next.ts';
 import type { LiveStepFact, NextAction } from '../next/next.types.ts';
 import { checksInFlight, decideSafepoint } from '../safepoint/safepoint.ts';
@@ -103,6 +104,12 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
     sessionId: string,
     sections: BriefSection[],
   ): Promise<string> => {
+    // Чат открывается словом человека, а не брифом шага: в виде сеанса первым пузырём стоит то,
+    // что человек написал, и модель отвечает на него (этап 10).
+    if (s.def.kind === 'chat') {
+      const first = chatOpeningOf(task);
+      if (first) return first;
+    }
     const economy = deps.economy;
     if (!economy?.opening) return briefText(s, sections);
     return (await economy.opening(task, s, sessionId, sections)) ?? stepLine(s);
@@ -161,7 +168,11 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
       return `${END_REASON.briefOverBudget}: ${String((err as Error).message ?? err)}`;
     }
     // Ключ дубля — сам шаг: та же сессия после перезапуска ядра получит «дубль», не второй бриф.
-    await deps.sessions.send(got.sessionId, text, s.stepId, 'platform');
+    // Картинки вопроса едут только с первым словом чата: модель видит их в том же ходе.
+    const images = s.def.kind === 'chat' ? chatImagesOf(task) : [];
+    if (images.length > 0)
+      await deps.sessions.send(got.sessionId, text, s.stepId, 'platform', images);
+    else await deps.sessions.send(got.sessionId, text, s.stepId, 'platform');
     return null;
   };
 

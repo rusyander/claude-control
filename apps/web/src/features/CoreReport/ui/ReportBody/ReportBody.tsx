@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { machineStateLabel } from '@entities/CoreTask';
 import { Badge } from '@shared/ui/badge';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -28,7 +29,11 @@ export function ReportBody({ report }: ReportBodyProps) {
         {report.units.map((u) => (
           <li key={u.unitId}>
             <Typography variant="body-sm" as="span">
-              {t('coreTimeline.report.unit', { name: u.name, state: u.state, branch: u.branch })}
+              {t('coreTimeline.report.unit', {
+                name: u.name,
+                state: machineStateLabel(t, 'unit', u.state),
+                branch: u.branch,
+              })}
             </Typography>
           </li>
         ))}

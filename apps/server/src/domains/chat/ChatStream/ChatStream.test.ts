@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { ChatRunRegistry } from '../ChatRunRegistry/ChatRunRegistry.ts';
+import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { streamRun } from './ChatStream.ts';
 
 describe('streamRun', () => {
@@ -35,35 +36,6 @@ describe('streamRun', () => {
       clearTimeout(timer);
       abort.abort();
     }
-  });
-
-  // Брокер прав показывает автономному чату карточку, только пока его кто-то
-  // смотрит (решение владельца 23.10): открытый поток — это и есть «смотрит».
-  it('открытый поток — человек смотрит; закрыли — нет', async () => {
-    const registry = new ChatRunRegistry(() => ({
-      start: () => new Promise<void>(() => undefined),
-      stop: () => undefined,
-    }));
-    registry.start('чат', { prompt: 'x', cwd: '/tmp/x' }, {});
-    // Служебная подписка панели (очередь на занятый ход) — не человек.
-    registry.attach('чат', Number.MAX_SAFE_INTEGER, { send: () => undefined, close: () => {} });
-    expect(registry.hasViewer('чат')).toBe(false);
-    app = Fastify();
-    app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
-    const address = await app.listen({ port: 0, host: '127.0.0.1' });
-    const abort = new AbortController();
-    try {
-      await fetch(`${address}/stream`, { signal: abort.signal });
-      expect(registry.hasViewer('чат')).toBe(true);
-    } finally {
-      abort.abort();
-    }
-    const deadline = Date.now() + 2_000;
-    while (registry.hasViewer('чат') && Date.now() < deadline) {
-      await new Promise((done) => setTimeout(done, 10));
-    }
-    expect(registry.hasViewer('чат')).toBe(false);
-    registry.stopAll();
   });
 });
 
@@ -106,6 +78,35 @@ describe('кадр ошибки прогона', () => {
       params: { current: '2.1.278', required: '2.1.280' },
       overflow: true,
       retriable: false,
+    });
+  });
+
+  // s10 G7: отказ ядра в ходе чата — текст панели по коду; кадр несёт код и флаг `panel`,
+  // клиент показывает перевод кода, а не русскую строку и не английскую фразу ядра.
+  it('отказ ядра в ходе чата уходит кодом панели с флагом panel', async () => {
+    const message = serverText('core-chat-contour-down', { contour: 'c1' });
+    const registry = {
+      attach: (
+        _chatId: string,
+        _from: number,
+        subscriber: import('../ChatRunRegistry/ChatRunRegistry.ts').RunSubscriber,
+      ) => {
+        subscriber.send({ seq: 1, event: { kind: 'error', message } });
+        subscriber.close();
+        return () => undefined;
+      },
+    } as unknown as ChatRunRegistry;
+    app = Fastify();
+    app.get('/stream', (_request, reply) => streamRun(registry, reply, 'чат', 0));
+
+    const response = await app.inject({ method: 'GET', url: '/stream' });
+    const data = response.body.split('\n').find((line) => line.startsWith('data: ')) ?? '';
+    expect(JSON.parse(data.slice('data: '.length))).toMatchObject({
+      kind: 'error',
+      message,
+      code: 'core-chat-contour-down',
+      params: { contour: 'c1' },
+      panel: true,
     });
   });
 

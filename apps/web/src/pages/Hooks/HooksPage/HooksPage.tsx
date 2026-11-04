@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { serverFieldText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { useEntityUrl, useEntityUrlWriter } from '@shared/hooks/use-entity-url';
 import { useCreateParam } from '@shared/hooks/use-create-param';
@@ -117,7 +118,7 @@ export function HooksPage() {
                       clamp={2}
                       className={styles.description}
                     >
-                      {hook.description}
+                      {serverFieldText(hook, 'description', t)}
                     </Typography>
                   )}
 

@@ -1,8 +1,9 @@
 // Review agents spawn unasked: a one-question grant per review still kept the user at the screen
 // before every review, and a review fleet is sized by the skill's plan, not by a dialog.
 // A spawn passes when its `description` carries a review tag and it runs on `lane-high` (a reviewer is
-// never weaker than the author); 40 per session, the 41st gets spawn-cost-guard's ordinary dialog —
-// a backstop against a runaway loop, not a budget. Any failure → false → the dialog.
+// never weaker than the author); 100 per session (40 stopped a five-MR review batch mid-run), the 101st
+// gets spawn-cost-guard's ordinary dialog — a backstop against a runaway loop, not a budget.
+// Any failure → false → the dialog.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { stateDir, sessionKey } from './kit-paths.mjs';
@@ -10,7 +11,7 @@ import { stateDir, sessionKey } from './kit-paths.mjs';
 const TAG = /^(?:deep-review\s+(?:r\d+|verify)\b|review:)/i;
 /** The kit's own agent, bare or plugin-namespaced. */
 const LANE_HIGH = /^(?:agentdeck-kit:)?lane-high$/;
-const CAP = 40;
+const CAP = 100;
 
 /** True = a tagged lane-high review spawn inside the session cap; it is counted. */
 export function reviewSpawnAllows(input, arg) {

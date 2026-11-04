@@ -30,7 +30,7 @@ import {
   type ContourActivationDeps,
 } from '../../domains/platform/activation/activation.ts';
 import { PlatformError, invalidField } from '../../domains/platform/errors.ts';
-import type { PlatformGateway } from '../../domains/platform/gateway/listener/listener.ts';
+import type { CoreGatewayView } from '../../domains/platform/gateway-view/gateway-view.ts';
 import { applyContour } from '../../domains/platform/apply/apply.ts';
 import {
   buildPlatformApplyPlan,
@@ -58,12 +58,7 @@ import {
 } from '../../domains/platform/routing/routing.ts';
 import { driverOf } from '../../domains/platform/drivers/index.ts';
 import { brokenExclusion } from '../../domains/platform/rules-matrix/rules-matrix.ts';
-import {
-  clearExhausted,
-  emptySpend,
-  gatewayPricing,
-  spendInfo,
-} from '../../domains/platform/spend/spend.ts';
+import { emptySpend, spendInfo } from '@agentdeck/pricing/contour-spend';
 import {
   assertToken,
   describePlatform,
@@ -99,7 +94,7 @@ import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 export function registerPlatformRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  gateway: PlatformGateway,
+  gateway: CoreGatewayView,
   /**
    * Адрес самой панели. Нужен ровно одному маршруту — регистрации переходника
    * MCP: в его записи лежит только этот адрес, и никогда ключ контура. Порт
@@ -122,86 +117,69 @@ export function registerPlatformRoutes(
    * Состояние шлюза. Отдельно от списка контуров: слушатель один на все, и
    * его порт с адресами — не свойство конкретного контура.
    */
-  app.get('/api/platforms/gateway', () => gatewayInfo());
+  app.get('/api/platforms/gateway', async () => {
+    // Шлюз и учёт запросов держит ядро (C3b/C3d): карточка шлюза читает их свежими, а не
+    // последним опросом. Ядро не ответило — прошлый ответ.
+    await gateway.contours.refresh();
+    return gatewayInfo();
+  });
 
   /**
-   * Поднять, погасить или перезапустить слушатель ПО НАСТРОЙКЕ. Своих
-   * параметров у маршрута нет намеренно: настройки правятся общим PATCH, а
-   * здесь применяется уже сохранённое — иначе состояние экрана и состояние
-   * слушателя разъехались бы на первом же отказе.
-   */
-  const startGateway = (): Promise<unknown> =>
-    gateway.start({
-      store: ctx.store,
-      appDataDir: appData(),
-      port: ctx.store.getSettings().platformGateway.port,
-      pricing: gatewayPricing(ctx.store, ctx.pricing),
-    });
-
-  /**
-   * Активация поднимает погашенный шлюз сама: включает настройку тем же
-   * порядком, что мастер («Поднять шлюз»), и сверяет управляемые профили, как
-   * общий PATCH настроек шлюза.
+   * Шлюз держит ядро (C3d): поднимать здесь нечего. «Поднять» — включить настройку тем же
+   * порядком, что мастер (управляемые профили сверяются, адрес CLI в них — порт ядра), спросить
+   * ядро свежим и убедиться, что шлюз человека слушает; не слушает — 409 со словами ядра (ждёт
+   * порт, причина). Активация зовёт тот же `ensureGateway`.
    */
   const ensureGateway = async (): Promise<void> => {
-    if (gateway.status().running) return;
     const settings = ctx.store.getSettings().platformGateway;
     if (!settings.enabled) {
       ctx.store.updateSettings({ platformGateway: { ...settings, enabled: true } });
       reconcileManagedProfiles(ctx.store);
     }
-    await startGateway();
+    await gateway.ensure();
   };
 
-  /**
-   * «Поднять шлюз» с карточки контура: включить настройку и поднять слушатель
-   * одним вызовом — тем же `ensureGateway`, что и активация. Живой шлюз не
-   * перезапускается: кнопку жмут, когда он погас, а не чтобы оборвать прогоны.
-   */
+  const notStarted = (error: unknown) => ({
+    code: 'gateway_start_failed',
+    message: 'Шлюз не поднялся',
+    messageCode: 'gateway-not-started',
+    detail: error instanceof Error ? error.message : String(error),
+  });
+
+  /** «Поднять шлюз» с карточки контура — тем же `ensureGateway`, что и активация. */
   app.post('/api/platforms/gateway/start', async (_request, reply) => {
     try {
       await ensureGateway();
       return gatewayInfo();
     } catch (error) {
-      return reply.code(409).send({
-        code: 'gateway_start_failed',
-        message: 'Шлюз не поднялся',
-        messageCode: 'gateway-not-started',
-        detail: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  app.post('/api/platforms/gateway/restart', async (_request, reply) => {
-    const settings = ctx.store.getSettings().platformGateway;
-    try {
-      if (!settings.enabled) {
-        await gateway.stop();
-        return gatewayInfo();
-      }
-      await startGateway();
-      return gatewayInfo();
-    } catch (error) {
-      // Не поднявшийся слушатель — это состояние с причиной, а не 500: адрес
-      // человек всё равно читает с этого же экрана.
-      return reply.code(409).send({
-        code: 'gateway_start_failed',
-        message: 'Шлюз не поднялся',
-        messageCode: 'gateway-not-started',
-        detail: error instanceof Error ? error.message : String(error),
-      });
+      return reply.code(409).send(notStarted(error));
     }
   });
 
   /**
-   * Список контуров одним ответом: карточки, активный и разовый рассказ о
+   * Применить сохранённые настройки шлюза: слушателя у панели нет — ядро читает порт из
+   * настроек на своём такте; здесь панель спрашивает его свежим и отвечает, слушает ли он.
+   * Выключенный шлюз — ответ без вопроса ядру: адрес CLI в профилях снят сверкой настроек.
+   */
+  app.post('/api/platforms/gateway/restart', async (_request, reply) => {
+    if (!ctx.store.getSettings().platformGateway.enabled) return gatewayInfo();
+    try {
+      await gateway.ensure();
+      return gatewayInfo();
+    } catch (error) {
+      return reply.code(409).send(notStarted(error));
+    }
+  });
+
+  /**
+   * Список контуров одним ответом
    * переносе. Собирается в одном месте — второй сборки хватило бы, чтобы
    * удаление контура отвечало без активного, а список с ним.
    */
   const platformsInfo = (): PlatformsInfo => {
     const notice = ctx.store.getPlatformActivationNotice();
     return {
-      platforms: describePlatforms(ctx.store, appData()),
+      platforms: describePlatforms(ctx.store, appData(), gateway.contours.records()),
       activePlatformId: ctx.store.getSettings().activePlatformId,
       ...(notice ? { activationNotice: notice } : {}),
     };
@@ -226,7 +204,8 @@ export function registerPlatformRoutes(
         {
           store: ctx.store,
           appDataDir: appData(),
-          gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+          gatewayPort: () => gateway.contours.userGatewayPort(),
+          contourSpend: () => gateway.contours.records(),
           ...(claudeSettingsRoute ? { claudeSettingsRoute } : {}),
           ...(localMcpPicks ? { localMcpPicks } : {}),
         },
@@ -235,11 +214,10 @@ export function registerPlatformRoutes(
       ),
   );
 
-  app.get('/api/platforms', () => {
-    // Хвост учёта дописываем ПЕРЕД чтением: расход копится пачкой (см.
-    // `gateway/spend-flush.ts`), и карточка, открытая сразу после ответа
-    // модели, иначе показывала бы цифру пятисекундной давности.
-    gateway.flushSpend();
+  app.get('/api/platforms', async () => {
+    // Расход ведёт звено ядра (C3b): перечитываем ПЕРЕД ответом — карточка, открытая
+    // сразу после ответа модели, иначе показывала бы цифру прошлого опроса.
+    await gateway.contours.refresh();
     return platformsInfo();
   });
 
@@ -314,7 +292,7 @@ export function registerPlatformRoutes(
       const stored = { ...platform, enabled: ctx.store.getSettings().activePlatformId === id };
       writePlatform(ctx.store, stored);
       if (typeof body?.token === 'string') writeToken(appData(), platform.id, body.token.trim());
-      return describePlatform(ctx.store, appData(), stored);
+      return describePlatform(ctx.store, appData(), stored, gateway.contours.records()[id]);
     } catch (error) {
       return fail(reply, error);
     }
@@ -364,10 +342,10 @@ export function registerPlatformRoutes(
     },
     backupDir: ctx.backupDir,
     appDataDir: appData(),
-    // Порт — у живого слушателя. Записанный в состоянии остаётся от прошлого
-    // запуска, и пробный запрос ушёл бы процессу, который занял порт после
-    // убитой панели.
-    gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
+    // Порт — у шлюза человека, который ядро держит сейчас. Записанный в состоянии
+    // остаётся от прошлого ответа ядра, и пробный запрос ушёл бы процессу, который
+    // занял порт после него.
+    gatewayPort: () => gateway.contours.userGatewayPort(),
     ensureGateway,
   });
 
@@ -676,17 +654,17 @@ export function registerPlatformRoutes(
   /**
    * Расход контура: период бюджета, всё время, дни.
    *
-   * Читается из состояния панели и наружу не ходит НИ РАЗУ: остатка бюджета у
-   * контура не спросить (подпись `budget-manual`), а поход по сети ради экрана
-   * с цифрами нарушил бы инвариант «включённый контур молчит, пока его не
-   * попросили». Перед чтением сбрасываем накопленный шлюзом хвост — иначе
-   * человек, открывший карточку сразу после ответа, увидел бы вчерашнюю цифру.
+   * Читается из учёта звена ядра на этой машине (C3b) и в контур не ходит НИ РАЗУ:
+   * поход по сети ради экрана с цифрами нарушил бы инвариант «включённый контур
+   * молчит, пока его не попросили». Перед чтением перечитываем учёт — иначе
+   * человек, открывший карточку сразу после ответа, увидел бы цифру прошлого опроса.
    */
-  app.get<{ Params: { id: string } }>('/api/platforms/:id/spend', (request, reply) => {
+  app.get<{ Params: { id: string } }>('/api/platforms/:id/spend', async (request, reply) => {
     try {
       const platform = requirePlatform(ctx.store, request.params.id);
-      gateway.flushSpend();
-      const record = ctx.store.getPlatformSpend()[platform.id] ?? emptySpend(platform.id);
+      // compromise: budget-manual — остаток бюджета контур наружу не отдаёт: цифра введена руками, а период считается от названного человеком дня
+      await gateway.contours.refresh();
+      const record = gateway.contours.records()[platform.id] ?? emptySpend(platform.id);
       return spendInfo(platform, record) satisfies PlatformSpendInfo;
     } catch (error) {
       return fail(reply, error);
@@ -700,18 +678,22 @@ export function registerPlatformRoutes(
    * «всё в порядке» контуру, который отказывает. Бюджет продлили в админке —
    * человек говорит об этом сам.
    */
-  app.delete<{ Params: { id: string } }>('/api/platforms/:id/spend/exhausted', (request, reply) => {
-    try {
-      const platform = requirePlatform(ctx.store, request.params.id);
-      const cleared = clearExhausted(ctx.store, platform.id);
-      const record = ctx.store.getPlatformSpend()[platform.id] ?? emptySpend(platform.id);
-      return { cleared, ...spendInfo(platform, record) } satisfies PlatformSpendInfo & {
-        cleared: boolean;
-      };
-    } catch (error) {
-      return fail(reply, error);
-    }
-  });
+  app.delete<{ Params: { id: string } }>(
+    '/api/platforms/:id/spend/exhausted',
+    async (request, reply) => {
+      try {
+        const platform = requirePlatform(ctx.store, request.params.id);
+        // Снимают обе отметки звена ядра: карточку контура и отказ маршрута сеансов (C3b).
+        const cleared = await gateway.contours.clearExhausted(platform.id);
+        const record = gateway.contours.records()[platform.id] ?? emptySpend(platform.id);
+        return { cleared, ...spendInfo(platform, record) } satisfies PlatformSpendInfo & {
+          cleared: boolean;
+        };
+      } catch (error) {
+        return fail(reply, error);
+      }
+    },
+  );
 
   /**
    * Ключ отдельным маршрутом: он не часть настройки и не должен ездить вместе с

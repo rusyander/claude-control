@@ -1,10 +1,10 @@
 /**
- * Кейс layout-003: два окна боковой панели на телефоне (400×800), в светлой и
- * тёмной теме — окно агента панели и окно фонового наблюдателя.
+ * Кейс layout-003: окно агента панели на телефоне (400×800), в светлой и тёмной
+ * теме (окно фонового наблюдателя снято вместе с наблюдателем, этап 10).
  *
- * Обход устойчивости окон (`check-modal-stability.mjs`) и обходы доступности их
- * не видят: оба окна — не общий `Modal`, а открываются кнопками свёрнутой боковой
- * панели. Здесь каждое открывается так, как это сделал бы человек с телефона, и
+ * Обход устойчивости окон (`check-modal-stability.mjs`) и обходы доступности его
+ * не видят: окно — не общий `Modal`, а открывается кнопкой свёрнутой боковой
+ * панели. Здесь оно открывается так, как это сделал бы человек с телефона, и
  * проверяется то, что он увидел бы:
  *  - окно целиком в экране (ни края за пределами 400×800), страница не уехала
  *    вбок (нет горизонтальной прокрутки);
@@ -12,8 +12,8 @@
  *  - Escape закрывает окно и возвращает фокус на кнопку, которая его открыла.
  *
  * Стенд — живой (`pnpm dev`, :8888), только чтение: тема подменяется в ответе
- * GET /api/settings, наблюдатель — подменённым статусом, любая запись к серверу
- * заглушена 501. `SHOTS=<каталог>` — снимки обоих окон в обеих темах.
+ * GET /api/settings, любая запись к серверу
+ * заглушена 501. `SHOTS=<каталог>` — снимки окна в обеих темах.
  *
  * Запуск: `node tools/qa/check-narrow-windows.mjs`.
  */
@@ -38,24 +38,6 @@ const check = (ok, text, detail = '') => {
 if (!(await waitForStand(BASE))) {
   console.log(`НЕ ПРОВЕРЕНО: стенд ${BASE} не ответил`);
   process.exit(2);
-}
-
-/** Статус включённого наблюдателя: окно и строка видны только при нём. */
-function watcherStatus() {
-  const now = new Date().toISOString();
-  return {
-    enabled: true,
-    since: new Date(Date.now() - 95_000).toISOString(),
-    serverNow: now,
-    analyzing: false,
-    pending: 1,
-    findings: 3,
-    remarks: 1,
-    thresholds: { slowRequestMs: 5000, stuckLoadingMs: 30000 },
-    hourlyCap: { limit: 12, used: 2 },
-    spend: { input: 1840, output: 410, cacheRead: 12600, cacheCreation: 900, runs: 2 },
-    reportPath: 'C:/qa/WATCH-REPORT.md',
-  };
 }
 
 /** Коробка элемента против экрана и ширина документа. */
@@ -116,7 +98,6 @@ try {
         // на стенде, где онбординг не пройден, мастер накрывал окно агента.
         return route.fulfill({ response, json: { ...body, theme, onboardingDone: true } });
       }
-      if (url.pathname === '/api/watcher') return route.fulfill({ json: watcherStatus() });
       return route.fallback();
     });
 
@@ -128,11 +109,9 @@ try {
     check(applied === theme, `[${theme}] тема применена`, applied);
     const notify = page.locator('nav button[aria-label="Уведомления"]').first();
     const agentTrigger = page.locator('[data-panel-agent-trigger]').first();
-    const watcherTrigger = page.locator('[data-watcher-indicator]:not([data-watcher-off])').first();
     for (const [name, button] of [
       ['уведомления', notify],
       ['агент панели', agentTrigger],
-      ['наблюдатель', watcherTrigger],
     ]) {
       const text = (await button.count()) ? await peek(button) : '';
       check(
@@ -165,34 +144,6 @@ try {
       );
     }
 
-    // ── Фоновый наблюдатель ─────────────────────────────────────────────────
-    const hasWatcher = await watcherTrigger
-      .waitFor({ state: 'visible', timeout: 10_000 })
-      .then(() => true)
-      .catch(() => false);
-    check(hasWatcher, `[${theme}] строка наблюдателя видна (статус подменён)`);
-    if (hasWatcher) {
-      await watcherTrigger.click({ position: { x: 20, y: 20 } });
-      const popover = page.locator('[data-watcher-popover]').first();
-      const popoverOpen = await popover
-        .waitFor({ state: 'visible', timeout: 10_000 })
-        .then(() => true)
-        .catch(() => false);
-      check(popoverOpen, `[${theme}] окно наблюдателя открылось`);
-      if (popoverOpen) {
-        await page.waitForTimeout(600);
-        const box = await fits(page, popover);
-        check(box.ok, `[${theme}] окно наблюдателя целиком в экране 400×800`, box.text);
-        if (SHOTS) await page.screenshot({ path: join(SHOTS, `${theme}-watcher.png`) });
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(500);
-        check(!(await popover.isVisible()), `[${theme}] Escape закрыл окно наблюдателя`);
-        check(
-          await watcherTrigger.evaluate((el) => el === document.activeElement),
-          `[${theme}] фокус вернулся на строку наблюдателя`,
-        );
-      }
-    }
     check(errors.length === 0, `[${theme}] страница без необработанных ошибок`, errors.join(' | '));
     await context.close();
   }

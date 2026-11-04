@@ -83,7 +83,7 @@ export const gooseProvider: ConfigProvider = {
   },
   configLocations: () => [gooseConfigDir()],
   // Рычаги экономии групп (план экономии чужих CLI, 22.10.2026, живые пробы goose 1.54.0).
-  // Переменные окружения запуска (`economy-run/goose.ts`): Goose ставит их выше
+  // Переменные окружения запуска (ядро: `apps/core/src/adapters/economy-carry.ts`): Goose ставит их выше
   // `config.yaml`, и до `goose acp` на каждый ответ они доходят — снято пробой.
   groupEconomy: {
     channel: 'goose',
@@ -102,12 +102,6 @@ export const gooseProvider: ConfigProvider = {
       cacheTtl: { support: 'impossible', note: 'economy-note-no-effect' },
       // `goose acp` и `goose run` без редактора.
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      // Модель выбирается в самом Goose, лестницы моделей у панели нет.
-      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
-      // Провайдер — выбор человека в Goose: ни цены кэша, ни срока его жизни панель не
-      // знает, а без них паузу «кэш остыл» и окупаемость пинга не посчитать.
-      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
-      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
       workHabits: { support: 'emulated' },
     },
   },

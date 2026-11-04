@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Заглушка модели по сценарию: три протокола провода (Anthropic messages, OpenAI chat и responses), поток SSE, след запросов — одна на тесты ядра и проверки tools/qa",
+  "description": "Заглушка модели по сценарию: четыре протокола провода (Anthropic messages, OpenAI chat и responses, Google generateContent), поток SSE, след запросов — одна на тесты ядра и проверки tools/qa",
   "exports": {
     ".": {
       "types": "./src/index.d.mts",
@@ -12,6 +12,10 @@
     "./scenarios/contour": {
       "types": "./src/scenarios/contour.d.mts",
       "default": "./src/scenarios/contour.mjs"
+    },
+    "./scenarios/panel-agent": {
+      "types": "./src/scenarios/panel-agent.d.mts",
+      "default": "./src/scenarios/panel-agent.mjs"
     }
   },
   "scripts": {

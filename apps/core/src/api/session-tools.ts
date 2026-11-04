@@ -1,9 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import {
-  inputSchemaOf,
-  MODEL_TOOL_DESCRIPTIONS,
-  toolPlanFor,
-} from '@agentdeck/contracts/core/model-tools';
+import { sessionToolsFor, toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { TaskRegistry } from '../conductor/tasks.ts';
 import { bindingOf } from '../conductor/model-tools/binding.ts';
 import { handleModelTool } from '../conductor/model-tools/model-tools.ts';
@@ -86,11 +82,7 @@ export function registerSessionTools(app: FastifyInstance, deps: SessionToolsDep
     return {
       stepKind: got.binding.stepKind,
       builtins: plan?.builtins ?? 'read-only',
-      tools: (plan?.modelTools ?? []).map((name) => ({
-        name,
-        description: MODEL_TOOL_DESCRIPTIONS[name],
-        inputSchema: inputSchemaOf(name),
-      })),
+      tools: sessionToolsFor(got.binding.stepKind),
     };
   });
 

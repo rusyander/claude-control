@@ -6,39 +6,31 @@ import { toast } from '@shared/lib/toast';
 import { toErrorMessage } from '@shared/api/toErrorMessage';
 import { useLocalActivity } from '../../api/useLocalActivity';
 import { useRestartLocalServer } from '../../api/useRestartLocalServer';
-import { localRunView, type LocalRunStage } from '../../model/localRunView';
-import { LocalLayerNotice } from '../LocalLayerNotice/LocalLayerNotice';
+import { localRunView } from '../../model/localRunView';
 import type { LocalRunStatusProps } from './LocalRunStatus.types';
 import styles from './LocalRunStatus.module.scss';
 
 /**
- * Что локальная модель делает с ходом прямо сейчас (L6): модель, квантование и окно, этап —
- * загрузка, разбор промпта (сколько из скольких), ответ, ожидание разрешения — и тишина
- * сервера с кнопкой перезапуска. Без этой строки 20 минут разбора длинного промпта
- * неотличимы от зависания, и человек слал сообщение заново, обрывая начатое.
+ * Что с локальной моделью в этом ходе (L6): модель, квантование и окно, ожидание разрешения и
+ * отказ сервера — красным, с его кодом и текстом и кнопкой перезапуска. Этапов хода (загрузка,
+ * разбор промпта, ответ) строка не показывает: запросы ведёт ядро, ленты активности звена у него
+ * пока нет.
  */
-export function LocalRunStatus({
-  waitingPermission,
-  since,
-  session,
-  className,
-}: LocalRunStatusProps) {
+export function LocalRunStatus({ waitingPermission, since, className }: LocalRunStatusProps) {
   const { t, i18n } = useTranslation();
   const activity = useLocalActivity(true);
   const restart = useRestartLocalServer();
-  const view = localRunView(activity.data, waitingPermission, Date.now(), since);
-  const number = (value: number): string => value.toLocaleString(i18n.language);
+  const view = localRunView(activity.data, waitingPermission, since);
   const server = view.server
     ? t('chat.localRun.server', {
         model: view.server.model,
         quant: view.server.quant ?? '—',
-        context: view.server.context ? number(view.server.context) : '—',
+        context: view.server.context ? view.server.context.toLocaleString(i18n.language) : '—',
       })
     : t('chat.localRun.serverUnknown');
-  const share = view.stage.key === 'prompt' ? view.stage.share : undefined;
   let dotTone: 'success' | 'warning' | 'danger' = 'success';
   if (view.stage.key === 'failed') dotTone = 'danger';
-  else if (view.silent || view.failed) dotTone = 'warning';
+  else if (view.failed) dotTone = 'warning';
 
   return (
     <div
@@ -53,24 +45,13 @@ export function LocalRunStatus({
           {server}
         </Typography>
         <Typography as="span" variant="body-sm">
-          {stageText(view.stage, t, number)}
+          {t(`chat.localRun.${view.stage.key}`)}
         </Typography>
       </div>
-      {share !== undefined && (
-        <div
-          className={styles.track}
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(share * 100)}
-        >
-          <span className={styles.fill} style={{ width: `${Math.round(share * 100)}%` }} />
-        </div>
-      )}
-      {view.silent && (
+      {view.failed && (
         <div className={styles.line}>
-          <Typography as="span" variant="body-sm" color="warning">
-            {t('chat.localRun.silent', view.silent)}
+          <Typography as="span" variant="body-sm" color="danger" className={styles.failure}>
+            {t('chat.localRun.failure', view.failed)}
           </Typography>
           <Button
             size="sm"
@@ -87,34 +68,6 @@ export function LocalRunStatus({
           </Button>
         </div>
       )}
-      {view.failed && (
-        <Typography as="span" variant="body-sm" color="danger" className={styles.failure}>
-          {t('chat.localRun.failure', view.failed)}
-        </Typography>
-      )}
-      <LocalLayerNotice layer={activity.data?.layer} {...(session ? { session } : {})} />
-      {view.stalled && !view.silent && (
-        <Typography as="span" variant="body-sm" color="muted">
-          {t('chat.localRun.stalled', view.stalled)}
-        </Typography>
-      )}
     </div>
   );
-}
-
-function stageText(
-  stage: LocalRunStage,
-  t: ReturnType<typeof useTranslation>['t'],
-  number: (value: number) => string,
-): string {
-  switch (stage.key) {
-    case 'prompt':
-      return stage.total
-        ? t('chat.localRun.prompt', { filled: number(stage.filled), total: number(stage.total) })
-        : t('chat.localRun.promptNoTotal', { filled: number(stage.filled) });
-    case 'generating':
-      return t('chat.localRun.generating', { decoded: number(stage.decoded) });
-    default:
-      return t(`chat.localRun.${stage.key}`);
-  }
 }

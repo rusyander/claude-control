@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from './run-notice.types.ts';
 import { createOutsideDone, OUTSIDE_SETTLE_MS } from './outside-done.ts';
 
 /**

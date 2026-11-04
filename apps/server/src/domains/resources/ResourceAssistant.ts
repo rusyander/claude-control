@@ -1,13 +1,7 @@
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { listResourceFiles, readResourceFile, isWritable } from './ResourceFiles.ts';
 import type { ResourceKind } from './registry.ts';
-import { defaultCliCommand } from '../../providers/cli/cli.ts';
-import {
-  helperAskOf,
-  historyLines,
-  type AssistTurn,
-  type HelperAsk,
-} from '../assistant/assistant.ts';
+import { historyLines, type AssistTurn, type HelperAsk } from '../assistant/assistant.ts';
 import { maskAssistText } from '../assistant-secrets.ts';
 import { SECRET_MASK, maskSecretsInText, restoreMaskedSecrets } from '@agentdeck/dlp/secret-mask';
 import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
@@ -22,11 +16,10 @@ import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contract
  * слиянием — существующее обновляется, новое добавляется, ничего не
  * удаляется само.
  *
- * Запуск — то же лёгкое окно, что у помощника формы, и тем же маршрутом
- * активного провайдера (`assistant-route.ts`): у Claude — `runClaudeOneShot` без
- * инструментов, сессии и наших слоёв, у чужого CLI — его неинтерактивный флаг с
- * окружением маршрута, у выбранного профиля ассистента — прямой вызов по нему. Разговор продолжается историей в запросе
- * (её держит окно помощника), а текущее дерево файлов приходит заново каждый ход.
+ * Запуск — то же лёгкое окно, что у помощника формы: вопрос ядра «ask» без инструментов
+ * активным CLI и профилем «Ассистент панели» (`core-ask/one-shot.ts`, этап 10). Разговор
+ * продолжается историей в запросе (её держит окно помощника), а текущее дерево файлов
+ * приходит заново каждый ход.
  *
  * Секреты в файлах (U6, 28.09): модель видит содержимое через маску, а ответ
  * пишется на диск сразу — поэтому маска в ответе возвращается секретом файла
@@ -58,8 +51,8 @@ export async function assistStructure(
   id: string,
   prompt: string,
   location: ClaudeLocation,
-  /** Кто отвечает: маршрут провайдера (`helperAsk`) или команда `claude` — прежняя подпись. */
-  ask: string | HelperAsk = defaultCliCommand(),
+  /** Кто отвечает: вопрос ядра (`coreHelperAsk`); проверки подают свой. */
+  ask: HelperAsk,
   history: readonly AssistTurn[] = [],
   images: readonly AgentImage[] = [],
 ): Promise<StructureAssistResult> {
@@ -74,7 +67,7 @@ export async function assistStructure(
 
   try {
     const current = readCurrent(kind, id, location);
-    const answer = await helperAskOf(ask)(
+    const answer = await ask(
       buildPrompt(kind, prompt, current, history),
       images,
       STRUCTURE_TIMEOUT_MS,

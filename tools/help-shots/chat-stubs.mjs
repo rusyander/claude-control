@@ -149,9 +149,6 @@ export async function projectShell(page, { git = GIT, worktrees, localHint = fal
     route.fulfill({ json: { steps: [], isComplete: false } }),
   );
   await page.route('**/api/chat/*/artifacts*', (route) => route.fulfill({ json: [] }));
-  await page.route('**/api/chat/cascade*', (route) =>
-    route.fulfill({ json: { enabled: true, project: PROJECT.path } }),
-  );
   await page.route('**/api/chat/handoff/state*', (route) =>
     route.fulfill({ json: { auto: true, depth: 1, maxChain: 8 } }),
   );
@@ -176,7 +173,9 @@ export const chat = (id, title, extra = {}) => ({
 
 /** Открыть вкладку проекта: сегмент «Проекты» → строка проекта. */
 export async function openProject(page, web) {
-  await page.goto(`${web}/chat`, { waitUntil: 'domcontentloaded' });
+  // Первый заход на одноразовый фронт — холодная сборка модулей Vite, ~30 с и дольше:
+  // штатные 30 с Playwright на ней кончаются раньше страницы.
+  await page.goto(`${web}/chat`, { waitUntil: 'domcontentloaded', timeout: 180_000 });
   await page.waitForSelector('nav');
   await page.waitForTimeout(1500);
   await page.getByRole('tab', { name: /^(Проекты|Projects)$/ }).click();

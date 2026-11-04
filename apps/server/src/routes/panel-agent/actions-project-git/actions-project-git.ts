@@ -525,8 +525,8 @@ const readProjectCopySettings = definePanelAction({
   section: 'projects',
   risk: 'read',
   description:
-    'Working-copy and split settings of one project: extra mirror patterns (include/exclude), the install ' +
-    'command after a copy is made, delivery of split groups to a merge request and how many groups run at once. ' +
+    'Working-copy and group settings of one project: extra mirror patterns (include/exclude), the install ' +
+    'command after a copy is made, delivery of groups to a merge request and how many groups run at once. ' +
     'groupPermissions are shown for reading only — the human sets them.',
   input: z.object({ project: projectRef }),
   route: async (input, inject) => ({

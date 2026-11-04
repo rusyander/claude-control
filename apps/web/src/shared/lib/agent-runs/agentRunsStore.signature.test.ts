@@ -51,7 +51,6 @@ function seed(id: string, extra: Partial<AgentRun> = {}): void {
     thinking: '',
     tools: [],
     permissions: [],
-    branchGates: [],
     queued: [],
     tokens: 0,
     startedAt: Date.now(),

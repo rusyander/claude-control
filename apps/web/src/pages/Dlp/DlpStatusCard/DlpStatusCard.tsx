@@ -9,6 +9,8 @@ import { Badge } from '@shared/ui/badge';
 import { Toggle } from '@shared/ui/toggle';
 import { TextField } from '@shared/ui/text-field';
 import { SelectField } from '@shared/ui/select-field';
+import { serverFieldText } from '@shared/config/i18n';
+import { endpointProfileName } from '@entities/Endpoint';
 import type { Props } from './DlpStatusCard.types';
 import { parsePort } from '../lib/parsePort';
 import { isHttpUrl } from '../lib/isHttpUrl';
@@ -114,7 +116,7 @@ export function DlpStatusCard({
 
         {status.error && (
           <Typography variant="body-sm" color="danger">
-            {status.error}
+            {serverFieldText(status, 'error')}
           </Typography>
         )}
 
@@ -157,7 +159,10 @@ export function DlpStatusCard({
             onChange={(upstreamProfileId) => onChange({ upstreamProfileId })}
             options={[
               { value: '', label: t('dlp.upstreamProfileNone') },
-              ...profiles.map((profile) => ({ value: profile.id, label: profile.name })),
+              ...profiles.map((profile) => ({
+                value: profile.id,
+                label: endpointProfileName(profile),
+              })),
             ]}
             hint={t('dlp.upstreamProfileHint')}
           />

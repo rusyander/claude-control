@@ -1,6 +1,7 @@
 /**
  * Живое доказательство связки 5.2: хук списка задач едет в прогон обычного чата
- * настоящей панели, пока включена инициатива разделения, и не едет без неё.
+ * настоящей панели. Прежде он шёл под тумблером инициативы разделения; тумблер
+ * снят (этап 10, G14), хук едет всегда.
  *
  * `check-board-fields.mjs` доказывает, что делает с хуком настоящий CLI; там
  * настройки собраны самой проверкой. Здесь — обратное: CLI фальшивый, а всё
@@ -9,8 +10,8 @@
  * и раннер. Фальшивый `claude` при старте списывает свой argv и содержимое
  * файла `--settings` (панель стирает его, как только процесс вышел).
  *
- * Случаи: инициатива включена (по умолчанию) — в `--settings` хук PreToolUse на
- * поиск, доску и спринт; выключена — хука нет.
+ * Случаи: обычный чат — в `--settings` хук PreToolUse на поиск, доску и спринт;
+ * прежний клиент шлёт снятый тумблер выключенным — PATCH проходит, хук на месте.
  *
  * Запуск: `node tools/qa/check-board-fields-wiring.mjs`. Стенд человека и его
  * `~/.claude` не трогаются; установленный `claude` не нужен.
@@ -80,7 +81,7 @@ await runOnStand(
     };
 
     const on = await send('bf-on');
-    check('чат с инициативой: CLI запущен', Boolean(on.call), `статус ${on.status}`);
+    check('обычный чат: CLI запущен', Boolean(on.call), `статус ${on.status}`);
     const hook = hookOf(on.call);
     check(
       'в --settings хук PreToolUse на поиск, доску и спринт',
@@ -102,12 +103,16 @@ await runOnStand(
       method: 'PATCH',
       body: { taskSplitInitiative: false },
     });
-    check('инициатива выключена', patched.status === 200, patched.text.slice(0, 300));
-    const off = await send('bf-off');
-    check('чат без инициативы: CLI запущен', Boolean(off.call), `статус ${off.status}`);
     check(
-      'без инициативы хука нет',
-      !hookOf(off.call),
+      'прежний клиент со снятым тумблером: PATCH проходит',
+      patched.status === 200,
+      patched.text.slice(0, 300),
+    );
+    const off = await send('bf-off');
+    check('после PATCH: CLI запущен', Boolean(off.call), `статус ${off.status}`);
+    check(
+      'снятый тумблер хук не убирает',
+      Boolean(hookOf(off.call)),
       off.call?.settings || '(файла --settings нет)',
     );
   },

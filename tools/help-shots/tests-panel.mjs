@@ -32,7 +32,8 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSyn
 import { tmpdir } from 'node:os';
 import { delimiter, join, resolve } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage, shotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, shotLanguage, shotTheme, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5194);
@@ -325,6 +326,10 @@ writeFileSync(
         { id: 'shop', name: PROJECT_NAME, path: PROJECT },
         { id: 'goshop', name: BACKEND_NAME, path: BACKEND },
       ],
+      // Мастер первого запуска закрыт, тема и язык — варианта: без этого окно «Добро
+      // пожаловать» накрывало чат на шаге e2e (03.11.2026), а правку настроек из процесса
+      // съёмки ворота «решает только человек» могут отклонить.
+      settings: { onboardingDone: true, theme: shotTheme(), language: shotLanguage() },
     },
     null,
     2,
@@ -338,12 +343,15 @@ try {
   buildBackend();
   console.log(`проект ${PROJECT}`);
 
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-tests' },
+  );
   // Сервер панели видит фальшивые `claude` и `npx` раньше настоящих; фронту они не нужны.
   const serverEnv = standEnv(env, fakeBin(home));
 
@@ -389,6 +397,7 @@ try {
   await shoot();
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true });
   if (!process.env.GUIDE_KEEP_PROJECT) {
     rmSync(PROJECT, { recursive: true, force: true });
@@ -398,6 +407,7 @@ try {
 
 async function shoot() {
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   try {
     await page.goto(`${WEB}/`, { waitUntil: 'domcontentloaded' });
@@ -871,38 +881,11 @@ async function e2e(page) {
   await page.waitForTimeout(600);
   await scenario.shot(page, '10-pyramid', { clip: pyramid, padding: 8 });
 
-  // Сторона чата: агент обычного разговора узнал папку из строки панели и
-  // положил туда тест; кейс завела сама панель по концу хода.
-  await page.goto(`${WEB}/chat`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('nav');
-  await page.waitForTimeout(2000);
-  await page
-    .getByRole('button', { name: /^(Новый чат|New chat)/ })
-    .first()
-    .click();
-  await page.waitForTimeout(1500);
-  const input = page.locator('textarea[data-chat-input]');
-  await input.fill(
-    shotLanguage() === 'en'
-      ? 'Write an e2e test: an order is paid by card.'
-      : 'Напиши e2e-тест: заказ оплачивается картой.',
-  );
-  await input.press('Enter');
-  await page
-    .getByText(/checkout\.spec\.ts —/)
-    .first()
-    .waitFor({ timeout: 30_000 });
-  await page.waitForTimeout(1500);
-  await scenario.shot(page, '07-chat-test');
-  await openTests(page);
-  // Группу завела сверка по концу хода; её заголовок — describe спеки.
-  await page.getByText('Оформление', { exact: true }).first().click();
-  await page.waitForTimeout(1200);
-  await page
-    .getByText(/заказ оплачивается картой/i)
-    .first()
-    .waitFor({ timeout: 15_000 });
-  await scenario.shot(page, '08-chat-case');
+  // Кадры 07-chat-test и 08-chat-case (агент чата кладёт спеку, кейс заводится сам) здесь
+  // больше не снимаются: ход чата идёт задачей ядра (этап 10), а этот стенд поднимает только
+  // панель с подменным `claude` — ядра в нём нет, и форма «Новый чат» ход не начнёт. Шаги
+  // документа идут без кадров, пока сцену не перенесут на стенд с ядром
+  // (`tools/qa/throwaway-stand.mjs`, как у core-panel.mjs).
   await openTests(page);
 
   await within.getByRole('button', { name: /^(Убрать папку|Remove folder)$/ }).click();
@@ -957,6 +940,21 @@ function buildBackend() {
     'orders/table_test.go',
     'package orders\n\nimport "testing"\n\nfunc TestTable(t *testing.T) {}\n',
   );
+  // Репозиторий под git, где `.agent/tests` git ВИДИТ: в таком проекте панель сама наборы и
+  // команду не заводит (`mayWriteQuietly`, suites.ts) — сотни файлов легли бы в чужой
+  // `git status`, — и путь «рецепт → Взять → Сохранить» остаётся человеку. Без git панель при
+  // старте сама записала бы команду по рецепту, и кадр рецептов было бы не снять (03.11.2026).
+  // Свой пустой excludesFile — чтобы глобальный список исключений машины съёмки не прятал
+  // `.agent` и не менял сценарий.
+  const gitIn = (...args) => {
+    const result = spawnSync('git', ['-C', BACKEND, ...args], { encoding: 'utf8' });
+    if (result.status !== 0) {
+      throw new Error(`git ${args.join(' ')}: ${(result.stderr || result.stdout || '').trim()}`);
+    }
+  };
+  gitIn('init', '-q');
+  writeFileSync(join(BACKEND, '.git', 'no-excludes'), '', 'utf8');
+  gitIn('config', 'core.excludesFile', join(BACKEND, '.git', 'no-excludes'));
 }
 
 /**
@@ -987,6 +985,12 @@ async function backend(page) {
   const adopt = within.getByRole('button', { name: /^(Завести кейс|Create (a )?cases?)/ });
   await adopt.waitFor({ timeout: 30_000 });
   await page.waitForTimeout(800);
+  // Щелчок по кнопке внизу карточки прокручивает её верх за край окна, а снимок области
+  // обрезается по окну — заголовок «Папка автотестов» выходил срезанным. Карточка ниже окна,
+  // поэтому её середина в середине окна показывает её целиком.
+  const centre = () => within.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  await centre();
+  await page.waitForTimeout(300);
   await scenario.shot(page, '02-run-adopt', { clip: card, padding: 8 });
 
   await adopt.click();
@@ -995,6 +999,8 @@ async function backend(page) {
     .first()
     .waitFor({ timeout: 15_000 });
   await page.waitForTimeout(800);
+  await centre();
+  await page.waitForTimeout(300);
   await scenario.shot(page, '03-adopted', { clip: card, padding: 8 });
 
   // Второй прогон ложится на заведённые кейсы — кадр библиотеки с их статусами.

@@ -18,8 +18,8 @@
 //
 // Store: stateDir('grants')/spawn-<session>.json {from, until, text≤200} — per session, so another
 // session (a parallel chat, a split group) never rides on it.
-// A split-group session (AGENTDECK_SPLIT_CHILD=1) neither records nor reads a grant: its «user» prompt
-// is written by the panel, not typed by the human.
+// A task step of the agentdeck core (AGENTDECK_STEP_KIND, not `chat`) neither records nor reads a grant:
+// its «user» prompt is written by the core, not typed by the human.
 // The guard trusts the store file, so a model that writes it grants itself: `grantStoreWrite` refuses
 // any model write into the kit state dir (called first by secret-guard, hard deny, no repeat escape).
 // The grant is honoured only while that guard is in the composed kit: secret-guard switched off in the
@@ -190,7 +190,8 @@ export function parseSpawnGrant(text, now = Date.now()) {
 }
 
 function grantFile(input) {
-  if (process.env.AGENTDECK_SPLIT_CHILD === '1') return null;
+  const step = String(process.env.AGENTDECK_STEP_KIND ?? '').trim();
+  if (step && step !== 'chat') return null;
   const key = sessionKey(input);
   const dir = key && stateDir('grants');
   return dir ? join(dir, `spawn-${key}.json`) : null;

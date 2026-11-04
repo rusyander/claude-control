@@ -66,7 +66,14 @@ export function testEnv(libraryDir: string): TestEnv {
     allowedRoutes: () => ({ routes: [], level: 2 }),
     workTreeOf: (p) => workTreeOf(p),
     pinBase: (repo, ref) => pinBase(repo, ref),
-    remotesOf: async (repo) => ({ value: await remotesOf(repo, {}) }),
+    // Как в настоящей проводке (`conductor-wiring/split.ts`): папка без git — `unknown`, не исключение.
+    remotesOf: async (repo) => {
+      try {
+        return { value: await remotesOf(repo, {}) };
+      } catch (error) {
+        return { unknown: error instanceof Error ? error.message : String(error) };
+      }
+    },
     preflight: (input) => runPreflight(input, probesAll(env.roads)),
     needsServices: async () => false,
     capacity: () => ({ slots: 2, minutes: null }),

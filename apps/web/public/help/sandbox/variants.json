@@ -1,0 +1,93 @@
+{
+  "topic": "sandbox",
+  "frames": {
+    "conversation/01-composition": {
+      "light-ru": {
+        "file": "01-composition.png",
+        "width": 1428,
+        "height": 884
+      },
+      "light-en": {
+        "file": "01-composition.en.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-ru": {
+        "file": "01-composition.dark.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-en": {
+        "file": "01-composition.dark.en.png",
+        "width": 1428,
+        "height": 884
+      }
+    },
+    "conversation/02-waiting": {
+      "light-ru": {
+        "file": "02-waiting.png",
+        "width": 1428,
+        "height": 884
+      },
+      "light-en": {
+        "file": "02-waiting.en.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-ru": {
+        "file": "02-waiting.dark.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-en": {
+        "file": "02-waiting.dark.en.png",
+        "width": 1428,
+        "height": 884
+      }
+    },
+    "conversation/03-answer": {
+      "light-ru": {
+        "file": "03-answer.png",
+        "width": 1428,
+        "height": 884
+      },
+      "light-en": {
+        "file": "03-answer.en.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-ru": {
+        "file": "03-answer.dark.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-en": {
+        "file": "03-answer.dark.en.png",
+        "width": 1428,
+        "height": 884
+      }
+    },
+    "conversation/04-refused": {
+      "light-ru": {
+        "file": "04-refused.png",
+        "width": 1428,
+        "height": 884
+      },
+      "light-en": {
+        "file": "04-refused.en.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-ru": {
+        "file": "04-refused.dark.png",
+        "width": 1428,
+        "height": 884
+      },
+      "dark-en": {
+        "file": "04-refused.dark.en.png",
+        "width": 1428,
+        "height": 884
+      }
+    }
+  }
+}

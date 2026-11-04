@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { AppStore } from '../lib/app-store/app-store.ts';
 import { registerEmptyBodyGuard } from '../lib/empty-body.ts';
 import type { ServerContext } from '../context.ts';
-import { registerGroupRoutes } from './group-routes/group-routes.ts';
 import { registerProjectGitRoutes } from './project-git-routes/project-git-routes.ts';
 import { registerHookRoutes } from './entity/hook-routes.ts';
 import { registerMcpRoutes } from './entity/mcp-routes.ts';
@@ -28,7 +27,6 @@ import { registerPluginRoutes } from './plugin-routes/plugin-routes.ts';
 describe('маршруты: запрос без тела не даёт 500', () => {
   let root: string;
   let app: FastifyInstance;
-  let groupId: string;
 
   beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'cc-empty-body-'));
@@ -56,7 +54,6 @@ describe('маршруты: запрос без тела не даёт 500', () 
     // Тот же самый хук, что стоит в боевом `index.ts`: без него стенд проверял
     // бы не тот сервер, который работает у человека.
     registerEmptyBodyGuard(app);
-    registerGroupRoutes(app, ctx);
     // Реестр прогонов не передаём: он необязателен, а проверяем мы разбор тела.
     registerProjectGitRoutes(app, ctx);
     registerHookRoutes(app, ctx);
@@ -64,13 +61,6 @@ describe('маршруты: запрос без тела не даёт 500', () 
     registerScriptRoutes(app, ctx);
     registerPluginRoutes(app, ctx);
     await app.ready();
-
-    const created = await app.inject({
-      method: 'POST',
-      url: '/api/groups',
-      payload: { name: 'Набор' },
-    });
-    groupId = created.json<{ id: string }>().id;
   });
 
   afterEach(async () => {
@@ -82,10 +72,6 @@ describe('маршруты: запрос без тела не даёт 500', () 
   const bodyless = (method: 'POST' | 'PUT', url: string) => app.inject({ method, url });
 
   const routes: ['POST' | 'PUT', string][] = [
-    ['POST', '/api/groups'],
-    ['PUT', `/api/groups/${'ЗАГЛУШКА'}`],
-    ['POST', '/api/groups/ЗАГЛУШКА/enabled'],
-    ['POST', '/api/groups/activate'],
     ['POST', '/api/project-git/checkout'],
     ['POST', '/api/project-git/branch'],
     ['POST', '/api/project-git/commit'],
@@ -111,34 +97,12 @@ describe('маршруты: запрос без тела не даёт 500', () 
 
   for (const [method, url] of routes) {
     it(`${method} ${url}`, async () => {
-      const target = url.replace('ЗАГЛУШКА', groupId);
-      const res = await bodyless(method, target);
+      const res = await bodyless(method, url);
       expect(res.statusCode).toBeLessThan(500);
     });
   }
 
-  it('переключатель группы без состояния отвечает 400, а не гасит наугад', async () => {
-    // Домыслить `isEnabled` нельзя: промах здесь означал бы правку настоящего
-    // ~/.claude не в ту сторону.
-    const res = await app.inject({ method: 'POST', url: `/api/groups/${groupId}/enabled` });
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('набор без имени не заводится: безымянную строку в списке не опознать', async () => {
-    // PUT по неизвестному id тоже ЗАВОДИТ набор, поэтому проверяются оба входа.
-    for (const [method, url] of [
-      ['POST', '/api/groups'],
-      ['PUT', '/api/groups/нет-такого'],
-    ] as const) {
-      const res = await app.inject({ method, url });
-      expect(res.statusCode, url).toBe(400);
-    }
-
-    const list = await app.inject({ method: 'GET', url: '/api/groups' });
-    expect(list.json<{ name: string }[]>().every((group) => group.name.trim() !== '')).toBe(true);
-  });
-
-  it('прочие переключатели без состояния тоже отказывают, а не выбирают за человека', async () => {
+  it('переключатели без состояния отказывают, а не выбирают за человека', async () => {
     // Раньше пустое тело здесь означало «вниз» и «выключить»: оборванный запрос
     // молча переставлял хук и гасил плагин.
     for (const url of ['/api/hooks/Stop:0:0/move', '/api/plugins/нет-такого/enabled']) {
@@ -152,7 +116,7 @@ describe('маршруты: запрос без тела не даёт 500', () 
     // такой запрос пропустила бы, а чтение поля всё равно упало бы.
     const res = await app.inject({
       method: 'POST',
-      url: '/api/groups/activate',
+      url: '/api/project-git/checkout',
       headers: { 'content-type': 'application/json' },
       payload: 'null',
     });

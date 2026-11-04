@@ -169,3 +169,14 @@ export function pinnedBaseOf(task: LiveTask, unitId: string): string | undefined
   const sha = first.idempotencyHint.slice(first.idempotencyHint.lastIndexOf('@') + 1);
   return /^[0-9a-f]{40,64}$/.test(sha) ? sha : undefined;
 }
+
+/**
+ * База диффа для ревьюера: у ревью MR по ссылке (этап 10, F8) — общий предок целевой ветки и
+ * головы MR (копия встала на голову MR, и дифф от неё был бы пуст); у остальных — приколотая база.
+ * Только для показа изменений ревьюеру: проверки и копия по-прежнему от приколотой базы.
+ */
+export function reviewBaseOf(task: LiveTask, unitId: string): string | undefined {
+  const pinned = pinnedBaseOf(task, unitId);
+  if (!pinned) return undefined;
+  return task.state.created?.review?.reviewBase ?? pinned;
+}

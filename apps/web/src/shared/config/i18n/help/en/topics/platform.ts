@@ -93,10 +93,21 @@ export const platformEn: typeof platformRu = {
     accessMeaningColumn: 'What it means',
     accessConsumers: 'Sections',
     accessConsumersText:
-      'Chat, split groups, the tests agent, the panel assistant, foreign CLI chats and ' +
+      'Chat, groups, the tests agent, the panel assistant, foreign CLI chats and ' +
       '“Terminal” — the same rows as in the wizard, with the same dashes and reasons. Chat, ' +
       'groups, tests and foreign CLIs are decided at every start: the gateway address goes into ' +
-      'the run’s environment and nothing is written.',
+      'the run’s environment and nothing is written. “Required” mode outranks the boxes for core ' +
+      'tasks — Claude chat, the tests agent and foreign CLI chats: they always go through the contour, box ' +
+      'ticked or not, with the section’s model, or the contour’s model when it has none. A model ' +
+      'picked in the chat goes through the name map, as the header caption shows; a name the ' +
+      'contour does not know is replaced by the contour’s model instead of failing. A core task ' +
+      'nobody named a model for goes with the contour’s default model; a named model (the task ' +
+      'ceiling, a step model) stays. A mode change takes effect from the next core command — ' +
+      'the core needs no restart. A new contour becomes a core route the moment its card is ' +
+      'saved, also without a restart. If a turn still does not go (the gateway has no key, no ' +
+      'model was found), the chat names the reason in interface words, not the core’s line. For ' +
+      'them the boxes decide only in “best effort” mode; while the mode is “required”, a line ' +
+      'under the boxes says so.',
     accessWrites: 'What gets written',
     accessWritesText:
       'The panel assistant writes the gateway address into its profile, “Terminal” into the ' +
@@ -125,7 +136,7 @@ export const platformEn: typeof platformRu = {
     configMeaningColumn: 'How it works',
     configSections: 'Sections through this contour',
     configSectionsText:
-      'A switch for every section: chat, split groups, the tests agent, foreign CLI chats, the ' +
+      'A switch for every section: chat, groups, the tests agent, foreign CLI chats, the ' +
       'panel assistant and “Terminal”. The first four open and close right here. The assistant ' +
       'and the terminal can only be closed here: opening them means writing the address into ' +
       'the assistant profile or into CLI files, and the button leads to the “Section access” ' +
@@ -136,7 +147,9 @@ export const platformEn: typeof platformRu = {
       'Every section gets a gateway address with its own mark (/<contour>/_s/<section>/…). The ' +
       'gateway checks the mark against the choice on every request: a closed section gets a 403 ' +
       'naming the section, and nothing goes to the contour. So closing takes effect at once — ' +
-      'for a run started earlier and for CLI files that still point at the contour.',
+      'for a run started earlier and for CLI files that still point at the contour. The core ' +
+      'holds the gateway, and the panel answers a save only after the core has applied it: once ' +
+      'the click is done, the next request already follows the new setting.',
     configRules: 'Whose rules apply',
     configRulesText:
       '“Both sets” — the contour rules go into the request, our layers into the run. “Contour ' +
@@ -155,7 +168,7 @@ export const platformEn: typeof platformRu = {
       'happen in the run.',
     configUntaggedTitle: 'The gateway lets an address without a section mark through',
     configUntaggedText:
-      'Panel checks and images go that way. So did CLI files written before this version: apply ' +
+      'Panel checks go that way. So did CLI files written before this version: apply ' +
       'them again — the old address will show as a conflict, the new one gets the “Terminal” ' +
       'mark. The data mask, the tool shim and what the contour owner turns on at their side ' +
       '(checks, data substitution, knowledge base, history compaction) are not removed by the ' +
@@ -291,7 +304,9 @@ export const platformEn: typeof platformRu = {
       'with what to press: “Start the gateway” on the contour card, or the “Key” step. ' +
       '“Best effort” lets such a run bypass the contour instead — and the chat header (own and ' +
       'foreign CLI) says so before sending, with a “Bypassing the contour” line and the same ' +
-      'reason: in neither mode does data leave for the vendor cloud quietly.',
+      'reason: in neither mode does data leave for the vendor cloud quietly. One more price: ' +
+      'under “required” Claude chat, the tests agent and foreign CLI chats go through the contour even with ' +
+      'the box unticked — only “best effort” mode takes them out of it.',
 
     activeTitle: 'The active contour: exactly one',
     activeCaption:
@@ -504,7 +519,7 @@ export const platformEn: typeof platformRu = {
       'setting that is in force cannot be invisible.',
     modelsConsumer: 'A model per consumer',
     modelsConsumerText:
-      'One row for everyone who goes through the contour in their own process: chat, split ' +
+      'One row for everyone who goes through the contour in their own process: chat, ' +
       'groups, the tests agent, a foreign CLI. Empty — the contour’s model is used. That is how ' +
       '“a bigger model for chat, a cheaper one for tests” works without a second contour. The ' +
       'assistant and the terminal are not in the list: they have exactly one model — the one ' +
@@ -515,14 +530,10 @@ export const platformEn: typeof platformRu = {
       'model. A run that names a model itself goes with the model flag, and that flag beats the ' +
       'address variable: without the map the vendor name reaches the contour. Case does not ' +
       'matter. A name the contour lists in its own catalog needs no translation — it travels ' +
-      'as is. A translation by the map is your own word, not a replacement: the chat header ' +
+      'as is. So does a model from the right column of the map, even when the contour’s catalog ' +
+      'did not list it: you named it yourself. A translation by the map is your own word, not a replacement: the chat header ' +
       'says “sonnet” by the contour map — such-and-such model, in the ordinary colour, with ' +
-      'no warning. The “sonnet” row also decides “Delivery on Sonnet” for split groups: through ' +
-      'the contour the delivery link goes on that row’s model, and the toggle on the split card ' +
-      'says so — “such-and-such by the contour map”. No row — the lever does nothing through the ' +
-      'contour, the toggle is gone, and delivery goes on the work model. A foreign CLI’s group ' +
-      'follows the same rule for the lowest model of its ladder: delivery through the contour ' +
-      'goes there only if the map translates that name. If the contour’s catalog declares the ' +
+      'no warning. If the contour’s catalog declares the ' +
       'window of the run’s model, a group window above it is pressed down to it: otherwise the ' +
       'contour would refuse before the CLI had a chance to compact its history.',
     modelsUnknownTitle: 'An unknown name is replaced, and the replacement is named',
@@ -647,10 +658,10 @@ export const platformEn: typeof platformRu = {
       'project CLAUDE.md and repository settings THIS flag does not touch: those are the rules of ' +
       'the task, not ours (measured, not assumed). One file needs more than the flag: when the ' +
       'project lives under your home folder, the CLI walks up, finds the personal instructions ' +
-      'file and reads it as a project file. The panel then excludes exactly those files for the ' +
-      'run (`claudeMdExcludes` through `--settings`) — BOTH names, CLAUDE.md and AGENTS.md, ' +
-      'because the naming mode is not ours to know — so your personal rules do not come back in ' +
-      'by the side door.',
+      'file and reads it as a project file. The core then excludes exactly those files for the ' +
+      'run (`claudeMdExcludes` through `--settings`) — under all three names, CLAUDE.md, ' +
+      'CLAUDE.local.md and AGENTS.md, because the naming mode is not ours to know — so your ' +
+      'personal rules do not come back in by the side door.',
     layerSkills: 'Skills',
     layerSkillsText:
       'Skills and the `Skill` tool itself — with `--disable-slash-commands`. A separate switch not ' +
@@ -685,11 +696,15 @@ export const platformEn: typeof platformRu = {
       'reach the CLI launch. “Personal rules dropped” without saying by what would be a request ' +
       'to take it on trust. The server computes them, the screen only shows them; the chat header ' +
       'says the same BEFORE a message is sent — otherwise “the agent does not read my rules” ' +
-      'looks like a broken agent rather than your own switch. In a conversation created by a ' +
-      'split the header asks with the same consumer the run itself will use (“Split groups”), not ' +
+      'looks like a broken agent rather than your own switch. In a group’s conversation ' +
+      'the header asks with the same consumer the run itself will use (“Groups”), not ' +
       '“Chat”: otherwise it would describe a foreign route. And when the contour’s route has no ' +
       'Claude launch ticked at all — no chat, no groups, no tests agent — the line under the ' +
-      'flags says exactly that: there is nobody to receive them yet.',
+      'flags says exactly that: there is nobody to receive them yet. A chat turn runs as a core ' +
+      'task, and the flags reach it as session fields rather than a raw line: the core itself ' +
+      'narrows the setting sources, skills, MCP servers and built-in tools, and a dropped ' +
+      '“system prompt” removes the panel’s additions. A flag the core does not know is not lost ' +
+      'silently: the chat does not start and names it.',
     layersMissingTitle: 'Three neighbouring settings are absent here',
     layersMissingText:
       'The prompt gate is physically our hook in `~/.claude/settings.json`: it leaves together ' +
@@ -786,9 +801,9 @@ export const platformEn: typeof platformRu = {
     neighboursContour: 'A contour',
     neighboursContourText:
       'It provides the company’s models, embeddings and agents behind one key, and keeps that ' +
-      'key to itself. CLIs are pointed at the panel’s local gateway; the key is substituted ' +
-      'there and never reaches a foreign configuration. The price: the panel has to be ' +
-      'running — a dead panel means a dead gateway.',
+      'key to itself. CLIs are pointed at a local gateway on your machine; the key is substituted ' +
+      'there and never reaches a foreign configuration. The price: the AgentDeck core has to ' +
+      'be running on the machine — it holds the gateway, and without the core there is none.',
 
     getKeyTitle: 'What else lives in the contour admin',
     getKeyCaption:
@@ -864,10 +879,11 @@ export const platformEn: typeof platformRu = {
       'which code each of them answers with.',
     pathTextTitle: 'The same in words',
     pathTextText:
-      'CLIs and the built-in assistant do not talk to the contour: they talk to the panel’s ' +
-      'local gateway on 127.0.0.1; the default port is 5179, and if it is busy the gateway ' +
-      'takes a neighbouring one and names what it got — that is the port the panel writes into ' +
-      'a CLI’s configuration. The gateway translates the request into the contour’s ' +
+      'CLIs and the built-in assistant do not talk to the contour: they talk to a local ' +
+      'gateway on 127.0.0.1; the AgentDeck core holds it, the default port is 5179 and is set ' +
+      'in the panel settings. If the port is busy, the gateway waits until it is released ' +
+      'instead of taking a neighbouring one, so the address in CLI configurations stays the ' +
+      'same. The gateway translates the request into the contour’s ' +
       'dialect, applies your blind-spot rules, substitutes the key and sends the request out — ' +
       'the single moment anything leaves the machine. On the contour’s side the request passes ' +
       'the content checks, receives the company’s tools and knowledge, and reaches the model. ' +
@@ -1014,13 +1030,13 @@ export const platformEn: typeof platformRu = {
       'by a preset checked against the gateway docs, or by you — in the wizard’s “What the ' +
       'gateway can do” block, when your gateway’s docs name it. The second road is your own ' +
       'endpoint profile with a generation address field. ' +
-      'A contour request travels through the panel gateway, so it is in the gateway journal. It ' +
+      'A contour request travels through the core, the same road the CLI requests of this ' +
+      'contour take, so it is in the journal. It ' +
       'reaches the key’s spend only if the contour sent a bill: the company platform sends an image as part ' +
-      'of an answer without one, so such an image is not in the key’s spend. The gateway has ' +
-      'to be up for this — and when its switch is on while no listener is there, the panel ' +
-      'raises it itself, once: the lock with a reason appears only after that failed, and it ' +
-      'names the reason in the gateway’s own words. A switch left off the panel does not turn ' +
-      'on for you — the lock says exactly that: the gateway is off.',
+      'of an answer without one, so such an image is not in the key’s spend. The panel gateway ' +
+      'switch plays no part here. If the core did not answer or did not accept the contour at the ' +
+      'moment of the request, the image is not drawn, and the refusal names the reason in the ' +
+      'core’s words.',
     workDecks: 'Presentations on a topic from chat',
     workDecksWhy:
       'The deck itself asks the contour for no capability: the panel sends an ordinary chat ' +
@@ -1037,7 +1053,10 @@ export const platformEn: typeof platformRu = {
       'than as «a panel error». And the mode does not depend on a contour: in a conversation ' +
       'the agent dictates the presentation itself — a revision too, and the pictures already ' +
       'drawn for the previous deck carry over into the new one — while a contour or an own ' +
-      'endpoint dictates it only outside a conversation.',
+      'endpoint dictates it only outside a conversation. A deck request to the contour goes ' +
+      'through the core, the same road as pictures: the panel gateway toggle is not needed for ' +
+      'it, and if the core did not answer or did not accept the contour, the refusal comes at ' +
+      'sending and names the cause.',
     worksHonestTitle: 'How the shim differs from real tools',
     worksHonestText:
       'It is a protocol on top of a foreign one, and it is weaker than the vendor’s: a call ' +
@@ -1378,7 +1397,7 @@ export const platformEn: typeof platformRu = {
         'tick: there is nothing to promise beyond what was checked.',
       pTargets: 'Step 4: where the contour works',
       pTargetsText:
-        'The list of consumers: chat, split groups, the test agent, the panel assistant, the ' +
+        'The list of consumers: chat, groups, the test agent, the panel assistant, the ' +
         'chats of foreign CLIs and “Terminal”. Only the assistant is ticked by default — it ' +
         'is the one thing that works through a contour in full; everything else is switched ' +
         'on by hand, and every run row carries the note that a CLI behind the gateway has no ' +
@@ -1408,12 +1427,14 @@ export const platformEn: typeof platformRu = {
         'the CLI reads the address from its own config on every launch, the panel’s launches ' +
         'included, so a cleared “Chat” with “Terminal” applied will not return the chat to the ' +
         'vendor cloud. A line under the consumer says so right where the box is.',
-      pGateway: 'Raise the gateway',
+      pGateway: 'Check the gateway',
       pGatewayText:
-        'The “Raise the gateway” button sits on the same step. Once up, it names its address ' +
-        '— http://127.0.0.1:5179 on the screenshot — and that is what lands in the ' +
+        'The AgentDeck core holds the gateway, and the same step shows its state. While it ' +
+        'listens, the line names its address (http://127.0.0.1:5179 by default, the port is ' +
+        'set in the settings) — and that is what lands in the ' +
         'consumers’ configs, with the contour identifier and the section mark appended — for ' +
-        'CLI files that is http://127.0.0.1:5179/company-stand/_s/terminal/v1. The dashes next ' +
+        'CLI files that is http://127.0.0.1:5179/company-stand/_s/terminal/v1. When it is down, ' +
+        'a “Start the gateway” button stands in place of the address. The dashes next ' +
         'to the consumers stay to the very ' +
         'end: the contour is switched on only by “Done”, and until then the row honestly says ' +
         'there is nothing to apply yet. A forgotten button does not break the connection: ' +
@@ -1425,7 +1446,7 @@ export const platformEn: typeof platformRu = {
         'On “Done” the new contour becomes active at once, and the panel immediately asks the ' +
         'model through its own gateway — the same way the CLIs will go. On the screenshot that ' +
         'is the “active” badge, the “online” state and the line “Test request went through”, ' +
-        'with the model’s answer, the delay and qwen2.5:0.5b. EVERY new contour becomes active, ' +
+        'with the model’s answer, the delay and qwen2.5:7b. EVERY new contour becomes active, ' +
         'even when another one was working before it: the previous one goes dark but stays ' +
         'configured. “Configure” on a connected contour opens the same wizard, and there ' +
         '“Done” only saves the edit. On an inactive contour “Done” closes the wizard and a toast ' +
@@ -1500,7 +1521,7 @@ export const platformEn: typeof platformRu = {
       rHeader: 'The chat header says it before sending',
       rHeaderText:
         'Under the model picker there are two lines: “Through the "<your title>" contour: ' +
-        'qwen2.5:0.5b.” and “takes no reasoning effort — it is not sent.” That is what really ' +
+        'qwen2.5:7b.” and “takes no reasoning effort — it is not sent.” That is what really ' +
         'leaves: the header’s model list holds vendor names, and through a contour the name map ' +
         'translates them. A name the map translated is named so — “"sonnet" by the contour map ' +
         '— …”, with no warning. A name that is neither in the map nor in the key catalogue is ' +
@@ -1548,9 +1569,12 @@ export const platformEn: typeof platformRu = {
       agCallText:
         'The scripted contour answered with a Write call in protocol tags. The shim rebuilt a ' +
         'real call out of it, and Claude Code itself ran it — with its own permissions, as with ' +
-        'the vendor: the conversation shows a Write chip followed by the answer. The shoot ' +
-        'checks the file on disk, not the text on screen: no file, no frame. The header reads ' +
-        '“Through the "Scripted contour" contour: stub-tool-shim.”',
+        'the vendor: the conversation shows a Write chip followed by the answer “file created ' +
+        'by the protocol”. The task names the file after “ФАЙЛ:” — the scripted model takes ' +
+        'its path from there, and “ЯЗЫК: en” switches its replies to English. The shoot ' +
+        'checks the file on disk, not the text on screen: no file, no frame. The conversation ' +
+        'is shot on the “Chat through the core” page: Claude Code runs as a core task right in ' +
+        'the project folder, with the scripted contour (stub-tool-shim) as its model.',
       agQuote: 'An example in a code block does not run',
       agQuoteText:
         'The same call, shown as an example in a code block, stays text: there is no Write ' +
@@ -1644,7 +1668,7 @@ export const platformEn: typeof platformRu = {
       shotsTitle: 'Where these screenshots come from and why they can be trusted',
       shotsText:
         'The frames are taken by a run of their own. The admin and most of the panel come ' +
-        'from a live company platform stand with the local qwen2.5:0.5b model; the panel there is a ' +
+        'from a live company platform stand with the local qwen2.5:7b and qwen2.5:0.5b models; the panel there is a ' +
         'throwaway copy with its own config directory, so that nobody’s working stand is ' +
         'touched. What the stand cannot show — a successful tool call, a drawing model, a ' +
         'contour gone dark — was shot on the scripted contour: a stub from the panel’s own ' +
@@ -1677,7 +1701,7 @@ export const platformEn: typeof platformRu = {
       '13-wizard-capabilities': 'Step 3: what the probe confirmed, and what stayed “not declared”',
       '14-wizard-targets':
         'Step 4: consumers, mode, budget. The dashes stay until “Done” — the contour is still off',
-      '15-wizard-gateway': 'The gateway is up on 127.0.0.1:5179 — now CLIs have somewhere to point',
+      '15-wizard-gateway': 'The gateway is up on 127.0.0.1 — now CLIs have somewhere to point',
       '16-panel-card': 'Right after “Done”: the contour is active, the test request went through',
       '18-panel-delete': 'Deleting asks for the title; the apply is removed before it by itself',
     },

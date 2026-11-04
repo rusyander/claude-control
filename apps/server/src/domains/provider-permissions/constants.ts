@@ -1,35 +1,14 @@
 import type {
   CodexApprovalPolicy,
   CodexSandboxMode,
-  CursorPermissionKind,
   GeminiApprovalMode,
   QwenApprovalMode,
 } from '@agentdeck/contracts';
 
-/** Разрешённые значения (дублируют contracts значением — в рантайм сервера contracts тянется лишь как тип). */
-export const APPROVAL_POLICIES: readonly CodexApprovalPolicy[] = [
-  'untrusted',
-  'on-request',
-  'never',
-];
-export const SANDBOX_MODES: readonly CodexSandboxMode[] = [
-  'read-only',
-  'workspace-write',
-  'danger-full-access',
-];
-
-/** Разрешённые в settings.json режимы аппрувов Gemini. `yolo` сюда НЕ входит. */
-export const GEMINI_APPROVAL_MODES: readonly GeminiApprovalMode[] = [
-  'default',
-  'auto_edit',
-  'plan',
-];
-
 /**
- * Режимы, которые Gemini понимает ТОЛЬКО как флаг командной строки: в
- * settings.json они вызывают ошибку enum при старте CLI. Панель их не пишет.
+ * Дефолты и наборы, нужные только чтению и записи сервера. Наборы Codex, Gemini и
+ * Cursor и разбор черновиков лежат одной копией в `@agentdeck/contracts/permissions`.
  */
-export const GEMINI_CLI_ONLY_APPROVAL_MODES: readonly string[] = ['yolo'];
 
 /** Дефолты Codex (когда ключ отсутствует). НЕ записываются молча — только по действию пользователя. */
 export const DEFAULT_APPROVAL: CodexApprovalPolicy = 'on-request';
@@ -53,15 +32,3 @@ export const QWEN_APPROVAL_MODES: readonly QwenApprovalMode[] = [
 
 /** Дефолт Qwen: спрашивать подтверждение перед каждым действием. */
 export const DEFAULT_QWEN_APPROVAL: QwenApprovalMode = 'default';
-
-/**
- * Задокументированные формы правил Cursor. Список идёт КЛИЕНТУ как подсказка и
- * НЕ используется как фильтр: панель правила не толкует (см. `parseCursorDraft`).
- */
-export const CURSOR_RULE_KINDS: readonly CursorPermissionKind[] = [
-  'Shell',
-  'Read',
-  'Write',
-  'WebFetch',
-  'Mcp',
-];

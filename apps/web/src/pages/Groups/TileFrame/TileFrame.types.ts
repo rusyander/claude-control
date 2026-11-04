@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 
 export interface TileFrameProps {
   name: string;
-  onOpen: () => void;
+  /** Открыть окно карточки; нет — имя просто текст (сетка только для чтения). */
+  onOpen?: () => void;
   badges: ReactNode;
   /**
    * Строка «Когда» как есть; пусто — карточка пишет `whenEmpty` приглушённо.
@@ -23,7 +24,7 @@ export interface TileFrameProps {
    * читались одной фразой.
    */
   warnings?: readonly string[];
-  /** Справа от имени: «Копировать» и тумблер группы. */
+  /** Справа от имени: действия карточки («В ядро» у прежней группы). */
   aside?: ReactNode;
   /** Якорь для агента панели: по нему он показывает карточку. */
   anchor?: string;

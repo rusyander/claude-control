@@ -29,12 +29,10 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
   'gateway-registry-not-ready': 'Контур ещё поднимается: реестр моделей не готов',
   'gateway-route-unknown': 'Шлюз панели принимает только {{routes}} по адресу /<контур>/v1/...',
   'gateway-contour-unknown': 'Контур «{{id}}» в панели не заведён',
-  'gateway-contour-disabled': 'Контур «{{title}}» выключен в панели',
-  'gateway-contour-no-key': 'У контура «{{title}}» не сохранён ключ',
   'gateway-section-closed-chat':
     'Раздел «Чат» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
   'gateway-section-closed-groups':
-    'Раздел «Группы разделения» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    'Раздел «Группы» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
   'gateway-section-closed-tests':
     'Раздел «Агент тестов» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
   'gateway-section-closed-assistant':
@@ -75,7 +73,6 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
     'Правило прав «{{rule}}» требует подтверждения человека, а спросить некому',
   'gateway-answer-too-large':
     'Ответ контура больше 8 МБ — шлюз не собирает его целиком. Тот же запрос потоком приходит без этого потолка',
-  'gateway-not-anthropic': 'Платформа ответила не сообщением диалекта Anthropic',
   'gateway-mask-rules-broken': 'Защита данных включена, а правила не читаются ({{error}})',
   'gateway-mask-unparsed': 'Защита данных не разобрала тело запроса',
   'gateway-mask-blocked':
@@ -84,9 +81,9 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
     'Вызов инструмента остановлен: метку защиты данных {{names}} нечем развернуть — она уехала бы в файл вместо значения',
   'gateway-images-not-declared': 'У контура «{{title}}» ручка картинок манифестом не объявлена',
   'gateway-images-too-large': 'Ответ ручки картинок больше 16 МБ — шлюз его не собирает',
-  'gateway-failed': 'AgentDeck: шлюз не смог обработать запрос',
-  'gateway-ports-busy': 'порты {{from}}–{{to}} заняты: {{reason}}',
   'gateway-ports-busy-unknown': 'причина неизвестна',
+  'gateway-core-unknown': 'ядро ещё не сказало, слушает ли шлюз контуров',
+  'gateway-core-waiting': 'шлюз контуров у ядра ждёт порт {{port}}: {{reason}}',
   'gateway-ceiling-cut':
     'Ответ контура оборвался на {{seconds}}-й секунде — это потолок самой платформы на любой ответ, поток тоже. Сеть здесь ни при чём: сократите ход (меньше размышлений, короче ответ) или попросите владельца контура поднять потолок',
   'gateway-url-not-http': 'Адрес контура не http(s): {{url}}',
@@ -97,12 +94,6 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
   'gateway-headers-timeout': 'Контур не начал отвечать за {{seconds}} с',
   'gateway-headers-timeout-local':
     'Локальная модель не начала отвечать за {{seconds}} с: длинный запрос обрабатывается дольше, чем отведено. Сожмите историю (/compact) или начните новый чат',
-  'gateway-local-restarting': 'Сервер моделей перезапускается после сбоя — запрос повторится сам',
-  'gateway-local-stopped':
-    'Сервер моделей остановлен — запустите его в разделе «Локальные модели», прогон продолжится сам',
-  'gateway-local-down':
-    'Сервер моделей не отвечает: {{reason}}. Запустите его в разделе «Локальные модели» — прогон продолжится сам',
-  'gateway-local-down-unknown': 'причина не названа',
   'gateway-cert-failed':
     'Сертификат контура не проверился: {{reason}}. Укажите корневой сертификат компании в настройках контура',
   'gateway-no-connection': 'Нет связи с контуром: {{reason}}',
@@ -133,7 +124,6 @@ export const gatewayRu: Record<GatewayMessageCode, string> = {
   'gateway-flaw-stop-without-call': 'причина остановки «вызов» без единого вызова',
   'gateway-request-aborted': 'Запрос отменён',
   'proxy-failed': 'прокси не смог обработать запрос',
-  'proxy-not-configured': 'прокси не настроен',
   'proxy-body-too-large': 'тело запроса слишком велико',
   'proxy-shape-unknown': 'форма запроса не разбирается',
   'proxy-body-not-json': 'тело запроса не JSON',

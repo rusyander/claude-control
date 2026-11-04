@@ -24,6 +24,7 @@ type Field =
   | 'readRoots'
   | 'humanRoots'
   | 'ownTemp'
+  | 'attachments'
   | 'credentials';
 
 export interface FoldedPaths {
@@ -36,6 +37,8 @@ export interface FoldedPaths {
   humanRoots: readonly string[];
   /** Временный каталог сеанса; нет — не задан или несводим. */
   ownTemp: string | undefined;
+  /** Каталог копий вложений задачи; нет — не задан или несводим. */
+  attachments: string | undefined;
   credentials: readonly string[];
   /** Первая несводимая запись каждого поля; пусто — всё сложено. */
   unfoldable: Partial<Record<Field, string>>;
@@ -58,6 +61,7 @@ const ABSOLUTE_ONLY: ReadonlySet<Field> = new Set([
   'readRoots',
   'humanRoots',
   'ownTemp',
+  'attachments',
   'credentials',
 ]);
 
@@ -92,6 +96,7 @@ export function foldedPaths(ctx: PermitContext): FoldedPaths {
     scope?.roots,
     scope?.human,
     scope?.ownTemp,
+    scope?.attachments,
     scope?.credentials,
   ];
   const hit = cache.get(ctx);
@@ -101,6 +106,11 @@ export function foldedPaths(ctx: PermitContext): FoldedPaths {
   if (copyRoot === null) unfoldable.copyRoot = ctx.copyRoot;
   const ownTemp = scope?.ownTemp === undefined ? null : fold(scope.ownTemp, 'ownTemp');
   if (scope?.ownTemp !== undefined && ownTemp === null) unfoldable.ownTemp = scope.ownTemp;
+  const attachments =
+    scope?.attachments === undefined ? null : fold(scope.attachments, 'attachments');
+  if (scope?.attachments !== undefined && attachments === null) {
+    unfoldable.attachments = scope.attachments;
+  }
   const folded: FoldedPaths = {
     // Несводимый корень копии остаётся как написан только для текста отказа: судья с ним
     // ничего не сравнивает (`unfoldable.copyRoot` закрывает read/edit/exec раньше).
@@ -111,6 +121,7 @@ export function foldedPaths(ctx: PermitContext): FoldedPaths {
     readRoots: foldList(scope?.roots ?? [], 'readRoots', unfoldable),
     humanRoots: foldList(scope?.human ?? [], 'humanRoots', unfoldable),
     ownTemp: ownTemp ?? undefined,
+    attachments: attachments ?? undefined,
     credentials: foldList(scope?.credentials ?? [], 'credentials', unfoldable),
     unfoldable,
   };

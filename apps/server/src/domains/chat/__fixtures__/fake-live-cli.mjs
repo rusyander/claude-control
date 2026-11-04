@@ -12,7 +12,6 @@
 // stdin) and reports its exit code. FAKE_ARGV_DUMP=<file> appends argv at start-up — for
 // paths whose prompt the test does not choose. STARTONLY <file> / STARTTOOL: the turn starts
 // (message_start with tokens) and then hangs, bare or after a tool call — a cut keep-alive ping.
-/* global process, setTimeout, clearTimeout, setInterval, clearInterval */
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';

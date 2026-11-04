@@ -24,7 +24,8 @@ export async function call(
   let firstByteMs = -1;
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${client.path}`, {
+    const path = typeof client.path === 'function' ? client.path(options) : client.path;
+    response = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...client.headers },
       body: JSON.stringify(client.request(options)),

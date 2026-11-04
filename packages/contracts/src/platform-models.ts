@@ -208,6 +208,16 @@ export function chooseRunModel(rules: PlatformModelRules, asked: string): Platfo
     return { model: known, asked: wanted, source: 'asked', replaced: false };
   }
 
+  // Цель строки карты — тоже слово человека: панель шлёт ядру уже переведённое имя, и ядро,
+  // выбирая тем же правилом ещё раз, не должно заменять его моделью по умолчанию лишь потому,
+  // что каталог контура не прочитан или модели в нём нет.
+  const target = Object.values(rules.map)
+    .map((value) => value.trim())
+    .find((value) => value && lower(value) === lower(wanted));
+  if (target) {
+    return { model: target, asked: wanted, source: 'mapped', replaced: false };
+  }
+
   // Строка карты по СЕМЕЙСТВУ. Человек пишет карту так, как модель называется в
   // шапке («sonnet»), а ступень разделения и веера уезжает развёрнутым именем
   // (`claude-sonnet-5`, `expandAssignedModel` на сервере): без этой строки

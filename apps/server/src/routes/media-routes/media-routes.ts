@@ -15,7 +15,7 @@ import {
   PICTURE_MAX_CHARS,
 } from '@agentdeck/contracts/media-block';
 import type { ServerContext } from '../../context.ts';
-import { generateImage, planImageReady, savePicture } from '../../domains/media/images.ts';
+import { generateImage, planImage, savePicture } from '../../domains/media/images.ts';
 import type { MediaDeps } from '../../domains/media/images.ts';
 import {
   deckFile,
@@ -89,19 +89,17 @@ const blockRoute = {
 export function registerMediaRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  gatewayPort: () => number,
   /**
-   * Подъём своего шлюза, когда его тумблер включён, а слушателя нет (A-1).
-   * Приходит извне, потому что слушатель живёт дольше запроса; не задан —
-   * маршруты отвечают по тому, что есть, как отвечали раньше.
+   * Адрес звена ядра для запросов в контур (C3b): клиент учёта контуров панели. Обязателен
+   * намеренно — забытая проводка иначе тихо запирает дорогу контура; `undefined` — явный отказ
+   * при отправке (тесты без контура).
    */
-  gateway?: { raise: () => Promise<void>; failure: () => string | undefined },
+  contourLink: MediaDeps['contourLink'],
 ): void {
   const deps = (): MediaDeps => ({
     appDataDir: ctx.location.paths.appData,
     store: ctx.store,
-    gatewayPort,
-    ...(gateway ? { raiseGateway: gateway.raise, gatewayFailure: gateway.failure } : {}),
+    ...(contourLink ? { contourLink } : {}),
   });
 
   const failed = (error: unknown, reply: FastifyReply): FastifyReply => {
@@ -154,13 +152,11 @@ export function registerMediaRoutes(
   const wantsAgent = (value: unknown): boolean => value === '1' || value === 'true';
 
   /**
-   * Чем нарисуем и почему нет. Единственный маршрут плана, который ещё и
-   * ДЕЙСТВУЕТ: погашенный слушатель своего шлюза панель поднимает сама (A-1) —
-   * замок «шлюз не поднят» там, где панель умеет его поднять одним вызовом, был
-   * отказом собственной работе. Тумблер при этом не трогается ни разу.
+   * Чем нарисуем и почему нет. Шлюз панели плану больше не нужен: контур — через звено
+   * ядра (C3b), и поднимать перед расчётом нечего.
    */
   app.get<{ Querystring: { agent?: string } }>('/api/media/images/plan', (request) =>
-    planImageReady(deps(), { agent: wantsAgent(request.query.agent) }),
+    planImage(deps(), { agent: wantsAgent(request.query.agent) }),
   );
 
   app.post<{ Body: unknown }>('/api/media/images', async (request, reply) => {

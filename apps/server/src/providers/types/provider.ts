@@ -1,5 +1,4 @@
 import type { ClaudePaths } from '@agentdeck/contracts';
-import type { GroupLayerKind } from '@agentdeck/contracts/group-delivery';
 import type { ProviderGroupEconomy } from './economy.ts';
 import type { CapabilityMap, ProviderStatus } from './capabilities.ts';
 import type {
@@ -386,15 +385,6 @@ export interface ConfigProvider {
    * поэтому едет вообще без флага модели.
    */
   modelLadder?: string[];
-  /**
-   * Чем группа из файлов Claude едет на ОДИН прогон этого CLI
-   * (`domains/groups/run-layer/run-layer.ts`). Тумблер каталогов Claude чужому CLI ничего
-   * не даёт, поэтому без слоя группа на его прогоны не действует вовсе — и
-   * панель так и говорит (`group-layer-none`), а не включает её в `~/.claude`.
-   * Задан только там, где механизм «на один запуск» проверен: Qwen — файл
-   * системных настроек, Codex — накладка поверх его конфига.
-   */
-  groupLayer?: GroupLayerKind;
   /** Рычаги экономии групп: где действуют и чем доходят до прогона (`types/economy.ts`). */
   groupEconomy?: ProviderGroupEconomy;
 }

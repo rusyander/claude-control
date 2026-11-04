@@ -75,13 +75,47 @@ export type OpencodePermissionLevel = (typeof OPENCODE_PERMISSION_LEVELS)[number
 export const OPENCODE_PERMISSION_TOOLS = ['edit', 'bash', 'webfetch', 'read'] as const;
 export type OpencodePermissionTool = (typeof OPENCODE_PERMISSION_TOOLS)[number];
 
+/** Политика аппрувов Codex (`approval_policy` в `config.toml`): когда спрашивать подтверждение. */
+export const CODEX_APPROVAL_POLICIES = ['untrusted', 'on-request', 'never'] as const;
+export type CodexApprovalPolicy = (typeof CODEX_APPROVAL_POLICIES)[number];
+
+/** Режим песочницы Codex (`sandbox_mode`): границы файловой системы и сети. */
+export const CODEX_SANDBOX_MODES = ['read-only', 'workspace-write', 'danger-full-access'] as const;
+export type CodexSandboxMode = (typeof CODEX_SANDBOX_MODES)[number];
+
+/**
+ * Режимы аппрувов Gemini, допустимые в `settings.json` (`general.defaultApprovalMode`).
+ * `yolo` сюда не входит: это режим только флага командной строки, записанный в
+ * файл он валит старт CLI ошибкой enum.
+ */
+export const GEMINI_APPROVAL_MODES = ['default', 'auto_edit', 'plan'] as const;
+export type GeminiApprovalMode = (typeof GEMINI_APPROVAL_MODES)[number];
+
+/**
+ * Задокументированные формы правил Cursor. Только подсказка интерфейсу, не фильтр:
+ * панель правила не толкует и хранит как есть.
+ */
+export const CURSOR_RULE_KINDS = ['Shell', 'Read', 'Write', 'WebFetch', 'Mcp'] as const;
+export type CursorPermissionKind = (typeof CURSOR_RULE_KINDS)[number];
+
 /** Режимы аппрувов Goose: значение корневого ключа `GOOSE_MODE`. */
 export const GOOSE_MODES = ['auto', 'approve', 'smart_approve', 'chat'] as const;
 export type GooseMode = (typeof GOOSE_MODES)[number];
 
-/** Режимы аппрувов Kimi Code: значение корневого ключа `default_permission_mode`. */
+/**
+ * Режимы аппрувов Kimi Code: значение корневого ключа `default_permission_mode` в config.toml.
+ * Проба 2.4.1 (02.11): `kimi doctor config` принимает ровно эти три; `default`, `plan` и прочее —
+ * «Invalid input», а при запуске Kimi такой ключ молча выбрасывает (остаётся `manual`).
+ */
 export const KIMI_MODES = ['manual', 'auto', 'yolo'] as const;
 export type KimiMode = (typeof KIMI_MODES)[number];
+
+/**
+ * Режимы сеанса Kimi по ACP (`session/new` → `modes.currentModeId`) — ДРУГОЙ словарь, не значения
+ * config.toml: проба 2.4.1 — `currentModeId` всегда `default`, что бы ни стояло в конфиге.
+ */
+export const KIMI_ACP_MODES = ['default', 'plan', 'auto', 'yolo'] as const;
+export type KimiAcpMode = (typeof KIMI_ACP_MODES)[number];
 
 /** Решение правила Kimi: что делать с подходящим вызовом инструмента. */
 export const KIMI_DECISIONS = ['allow', 'ask', 'deny'] as const;

@@ -48,8 +48,8 @@ export interface SupervisorDeps {
   record: () => ServerRecord | undefined;
   health: () => Promise<Health | undefined>;
   pidAlive: (pid: number) => boolean;
-  /** Снять зависший процесс. */
-  kill: (record: ServerRecord) => void;
+  /** Снять зависший сервер (освобождением удержания в ядре: процесс — ядра, не панели). */
+  kill: (record: ServerRecord) => void | Promise<void>;
   /**
    * Поднять сервер по записи; отказ — исключением. `cancelled` — человек нажал «Стоп», пока
    * подъём шёл: запускать процесс уже не нужно (L4c, F4).
@@ -64,8 +64,6 @@ export interface SupervisorDeps {
 export interface ServerSupervisor {
   /** Одна проверка; вызывается таймером. */
   tick(): Promise<ReviveResult>;
-  /** Шлюз получил отказ в соединении: поднять сейчас, если сервер мёртв и потолок не исчерпан. */
-  revive(): Promise<ReviveResult>;
   notice(): ServerNotice | undefined;
   /** Запись о сервере, которую присмотр помнит, даже когда сама запись пропала (неудачный подъём стирает её). */
   target(): ServerRecord | undefined;
@@ -122,7 +120,7 @@ export function createServerSupervisor(deps: SupervisorDeps): ServerSupervisor {
     const started = generation;
     const control = { cancelled: () => started !== generation };
     try {
-      if (hung) deps.kill(record);
+      if (hung) await deps.kill(record);
       await deps.restart(record, control);
       if (control.cancelled()) return 'none';
       misses = 0;
@@ -168,7 +166,7 @@ export function createServerSupervisor(deps: SupervisorDeps): ServerSupervisor {
     return misses >= HUNG_AFTER_MISSES ? { record, hung: true } : 'alive';
   }
 
-  async function check(byTimer: boolean): Promise<ReviveResult> {
+  async function check(): Promise<ReviveResult> {
     if (deps.busy()) return 'busy';
     const state = await diagnose();
     if (state === 'none') {
@@ -176,30 +174,24 @@ export function createServerSupervisor(deps: SupervisorDeps): ServerSupervisor {
       return 'none';
     }
     if (state === 'alive') return 'alive';
-    // Таймер не будит модель, которая при нас не жила: сервер после перезагрузки поднимает человек или запрос.
-    if (byTimer && !watching) return 'none';
+    // Таймер не будит модель, которая при нас не жила: сервер после перезагрузки поднимает человек
+    // или запрос — его первый же запрос на постоянный порт поднимает ядро (`routes/local/own/front.ts`).
+    if (!watching) return 'none';
     // Пока шла проверка, панель могла начать свой запуск.
     if (deps.busy()) return 'busy';
     return recover(state.record, state.hung);
   }
 
-  /** Один подъём за раз: тик и шлюз не запускают два процесса на один порт. */
-  function single(byTimer: boolean): Promise<ReviveResult> {
-    inFlight ??= check(byTimer).finally(() => {
+  /** Один подъём за раз: тики не запускают два процесса на один порт. */
+  function single(): Promise<ReviveResult> {
+    inFlight ??= check().finally(() => {
       inFlight = undefined;
     });
     return inFlight;
   }
 
-  /** Запрос шлюза ждёт идущую проверку и проверяет заново: её исход мог быть «не мой случай». */
-  async function reviveNow(): Promise<ReviveResult> {
-    if (inFlight) await inFlight.catch(() => undefined);
-    return single(false);
-  }
-
   return {
-    tick: () => single(true),
-    revive: reviveNow,
+    tick: () => single(),
     notice: () => notice,
     target: () => remembered,
     observe(record) {
@@ -224,7 +216,7 @@ export function createServerSupervisor(deps: SupervisorDeps): ServerSupervisor {
     start() {
       if (timer) return;
       timer = setInterval(
-        () => void single(true).catch(() => undefined),
+        () => void single().catch(() => undefined),
         deps.intervalMs ?? SUPERVISE_INTERVAL_MS,
       );
       timer.unref();

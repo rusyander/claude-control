@@ -14,11 +14,27 @@ import { BRAND_NAME, LEGACY_BRAND_NAME } from '../brand.mjs';
  * панелью раньше, описанием не считается.
  */
 export function readScriptDescription(scriptPath: string): string | undefined {
-  if (!existsSync(scriptPath)) return undefined;
+  return readScriptDescriptionCoded(scriptPath).description;
+}
+
+/** Описание и код его перевода (`@description-code`) — для страницы «Хуки». */
+export interface CodedScriptDescription {
+  description?: string;
+  descriptionCode?: string;
+}
+
+/**
+ * Шапка скрипта, который панель пишет сама (хук телефона, хук блока «Тесты»),
+ * русская — её читает человек в файле. Строка `@description-code <код>` в шапке
+ * даёт интерфейсу код перевода; без неё под en описание показывалось по-русски.
+ * Сама строка в описание не входит.
+ */
+export function readScriptDescriptionCoded(scriptPath: string): CodedScriptDescription {
+  if (!existsSync(scriptPath)) return {};
   try {
-    return describeScript(readFileSync(scriptPath, 'utf8'));
+    return describeScriptCoded(readFileSync(scriptPath, 'utf8'));
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -32,11 +48,30 @@ const LINE_COMMENT = /^(?:\/\/|#)\s?(.*)$/;
 /** Служебная строка файлов, созданных панелью раньше: описание — не она. */
 const LEGACY_EVENT_LINE = new RegExp(`^Событие: .*(?:${BRAND_NAME}|${LEGACY_BRAND_NAME})`);
 
+/** Строка кода перевода описания; код — в группе. */
+const DESCRIPTION_CODE_LINE = /^@description-code\s+([\w-]+)$/;
+/**
+ * Комментарий-указание инструменту (`/* global … *\/` для eslint и родня) — не
+ * текст для человека: шапка хука телефона кончалась на «global process, fetch…».
+ */
+const DIRECTIVE =
+  /^(?:globals?\s+[\w$]+(?:\s*:\s*\w+)?(?:\s*,\s*[\w$]+(?:\s*:\s*\w+)?)*|(?:eslint(?:-[\w-]+)?|jshint|exported|@ts-[\w-]+)(?:\s.*)?|prettier-ignore)$/;
+
 /** Описание из текста файла — вынесено ради тестов без диска. */
 export function describeScript(text: string): string | undefined {
+  return describeScriptCoded(text).description;
+}
+
+export function describeScriptCoded(text: string): CodedScriptDescription {
   const comments: string[] = [];
+  let descriptionCode: string | undefined;
   const push = (body: string): void => {
     const clean = body.trim();
+    const code = DESCRIPTION_CODE_LINE.exec(clean);
+    if (code) {
+      descriptionCode = code[1];
+      return;
+    }
     if (clean && !LEGACY_EVENT_LINE.test(clean)) comments.push(clean);
   };
 
@@ -58,6 +93,12 @@ export function describeScript(text: string): string | undefined {
     }
 
     const opener = BLOCK_OPENER.exec(line);
+    // Указание инструменту — как строка кода: после текста закрывает описание.
+    const body = opener?.[1] ?? LINE_COMMENT.exec(line)?.[1] ?? '';
+    if (DIRECTIVE.test(body.split(BLOCK_CLOSER)[0]!.trim())) {
+      if (comments.length > 0) break;
+      continue;
+    }
     if (opener) {
       const rest = opener[1] ?? '';
       const closeAt = rest.search(BLOCK_CLOSER);
@@ -78,5 +119,9 @@ export function describeScript(text: string): string | undefined {
     if (comments.length > 0) break;
   }
 
-  return comments.join(' ').trim() || undefined;
+  const description = comments.join(' ').trim() || undefined;
+  return {
+    ...(description ? { description } : {}),
+    ...(descriptionCode ? { descriptionCode } : {}),
+  };
 }

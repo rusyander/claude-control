@@ -291,6 +291,12 @@ export const REFUSAL_CODES = [
   'credential_absent',
   'route_unavailable',
   'not_allowed',
+  /** Сервер человека (`local:user`) не ответил на пробу: ядро его не поднимает (этап 10). */
+  'user_server_down',
+  /** Переходник CLI зарегистрирован заготовкой: возможностей нет, запуск отказан (этап 10). */
+  'adapter_not_built',
+  /** У CLI нет ни хука до вызова, ни оверлея запретов — защиту ядра не поставить (03:60, P81). */
+  'no_core_hook',
 ] as const;
 export type RefusalCode = (typeof REFUSAL_CODES)[number];
 
@@ -298,15 +304,26 @@ export type FactState = 'value' | 'absent' | 'unknown';
 
 export interface CompatAdapter {
   id: AdapterId;
-  caps: Pick<AdapterCaps, 'login' | 'channels' | 'limitsChannel'>;
+  /** Защита ядра — хук до вызова или оверлей запретов; ни того ни другого — `no_core_hook`. */
+  caps: Pick<AdapterCaps, 'login' | 'channels' | 'limitsChannel' | 'preToolHooks' | 'denyOverlay'>;
   /** Прочитанное переходником состояние настроек обхода по имени; нет записи — `unknown`. */
   bypassActive: Record<string, boolean | 'unknown'>;
+  /** `false` — переходник-заготовка (этап 10): судья отказывает `adapter_not_built` первым. */
+  built?: false;
 }
 
 export interface CompatRoute {
   id: RouteId;
   caps: RouteCaps;
-  availability: { state: FactState; onUnknown: UnknownAction };
+  availability: {
+    state: FactState;
+    onUnknown: UnknownAction;
+    /**
+     * Проба маршрута назвала сервер человека лежащим (`local:user`, текст пробы): при `absent`
+     * отказ `user_server_down` — поднять его может только человек. Нет — обычная недоступность.
+     */
+    downReason?: string;
+  };
   /** `none` — маршруту доступ не нужен (своя модель, заглушка, вход CLI). */
   credential: FactState | 'none';
 }

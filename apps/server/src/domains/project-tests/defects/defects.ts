@@ -13,9 +13,8 @@ import { jiraAccessFrom } from '../../integrations/atlassian/access.ts';
 import { createIssue } from '../../integrations/atlassian/jira.ts';
 import { IntegrationError } from '../../integrations/errors.ts';
 import { createForgeIssue, toForgeAccess } from '../../integrations/forge.ts';
-import { pickForge, type PickedForge } from '../../integrations/forge-pick.ts';
 import { linkForCwd } from '../../integrations/links.ts';
-import { isConnected } from '../../integrations/store/store.ts';
+import { isConnected, pickForge, type PickedForge } from '../../integrations/store/store.ts';
 import { ProjectTestsError } from '../files.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
 
@@ -180,7 +179,7 @@ function jiraProjectOf(deps?: DefectDeps): string | undefined {
 /**
  * Фордж по токену для этого проекта: GitLab и GitHub подключаются по
  * отдельности, и при двух подключённых дефект уходит туда, куда смотрит origin
- * проекта (`forge-pick.ts`).
+ * проекта (`integrations/store` `pickForge`).
  */
 function projectForge(deps?: DefectDeps): PickedForge | undefined {
   if (!deps) return undefined;

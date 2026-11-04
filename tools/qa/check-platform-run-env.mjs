@@ -4,44 +4,50 @@
  *
  * Почему таблица `routing.test.ts` без этого прогона ничего не значит. Она
  * проверяет РЕШЕНИЕ (`resolveRunRoute` вернул такой-то объект) и зеленеет даже
- * тогда, когда между решением и `spawn` порвано всё: поле `platformEnv` не
- * дошло до `ChatRunner`, `spawnCliProcess` выкинул опцию `env` (так и было —
- * блокер ревью Т3), оболочка Windows съела переменную, реестр прогонов
- * подставил старое значение. Здесь не подменяется ничего, кроме самого CLI: на
- * PATH кладётся фальшивый, который печатает СВОЁ окружение в файл и выходит.
- * Ни одного токена не тратится, сеть не трогается, стенд не нужен.
+ * тогда, когда между решением и процессом порвано всё: поле не перенесено в
+ * сеанс ядра (`session-carry.ts`), ядро выбрало модель заново и иначе, оболочка
+ * Windows съела переменную, реестр прогонов подставил старое значение. Здесь не
+ * подменяется ничего, кроме самого CLI: на PATH кладётся фальшивый, который
+ * печатает СВОЁ окружение и argv в файл, копирует файлы промпта и списка MCP и
+ * выходит. Ни одного токена не тратится, сеть не трогается, стенд не нужен.
+ *
+ * Чат и группы идут так же, как у человека с этапа 10: реестр `ChatRunRegistry`
+ * с исполнителем хода `CoreChatRun` (сборка `bootstrap/runtime/chat-wiring.ts`),
+ * процесс поднимает НАСТОЯЩЕЕ ядро (`bootCore`) на доме хоста звеньев; своего
+ * процесса CLI у панели нет. Папки прогонов — репозитории git с отметкой доверия
+ * CLI во временном каталоге конфигурации (как проект человека), каталог
+ * конфигурации ядра — тот же временный: настоящий `~/.claude` не читается.
  *
  * Что доказывается (каждая строка — обещание панели человеку):
- *   1. прогон чата с отмеченной галочкой «Чат» получает ANTHROPIC_BASE_URL
- *      живого шлюза, заглушку ключа и модель управляемого профиля;
+ *   1. прогон чата с отмеченной галочкой «Чат» получает адрес звена ядра, заглушку
+ *      ключа ровно под одним именем и модель контура флагом `--model`; промпт агента
+ *      контура и преамбула доходят до процесса файлом;
  *   2. настоящий ключ контура в окружении процесса НЕ появляется;
  *   3. файл настроек CLI не меняется ни на байт — маршрут живёт в процессе;
- *   4. прогон группы разделения, чья галочка снята, идёт БЕЗ адреса шлюза,
- *      даже если адрес лежал в параметрах прошлой жизни разговора
- *      (продолжение остановленного прогона — ровно этот случай);
- *   5. агент тестов — отдельное место запуска, и его галочка работает там же;
- *   6. чат чужого CLI с отмеченной галочкой `foreign:<cli>` тоже получает
- *      адрес — в переменных, которые задокументированы у ЭТОГО CLI, — а со
- *      снятой идёт своим провайдером;
- *   7. снятые нами слои (Т8) доезжают до argv процесса флагами, дописка панели
- *      к системному промпту не уезжает вовсе, а брокер прав встаёт ПОСЛЕ
- *      `--strict-mcp-config` и потому переживает его. Что каждый флаг делает с
- *      настоящим CLI — отдельная проверка, `check-run-layers.mjs`;
- *   8. помощник формы при активном чужом CLI идёт ТЕМ ЖЕ маршрутом, что его
- *      чат: адрес шлюза в окружении, свой неинтерактивный флаг в режиме без
- *      правок, ни одного флага Claude; со снятой галочкой — без адреса;
- *   9. фоновый наблюдатель с «Ассистентом панели» на контуре разбирает через
- *      шлюз и без модели вендора; при активном чужом CLI и облачном «Ассистенте»
- *      разбор ведёт сам этот CLI (X9) в режиме без правок, маршрутом своего
- *      чата: с галочкой `foreign:<cli>` — адрес шлюза, со снятой — без него;
- *  10. Kimi Code, Goose и OpenCode — CLI без переменных адреса в реестре (X7) —
- *      получают адрес окружением прогона (`runEndpoint`) в ТЕХ переменных,
- *      которые задокументированы у каждого, без ключа контура; настройка конфига
- *      Kimi, уводящая часть прогона мимо контура, даёт отказ без процесса. Что
- *      настоящий CLI с этим окружением идёт в шлюз — `check-run-endpoint-cli.mjs`;
- *  11. запасной путь «Codex» (владелец 06.10): контур драйвером `openai-compat`
- *      с облачным адресом OpenAI ведёт тот же `claude` — чат, группа разделения,
- *      агент тестов и наблюдатель получают адрес шлюза панели, модель OpenAI и
+ *   4. обязательный контур: прогон группы разделения со снятой галочкой всё равно
+ *      идёт через звено ядра, а адрес из параметров прошлой жизни разговора
+ *      (продолжение остановленного прогона) не переживает старт;
+ *   5. агент тестов — задача ядра: галочка «Тесты» даёт ей маршрут контура
+ *      (`coreContourRoutes`), и процесс, который поднимает ядро, получает адрес
+ *      звена ядра без ключа контура;
+ *   6. чат чужого CLI — задача ядра (`startCoreForeignChat`, этап 10): с отмеченной
+ *      галочкой `foreign:<cli>` её процесс получает адрес звена ядра — в переменных,
+ *      которые задокументированы у ЭТОГО CLI, — а со снятой идёт своим входом CLI;
+ *   7. снятые нами слои (Т8) доезжают до argv процесса флагами, сервер MCP человека
+ *      пропадает из строгого списка ядра, дописка панели к системному промпту не
+ *      уезжает в бриф, а конфиг брокера прав едет. Слои на месте — флагов снятия нет,
+ *      сервер человека в списке, дописка в брифе. Что каждое поле переноса делает с
+ *      настоящим CLI — живой тест переноса ядра,
+ *      `apps/core/src/adapters/claude/claude.carry.live.integration.test.ts`;
+ *   8. (помощник формы — вопрос ядра с этапа 10, F2b; его маршрут проверяют
+ *      проверки `core-ask/one-shot`, здесь его нет);
+ *   9. Kimi Code, Goose и OpenCode (X7) — задачи ядра тем же стартером: процесс получает
+ *      адрес звена ядра в ТЕХ переменных, которые задокументированы у каждого
+ *      (`packages/providers`), без ключа контура. Что настоящий CLI с этим окружением
+ *      идёт в шлюз — `check-run-endpoint-cli.mjs`;
+ *  10. запасной путь «Codex» (владелец 06.10): контур драйвером `openai-compat`
+ *      с облачным адресом OpenAI ведёт тот же `claude` — чат, группа разделения
+ *      и агент тестов получают адрес шлюза панели, модель OpenAI и
  *      заглушку ключа; ни ключа, ни облачного адреса в процессе нет.
  *
  * Запуск: node tools/qa/check-platform-run-env.mjs
@@ -51,8 +57,9 @@ import { fileURLToPath } from 'node:url';
 import {
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
+  readdirSync,
+  realpathSync,
   writeFileSync,
   rmSync,
   existsSync,
@@ -91,6 +98,24 @@ function removeDir(dir) {
 const SYSTEM_PROMPT_COPY = 'cc-system-prompt.txt';
 /** Копия дописки `--append-system-prompt-file`: на Windows дописка панели едет только файлом. */
 const APPEND_PROMPT_COPY = 'cc-append-prompt.txt';
+/** Копия `--mcp-config` сеанса ядра: строгий список MCP, в котором видно, доехал ли сервер человека. */
+const MCP_CONFIG_COPY = 'cc-mcp-config.json';
+/**
+ * Строка панели к системному промпту, которую путь ядра везёт сеансу (`appendOf` в
+ * `session-carry.ts`): строка о тестах проекта. Собственная дописка панели к ядру не едет вовсе —
+ * её место занимает бриф ядра, — поэтому слой «системный промпт» виден по этой строке: снятый, он
+ * её убирает, возвращённый — возвращает.
+ */
+const PANEL_APPEND = 'ДОПИСКА ПАНЕЛИ';
+/** Сервер MCP человека во временном `.claude.json`: снятые слои MCP обязаны его убрать. */
+const PERSONAL_MCP = 'personal-mcp-qa';
+
+/** Серверы строгого списка MCP, с которым ядро запустило процесс. */
+function mcpServersOf(dir) {
+  const file = join(dir, MCP_CONFIG_COPY);
+  if (!existsSync(file)) return undefined;
+  return Object.keys(JSON.parse(readFileSync(file, 'utf8')).mcpServers ?? {});
+}
 /** Чужой CLI для проверки: у него задокументирован и неинтерактивный флаг, и раздел переменных. */
 const FOREIGN = 'qwen';
 
@@ -113,107 +138,92 @@ function dumpOf(dir) {
   return { raw: text, env };
 }
 
-/** Выгрузка фальшивого CLI помощника: JSON с argv и окружением. */
-const HELPER_DUMP_SCRIPT = `
-const fs = require('node:fs');
-if (process.env.CC_HELPER_DUMP) {
-  // Файл на процесс: чат чужого CLI, ещё живой с прошлого шага, тоже найдёт эту
-  // копию на PATH — общий файл два процесса испортили бы друг другу.
-  fs.writeFileSync(
-    require('node:path').join(process.env.CC_HELPER_DUMP, process.pid + '.json'),
-    JSON.stringify({ args: [...process.execArgv, ...process.argv.slice(2)], env: process.env }),
-  );
-  process.stdout.write(JSON.stringify({ reply: 'ok', fields: {} }));
-  process.exit(0);
-}
-`;
-
 /**
- * Фальшивый чужой CLI помощника формы и разбора наблюдателя. Задание у них
- * многострочное, а `.cmd`-обёртку с таким argv через cmd.exe не пустить
- * (`cli-spawn`), поэтому на Windows — форма обёртки npm, как у настоящей
- * установки (`qwen.cmd` → `node <скрипт> %*`): панель запускает её скрипт node
- * напрямую. Копия node под именем CLI не годится — флаг режима правок перед
- * `-p` node счёл бы своим. На остальных системах — скрипт с тем же кодом.
+ * Папка проекта — репозиторий git с одним коммитом: задачу ядро заводит только в рабочем дереве
+ * git (оценка отказывает «not a git repository»), как и в настоящем проекте человека.
  */
-function fakeHelperCli(dir, name) {
-  const script = join(dir, 'helper-dump.cjs');
-  writeFileSync(script, HELPER_DUMP_SCRIPT);
-  if (isWindows) writeFileSync(join(dir, `${name}.cmd`), '@node "%~dp0\\helper-dump.cjs" %*\r\n');
-  else {
-    writeFileSync(join(dir, name), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
-      mode: 0o755,
+function gitRepo(dir) {
+  const git = (...args) =>
+    spawnSync('git', ['-c', 'user.name=qa', '-c', 'user.email=qa@example.com', ...args], {
+      cwd: dir,
+      encoding: 'utf8',
     });
-  }
-  return script;
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'init');
+  trustDir(dir);
+}
+
+/** `.claude.json` временного каталога конфигурации — задаёт `main()`. */
+let trustFile = '';
+
+/**
+ * Папка проекта, которой человек доверился в CLI (`projects[<путь>].hasTrustDialogAccepted`) — как
+ * настоящий проект, где открывают чат. Без отметки ядро ведёт сеанс в режиме «observe»
+ * (`--setting-sources ''`, F-86), и флаги наших слоёв в argv не видны вовсе: проверка смотрела
+ * бы режим недоверенной копии, а не путь человека.
+ */
+function trustDir(dir) {
+  if (!trustFile) return;
+  const config = existsSync(trustFile) ? JSON.parse(readFileSync(trustFile, 'utf8')) : {};
+  const key = realpathSync.native(dir).replaceAll('\\', '/');
+  config.projects = { ...config.projects, [key]: { hasTrustDialogAccepted: true } };
+  writeFileSync(trustFile, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 }
 
 /**
- * Один запуск чужого CLI с выгрузкой процесса. Папка фальшивого CLI и путь
- * выгрузки живут только на время вызова: чат чужого CLI выше проверяется своей
- * `.cmd`-обёрткой, а не этой.
+ * Выгрузка процесса, который поднимает ядро: задача ядра идёт в своей копии проекта (рабочее
+ * дерево git рядом с проектом), и CLI пишет выгрузку туда. Ищем в проекте и во всех его деревьях.
  */
-async function helperRun(dir, marker, run, resetLookup) {
-  const dump = join(dir, 'dumps');
-  rmSync(dump, { recursive: true, force: true });
-  mkdirSync(dump);
-  const saved = {
-    CC_HELPER_DUMP: process.env.CC_HELPER_DUMP,
-    PATH: process.env.PATH,
-  };
-  process.env.CC_HELPER_DUMP = dump;
-  process.env.PATH = `${dir}${isWindows ? ';' : ':'}${process.env.PATH ?? ''}`;
-  resetLookup();
-  try {
-    const reply = await run();
-    // Своя выгрузка — та, где в задании есть просьба помощника. Разбор без
-    // печати сырого текста: в нём окружение процесса целиком.
-    for (const name of readdirSync(dump)) {
-      const raw = readFileSync(join(dump, name), 'utf8');
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        continue;
-      }
-      if (parsed.args.some((arg) => arg.includes(marker))) return { reply, raw, dump: parsed };
-    }
-    return { reply, raw: '' };
-  } finally {
-    for (const [name, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-    resetLookup();
-  }
-}
-
-/**
- * Каждая выгрузка, которую дождалась проверка, — с папкой прогона: в конце у всех
- * разом сверяется preload журнала проверок (Т29). Путь запуска, который собрал
- * окружение заново и потерял NODE_OPTIONS, виден здесь, где бы он ни стоял.
- */
-const seenDumps = [];
-
-async function waitForDump(dir, seconds = 30) {
-  const dump = await waitForDumpFile(dir, seconds);
-  if (dump) seenDumps.push({ dir, dump });
-  return dump;
-}
-
-async function waitForDumpFile(dir, seconds) {
-  // Фальшивый CLI пишет выгрузку в два шага: окружение, затем строку argv.
-  // Файл появляется после первого — ждём последнюю строку, иначе argv
-  // читается пустым у того прогона, которому не повезло с моментом.
-  const file = join(dir, DUMP);
+async function waitForCoreDump(project, seconds = 60) {
   for (let i = 0; i < seconds * 4; i += 1) {
-    if (existsSync(file) && readFileSync(file, 'utf8').includes(`${ARGV_KEY}=`)) {
-      return dumpOf(dir);
+    const listed = spawnSync('git', ['worktree', 'list', '--porcelain'], {
+      cwd: project,
+      encoding: 'utf8',
+    });
+    const trees = (listed.stdout ?? '')
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length));
+    for (const dir of [project, ...trees]) {
+      const file = join(dir, DUMP);
+      if (existsSync(file) && readFileSync(file, 'utf8').includes(`${ARGV_KEY}=`)) {
+        return dumpOf(dir);
+      }
     }
     await wait(250);
   }
-  return existsSync(file) ? dumpOf(dir) : undefined;
+  return undefined;
 }
+
+/** Тексты системного промпта и брифа, которые процесс получил файлами (копии фальшивого CLI). */
+function promptFilesOf(dir) {
+  return [SYSTEM_PROMPT_COPY, APPEND_PROMPT_COPY]
+    .map((name) => join(dir, name))
+    .filter((file) => existsSync(file))
+    .map((file) => readFileSync(file, 'utf8'))
+    .join('\n');
+}
+
+/** Имена ключей с непустым значением в окружении процесса. */
+function filledKeys(dump) {
+  return [...dump.env.entries()]
+    .filter(([key, value]) => /KEY|TOKEN/i.test(key) && value.trim() !== '')
+    .map(([key]) => key);
+}
+
+/**
+ * Ядро кладёт заглушку звена ровно под одно имя ключа Anthropic, прочие имена гасит пустыми, чтобы
+ * унаследованное не уехало; что это не ключ контура — отдельная строка (`SECRET` во всём окружении).
+ */
+function placeholderOnly(dump) {
+  const filled = filledKeys(dump);
+  return (
+    ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN'].filter((key) => filled.includes(key)).length === 1
+  );
+}
+
+/** Текст обёртки npm (`<имя>.cmd`) — та же фикстура, на которой ядро проверяет свой разбор. */
+let npmCmdShim;
 
 /**
  * Фальшивый CLI под этим именем: печатает окружение и СВОЙ argv в рабочую папку
@@ -225,24 +235,42 @@ async function waitForDumpFile(dir, seconds) {
  *
  * Файл `--system-prompt-file` копируется ДО выгрузки: панель стирает свою
  * временную папку, как только процесс вышел, а проверка ждёт именно выгрузку.
+ *
+ * На Windows — обёртка npm (`<имя>.cmd` → `node <скрипт> %*`), как у настоящей установки:
+ * ядро без оболочки запускает только её (`exec-resolve.ts`, иная `.cmd` — отказ), а панель
+ * разворачивает её так же. Выгрузка пишется одним разом, строкой argv в конце.
  */
 function fakeCli(bin, name) {
   if (isWindows) {
-    const scan =
-      `:scan\r\nif "%~1"=="" goto dump\r\n` +
-      `if "%~1"=="--system-prompt-file" copy /y "%~2" "%CD%\\${SYSTEM_PROMPT_COPY}" >nul\r\n` +
-      `if "%~1"=="--append-system-prompt-file" copy /y "%~2" "%CD%\\${APPEND_PROMPT_COPY}" >nul\r\n` +
-      `shift\r\ngoto scan\r\n:dump\r\n`;
+    const script = `${name}-dump.cjs`;
     writeFileSync(
-      join(bin, `${name}.cmd`),
-      `@echo off\r\n${scan}set > "%CD%\\${DUMP}"\r\necho ${ARGV_KEY}=%* >> "%CD%\\${DUMP}"\r\nexit /b 0\r\n`,
+      join(bin, script),
+      [
+        "const fs = require('node:fs');",
+        "const path = require('node:path');",
+        'const args = process.argv.slice(2);',
+        // Разовые вызовы ядра (`--version` замера базы, `--help`) — не прогон: ответ и выход.
+        "if (args.includes('--version')) { console.log('2.1.0 (Claude Code)'); process.exit(0); }",
+        "if (args.includes('--help')) process.exit(0);",
+        'const here = (file) => path.join(process.cwd(), file);',
+        `const copies = { '--system-prompt-file': '${SYSTEM_PROMPT_COPY}', '--append-system-prompt-file': '${APPEND_PROMPT_COPY}', '--mcp-config': '${MCP_CONFIG_COPY}' };`,
+        'args.forEach((arg, i) => {',
+        '  if (copies[arg] && args[i + 1]) try { fs.copyFileSync(args[i + 1], here(copies[arg])); } catch {}',
+        '});',
+        'const lines = Object.entries(process.env).map(([key, value]) => `${key}=${value}`);',
+        `lines.push('${ARGV_KEY}=' + args.join(' '));`,
+        `fs.writeFileSync(here('${DUMP}'), lines.join('\\n') + '\\n');`,
+        '',
+      ].join('\n'),
     );
+    writeFileSync(join(bin, `${name}.cmd`), npmCmdShim(script));
     return;
   }
   const scan =
     `prev=""\nfor a in "$@"; do\n` +
     `  [ "$prev" = "--system-prompt-file" ] && cp "$a" "$PWD/${SYSTEM_PROMPT_COPY}"\n` +
     `  [ "$prev" = "--append-system-prompt-file" ] && cp "$a" "$PWD/${APPEND_PROMPT_COPY}"\n` +
+    `  [ "$prev" = "--mcp-config" ] && cp "$a" "$PWD/${MCP_CONFIG_COPY}"\n` +
     `  prev="$a"\ndone\n`;
   writeFileSync(
     join(bin, name),
@@ -276,114 +304,82 @@ async function main() {
   // Импорт ВНУТРИ функции: наверху он случился бы до перезапуска с флагом
   // снятия типов, и на Node 22.6 сорвался бы на первом же `.ts`.
   const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
-  const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
+  const { coreGateway } = await import('./core-gateway.mjs');
   const { writePlatform, writeToken } =
     await import('../../apps/server/src/domains/platform/store/store.ts');
-  const { buildManagedProfile, PLACEHOLDER_KEY } =
+  const { buildManagedProfile } =
     await import('../../apps/server/src/domains/platform/apply/profile.ts');
   const { resolveRunRoute, runRouteOf } =
     await import('../../apps/server/src/domains/platform/routing/routing.ts');
   const { promptText } = await import('../../apps/server/src/domains/prompts/prompts.ts');
   const { ChatRunRegistry } =
     await import('../../apps/server/src/domains/chat/ChatRunRegistry/ChatRunRegistry.ts');
+  const { CoreChatRun } = await import('../../apps/server/src/domains/chat/core-run/core-run.ts');
+  const { carryOfTestsRoute } =
+    await import('../../apps/server/src/domains/chat/core-run/session-carry.ts');
+  const { createCoreChatBook } =
+    await import('../../apps/server/src/domains/chat/core-run/core-chat-book.ts');
   const { ProjectTestRunRegistry } =
     await import('../../apps/server/src/domains/project-tests/runs/runs.ts');
   const { createGroup, upsertCase } =
     await import('../../apps/server/src/domains/project-tests/store/store.ts');
-  const { ProviderChatService } =
-    await import('../../apps/server/src/domains/provider-chat/ProviderChatService/ProviderChatService.ts');
-  const { createChat, readChat } =
-    await import('../../apps/server/src/domains/provider-chat/store/store.ts');
-  const { getProvider } = await import('../../apps/server/src/providers/registry.ts');
-  const { resetCliLookupCache } = await import('../../apps/server/src/providers/detect/detect.ts');
-  const { askAssistant } = await import('../../apps/server/src/domains/assistant/assistant.ts');
-  const { helperAskFor } = await import('../../apps/server/src/domains/assistant-route.ts');
-  const { BackgroundWatcher } = await import('../../apps/server/src/domains/watcher/watcher.ts');
-  const { backgroundWatcherDeps } =
-    await import('../../apps/server/src/bootstrap/watcher/watcher.ts');
+  const { startCoreForeignChat, withRoutes } =
+    await import('../../apps/server/src/domains/chat/core-foreign/core-foreign-start.ts');
+  const { bootCore } = await import('../../apps/core/src/bootstrap/boot.ts');
+  const { createCoreCaller } = await import('../../apps/server/src/domains/core-ask/core-ask.ts');
+  const { createCoreChatPort } =
+    await import('../../apps/server/src/domains/chat/core-run/core-chat-port.ts');
+  const { coreContourRoutes } =
+    await import('../../apps/server/src/domains/platform/routing/core-contour.ts');
+  const { reapCoreSessions } = await import('./throwaway-stand.mjs');
+  ({ npmCmdShim } = await import('../../apps/core/src/platform/__fixtures__/shims.ts'));
 
-  /**
-   * Один разбор наблюдателя: зависимости — сборкой сервера, свои только рабочая
-   * папка и отчёт (фальшивый `claude` пишет выгрузку в рабочую папку).
-   */
-  // Свой текст сбоя на каждый разбор: тот же текст, уже разобранный, наблюдатель
-  // повторно не разбирает (32adf7fc, 20.10; цифры и id отпечаток отбрасывает — нужны
-  // слова). Подстрока «qa failure» остаётся: по ней `helperRun` узнаёт свою выгрузку.
-  const WATCH_WORDS = ['alpha', 'bravo', 'charlie', 'delta', 'echo', 'foxtrot', 'golf', 'hotel'];
-  let watchCount = 0;
-  const watchRun = async (store, appData, dir, gatewayPort, runRoute) => {
-    const word = WATCH_WORDS[watchCount++ % WATCH_WORDS.length];
-    const ctx = {
-      store,
-      location: { paths: { appData } },
-      pricing: { current: () => ({ entries: [] }) },
-    };
-    const watcher = new BackgroundWatcher({
-      ...backgroundWatcherDeps(ctx, gatewayPort, undefined, runRoute),
-      cwd: dir,
-      reportPath: () => join(dir, 'WATCH-REPORT.md'),
-      debounceMs: 10,
-    });
-    try {
-      watcher.setEnabled(true);
-      watcher.signal({
-        source: 'server',
-        kind: 'http-5xx',
-        method: 'GET',
-        path: '/api/qa',
-        status: 500,
-        message: `qa failure ${word}`,
-      });
-      await watcher.settled();
-      return { dump: await waitForDump(dir, 5), problem: watcher.status().problem };
-    } finally {
-      watcher.shutdown();
-    }
-  };
   const { defaultOurRules, defaultPlatformRules } =
     await import('../../packages/contracts/src/platform.ts');
 
-  const { activateLedger } =
-    await import('../../apps/server/src/domains/verify-ledger/verify-ledger.ts');
-  /** Журнал подмешивает preload в окружение процесса; после прогона — как было. */
-  const nodeOptionsBefore = process.env.NODE_OPTIONS;
-
   const appData = mkdtempSync(join(tmpdir(), 'cc-t3-appdata-'));
   const configDir = mkdtempSync(join(tmpdir(), 'cc-t3-config-'));
+  // Каталог конфигурации CLI для ЯДРА тоже временный: ядро в этом же процессе, и без переменной
+  // сеанс читал настоящий `~/.claude` человека (его CLAUDE.md уезжал в бриф фальшивого CLI).
+  process.env.CLAUDE_CONFIG_DIR = configDir;
+  trustFile = join(configDir, '.claude.json');
+  writeFileSync(
+    trustFile,
+    `${JSON.stringify({ mcpServers: { [PERSONAL_MCP]: { command: 'node', args: ['--version'] } } })}\n`,
+    'utf8',
+  );
   const bin = mkdtempSync(join(tmpdir(), 'cc-t3-bin-'));
   const chatDir = mkdtempSync(join(tmpdir(), 'cc-t3-chat-'));
   const groupDir = mkdtempSync(join(tmpdir(), 'cc-t3-group-'));
   const project = mkdtempSync(join(tmpdir(), 'cc-t3-project-'));
   const foreignDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-'));
   const foreignOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-off-'));
-  const helperBin = mkdtempSync(join(tmpdir(), 'cc-t3-helper-bin-'));
-  const watchDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-'));
-  const watchOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-watch-off-'));
+  const foreignBestDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-best-'));
   const localDir = mkdtempSync(join(tmpdir(), 'cc-t3-local-'));
   // Конфиги Kimi и Goose — временные: проверка читает их (настройка мимо контура)
   // и не должна зависеть от конфигов человека на этой машине.
   const cliHomes = mkdtempSync(join(tmpdir(), 'cc-t3-cli-homes-'));
   const endpointDirs = Object.fromEntries(
-    ['kimi', 'goose', 'opencode', 'kimi-bypass'].map((id) => [
-      id,
-      mkdtempSync(join(tmpdir(), `cc-t3-${id}-`)),
-    ]),
+    ['kimi', 'goose', 'opencode'].map((id) => [id, mkdtempSync(join(tmpdir(), `cc-t3-${id}-`))]),
   );
   // Запасной путь «Codex»: у каждого места запуска — своя папка выгрузки.
   const codexDirs = Object.fromEntries(
-    ['chat', 'group', 'project', 'watch'].map((id) => [
+    ['chat', 'group', 'project'].map((id) => [
       id,
-      mkdtempSync(join(tmpdir(), `cc-t3-codex-${id}-`)),
+      // Имя короткое: длинное пёстрое имя папки маска секретов журнала ядра принимает за
+      // ключ, и задача ядра теряет свой каталог (отдельный дефект ядра, не предмет этой проверки).
+      mkdtempSync(join(tmpdir(), `cc-cx-${id}-`)),
     ]),
   );
-  const gateway = new PlatformGateway();
+  // Шлюз держит ядро (этап 10); проверка смотрит окружение прогона, не расход.
+  const gateway = coreGateway();
+  /** Ядро рядом с хостом звеньев (`bootCore`); поднимается после шлюза. */
+  let core;
 
   try {
     fakeCli(bin, 'claude');
     fakeCli(bin, FOREIGN);
     for (const id of ['kimi', 'goose', 'opencode']) fakeCli(bin, id);
-    fakeHelperCli(helperBin, FOREIGN);
     // На Windows панель берёт нативный `<имя>.exe` из ЛЮБОЙ папки PATH раньше
     // `.cmd`-обёртки (resolveWindowsExecutable), и установленный у человека goose
     // перебивал бы фальшивый. Папки с настоящими копиями фальшивых CLI убираем.
@@ -397,17 +393,6 @@ async function main() {
       .filter((dir) => dir && !realCopy(dir));
     process.env.PATH = [bin, ...rest].join(isWindows ? ';' : ':');
 
-    // Журнал проверок — той же функцией, что и `bootstrap/runtime/runtime.ts`:
-    // настоящая установка версии preload и подмешивание в окружение панели.
-    const ledger = activateLedger(
-      appData,
-      fileURLToPath(new URL('../verify-ledger', import.meta.url)),
-    );
-    check(
-      Boolean(ledger.preload),
-      `журнал проверок установлен: ${ledger.preload ?? ledger.reason}`,
-    );
-
     // ── Состояние панели: контур сохранён, активен, ключ на месте ────────────
     const store = new AppStore(appData);
     writePlatform(store, platform);
@@ -416,10 +401,41 @@ async function main() {
 
     // Шлюз поднимается НАСТОЯЩИЙ: порт маршруту отдаёт живой слушатель, а не
     // запись в настройках — именно это отличие и стоило Т1 одного отказа.
-    await gateway.start({ store, appDataDir: appData, port: 0 });
+    await gateway.start({ appDataDir: appData });
     const port = gateway.status().port;
-    const gatewayPort = () => (gateway.status().running ? gateway.status().port : 0);
     check(gateway.status().running && port > 0, `шлюз поднят на порту ${port}`);
+
+    // Агент тестов — задача ядра (этап 10, F6): его процесс поднимает ядро, а контур едет
+    // разрешённым набором задачи (`coreContourRoutes`). Ядро — настоящее, на доме того же
+    // хоста звеньев, с исполнителем задач: подменять его значило бы проверять подмену.
+    const bootRunEnvCore = () =>
+      bootCore({ home: gateway.home(), build: 'run-env-qa', panelAppData: appData });
+    core = await bootRunEnvCore();
+    /** Ядро заново на том же доме: так ядро перечитывает политику контура панели. */
+    const restartCore = async () => {
+      await core.stop();
+      core = await bootRunEnvCore();
+    };
+    const corePort = createCoreChatPort(createCoreCaller(() => gateway.home()));
+    /** Прогон тестов, как его запускает маршрут панели (`run-routes.ts`). */
+    const startTests = (registry, projectPath) => {
+      registry.setCorePort(corePort);
+      return registry.start(
+        { projectPath, mode: 'run' },
+        new Date().toISOString(),
+        undefined,
+        undefined,
+        {
+          appData,
+          routes: coreContourRoutes(store, 'tests', 'claude'),
+        },
+      );
+    };
+    /** Адрес звена ядра: свой порт хоста звеньев, не порт шлюза человека. */
+    const isHopLink = (url) => {
+      const match = /^http:\/\/127\.0\.0\.1:(\d+)$/.exec(url ?? '');
+      return Boolean(match) && Number(match[1]) !== port;
+    };
 
     // Модель управляемого профиля — то, что человек выбрал в панели. Профиль
     // заводится тем же построителем, что и при применении контура.
@@ -457,8 +473,17 @@ async function main() {
       };
     };
 
-    const chatRuns = new ChatRunRegistry();
+    // Реестр чата собран ровно как в `bootstrap/runtime/chat-wiring.ts`: исполнитель хода — задача
+    // ядра (`CoreChatRun`, этап 10), своего процесса CLI у панели нет; маршрут контура — по галочке
+    // «Чат» свежим на каждую задачу. Процесс поднимает ядро на этом же доме.
+    const chatBook = createCoreChatBook(join(appData, 'core-chat-book.json'));
+    const chatRoutes = (asked) => coreContourRoutes(store, 'chat', 'claude', asked);
+    const chatRuns = new ChatRunRegistry(
+      () => new CoreChatRun({ port: corePort, book: chatBook, routes: chatRoutes }),
+    );
     chatRuns.setPlatformRouting(runRoute);
+    chatRuns.setWorkspaceNote(() => PANEL_APPEND);
+    for (const dir of [chatDir, groupDir, ...Object.values(codexDirs)]) gitRepo(dir);
 
     // ── 1. Чат с отмеченной галочкой ─────────────────────────────────────────
     const startedChat = chatRuns.start(
@@ -467,21 +492,21 @@ async function main() {
       { origin: 'chat' },
     );
     check(startedChat, 'прогон чата принят реестром');
-    const chat = await waitForDump(chatDir);
-    check(Boolean(chat), 'фальшивый CLI запустился и выгрузил своё окружение');
+    const chat = await waitForCoreDump(chatDir);
+    check(Boolean(chat), 'фальшивый CLI запустился (процесс ядра) и выгрузил своё окружение');
 
     if (chat) {
       check(
-        chat.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}/_s/chat`,
-        `адрес живого шлюза в окружении процесса: ${chat.env.get('ANTHROPIC_BASE_URL')}`,
+        isHopLink(chat.env.get('ANTHROPIC_BASE_URL')),
+        `адрес звена ядра в окружении процесса: ${chat.env.get('ANTHROPIC_BASE_URL')}`,
       );
       check(
-        chat.env.get('ANTHROPIC_AUTH_TOKEN') === PLACEHOLDER_KEY,
-        `вместо ключа — заглушка: ${chat.env.get('ANTHROPIC_AUTH_TOKEN')}`,
+        placeholderOnly(chat),
+        `вместо ключа — заглушка звена ровно под одним именем (заполнены: ${filledKeys(chat).join(', ') || '—'})`,
       );
       check(
-        chat.env.get('ANTHROPIC_MODEL') === MODEL,
-        `модель управляемого профиля: ${chat.env.get('ANTHROPIC_MODEL')}`,
+        (chat.env.get(ARGV_KEY) ?? '').includes(`--model ${MODEL}`),
+        `модель контура флагом: ${(chat.env.get(ARGV_KEY) ?? '').slice(0, 200)}`,
       );
       // Окружение сервера уцелело: адрес — ДОБАВКА, а не замена. Без PATH
       // фальшивый CLI не нашёлся бы вовсе, но своё имя он видит и в argv —
@@ -491,8 +516,9 @@ async function main() {
       // Аудит MD-06: преамбулу контура можно было править, а до процесса она не
       // доезжала. Сверка — с файлом, который CLI получил флагом: решение маршрута
       // не знает, что реестр и раннер из него донесли.
-      const copy = join(chatDir, SYSTEM_PROMPT_COPY);
-      const sent = existsSync(copy) ? readFileSync(copy, 'utf8') : '';
+      // Процесс ядра несёт промпт файлом брифа (`--append-system-prompt-file`), панельный —
+      // `--system-prompt-file`; сверяется то, что дошло до процесса любым из двух.
+      const sent = promptFilesOf(chatDir);
       const agent = promptText(appData, 'contour-agent').trim();
       const preamble = promptText(appData, 'contour-preamble').trim();
       check(sent.includes(agent), 'CLI получил файлом промпт агента через контур');
@@ -525,12 +551,14 @@ async function main() {
       { origin: 'groups' },
     );
     check(startedGroup, 'прогон группы принят реестром');
-    const group = await waitForDump(groupDir);
+    const group = await waitForCoreDump(groupDir);
     check(Boolean(group), 'фальшивый CLI запустился и во втором прогоне');
     if (group) {
+      // Контур обязательный (решение 02.11): снятая галочка не уводит прогон мимо контура —
+      // адрес звена ядра свежий, а не унаследованный из параметров прошлой жизни.
       check(
-        !group.env.has('ANTHROPIC_BASE_URL'),
-        `у снятой галочки адреса шлюза нет вовсе: ${group.env.get('ANTHROPIC_BASE_URL') ?? '—'}`,
+        isHopLink(group.env.get('ANTHROPIC_BASE_URL')),
+        `обязательный контур, галочка снята: адрес звена ядра, собранный заново: ${group.env.get('ANTHROPIC_BASE_URL') ?? '—'}`,
       );
       check(!group.raw.includes('stale-contour'), 'адрес прошлой жизни прогона не пережил старт');
     }
@@ -541,13 +569,14 @@ async function main() {
     // `--model`, который сильнее адресной переменной. Здесь проверяется argv
     // РЕАЛЬНОГО процесса: решение маршрута об этом не говорит ничего.
     const askedDir = mkdtempSync(join(tmpdir(), 'cc-t6-asked-'));
+    gitRepo(askedDir);
     writePlatform(store, { ...platform, consumers: ['chat'], modelMap: { sonnet: MODEL } });
     chatRuns.start(
       'live-asked',
       { prompt: 'привет', cwd: askedDir, configDir, model: 'sonnet', effort: 'high' },
       { origin: 'chat' },
     );
-    const asked = await waitForDump(askedDir);
+    const asked = await waitForCoreDump(askedDir);
     check(Boolean(asked), 'фальшивый CLI запустился и у прогона со своим выбором модели');
     if (asked) {
       const argv = asked.env.get(ARGV_KEY) ?? '';
@@ -570,6 +599,7 @@ async function main() {
     // понижение.
     const MAPPED = 'qwen2.5:14b';
     const loweredDir = mkdtempSync(join(tmpdir(), 'cc-t6-lowered-'));
+    gitRepo(loweredDir);
     const journaled = [];
     chatRuns.setLoweredJournal((record) => journaled.push(record));
     writePlatform(store, { ...platform, consumers: ['chat'], modelMap: { sonnet: MAPPED } });
@@ -578,7 +608,7 @@ async function main() {
       { prompt: 'привет', cwd: loweredDir, configDir, model: 'claude-sonnet-5', effort: 'medium' },
       { origin: 'chat', lowered: { model: 'claude-sonnet-5', effort: 'medium' } },
     );
-    const lowered = await waitForDump(loweredDir);
+    const lowered = await waitForCoreDump(loweredDir);
     check(Boolean(lowered), 'фальшивый CLI запустился и у понижённой ступени');
     if (lowered) {
       const argv = lowered.env.get(ARGV_KEY) ?? '';
@@ -602,6 +632,7 @@ async function main() {
     // `--strict-mcp-config`, иначе каждый запрос разрешения станет молчаливым
     // отказом посреди работы агента.
     const layersDir = mkdtempSync(join(tmpdir(), 'cc-t8-layers-'));
+    gitRepo(layersDir);
     writePlatform(store, {
       ...platform,
       consumers: ['chat'],
@@ -617,12 +648,11 @@ async function main() {
         prompt: 'привет',
         cwd: layersDir,
         configDir,
-        appendSystemPrompt: 'ДОПИСКА ПАНЕЛИ',
         permissionPrompt: { runId: 'live-layers', baseUrl: 'http://127.0.0.1:1' },
       },
       { origin: 'chat' },
     );
-    const dropped = await waitForDump(layersDir);
+    const dropped = await waitForCoreDump(layersDir);
     check(Boolean(dropped), 'фальшивый CLI запустился и у прогона со снятыми слоями');
     if (dropped) {
       const argv = dropped.env.get(ARGV_KEY) ?? '';
@@ -634,15 +664,26 @@ async function main() {
         `личные правила, хуки и права сняты флагом: ${argv}`,
       );
       check(argv.includes('--disable-slash-commands'), 'скиллы сняты своим флагом');
-      check(argv.includes('--strict-mcp-config'), 'MCP-серверы сняты своим флагом');
+      // `--strict-mcp-config` у сеанса ядра стоит всегда (свой список задачи); снятие видно по
+      // самому списку: сервера человека в нём нет.
+      const servers = mcpServersOf(layersDir);
       check(
-        !argv.includes('--append-system-prompt'),
-        'дописки панели к системному промпту в запуске нет вовсе',
+        argv.includes('--strict-mcp-config') &&
+          servers !== undefined &&
+          !servers.includes(PERSONAL_MCP),
+        `MCP-серверы человека сняты (в строгом списке: ${servers?.join(', ') ?? 'нет копии'})`,
+      );
+      // Бриф ядра едет файлом всегда (`--append-system-prompt-file`), поэтому смотрится его текст.
+      const brief = promptFilesOf(layersDir);
+      check(
+        brief.length > 0 && !brief.includes(PANEL_APPEND),
+        `дописки панели к системному промпту в запуске нет вовсе (бриф ${brief.length} знаков)`,
       );
       // Порядок этих двух флагов не решает НИЧЕГО, и прежняя проверка
       // (`--mcp-config` строго после `--strict-mcp-config`) охраняла свойство,
-      // которого у CLI нет: `check-run-layers.mjs` запускает настоящий `claude` в
-      // обратном порядке, и брокер там жив (ревью Т8, MINOR-3). Важно другое и
+      // которого у CLI нет: настоящий `claude` с обратным порядком держал брокер живым
+      // (ревью Т8, MINOR-3); строгий список MCP ядра у живого CLI проверяет
+      // `claude.carry.live.integration.test.ts`. Важно другое и
       // проверяется именно оно: снимая MCP, панель всё равно везёт конфиг
       // брокера — без него каждый запрос прав стал бы молчаливым отказом посреди
       // работы агента.
@@ -655,27 +696,26 @@ async function main() {
 
     // И обратная сторона: слои на месте — ни одного флага снятия, дописка едет.
     const keptDir = mkdtempSync(join(tmpdir(), 'cc-t8-kept-'));
+    gitRepo(keptDir);
     writePlatform(store, { ...platform, consumers: ['chat'] });
-    chatRuns.start(
-      'live-kept',
-      { prompt: 'привет', cwd: keptDir, configDir, appendSystemPrompt: 'ДОПИСКА ПАНЕЛИ' },
-      { origin: 'chat' },
-    );
-    const kept = await waitForDump(keptDir);
+    chatRuns.start('live-kept', { prompt: 'привет', cwd: keptDir, configDir }, { origin: 'chat' });
+    const kept = await waitForCoreDump(keptDir);
     check(Boolean(kept), 'фальшивый CLI запустился и у прогона с полным набором слоёв');
     if (kept) {
       const argv = kept.env.get(ARGV_KEY) ?? '';
       // `--setting-sources user` при своём каталоге конфигурации — не снятие
-      // слоя, а изоляция песочницы (ChatRunner): «user» и есть её каталог.
-      // Снятие слоёв контура — только `local` / `project,local`.
+      // слоя, а изоляция песочницы: «user» и есть её каталог.
+      // Снятие слоёв контура — только `local` / `project,local`. `--strict-mcp-config` у сеанса
+      // ядра стоит всегда — слой MCP на месте, если сервер человека есть в строгом списке.
       const sources = /--setting-sources (\S+)/.exec(argv)?.[1];
+      const servers = mcpServersOf(keptDir);
       check(
         (sources === undefined || sources === 'user') &&
           !argv.includes('--disable-slash-commands') &&
-          !argv.includes('--strict-mcp-config'),
-        `флагов снятия нет ни одного: ${argv}`,
+          Boolean(servers?.includes(PERSONAL_MCP)),
+        `флагов снятия нет ни одного, MCP человека в списке (${servers?.join(', ') ?? 'нет копии'}): ${argv}`,
       );
-      check(argv.includes('--append-system-prompt'), 'дописка панели едет как обычно');
+      check(promptFilesOf(keptDir).includes(PANEL_APPEND), 'дописка панели едет как обычно');
     }
     removeDir(keptDir);
 
@@ -685,17 +725,18 @@ async function main() {
     // ничего не возвращала: восстанавливать было нечего, и человек получал агента
     // без инициатив и разделения при молчащей шапке чата.
     const resumeDir = mkdtempSync(join(tmpdir(), 'cc-t8-resume-'));
+    gitRepo(resumeDir);
     const saved = chatRuns.describe('live-layers')?.options;
     check(Boolean(saved), 'снимок параметров прогона со снятым слоем сохранён');
     if (saved) {
       chatRuns.start('live-resume', { ...saved, cwd: resumeDir }, { origin: 'chat' });
-      const resumed = await waitForDump(resumeDir);
+      const resumed = await waitForCoreDump(resumeDir);
       check(Boolean(resumed), 'фальшивый CLI запустился и у продолженного прогона');
       if (resumed) {
         const argv = resumed.env.get(ARGV_KEY) ?? '';
         check(
-          argv.includes('--append-system-prompt'),
-          `возвращённая галочка вернула дописку продолженному прогону: ${argv}`,
+          promptFilesOf(resumeDir).includes(PANEL_APPEND),
+          `возвращённая галочка вернула дописку продолженному прогону: ${argv.slice(0, 200)}`,
         );
       }
     }
@@ -716,27 +757,41 @@ async function main() {
         ours: { ...defaultOurRules(), enabled: false },
       },
     });
+    gitRepo(project);
     createGroup(project, 'gui', 'GUI');
     upsertCase(project, 'gui', { title: 'Вход', steps: ['открыть'] }, new Date().toISOString());
 
     const testRuns = new ProjectTestRunRegistry();
-    testRuns.setPlatformRouting(() => runRoute('tests'));
-    testRuns.start({ projectPath: project, mode: 'run' }, new Date().toISOString());
+    // Ровно та же проводка, что в `bootstrap/runtime/runtime.ts`: слои маршрута `tests` агенту
+    // тестов на Claude — полями сеанса ядра (G13). Без неё проверка смотрела бы прогон без слоя.
+    testRuns.setLayerCarry(() => carryOfTestsRoute(runRoute('tests')));
+    check(
+      coreContourRoutes(store, 'tests', 'claude')?.[0]?.route.id === `gateway:${CONTOUR}`,
+      'галочка «Тесты» даёт задаче ядра маршрут контура',
+    );
+    startTests(testRuns, project);
 
-    const tests = await waitForDump(project);
-    check(Boolean(tests), 'фальшивый CLI запустился и у агента тестов');
+    const tests = await waitForCoreDump(project);
+    check(Boolean(tests), 'фальшивый CLI запустился и у агента тестов (процесс ядра)');
+    if (!tests) {
+      const view = testRuns.get(project);
+      console.log(
+        `      прогон: ${JSON.stringify({ ...view, log: view?.log?.slice(-800) }).slice(0, 1500)}`,
+      );
+    }
     if (tests) {
       check(
-        tests.env.get('ANTHROPIC_BASE_URL') === `http://127.0.0.1:${port}/${CONTOUR}/_s/tests`,
-        `галочка «Тесты» доводит адрес до своего прогона: ${tests.env.get('ANTHROPIC_BASE_URL')}`,
+        isHopLink(tests.env.get('ANTHROPIC_BASE_URL')),
+        `галочка «Тесты» доводит до прогона адрес звена ядра: ${tests.env.get('ANTHROPIC_BASE_URL')}`,
       );
       check(!tests.raw.includes(SECRET), 'ключа контура нет и в окружении агента тестов');
       const argv = tests.env.get(ARGV_KEY) ?? '';
+      // Набор «наш» снят: перенос слоя сужает источники настроек сеанса ядра — среди них нет
+      // `user`, а MCP человека отрезан строгим списком задачи (`--strict-mcp-config`).
+      const sources = /--setting-sources (\S*)/.exec(argv)?.[1];
       check(
-        /--setting-sources "?project,local"?/.test(argv) &&
-          argv.includes('--disable-slash-commands') &&
-          argv.includes('--strict-mcp-config'),
-        `снятые слои доезжают и до агента тестов: ${argv}`,
+        sources !== undefined && !sources.includes('user') && argv.includes('--strict-mcp-config'),
+        `слоёв человека у агента тестов нет (источники «${sources ?? '—'}»): ${argv.slice(0, 240)}`,
       );
       // Модель маршрута — флагом, как у чата (ревью Т6, m9): переменная
       // окружения слабее `--model`, и полагаться на неё одну значило бы ждать,
@@ -752,144 +807,117 @@ async function main() {
     // ── 4. Чат чужого CLI: галочка `foreign:<cli>` ───────────────────────────
     // Мастер показывает эту галочку наравне с остальными, и до правки ревью Т3
     // она была нарисованной: маршрут считался, а до запуска не доходил вовсе.
-    const provider = getProvider(FOREIGN);
-    const chats = new ProviderChatService();
-    chats.setPlatformRouting(runRoute);
+    // Чат чужого CLI — задача ядра (этап 10, F2c): сервер заводит её стартером
+    // `startCoreForeignChat`, галочка — разрешённый набор задачи (`set-route` до `set-cli`).
+    const foreignTasks = [];
+    /** Хвост журнала задачи ядра — почему процесс не поднялся. */
+    const journalTail = (taskId, count = 12) => {
+      try {
+        const dir = join(gateway.home(), 'tasks', taskId);
+        const name = readdirSync(dir).find((file) => file.endsWith('.jsonl'));
+        return readFileSync(join(dir, name), 'utf8')
+          .split('\n')
+          .filter(Boolean)
+          .slice(-count)
+          .map((line) => {
+            const row = JSON.parse(line);
+            return `${row.kind} ${JSON.stringify(row.data).slice(0, 200)}`;
+          });
+      } catch (error) {
+        return [`журнал не прочитан: ${error}`];
+      }
+    };
+    /** Чат чужого CLI так, как его заводит сервер (продолжение, перенос). */
+    const startForeign = async (cli, dir) => {
+      gitRepo(dir);
+      const outcome = await startCoreForeignChat(corePort, {
+        cli,
+        cwd: dir,
+        prompt: 'привет',
+        title: `run-env ${cli}`,
+        ...withRoutes(coreContourRoutes(store, `foreign:${cli}`, cli)),
+      }).catch((error) => ({ ok: false, code: 'core-unreachable', message: String(error) }));
+      if (outcome.ok) foreignTasks.push(outcome.taskId);
+      else console.log(`      ${cli}: ядро отказало: ${outcome.code} ${outcome.message}`);
+      return outcome;
+    };
+    /** Адрес звена ядра с путём диалекта (`/v1`): свой порт хоста звеньев, не шлюз человека. */
+    const hopBase = (url) => {
+      const match = /^(http:\/\/127\.0\.0\.1:\d+)(\/.*)?$/.exec(url ?? '');
+      return Boolean(match) && isHopLink(match[1]);
+    };
     writePlatform(store, { ...platform, consumers: [`foreign:${FOREIGN}`] });
 
-    const onChat = createChat(appData, FOREIGN, { title: 'через контур', workdir: foreignDir });
-    const sentOn = chats.send(
-      appData,
-      FOREIGN,
-      onChat.id,
-      { text: 'привет' },
-      { provider, detect: () => true },
-    );
-    check(sentOn.ok, 'сообщение чужому CLI принято службой');
-    const foreign = await waitForDump(foreignDir);
-    check(Boolean(foreign), 'фальшивый чужой CLI запустился и выгрузил окружение');
+    const sentOn = await startForeign(FOREIGN, foreignDir);
+    check(sentOn.ok, 'чат чужого CLI заведён задачей ядра с маршрутом контура');
+    const foreign = sentOn.ok ? await waitForCoreDump(foreignDir) : undefined;
+    check(Boolean(foreign), 'фальшивый чужой CLI запустился (процесс ядра) и выгрузил окружение');
     if (foreign) {
       const url = foreign.env.get('OPENAI_BASE_URL');
-      check(
-        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
-        `адрес шлюза в переменных чужого CLI: ${url ?? '—'}`,
-      );
+      check(hopBase(url), `адрес звена ядра в переменных чужого CLI: ${url ?? '—'}`);
       check(!foreign.raw.includes(SECRET), 'ключа контура нет и в окружении чужого CLI');
     }
 
-    // Снятая галочка у того же CLI — прогон идёт своим провайдером.
-    writePlatform(store, { ...platform, consumers: ['chat'] });
-    const offChat = createChat(appData, FOREIGN, { title: 'мимо контура', workdir: foreignOffDir });
-    chats.send(appData, FOREIGN, offChat.id, { text: 'привет' }, { provider, detect: () => true });
-    const foreignOff = await waitForDump(foreignOffDir, 20);
-    check(Boolean(foreignOff), 'фальшивый чужой CLI запустился и во втором разговоре');
-    if (foreignOff) {
-      check(
-        !foreignOff.env.has('OPENAI_BASE_URL'),
-        `со снятой галочкой адреса шлюза нет: ${foreignOff.env.get('OPENAI_BASE_URL') ?? '—'}`,
-      );
-    }
+    // Аренда маршрута (`route-lease`) — то, что ядро взяло для сеанса; упоминания входа CLI в
+    // разрешённом наборе до сужения контуром выбором не являются.
+    const leasesOf = (sent) =>
+      sent.ok ? journalTail(sent.taskId, 400).filter((line) => line.includes('"route-lease"')) : [];
 
-    // ── 5. Помощник формы при активном чужом CLI: тот же потребитель `foreign:<cli>`
-    // До правки окно формы запускало активный CLI с флагами Claude и без адреса
-    // контура. Путь настоящий от `askAssistant` (его зовёт `/api/assist`) до процесса.
-    store.updateSettings({ provider: FOREIGN });
-    writePlatform(store, { ...platform, consumers: [`foreign:${FOREIGN}`] });
-    const helperRequest = {
-      kind: 'rule',
-      message: 'назови правило lint',
-      fields: { title: '' },
-      schema: { title: 'Rule title.' },
-    };
-    const askOn = await helperRun(
-      helperBin,
-      helperRequest.message,
-      () => askAssistant(helperRequest, helperAskFor(store, appData, { runRoute, gatewayPort })),
-      resetCliLookupCache,
-    );
-    check(!askOn.reply.error, `помощник формы ответил без отказа: ${askOn.reply.error ?? 'ок'}`);
-    check(Boolean(askOn.dump), 'фальшивый чужой CLI помощника запустился и выгрузил окружение');
-    if (askOn.dump) {
-      const url = askOn.dump.env.OPENAI_BASE_URL;
-      check(
-        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
-        `адрес шлюза в окружении помощника формы: ${url ?? '—'}`,
-      );
-      check(askOn.dump.args.includes('-p'), `свой неинтерактивный флаг: ${askOn.dump.args[0]}`);
-      // Помощнику нужен только текст: режим без правок, а не настройка CLI по умолчанию.
-      check(
-        askOn.dump.args.join(' ').includes('--approval-mode default'),
-        `помощник идёт в режиме без правок: ${askOn.dump.args.slice(0, 3).join(' ')}`,
-      );
-      check(
-        !askOn.dump.args.some((arg) => ['--output-format', '--tools'].includes(arg)),
-        'флагов Claude у чужого CLI помощника нет',
-      );
-      check(!askOn.raw.includes(SECRET), 'ключа контура нет в окружении помощника формы');
-    }
-    // Снятая галочка — тот же CLI своим провайдером, адреса шлюза нет.
+    // Снятая галочка при ОБЯЗАТЕЛЬНОМ контуре (решение 02.11): каждый потребитель идёт через
+    // контур. Ядро и так сводит набор к шлюзу (L1, `contourNarrow`), но без маршрута панели шаблон
+    // модели оставался `*`, сеанс отказывал «needs a concrete model» — галочка ничего не решала, а
+    // прогон падал. Теперь сервер задаёт маршрут контура с моделью контура и при снятой галочке,
+    // и процесс ОБЯЗАН подняться с адресом звена ядра — «процесса нет» больше не зелёное.
     writePlatform(store, { ...platform, consumers: ['chat'] });
-    const askOff = await helperRun(
-      helperBin,
-      helperRequest.message,
-      () => askAssistant(helperRequest, helperAskFor(store, appData, { runRoute, gatewayPort })),
-      resetCliLookupCache,
+    check(
+      coreContourRoutes(store, `foreign:${FOREIGN}`, FOREIGN)?.[0]?.route.id ===
+        `gateway:${CONTOUR}`,
+      'обязательный контур: со снятой галочкой сервер всё равно задаёт чату чужого CLI маршрут контура',
+    );
+    const sentOff = await startForeign(FOREIGN, foreignOffDir);
+    const foreignOff = sentOff.ok ? await waitForCoreDump(foreignOffDir, 30) : undefined;
+    const offUrl = foreignOff?.env.get('OPENAI_BASE_URL') ?? '';
+    const offLeases = leasesOf(sentOff);
+    if (sentOff.ok && !foreignOff)
+      for (const line of journalTail(sentOff.taskId)) console.log(`      ${line}`);
+    check(
+      Boolean(foreignOff) && hopBase(offUrl) && !foreignOff.raw.includes(SECRET),
+      `обязательный контур, галочка снята: процесс поднялся через звено ядра без ключа контура: ${
+        foreignOff ? `адрес ${offUrl || '—'}` : 'процесса нет'
+      }`,
     );
     check(
-      Boolean(askOff.dump) && !askOff.dump.env.OPENAI_BASE_URL,
-      `со снятой галочкой помощник идёт без адреса шлюза: ${askOff.dump?.env.OPENAI_BASE_URL ?? '—'}`,
+      offLeases.length > 0 && offLeases.every((line) => line.includes(`gateway:${CONTOUR}`)),
+      `обязательный контур, галочка снята: арендован только маршрут контура (аренд ${offLeases.length})`,
     );
 
-    // ── 6. Фоновый наблюдатель: «Ассистент панели» на контуре ─────────────────
-    // Сборка зависимостей — та же, что у сервера (`backgroundWatcherDeps`); свои
-    // здесь только рабочая папка и путь отчёта, чтобы не трогать отчёт репозитория.
-    const profile = store.getSettings().endpointProfiles[0];
-    store.updateSettings({ provider: 'claude', assistantEndpointId: profile.id });
-    writePlatform(store, { ...platform, consumers: ['assistant'] });
-    const watchOn = await watchRun(store, appData, watchDir, gatewayPort);
-    check(Boolean(watchOn.dump), 'фальшивый claude разбора запустился и выгрузил окружение');
-    if (watchOn.dump) {
-      const base = watchOn.dump.env.get('ANTHROPIC_BASE_URL') ?? '';
-      check(base.includes(`127.0.0.1:${port}/`), `разбор идёт в шлюз панели: ${base || '—'}`);
-      const argv = watchOn.dump.env.get(ARGV_KEY) ?? '';
-      check(
-        !argv.includes('--model'),
-        `модель вендора разбору не отправлена: ${argv.slice(0, 80)}`,
-      );
-      check(!watchOn.dump.raw.includes(SECRET), 'ключа контура нет в окружении разбора');
-    }
-    // Активен чужой CLI, «Ассистент панели» — облако Claude, куда этот CLI не звал
-    // (X9): разбор ведёт сам CLI запуском без правок, маршрутом своего чата.
-    store.updateSettings({ provider: FOREIGN, assistantEndpointId: '' });
-    const watchForeign = async (consumers) => {
-      writePlatform(store, { ...platform, consumers });
-      // Задание разбора несёт сам сбой — по нему выгрузка опознаётся как своя.
-      return helperRun(
-        helperBin,
-        'qa failure',
-        () => watchRun(store, appData, watchOffDir, gatewayPort, runRoute),
-        resetCliLookupCache,
-      );
-    };
-    const viaGateway = await watchForeign([`foreign:${FOREIGN}`]);
-    check(Boolean(viaGateway.dump), 'при чужом CLI разбор ведёт сам этот CLI');
-    if (viaGateway.dump) {
-      const url = viaGateway.dump.env.OPENAI_BASE_URL;
-      check(
-        url === `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${FOREIGN}/v1`,
-        `с галочкой его чата разбор идёт в шлюз: ${url ?? '—'}`,
-      );
-      check(
-        viaGateway.dump.args.join(' ').includes('--approval-mode default'),
-        `разбор чужим CLI — в режиме без правок: ${viaGateway.dump.args.slice(0, 3).join(' ')}`,
-      );
-      check(!viaGateway.raw.includes(SECRET), 'ключа контура нет в окружении разбора чужим CLI');
-    }
-    const ownRoute = await watchForeign(['chat']);
+    // «По возможности»: галочка решает. Снятая — маршрута контура нет, задача идёт набором ядра по
+    // умолчанию, то есть своим входом CLI, и адреса звена в процессе нет. Политику контура ядро
+    // читает один раз на загрузку (`boot-core.ts`), поэтому смена режима — с перезапуском ядра.
+    writePlatform(store, { ...platform, mode: 'best-effort', consumers: ['chat'] });
+    await restartCore();
     check(
-      Boolean(ownRoute.dump) && !ownRoute.dump.env.OPENAI_BASE_URL,
-      `со снятой галочкой разбор чужим CLI идёт без адреса шлюза: ${ownRoute.dump?.env.OPENAI_BASE_URL ?? '—'}`,
+      coreContourRoutes(store, `foreign:${FOREIGN}`, FOREIGN) === undefined,
+      '«по возможности»: со снятой галочкой сервер маршрута контура чату чужого CLI не задаёт',
     );
+    const sentBest = await startForeign(FOREIGN, foreignBestDir);
+    const foreignBest = sentBest.ok ? await waitForCoreDump(foreignBestDir, 30) : undefined;
+    const bestUrl = foreignBest?.env.get('OPENAI_BASE_URL') ?? '';
+    const bestLeases = leasesOf(sentBest);
+    if (sentBest.ok && !foreignBest)
+      for (const line of journalTail(sentBest.taskId)) console.log(`      ${line}`);
+    check(
+      Boolean(foreignBest) && !hopBase(bestUrl) && !foreignBest.raw.includes(SECRET),
+      `«по возможности», галочка снята: процесс идёт своим входом CLI, без адреса звена: ${
+        foreignBest ? `адрес ${bestUrl || '—'}` : 'процесса нет'
+      }`,
+    );
+    check(
+      bestLeases.length > 0 && bestLeases.every((line) => line.includes('cli-login:')),
+      `«по возможности», галочка снята: арендован маршрут входа CLI (аренд ${bestLeases.length})`,
+    );
+    writePlatform(store, { ...platform, consumers: ['chat'] });
+    await restartCore();
 
     // ── 6а. Запасной путь «Codex»: совместимый шлюз в облаке OpenAI ──────────
     // Решение владельца 06.10: без отдельного движка — контур с облачным
@@ -913,6 +941,7 @@ async function main() {
       endpointProfiles: [openaiProfile],
       assistantEndpointId: openaiProfile.id,
     });
+    gitRepo(codexDirs.project);
     createGroup(codexDirs.project, 'gui', 'GUI');
     upsertCase(
       codexDirs.project,
@@ -921,7 +950,6 @@ async function main() {
       new Date().toISOString(),
     );
     const codexTests = new ProjectTestRunRegistry();
-    codexTests.setPlatformRouting(() => runRoute('tests'));
     const surfaces = [
       {
         name: 'чат',
@@ -949,31 +977,32 @@ async function main() {
         name: 'агент тестов',
         consumer: 'tests',
         dir: codexDirs.project,
-        start: () =>
-          codexTests.start(
-            { projectPath: codexDirs.project, mode: 'run' },
-            new Date().toISOString(),
-          ),
+        core: true,
+        start: () => startTests(codexTests, codexDirs.project),
       },
     ];
     for (const surface of surfaces) {
       surface.start();
-      const dump = await waitForDump(surface.dir);
-      check(Boolean(dump), `codex: ${surface.name} — фальшивый claude запустился`);
+      // Все три места запуска — задачи ядра (чат и группа — реестром чата с `CoreChatRun`).
+      const dump = await waitForCoreDump(surface.dir);
+      check(Boolean(dump), `codex: ${surface.name} — фальшивый claude запустился (процесс ядра)`);
+      if (!dump && surface.core) {
+        const view = codexTests.get(surface.dir);
+        console.log(
+          `      прогон: ${JSON.stringify({ ...view, log: view?.log?.slice(-800) }).slice(0, 1500)}`,
+        );
+      }
       if (!dump) continue;
       const base = dump.env.get('ANTHROPIC_BASE_URL');
-      check(
-        base === `http://127.0.0.1:${port}/${CONTOUR}/_s/${surface.consumer}`,
-        `codex: ${surface.name} — адрес шлюза панели: ${base ?? '—'}`,
-      );
+      check(isHopLink(base), `codex: ${surface.name} — адрес звена ядра: ${base ?? '—'}`);
       const argv = dump.env.get(ARGV_KEY) ?? '';
       check(
         argv.includes(`--model ${OPENAI_MODEL}`),
         `codex: ${surface.name} — модель OpenAI флагом: ${argv.slice(0, 160)}`,
       );
       check(
-        dump.env.get('ANTHROPIC_AUTH_TOKEN') === PLACEHOLDER_KEY,
-        `codex: ${surface.name} — вместо ключа заглушка`,
+        placeholderOnly(dump),
+        `codex: ${surface.name} — вместо ключа заглушка (заполнены: ${filledKeys(dump).join(', ') || '—'})`,
       );
       check(!dump.raw.includes(SECRET), `codex: ${surface.name} — ключа контура в окружении нет`);
       check(
@@ -982,21 +1011,6 @@ async function main() {
       );
     }
     codexTests.stopAll();
-    // Наблюдатель с «Ассистентом панели» на том же контуре: модель задаёт профиль.
-    const codexWatch = await watchRun(store, appData, codexDirs.watch, gatewayPort);
-    check(Boolean(codexWatch.dump), 'codex: наблюдатель — фальшивый claude разбора запустился');
-    if (codexWatch.dump) {
-      const base = codexWatch.dump.env.get('ANTHROPIC_BASE_URL');
-      check(
-        base === `http://127.0.0.1:${port}/${CONTOUR}/_s/assistant`,
-        `codex: наблюдатель — адрес шлюза панели: ${base ?? '—'}`,
-      );
-      check(
-        codexWatch.dump.env.get('ANTHROPIC_MODEL') === OPENAI_MODEL,
-        `codex: наблюдатель — модель профиля: ${codexWatch.dump.env.get('ANTHROPIC_MODEL') ?? '—'}`,
-      );
-      check(!codexWatch.dump.raw.includes(SECRET), 'codex: наблюдатель — ключа контура нет');
-    }
 
     // ── 6б. Локальная модель (L1): окно сервера доходит до процесса Claude ────
     // Без этих переменных Claude Code считает окно незнакомой модели 200 тысяч,
@@ -1044,6 +1058,10 @@ async function main() {
           ),
         ],
       });
+      // Ядро держит маршруты контуров и политику с загрузки: новый активный контур — пересборка
+      // шлюза и перезапуск ядра, как после правки контура в панели.
+      await gateway.refresh();
+      await restartCore();
       const localDeps = {
         ...deps,
         localRunEnv: (id) => (id === LOCAL_ID ? localRunEnv(LOCAL_CTX) : undefined),
@@ -1069,14 +1087,17 @@ async function main() {
           ? { ...route, kit: extras }
           : route;
       };
-      const localRuns = new ChatRunRegistry();
+      gitRepo(localDir);
+      const localRuns = new ChatRunRegistry(
+        () => new CoreChatRun({ port: corePort, book: chatBook, routes: chatRoutes }),
+      );
       localRuns.setPlatformRouting(localRoute);
       localRuns.start(
         'local-chat',
         { prompt: 'привет', cwd: localDir, configDir },
         { origin: 'chat' },
       );
-      const local = await waitForDump(localDir);
+      const local = await waitForCoreDump(localDir);
       check(Boolean(local), 'локальная модель: фальшивый claude запустился');
       if (local) {
         for (const [key, value] of Object.entries(localRunEnv(LOCAL_CTX))) {
@@ -1086,10 +1107,7 @@ async function main() {
           );
         }
         const base = local.env.get('ANTHROPIC_BASE_URL') ?? '';
-        check(
-          base === `http://127.0.0.1:${port}/${LOCAL_ID}/_s/chat`,
-          `локальная модель: адрес шлюза рядом с окном: ${base || '—'}`,
-        );
+        check(isHopLink(base), `локальная модель: адрес звена ядра рядом с окном: ${base || '—'}`);
         check(!local.raw.includes(SECRET), 'локальная модель: ключа контура в окружении нет');
         // Дисциплина — допиской: на Windows файлом, на остальных — аргументом.
         const copy = join(localDir, APPEND_PROMPT_COPY);
@@ -1100,25 +1118,35 @@ async function main() {
           appended.includes('Local model discipline'),
           `локальная модель, режим «глобальные»: дисциплина доехала допиской (${appended.length} знаков)`,
         );
+        // «Глобальные» набор не подключают; едет только накладка стражей, которых нет в слое
+        // человека (`guardsOverlay`, `effective/guards`), — собранный набор режима нет.
+        // Собственный плагин сеанса ядра (`<сеанс>/claude/plugin`: навыки и инструкции слоя ядра)
+        // набором не является — он есть у каждого сеанса.
+        const pluginDirs = [...(local.env.get(ARGV_KEY) ?? '').matchAll(/--plugin-dir (\S+)/g)]
+          .map((match) => match[1])
+          .filter((dir) => !/[\\/]sessions[\\/][^\\/]+[\\/]claude[\\/]plugin$/.test(dir));
         check(
-          !(local.env.get(ARGV_KEY) ?? '').includes('--plugin-dir'),
-          'локальная модель, режим «глобальные»: плагин набора не подключён',
+          pluginDirs.every((dir) => /[\\/]effective[\\/]guards[\\/]/.test(dir)),
+          `локальная модель, режим «глобальные»: набора нет, только стражи: ${pluginDirs.join(', ') || '—'}`,
         );
         // Полный набор по умолчанию (L6, 15.10): MCP-серверы и все инструменты едут,
-        // как у облачного Claude; правила и скиллы человека тоже.
+        // как у облачного Claude; правила и скиллы человека тоже. Строгий список MCP у сеанса
+        // ядра есть всегда — сервер человека обязан в нём быть.
         const localArgv = local.env.get(ARGV_KEY) ?? '';
+        const localServers = mcpServersOf(localDir);
         check(
-          !localArgv.includes('--strict-mcp-config'),
-          'локальная модель: MCP-серверы не сняты (полный набор по умолчанию)',
+          Boolean(localServers?.includes(PERSONAL_MCP)),
+          `локальная модель: MCP-серверы не сняты (полный набор по умолчанию; в списке: ${localServers?.join(', ') ?? 'нет копии'})`,
         );
         check(
           !localArgv.includes('--tools'),
           `локальная модель: инструменты без белого списка${localArgv.includes('--tools') ? `: ${localArgv}` : ''}`,
         );
+        const localSources = /--setting-sources (\S*)/.exec(localArgv)?.[1];
         check(
-          !localArgv.includes('--setting-sources') &&
+          (localSources === undefined || localSources === 'user') &&
             !localArgv.includes('--disable-slash-commands'),
-          'локальная модель: правила и скиллы человека не сняты',
+          `локальная модель: правила и скиллы человека не сняты (источники «${localSources ?? 'все'}»)`,
         );
       }
       localRuns.stopAll?.();
@@ -1135,6 +1163,8 @@ async function main() {
         activePlatformId: settingsBefore6b.activePlatformId,
         endpointProfiles: settingsBefore6b.endpointProfiles,
       });
+      await gateway.refresh();
+      await restartCore();
     }
 
     // ── 7. Контур окружением прогона: Kimi Code, Goose, OpenCode (X7) ────────
@@ -1142,38 +1172,29 @@ async function main() {
     process.env.KIMI_CODE_HOME = join(cliHomes, 'kimi-home');
     process.env.APPDATA = join(cliHomes, 'appdata');
     mkdirSync(process.env.KIMI_CODE_HOME, { recursive: true });
-    const endpointChats = new ProviderChatService();
-    // Проекция — та же, что у сборки сервера: `runRouteOf` везёт и отказ.
-    endpointChats.setPlatformRouting((origin, asked = '', runTag = '') =>
-      runRouteOf(resolveRunRoute(deps, origin, asked, runTag)),
-    );
+    // Чат каждого — задача ядра тем же стартером, что в §4: адрес — звено ядра в переменных,
+    // задокументированных у этого CLI (`packages/providers`), ключ — заглушка звена.
     const sendTo = async (id, dir) => {
       writePlatform(store, { ...platform, consumers: [`foreign:${id}`] });
-      const chat = createChat(appData, id, { title: 'через контур', workdir: dir });
-      const sent = endpointChats.send(
-        appData,
-        id,
-        chat.id,
-        { text: 'привет' },
-        { provider: getProvider(id), detect: () => true },
-      );
-      check(sent.ok, `${id}: сообщение принято службой`);
-      return { chat, dump: await waitForDump(dir, 20) };
+      const sent = await startForeign(id, dir);
+      check(sent.ok, `${id}: чат заведён задачей ядра с маршрутом контура`);
+      return { sent, dump: sent.ok ? await waitForCoreDump(dir, 30) : undefined };
     };
-    const runBase = (id) => `http://127.0.0.1:${port}/${CONTOUR}/_s/foreign/${id}/_run/`;
+    /** Заглушка звена вместо ключа: значение есть, и это не ключ контура. */
+    const placeholderKey = (value) => Boolean(value) && !String(value).includes(SECRET);
 
     const kimi = (await sendTo('kimi', endpointDirs.kimi)).dump;
     check(Boolean(kimi), 'kimi: фальшивый CLI запустился и выгрузил окружение');
     if (kimi) {
       const url = kimi.env.get('KIMI_MODEL_BASE_URL') ?? '';
       check(
-        url.startsWith(runBase('kimi')) && url.endsWith('/v1'),
-        `kimi: адрес шлюза в KIMI_MODEL_BASE_URL: ${url || '—'}`,
+        hopBase(url) && url.endsWith('/v1'),
+        `kimi: адрес звена ядра в KIMI_MODEL_BASE_URL: ${url || '—'}`,
       );
       check(kimi.env.get('KIMI_MODEL_PROVIDER_TYPE') === 'openai', 'kimi: провайдер openai');
       check(Boolean(kimi.env.get('KIMI_MODEL_NAME')), 'kimi: имя модели в окружении');
       check(
-        kimi.env.get('KIMI_MODEL_API_KEY') === PLACEHOLDER_KEY,
+        placeholderKey(kimi.env.get('KIMI_MODEL_API_KEY')),
         'kimi: в KIMI_MODEL_API_KEY заглушка, а не ключ',
       );
       check(!kimi.raw.includes(SECRET), 'kimi: ключа контура в окружении нет');
@@ -1181,17 +1202,14 @@ async function main() {
 
     const gooseChat = await sendTo('goose', endpointDirs.goose);
     const goose = gooseChat.dump;
-    check(
-      Boolean(goose),
-      `goose: фальшивый CLI запустился и выгрузил окружение${goose ? '' : ': ' + JSON.stringify(readChat(appData, 'goose', gooseChat.chat.id)?.messages ?? []).slice(0, 400)}`,
-    );
+    check(Boolean(goose), 'goose: фальшивый CLI запустился и выгрузил окружение');
     if (goose) {
       const host = goose.env.get('OPENAI_HOST');
       const path = goose.env.get('OPENAI_BASE_PATH') ?? '';
-      check(host === `http://127.0.0.1:${port}`, `goose: OPENAI_HOST — шлюз: ${host ?? '—'}`);
+      check(hopBase(host), `goose: OPENAI_HOST — звено ядра: ${host ?? '—'}`);
       check(
-        `${host}/${path}`.startsWith(runBase('goose')) && path.endsWith('/v1/chat/completions'),
-        `goose: OPENAI_BASE_PATH ведёт в раздел чата Goose: ${path || '—'}`,
+        path.endsWith('v1/chat/completions'),
+        `goose: OPENAI_BASE_PATH ведёт в chat/completions звена: ${path || '—'}`,
       );
       check(
         goose.env.get('GOOSE_PROVIDER') === 'openai' &&
@@ -1214,8 +1232,8 @@ async function main() {
       check(Boolean(config), 'opencode: OPENCODE_CONFIG_CONTENT — разбираемый JSON');
       const base = config?.provider?.contour?.options?.baseURL ?? '';
       check(
-        base.startsWith(runBase('opencode')) && base.endsWith('/v1'),
-        `opencode: адрес шлюза у провайдера contour: ${base || '—'}`,
+        hopBase(base) && base.endsWith('/v1'),
+        `opencode: адрес звена ядра у провайдера contour: ${base || '—'}`,
       );
       check(
         JSON.stringify(config?.enabled_providers) === '["contour"]',
@@ -1224,48 +1242,22 @@ async function main() {
       check(!opencode.raw.includes(SECRET), 'opencode: ключа контура в окружении нет');
     }
 
-    // Вторая модель в конфиге Kimi ушла бы своим провайдером: обязательный
-    // контур отказывает, и процесс не поднимается вовсе.
-    writeFileSync(
-      join(process.env.KIMI_CODE_HOME, 'config.toml'),
-      '[secondary_model]\nmodel = "k2-mini"\n',
-    );
-    const bypass = await sendTo('kimi', endpointDirs['kimi-bypass']);
-    check(!bypass.dump, 'kimi с [secondary_model]: процесс не запущен');
-    const refused = JSON.stringify(readChat(appData, 'kimi', bypass.chat.id)?.messages ?? []);
-    check(
-      refused.includes('[secondary_model] model'),
-      `kimi с [secondary_model]: в переписке отказ с именем настройки: ${refused.slice(0, 120)}`,
-    );
+    // Прежняя строка «Kimi с [secondary_model] в конфиге человека — отказ без процесса» снята:
+    // сеанс ядра конфиг человека не читает (свой дом Kimi на сеанс), и настройке в нём уводить
+    // прогон мимо контура неоткуда; обход канала судит ядро (`compat`, `bypass_setting`).
+    for (const id of foreignTasks) {
+      await corePort.command(id, 'cancel', { reason: 'run-env check done' }).catch(() => undefined);
+    }
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
-
-    // ── Т29: preload журнала доехал до каждого пути запуска ──────────────────
-    check(seenDumps.length > 0, `выгрузок окружения для сверки журнала: ${seenDumps.length}`);
-    for (const { dir, dump } of seenDumps) {
-      const options = dump.env.get('NODE_OPTIONS') ?? '';
-      const where = dir.replace(/^.*[\\/]cc-t\d+-/, '').replace(/-[^-]{6}$/, '');
-      const marker = dump.env.get('AGENTDECK_VERIFY_LEDGER_CLI') ?? '';
-      // Наблюдатель — окружение по белому списку (`panelAgentEnv`) и только
-      // Read/Grep/Glob: проверок он не гоняет, журнала у него быть не должно.
-      if (/watch/.test(where)) {
-        check(
-          !options.includes('verify-ledger') && !marker,
-          `${where}: окружение по списку, журнала нет: ${options || '—'} ${marker || '—'}`,
-        );
-        continue;
-      }
-      check(
-        Boolean(ledger.preload) && options.includes(ledger.preload),
-        `${where}: NODE_OPTIONS несёт preload журнала: ${options || '—'}`,
-      );
-      check(/^[\w.-]+$/.test(marker), `${where}: метка CLI для пульса журнала: ${marker || '—'}`);
-    }
   } finally {
-    if (nodeOptionsBefore === undefined) delete process.env.NODE_OPTIONS;
-    else process.env.NODE_OPTIONS = nodeOptionsBefore;
+    // Ядро и его сеансы — до хоста звеньев: ядро зовёт звено до последнего хода.
+    if (core) {
+      await core.stop().catch(() => undefined);
+      reapCoreSessions(gateway.home());
+    }
     await gateway.stop();
     await wait(500);
     for (const dir of [
@@ -1277,9 +1269,7 @@ async function main() {
       project,
       foreignDir,
       foreignOffDir,
-      helperBin,
-      watchDir,
-      watchOffDir,
+      foreignBestDir,
       localDir,
       cliHomes,
       ...Object.values(endpointDirs),

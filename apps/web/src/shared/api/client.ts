@@ -1,12 +1,5 @@
 import axios from 'axios';
 import { serverMessageFromPayload } from '@shared/config/i18n';
-import { WATCH_SEEN_HEADER } from '@agentdeck/contracts';
-import {
-  isWatchCaptureEnabled,
-  looksLikeWrongShape,
-  reportApiFailure,
-  reportContractMismatch,
-} from '@shared/lib/watch-capture';
 
 /**
  * Клиент локального API. Базовый путь относительный — Vite проксирует /api
@@ -19,46 +12,12 @@ export const apiClient = axios.create({
 });
 
 /**
- * Фоновому наблюдателю (если он включён): отказ, которого сервер не видел
- * (обрыв сети, 5xx прокси; видел — в ответе его заголовок), и ответ не того
- * вида — HTML вместо JSON. Отказ остаётся отказом, ответ — ответом: перехватчик
- * только смотрит и передаёт дальше. Отменённый запрос (ушли со страницы) — не сбой.
- */
-apiClient.interceptors.response.use(
-  (response) => {
-    const contentType = String(response.headers?.['content-type'] ?? '');
-    if (isWatchCaptureEnabled() && looksLikeWrongShape(response.data, contentType)) {
-      reportContractMismatch({
-        method: response.config?.method,
-        url: response.config?.url,
-        status: response.status,
-        contentType,
-        body: response.data,
-      });
-    }
-    return response;
-  },
-  (error: unknown) => {
-    if (axios.isAxiosError(error) && !axios.isCancel(error)) {
-      reportApiFailure({
-        method: error.config?.method,
-        url: error.config?.url,
-        status: error.response?.status,
-        message: messageFromPayload(error.response?.data) ?? error.message,
-        seenByServer: Boolean(error.response?.headers?.[WATCH_SEEN_HEADER]),
-      });
-    }
-    return Promise.reject(error);
-  },
-);
-
-/**
  * Долгие маршруты: клиентский таймаут обязан перекрывать бюджет сервера, иначе
  * запрос рвётся ложной ошибкой таймаута, пока сервер спокойно доводит работу и
  * записывает результат. Общие 60 c коротки для запуска CLI на холодную.
  */
 export const LONG_TIMEOUTS = {
-  /** assistant-runner: DEFAULT_TIMEOUT 180 c. */
+  /** Вопрос ядра окна ассистента: ONE_SHOT_TIMEOUT_MS 180 c (`core-ask/one-shot.ts`). */
   assistantRun: 200_000,
   /** provider-check: ASSISTANT_TIMEOUT_MS 90 c на шаг ассистента. */
   providerCheck: 120_000,

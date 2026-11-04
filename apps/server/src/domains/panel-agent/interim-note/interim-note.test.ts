@@ -1,64 +1,50 @@
-import { describe, it, expect } from 'vitest';
-import { EventEmitter } from 'node:events';
-import { PassThrough } from 'node:stream';
-import type { spawn as nodeSpawn } from 'node:child_process';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { PanelAgentRunEvent } from '@agentdeck/contracts/panel-agent';
-import { startPanelAgentRun } from '../runner/runner.ts';
+import type { SessionStreamEvent } from '@agentdeck/contracts/core/session-stream';
+import { createBridgeTokenLedger } from '../../../lib/bridge-tokens/bridge-tokens.ts';
+import { createCoreAskPort } from '../../core-ask/core-ask.ts';
+import { startFakeCore, type FakeCore } from '../../core-ask/__fixtures__/fake-core.ts';
+import { startPanelAgentTurn } from '../core-turn/core-turn.ts';
 
 /**
  * Живой прогон 26.09: в русском разговоре лента показывала «Need the rule id;
  * list rules.» и «Look at the target first.» — строка промпта про язык держала
- * лишь часть ходов. Проверка идёт через сам ход (`startPanelAgentRun`) на
- * подменённом процессе: поток событий CLI тот же, что пишет `claude -p`.
+ * лишь часть ходов. Проверка идёт через сам ход (`startPanelAgentTurn`) и настоящий
+ * клиент ядра; ядро — заглушка на HTTP, вид сеанса тот же, что пишет ядро о ходе CLI.
  */
-function fakeCli(lines: object[]): typeof nodeSpawn {
-  return (() => {
-    const child = new EventEmitter() as EventEmitter & {
-      stdout: PassThrough;
-      stderr: PassThrough;
-      stdin: PassThrough;
-      pid: number;
-      kill: () => boolean;
-    };
-    child.stdout = new PassThrough();
-    child.stderr = new PassThrough();
-    child.stdin = new PassThrough();
-    child.pid = 424242;
-    child.kill = () => true;
-    setImmediate(() => {
-      for (const line of lines) child.stdout.write(`${JSON.stringify(line)}\n`);
-      child.stdout.end();
-      setImmediate(() => child.emit('close', 0));
-    });
-    return child;
-  }) as unknown as typeof nodeSpawn;
-}
+type Line = Omit<SessionStreamEvent, 'offset'>;
+let script: Line[] = [];
+let core: FakeCore;
 
-const text = (value: string) => ({
-  type: 'assistant',
-  message: { content: [{ type: 'text', text: value }] },
+beforeAll(async () => {
+  core = await startFakeCore({ turn: async ({ emit }) => emit(...script) });
 });
-const tool = (id: string, name: string) => ({
-  type: 'assistant',
-  message: { content: [{ type: 'tool_use', id, name: `mcp__agentdeck-panel__${name}` }] },
-});
-const toolResult = (id: string) => ({
-  type: 'user',
-  message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'ok' }] },
-});
-const result = (value: string) => ({ type: 'result', result: value, is_error: false });
+afterAll(async () => core.close());
 
-async function run(userText: string, lines: object[]): Promise<PanelAgentRunEvent[]> {
+const text = (value: string): Line => ({ kind: 'assistant-text', data: { text: value } });
+const tool = (id: string, name: string): Line => ({
+  kind: 'tool-call',
+  data: { toolUseId: id, name: `mcp__panel-bridge__${name}`, input: {} },
+});
+const toolResult = (id: string): Line => ({
+  kind: 'tool-result',
+  data: { toolUseId: id, isError: false },
+});
+const end: Line = { kind: 'turn-end', data: { isError: false, numTurns: 1 } };
+
+async function run(userText: string, lines: Line[]): Promise<PanelAgentRunEvent[]> {
+  script = lines;
   const events: PanelAgentRunEvent[] = [];
-  const handle = startPanelAgentRun({
-    command: 'node',
-    env: {},
-    selfBaseUrl: 'http://127.0.0.1:1',
+  const handle = startPanelAgentTurn({
+    ask: createCoreAskPort(() => core.home, core.identity),
+    bridges: createBridgeTokenLedger(),
+    selfBaseUrl: 'http://127.0.0.1:5213',
     conversationId: 'c1',
     context: { route: '/rules', title: 'Правила' },
     messages: [{ role: 'user', content: userText }],
+    route: { adapter: 'claude' },
     onEvent: (event) => events.push(event),
-    spawnImpl: fakeCli(lines),
+    pollMs: 20,
   });
   await handle.done;
   return events;
@@ -74,7 +60,7 @@ describe('рабочие заметки модели не на языке раз
       tool('t1', 'list_rules'),
       toolResult('t1'),
       text('Правило выключено.'),
-      result('Правило выключено.'),
+      end,
     ]);
     expect(shownTexts(events)).toEqual(['Правило выключено.']);
     expect(events.some((event) => event.kind === 'tool' && event.name === 'list_rules')).toBe(true);
@@ -84,7 +70,7 @@ describe('рабочие заметки модели не на языке раз
     const events = await run('что с правилами?', [
       text('Все правила включены, их два.'),
       text('All rules are enabled, there are two of them.'),
-      result('All rules are enabled, there are two of them.'),
+      end,
     ]);
     expect(shownTexts(events)).toEqual([
       'Все правила включены, их два.',
@@ -97,7 +83,7 @@ describe('рабочие заметки модели не на языке раз
       text('Looking up the rule id first.'),
       tool('t1', 'list_rules'),
       toolResult('t1'),
-      result('Done.'),
+      end,
     ]);
     expect(shownTexts(events)).toEqual(['Looking up the rule id first.']);
   });
@@ -107,25 +93,25 @@ describe('рабочие заметки модели не на языке раз
       text('p1-rule'),
       tool('t1', 'list_rules'),
       toolResult('t1'),
-      result('Готово.'),
+      text('Готово.'),
+      end,
     ]);
-    expect(shownTexts(events)).toEqual(['p1-rule']);
+    expect(shownTexts(events)).toEqual(['p1-rule', 'Готово.']);
   });
 });
 
 /**
- * F-269. Заметка, снятая с ленты перед вызовом, оставалась в запасе ответа: без
- * текста итога CLI ответ собирается из текстов хода — и она возвращалась в
- * сохранённый ответ.
+ * F-269. Заметка, снятая с ленты перед вызовом, оставалась в запасе ответа: ответ
+ * собирается из текстов хода — и она возвращалась в сохранённый ответ.
  */
-describe('снятая заметка и ответ без итога CLI', () => {
+describe('снятая заметка и ответ', () => {
   it('в ответ собирается только показанное', async () => {
     const events = await run('выключи правило agentdeck-probe', [
       text('Need the rule id; list rules.'),
       tool('t1', 'list_rules'),
       toolResult('t1'),
       text('Правило выключено.'),
-      { type: 'result', result: '', is_error: false },
+      end,
     ]);
     const done = events.find((event) => event.kind === 'done');
     expect(done).toMatchObject({ kind: 'done', reply: 'Правило выключено.' });

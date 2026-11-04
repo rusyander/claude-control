@@ -56,8 +56,8 @@ group or the user names it.
 - **A live check on the stand** → no skill: the `live-check` situational rule arrives when a stand
   or browser run starts; depth and entry points from `node <kit>/tools/risk-tier.mjs`. Stand down →
   `agentdeck-kit:stand-doctor`.
-- **Running agent work to watch live** ("watch it live", "fix everything", "be the watchdog") →
-  `agentdeck-kit:watchdog`, every deviation fixed at once; AgentDeck split groups → `agentdeck-kit:agentdeck-watchdog`.
+- **Running agent work to watch live** ("watch it live", "watch the group", "fix everything", "be the watchdog") →
+  `agentdeck-kit:watchdog`, every deviation fixed at once; an AgentDeck core task step is watched as its Claude Code session.
 - **A design or UX question code has to answer** ("which layout?") → `agentdeck-kit:prototype`: throwaway variants,
   a decision, deleted — never promoted.
 - **A merge or rebase stuck on conflicts** → `agentdeck-kit:resolving-merge-conflicts`: resolve by intent, verify,

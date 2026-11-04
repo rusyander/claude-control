@@ -1,56 +1,30 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { i18n } from '@shared/config/i18n';
-import { mergeSplitGroups } from '../../lib/mergeSplitGroups';
 import type { ChildStageGroup } from '../ChildStages.types';
 import { ChildStages } from '../ChildStages/ChildStages';
-import { splitGroupKey } from '../../lib/splitGroupKey';
 
-const MR = 'https://tracker.example.com/team/app/-/merge_requests/898';
 const BRANCH = 'fix-PROJ-1459-PROJ-1444-PROJ-1402-PROJ-1399-PROJ-1362/docs-fixes';
 
-const split: SplitPlanView = {
-  parentChatId: 'parent',
-  triage: { at: '2026-10-05T10:00:00.000Z', received: true, repairs: [], conflicts: [] },
-  order: [0],
-  groups: [
-    {
-      index: 0,
-      title: 'Документация',
-      branch: BRANCH,
-      after: [],
-      status: 'done',
-      deliver: true,
-      mr: MR,
-      chatId: 'c0',
-      path: 'C:/copies/0',
-    },
-  ],
+const GROUP: ChildStageGroup = {
+  chatId: 'c0',
+  title: 'Документация',
+  branch: BRANCH,
+  stages: ['work'],
+  isRunning: false,
 };
 
 /**
- * Карточка группы (владелец 05.10.2026): кнопки — внутри неё, MR — своей
- * кнопкой, а не ссылкой внутри кликабельной строки; ветка — одной строкой с
- * подсказкой. Рисуется настоящей сводкой `ChildStages`, как её видит человек.
+ * Карточка группы (владелец 05.10.2026): кнопки — внутри неё, над растянутой
+ * кнопкой «открыть чат»; ветка — одной строкой с подсказкой. Рисуется настоящей
+ * сводкой `ChildStages`, как её видит человек. Кнопки MR у карточки больше нет —
+ * её ставил снятый конвейер разделения (этап 10, G14).
  */
-function render(mr: string = MR): string {
-  const rows = new Map<string, ChildStageGroup>([
-    [
-      splitGroupKey({ groupIndex: 0, id: 'c0' }),
-      { chatId: 'c0', title: 'Документация', branch: BRANCH, stages: ['work'], isRunning: false },
-    ],
-  ]);
+function render(groups: ChildStageGroup[] = [GROUP]): string {
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <ChildStages
-        groups={mergeSplitGroups(rows, {
-          ...split,
-          groups: split.groups.map((g) => ({ ...g, mr })),
-        })}
-        onOpen={() => {}}
-      />
+      <ChildStages groups={groups} onOpen={() => {}} />
     </QueryClientProvider>,
   );
 }
@@ -68,54 +42,36 @@ beforeAll(async () => {
 });
 
 describe('карточка группы в хабе', () => {
-  it('MR — отдельная кнопка, а не ссылка внутри открывающей чат', () => {
+  it('название — в растянутой кнопке «открыть чат», кнопки MR нет', () => {
     const html = render();
     const open = element(html, 'data-hub-open', 'button');
     expect(open).toContain('Документация');
-    expect(open).not.toContain(MR);
     expect(open).not.toContain('<a ');
-    const mr = element(html, 'data-hub-mr', 'button');
-    expect(mr).toContain('MR !898');
-    expect(html).not.toContain(`href="${MR}"`);
+    expect(html).not.toContain('data-hub-mr');
   });
 
-  // Живой прогон 08.10: PR GitHub подписывался по-гитлабовски, «MR !1».
-  it('PR GitHub подписан своим словом и номером — «PR #12»', () => {
-    const mr = element(render('https://github.com/team/app/pull/12'), 'data-hub-mr', 'button');
-    expect(mr).toContain('PR #12');
-    expect(mr).not.toContain('MR !');
+  it('кнопки группы — внутри её карточки, после её шапки', () => {
+    const html = render([GROUP, { ...GROUP, chatId: 'c1', title: 'Вторая' }]);
+    const first = html.indexOf('data-hub-row="chat"');
+    const second = html.indexOf('data-hub-row="chat"', first + 1);
+    const button = html.indexOf('data-received-open="c0"');
+    expect(button).toBeGreaterThan(html.indexOf('Документация'));
+    expect(button).toBeLessThan(second);
   });
 
-  it('кнопки группы — внутри её карточки', () => {
-    const html = render();
-    const card = html.slice(html.indexOf('data-hub-row="chat"'));
-    const actions = card.indexOf('data-recheck-group');
-    expect(actions).toBeGreaterThan(0);
-    expect(card.indexOf('data-accept-group')).toBeGreaterThan(0);
-    // Ни одна кнопка группы не стоит после конца её карточки — до раздела пересечений.
-    const overlap = card.indexOf('Пересечения веток');
-    expect(actions).toBeLessThan(overlap < 0 ? card.length : overlap);
+  it('карточка без вопроса — без полосы «ждёт вас»; с вопросом — в корзине «ask»', () => {
+    expect(render()).toContain('data-hub-bucket="idle"');
+    const html = render([{ ...GROUP, waitingFor: 'question' }]);
+    expect(html).toContain('data-hub-bucket="ask"');
+    expect(html).toContain('data-hub-waiting="question"');
   });
 
   // Владелец 22.10.2026: «план › работа › работа › работа» читался кашей, и
   // текущее звено терялось в конце строки.
   it('путь группы: повторы подряд — счётом, текущее звено — своей фишкой', () => {
-    const rows = new Map<string, ChildStageGroup>([
-      [
-        splitGroupKey({ groupIndex: 0, id: 'c0' }),
-        {
-          chatId: 'c0',
-          title: 'Документация',
-          stages: ['plan', 'work', 'work', 'work', 'review'],
-          isRunning: true,
-        },
-      ],
+    const html = render([
+      { ...GROUP, stages: ['plan', 'work', 'work', 'work', 'review'], isRunning: true },
     ]);
-    const html = renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}>
-        <ChildStages groups={mergeSplitGroups(rows, split)} onOpen={() => {}} />
-      </QueryClientProvider>,
-    );
     const from = html.indexOf('data-hub-stages');
     const stages = html
       .slice(from, html.indexOf('</span></span>', from))

@@ -101,7 +101,7 @@ export interface ProviderEndpointFile {
    * `/chat/completions`, а Codex с версии, снявшей `wire_api = "chat"`
    * (`openai/codex#7782`), умеет только `/responses`. Шлюз панели обслуживает
    * четыре маршрута, и `responses` среди них нет
-   * (`platform/gateway/pipeline.ts`, `GATEWAY_ROUTES`).
+   * (`@agentdeck/contracts/platform-gateway-routes`, `GATEWAY_ROUTES`).
    *
    * Поле заведено живой пробой 22.09.2026 на настоящем `codex-cli 0.155.1`:
    * конфиг, написанный панелью с `wire_api = "chat"`, этот CLI не загружает

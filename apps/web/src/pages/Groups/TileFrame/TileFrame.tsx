@@ -6,9 +6,9 @@ import styles from './TileFrame.module.scss';
 /**
  * Карточка сетки групп: имя, метки, «Когда», тело (что группа делает и из
  * чего состоит), числа и предупреждение — всегда на одних и тех же местах,
- * чтобы глаз находил их без чтения. Имя — кнопка, открывающая окно группы, и её
- * цель растянута на всю карточку; тумблер (`aside`) лежит поверх и остаётся
- * отдельной остановкой Tab.
+ * чтобы глаз находил их без чтения. С `onOpen` имя — кнопка, открывающая окно, и
+ * её цель растянута на всю карточку; без него (сетка прежних групп только для
+ * чтения) имя — просто текст. Действия (`aside`) — отдельные остановки Tab.
  */
 export function TileFrame({
   name,
@@ -32,9 +32,13 @@ export function TileFrame({
     >
       <div className={styles.head}>
         <Typography variant="body" weight="medium" as="h3" className={styles.name}>
-          <button type="button" className={styles.open} onClick={onOpen}>
-            {name}
-          </button>
+          {onOpen ? (
+            <button type="button" className={styles.open} onClick={onOpen}>
+              {name}
+            </button>
+          ) : (
+            name
+          )}
         </Typography>
         {aside && <div className={styles.aside}>{aside}</div>}
       </div>

@@ -1,5 +1,4 @@
 import type { GroupListItem } from '@entities/Group';
-import type { DiscoveredGroup } from '@agentdeck/contracts';
 
 /**
  * Карточка страницы групп. Связанная пара — глобальная копия и проектный
@@ -15,6 +14,4 @@ export interface GroupCardModel {
 export interface GroupSections {
   global: GroupCardModel[];
   project: GroupCardModel[];
-  /** Найдено, но ещё не стало группой. */
-  discovered: DiscoveredGroup[];
 }

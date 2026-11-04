@@ -1,26 +1,21 @@
 /**
- * Кадры путеводителя «Чат»: пять сценариев одной съёмкой.
+ * Кадры путеводителя «Чат»: три сценария одной съёмкой.
  *
  * `basics` — путь ОДНОГО разговора: пустой чат проекта, вопрос с вложением,
  * живой ответ с шагами и расходом, запрос прав, вопрос агента, пульт git,
  * меню чата, пульт агентов, продолжение в чистой сессии и окно кода.
  *
- * `split` — путь, на котором один разговор становится несколькими: карточка
- * разделения, дерево чатов, сводка групп у родителя, вопросы и права детей,
- * сверка веток, пауза дерева и параллельные копии репозитория.
+ * Путь `split` (разговор становится несколькими) снят вместе с разделением:
+ * группы и деревья теперь сценарии ядра, их кадры — в справке «Ядро».
  *
- * `autonomy` — группа и автономность чата: меню «из родителя», строка
- * автовыбора и карточка критичного в главном чате.
- *
- * `deferred` — вызовы, которые решает только человек: плашка «Ждёт решения»,
- * раздел D-n в сводке групп и карточка прав, ставшая записью D-n.
+ * `deferred` — прежние вызовы, которые решает только человек: плашка «Ждёт
+ * решения» и карточка прав, ставшая записью D-n.
  *
  * `agents` — план агента: дерево субагентов, значки скиллов, хуков и MCP и окно
  * с их хронологией; транскрипт настоящий, а не подменённый (см. `chat-agents.mjs`).
  *
- * Разделены они не по объёму, а по входу: человек, который никогда не делит
- * задачи, второй сценарий не откроет вовсе, а первый читает подряд с первого
- * дня.
+ * Разделены они не по объёму, а по входу: `basics` читают подряд с первого дня,
+ * остальные — когда до них дошло дело.
  *
  * ПАНЕЛЬ ОДНОРАЗОВАЯ: каталог конфигурации во временной папке, свои порты, свой
  * фронт. Рабочий стенд не трогается. Данные подменяются целиком на уровне
@@ -37,10 +32,9 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { shootBasics } from './chat-basics.mjs';
-import { shootSplit } from './chat-split.mjs';
-import { shootAutonomy } from './chat-autonomy.mjs';
 import { shootDeferred } from './chat-deferred.mjs';
 import { shootAgents } from './chat-agents.mjs';
 
@@ -69,12 +63,15 @@ writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
 writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-chat' },
+  );
 
   started.push(
     spawn(
@@ -116,6 +113,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном обоих.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -125,20 +123,6 @@ try {
       console.log('\nсценарий basics');
       await shootBasics(browser, WEB, basics, home);
       basics.finish();
-    }
-
-    if (!only || only === 'split') {
-      const split = openScenario('chat', 'split');
-      console.log('\nсценарий split');
-      await shootSplit(browser, WEB, split);
-      split.finish();
-    }
-
-    if (!only || only === 'autonomy') {
-      const autonomy = openScenario('chat', 'autonomy');
-      console.log('\nсценарий autonomy');
-      await shootAutonomy(browser, WEB, autonomy);
-      autonomy.finish();
     }
 
     if (!only || only === 'deferred') {
@@ -159,5 +143,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true });
 }

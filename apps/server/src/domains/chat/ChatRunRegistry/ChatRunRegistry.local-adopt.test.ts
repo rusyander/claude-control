@@ -5,7 +5,8 @@ import {
   type RunLedgerSink,
   type RunLike,
 } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 import type { RunLedgerEntry } from '../run-ledger/run-ledger.ts';
 
 /**

@@ -26,10 +26,13 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
   // Черновик запроса переживает перезагрузку: у каждой песочницы — свой.
   const [prompt, setPrompt] = useDraft(`sandbox:${sandboxId}`);
 
-  // Запросы собираются из самой настройки, поэтому проверяют именно её.
+  // Запросы собираются из самой настройки, поэтому проверяют именно её; текст — на языке интерфейса.
   const suggestions = useMemo(
-    () => buildTestPrompts(kind, { title, ...context }),
-    [kind, title, context],
+    () =>
+      buildTestPrompts(kind, { title, ...context }, (key, params) =>
+        t(`sandboxPrompts.${key}`, params),
+      ),
+    [kind, title, context, t],
   );
 
   return (
@@ -95,7 +98,10 @@ export function SandboxChat({ sandboxId, kind, title, context }: SandboxChatProp
           </Button>
         )}
 
-        {state.costUsd !== undefined && <Badge tone="neutral">${state.costUsd.toFixed(3)}</Badge>}
+        {/* Разговор идёт задачей ядра: цены хода оно не называет (0) — «$0.000» был бы неправдой. */}
+        {state.costUsd !== undefined && state.costUsd > 0 && (
+          <Badge tone="neutral">${state.costUsd.toFixed(3)}</Badge>
+        )}
 
         {state.tools.length > 0 && (
           <Stack direction="row" gap="var(--spacing-3xs)" wrap>

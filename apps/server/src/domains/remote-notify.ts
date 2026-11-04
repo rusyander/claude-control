@@ -1,6 +1,6 @@
 import type { PushDevice } from '@agentdeck/contracts';
 import { basename } from 'node:path';
-import type { RunNotice } from './chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from './notify/run-notice.types.ts';
 
 /**
  * Уведомления на телефон через сервис Expo.
@@ -102,11 +102,15 @@ export function createRunNotifier(deps: NotifierDeps): (notice: RunNotice) => vo
     // Отправка ничего не ждёт и никого не задерживает: прогон уже завершился, и
     // единственное, чем сеть может помешать, — задержать ответ следующему
     // запросу. Ошибки гасим здесь же — уведомление не повод уронить сервер.
-    void send(messages, deps.forget);
+    void sendExpoPush(messages, deps.forget);
   };
 }
 
-async function send(messages: ExpoMessage[], forget: (token: string) => void): Promise<void> {
+/** Отправка в Expo; её же берёт пересылка вопросов ядра (`domains/notify/core-ask-delivery.ts`). */
+export async function sendExpoPush(
+  messages: ExpoMessage[],
+  forget: (token: string) => void,
+): Promise<void> {
   try {
     const response = await fetch(EXPO_PUSH_URL, {
       method: 'POST',

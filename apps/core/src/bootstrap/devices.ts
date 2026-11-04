@@ -111,16 +111,20 @@ export function loadSigningDevices(layout: CoreHomeLayout, note?: DevicesNote): 
 
 /**
  * Перенос привязанных ключей телефона в устройства ядра (G9, команда `adopt-devices`, F11):
- * список заменяется целиком — отзыв в панели доезжает до ядра тем же переносом. Сначала
- * `devices.json`, затем память `devices.state.json {digest}`: крах между ними оставляет дрейф,
- * то есть ни одного годного устройства, а не список без стража.
+ * список заменяется целиком — отзыв в панели доезжает до ядра тем же переносом. Номер машины
+ * панели (этап 10, Q5) становится номером ядра: телефон подписывает номером панели, и прежде ядро
+ * отказывало каждой его подписи. Порядок: номер, `devices.json`, память
+ * `devices.state.json {digest}`; крах между записями оставляет дрейф или старый номер — ни одной
+ * принятой подписи, а не список без стража. Панель повторит перенос.
  */
 export function adoptSigningDevices(
   layout: CoreHomeLayout,
   devices: readonly SigningDevice[],
+  machineId: string,
 ): { digest: string } {
   const text = `${JSON.stringify({ devices }, null, 2)}\n`;
   const digest = sha256Hex(Buffer.from(text, 'utf8'));
+  writeFileAtomic(join(layout.root, 'machine-id'), `${machineId}\n`, { mode: 0o600 });
   writeFileAtomic(join(layout.root, 'devices.json'), text, { mode: 0o600 });
   writeFileAtomic(join(layout.root, 'devices.state.json'), `${JSON.stringify({ digest })}\n`, {
     mode: 0o600,
@@ -135,12 +139,15 @@ export function devicesPortOf(
   layout: CoreHomeLayout,
   note: DevicesNote,
 ): {
-  adopt(devices: readonly SigningDevice[], meta: { cmdId: string; by: string }): { digest: string };
+  adopt(
+    devices: readonly SigningDevice[],
+    meta: { cmdId: string; by: string; machineId: string },
+  ): { digest: string };
   refused(cmdId: string, code: string): void;
 } {
   return {
     adopt(devices, meta) {
-      const written = adoptSigningDevices(layout, devices);
+      const written = adoptSigningDevices(layout, devices, meta.machineId);
       note('devices.adopted', { ...meta, ids: devices.map((d) => d.id), digest: written.digest });
       return written;
     },

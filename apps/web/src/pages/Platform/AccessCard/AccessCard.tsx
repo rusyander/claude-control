@@ -147,6 +147,12 @@ export function AccessCard({ status }: AccessCardProps) {
           <Typography variant="caption" color="muted" className="prose">
             {t('contourConfig.access.consumersHint')}
           </Typography>
+          {/* Обязательный контур ведёт задачи ядра через себя и со снятой галочкой. */}
+          {platform.mode === 'required' && (
+            <Typography variant="caption" color="muted" className="prose" data-contour-required-all>
+              {t('contourConfig.access.requiredAll')}
+            </Typography>
+          )}
           {plan.isLoading && <SkeletonList rows={3} withActions={false} />}
           {data?.consumers.map((consumer) => (
             <ConsumerRow

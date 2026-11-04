@@ -52,6 +52,8 @@ export function runDailyBackup(opts: {
   backupsDir: string;
   tasksDir: string;
   profilesDir: string;
+  /** Корень копий вложений чата (`layout.attachments`, вне дома): каталог задачи едет рядом с журналом. */
+  attachmentsDir?: string;
   activeTaskIds: readonly string[];
   at: number;
 }): BackupOutcome {
@@ -81,8 +83,12 @@ export function runDailyBackup(opts: {
     }
     const before = outcome.failures.length;
     if (attempt(`${day}.partial`, () => ensureDir(partial))) {
-      for (const taskId of opts.activeTaskIds)
+      for (const taskId of opts.activeTaskIds) {
         copyTask(taskId, partial, opts.tasksDir, copy, outcome);
+        if (opts.attachmentsDir) {
+          copyAttachments(taskId, partial, opts.attachmentsDir, copy, outcome);
+        }
+      }
       const profiles = listSafe(opts.profilesDir);
       // Нечитаемые профили — названный сбой копии, а не «профилей нет» (P44).
       if ('unknown' in profiles) outcome.failures.push(`profiles: ${profiles.unknown}`);
@@ -112,6 +118,34 @@ export function runDailyBackup(opts: {
     }
   }
   return outcome;
+}
+
+/**
+ * Копии вложений задачи (s10 G11): `<корень>/<taskId>/<cmdId>/<имя>` → `<день>/attachments/<taskId>/…`.
+ * Каталога нет — у задачи нет вложений, это не сбой; нечитаемый — названный сбой копии.
+ */
+function copyAttachments(
+  taskId: string,
+  partial: string,
+  attachmentsDir: string,
+  copy: (what: string, from: string, to: string) => void,
+  outcome: BackupOutcome,
+): void {
+  const from = join(attachmentsDir, taskId);
+  if (!pathExists(from)) return;
+  const to = join(partial, 'attachments', taskId);
+  const slots = listSafe(from);
+  if ('unknown' in slots) outcome.failures.push(`${taskId}/attachments: ${slots.unknown}`);
+  if (!('value' in slots)) return;
+  for (const slot of slots.value) {
+    const names = listSafe(join(from, slot));
+    if ('unknown' in names)
+      outcome.failures.push(`${taskId}/attachments/${slot}: ${names.unknown}`);
+    if (!('value' in names)) continue;
+    for (const name of names.value) {
+      copy(`${taskId}/attachments/${slot}/${name}`, join(from, slot, name), join(to, slot, name));
+    }
+  }
 }
 
 function copyTask(

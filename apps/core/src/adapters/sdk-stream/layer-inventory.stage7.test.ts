@@ -154,7 +154,7 @@ describe('user layer inventory (stage 7)', () => {
     ]);
   });
 
-  it('caps from the probe: claude controls skills and keeps hooks in subagents; qwen only the latter', () => {
+  it('caps from the probe: claude governs skills and keeps hooks in subagents; qwen only the latter', () => {
     expect([CLAUDE_CAPS.skillControl, CLAUDE_CAPS.subagentHooks]).toEqual([true, true]);
     expect([QWEN_CAPS.skillControl, QWEN_CAPS.subagentHooks]).toEqual([false, true]);
   });

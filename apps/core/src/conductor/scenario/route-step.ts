@@ -112,6 +112,13 @@ export function decideRouting(
   });
   if (!contoured.ok) tier.reasons.unshift(contoured.reason);
   else tier.reasons.push(...contoured.applied.map((a) => `${a.path}: ${a.reason}`));
+  // Обязательный контур и модель никто не назвал: шлюз идёт моделью контура по умолчанию (s10 G7).
+  const fill = contoured.ok ? contoured.fill : undefined;
+  if (fill && tier.ok && tier.model === null && tier.route.id === fill.routeId) {
+    tier.model = fill.model;
+    tier.sources.model = 'contour';
+    tier.reasons.push(`model ${fill.model} is the default of the required contour`);
+  }
   if (!created) tier.reasons.unshift('task is not created');
   if (!tier.ok) return { tier, continuation: null };
   const sessions = sessionsOf(state);

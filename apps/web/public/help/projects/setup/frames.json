@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 980,
-      "shotAt": "2026-09-28T14:32:15.170Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов пока нет Добавьте папку проекта, чтобы управлять его конфигурацией отдельно от пользовательской.",
+      "shotAt": "2026-11-03T16:46:42.872Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов пока нет Добавьте папку проекта, чтобы управлять его конфигурацией отдельно от пользовательской.",
       "en": {
         "file": "01-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:34:24.904Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this No projects yet Add a project folder to manage its configuration separately from the user level."
+        "shotAt": "2026-11-03T16:47:31.547Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this No projects yet Add a project folder to manage its configuration separately from the user level.",
+        "seal": {
+          "png": "23ef6fa36607af4a",
+          "text": "a29c6c326b96726e"
+        }
       },
       "dark": {
         "file": "01-empty.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:36:30.616Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов пока нет Добавьте папку проекта, чтобы управлять его конфигурацией отдельно от пользовательской."
+        "shotAt": "2026-11-03T16:48:30.065Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов пока нет Добавьте папку проекта, чтобы управлять его конфигурацией отдельно от пользовательской.",
+        "seal": {
+          "png": "75c7c9a5bc3e210f",
+          "text": "50b989728235d2e0"
+        }
       },
       "darkEn": {
         "file": "01-empty.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:38:36.891Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this No projects yet Add a project folder to manage its configuration separately from the user level."
+        "shotAt": "2026-11-03T16:49:17.549Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this No projects yet Add a project folder to manage its configuration separately from the user level.",
+        "seal": {
+          "png": "a2802e8af941b551",
+          "text": "a29c6c326b96726e"
+        }
+      },
+      "seal": {
+        "png": "e87cdc0427e5f985",
+        "text": "50b989728235d2e0"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 740,
       "height": 680,
-      "shotAt": "2026-09-28T14:32:17.396Z",
+      "shotAt": "2026-11-03T16:46:48.553Z",
       "text": "Выбор папки проекта Откройте любую папку на диске как проект — даже если Claude там ещё не работал. C:\\ D:\\ Вверх shop-front shop-admin sandbox C:/work Отмена Открыть эту папку",
       "en": {
         "file": "02-picker.en.png",
         "masked": 0,
         "width": 740,
         "height": 680,
-        "shotAt": "2026-09-28T14:34:27.122Z",
-        "text": "Choose a project folder Open any folder on disk as a project — even one Claude has not worked in yet. C:\\ D:\\ Up shop-front shop-admin sandbox C:/work Cancel Open this folder"
+        "shotAt": "2026-11-03T16:47:37.188Z",
+        "text": "Choose a project folder Open any folder on disk as a project — even one Claude has not worked in yet. C:\\ D:\\ Up shop-front shop-admin sandbox C:/work Cancel Open this folder",
+        "seal": {
+          "png": "821620090afb0dcb",
+          "text": "829c814b93fd1b19"
+        }
       },
       "dark": {
         "file": "02-picker.dark.png",
         "masked": 0,
         "width": 740,
         "height": 680,
-        "shotAt": "2026-09-28T14:36:32.835Z",
-        "text": "Выбор папки проекта Откройте любую папку на диске как проект — даже если Claude там ещё не работал. C:\\ D:\\ Вверх shop-front shop-admin sandbox C:/work Отмена Открыть эту папку"
+        "shotAt": "2026-11-03T16:48:35.715Z",
+        "text": "Выбор папки проекта Откройте любую папку на диске как проект — даже если Claude там ещё не работал. C:\\ D:\\ Вверх shop-front shop-admin sandbox C:/work Отмена Открыть эту папку",
+        "seal": {
+          "png": "6309aaf4e3dfe4c1",
+          "text": "e8f99a75633e699f"
+        }
       },
       "darkEn": {
         "file": "02-picker.dark.en.png",
         "masked": 0,
         "width": 740,
         "height": 680,
-        "shotAt": "2026-09-28T14:38:39.061Z",
-        "text": "Choose a project folder Open any folder on disk as a project — even one Claude has not worked in yet. C:\\ D:\\ Up shop-front shop-admin sandbox C:/work Cancel Open this folder"
+        "shotAt": "2026-11-03T16:49:23.233Z",
+        "text": "Choose a project folder Open any folder on disk as a project — even one Claude has not worked in yet. C:\\ D:\\ Up shop-front shop-admin sandbox C:/work Cancel Open this folder",
+        "seal": {
+          "png": "6ac6329e07d223a3",
+          "text": "829c814b93fd1b19"
+        }
+      },
+      "seal": {
+        "png": "302e180bed218b77",
+        "text": "e8f99a75633e699f"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 980,
-      "shotAt": "2026-09-28T14:32:25.136Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:\\work\\shop-front\\CLAUDE.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Символов: 307 Изменения применятся после перезапуска Claude Code",
+      "shotAt": "2026-11-03T16:46:56.290Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:\\work\\shop-front\\CLAUDE.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Символов: 307 Изменения применятся после перезапуска Claude Code",
       "en": {
         "file": "03-rules.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:34:34.844Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:\\work\\shop-front\\CLAUDE.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Characters: 307 Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:47:44.927Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:\\work\\shop-front\\CLAUDE.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Characters: 307 Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "bd15fb9da646e7ea",
+          "text": "e602b8db74aa31e8"
+        }
       },
       "dark": {
         "file": "03-rules.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:36:40.571Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:\\work\\shop-front\\CLAUDE.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Символов: 307 Изменения применятся после перезапуска Claude Code"
+        "shotAt": "2026-11-03T16:48:43.477Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:\\work\\shop-front\\CLAUDE.md Править CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Символов: 307 Изменения применятся после перезапуска Claude Code",
+        "seal": {
+          "png": "31790f8e0bd1c8c9",
+          "text": "1f85d4ab47d3852c"
+        }
       },
       "darkEn": {
         "file": "03-rules.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:38:46.777Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:\\work\\shop-front\\CLAUDE.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Characters: 307 Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:49:30.994Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:\\work\\shop-front\\CLAUDE.md Edit The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\work\\shop-front\\CLAUDE.md Витрина магазина Магазин на React и Vite. Отвечай по-русски, правки делай точечные. Проверки перед сдачей pnpm type-check && pnpm lint && pnpm test Снимки до и после — для любой правки, которую видно глазами. Чего не делать Не трогать каталог migrations/: им владеет команда бэкенда. Characters: 307 Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "b03c539b1a1826d9",
+          "text": "e602b8db74aa31e8"
+        }
+      },
+      "seal": {
+        "png": "9a6b609310b8160b",
+        "text": "1f85d4ab47d3852c"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1440,
       "height": 980,
-      "shotAt": "2026-09-28T14:32:26.144Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.mcp.json Серверы из .mcp.json в корне проекта: добавляются, правятся и выключаются здесь. Claude Code подключает их в сессиях этого каталога. Добавить сервер catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp",
+      "shotAt": "2026-11-03T16:46:57.309Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.mcp.json Серверы из .mcp.json в корне проекта: добавляются, правятся и выключаются здесь. Claude Code подключает их в сессиях этого каталога. Добавить сервер catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp",
       "en": {
         "file": "04-mcp.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:34:35.845Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.mcp.json Servers from .mcp.json in the project root: added, edited and switched off here. Claude Code connects them in sessions of this directory. Add server catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp"
+        "shotAt": "2026-11-03T16:47:45.923Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.mcp.json Servers from .mcp.json in the project root: added, edited and switched off here. Claude Code connects them in sessions of this directory. Add server catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp",
+        "seal": {
+          "png": "5684a9675b42002a",
+          "text": "6ea1e3268e85b903"
+        }
       },
       "dark": {
         "file": "04-mcp.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:36:41.577Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.mcp.json Серверы из .mcp.json в корне проекта: добавляются, правятся и выключаются здесь. Claude Code подключает их в сессиях этого каталога. Добавить сервер catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp"
+        "shotAt": "2026-11-03T16:48:44.479Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.mcp.json Серверы из .mcp.json в корне проекта: добавляются, правятся и выключаются здесь. Claude Code подключает их в сессиях этого каталога. Добавить сервер catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp",
+        "seal": {
+          "png": "484e78ed26f31ae9",
+          "text": "b3407da74cd9197c"
+        }
       },
       "darkEn": {
         "file": "04-mcp.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:38:47.774Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.mcp.json Servers from .mcp.json in the project root: added, edited and switched off here. Claude Code connects them in sessions of this directory. Add server catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp"
+        "shotAt": "2026-11-03T16:49:32.020Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.mcp.json Servers from .mcp.json in the project root: added, edited and switched off here. Claude Code connects them in sessions of this directory. Add server catalog-mock stdio node tools/mcp/catalog.mjs design-mocks http http://127.0.0.1:4010/mcp",
+        "seal": {
+          "png": "48a076285e039d24",
+          "text": "6ea1e3268e85b903"
+        }
+      },
+      "seal": {
+        "png": "3488b0f7def1aa9b",
+        "text": "b3407da74cd9197c"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 1440,
       "height": 980,
-      "shotAt": "2026-09-28T14:32:27.147Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.claude/settings.json Правила доступа проекта. Запись с пометкой «локальные» лежит в settings.local.json, который обычно не коммитится. Добавить право Bash(pnpm test:*) Разрешено Edit(migrations/**) Запрещено Bash(git push:*) Спрашивать",
+      "shotAt": "2026-11-03T16:46:58.322Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.claude/settings.json Правила доступа проекта. Запись с пометкой «локальные» лежит в settings.local.json, который обычно не коммитится. Добавить право Bash(pnpm test:*) Разрешено Edit(migrations/**) Запрещено Bash(git push:*) Спрашивать",
       "en": {
         "file": "05-permissions.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:34:36.846Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.claude/settings.json The project’s access rules. An entry marked “local” lives in settings.local.json, which is usually not committed. Add permission Bash(pnpm test:*) Allowed Edit(migrations/**) Denied Bash(git push:*) Ask"
+        "shotAt": "2026-11-03T16:47:46.932Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.claude/settings.json The project’s access rules. An entry marked “local” lives in settings.local.json, which is usually not committed. Add permission Bash(pnpm test:*) Allowed Edit(migrations/**) Denied Bash(git push:*) Ask",
+        "seal": {
+          "png": "b7f01fab7a779ece",
+          "text": "d0862fa892936c63"
+        }
       },
       "dark": {
         "file": "05-permissions.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:36:42.555Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.claude/settings.json Правила доступа проекта. Запись с пометкой «локальные» лежит в settings.local.json, который обычно не коммитится. Добавить право Bash(pnpm test:*) Разрешено Edit(migrations/**) Запрещено Bash(git push:*) Спрашивать"
+        "shotAt": "2026-11-03T16:48:45.508Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 правится здесь C:/work/shop-front/.claude/settings.json Правила доступа проекта. Запись с пометкой «локальные» лежит в settings.local.json, который обычно не коммитится. Добавить право Bash(pnpm test:*) Разрешено Edit(migrations/**) Запрещено Bash(git push:*) Спрашивать",
+        "seal": {
+          "png": "98aff57741af2f91",
+          "text": "cc7b20a4b401dffd"
+        }
       },
       "darkEn": {
         "file": "05-permissions.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:38:48.773Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.claude/settings.json The project’s access rules. An entry marked “local” lives in settings.local.json, which is usually not committed. Add permission Bash(pnpm test:*) Allowed Edit(migrations/**) Denied Bash(git push:*) Ask"
+        "shotAt": "2026-11-03T16:49:33.033Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 edited here C:/work/shop-front/.claude/settings.json The project’s access rules. An entry marked “local” lives in settings.local.json, which is usually not committed. Add permission Bash(pnpm test:*) Allowed Edit(migrations/**) Denied Bash(git push:*) Ask",
+        "seal": {
+          "png": "a40d61598ad0c801",
+          "text": "d0862fa892936c63"
+        }
+      },
+      "seal": {
+        "png": "69018ca0859a6f77",
+        "text": "cc7b20a4b401dffd"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 0,
       "width": 1440,
       "height": 980,
-      "shotAt": "2026-09-28T14:32:31.240Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Codex (OpenAI): экспериментально Проекты — конфигурация Конфигурация конкретного проекта — в проектных файлах активного провайдера Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front Внешние привязки Ничего не привязано Привязать AGENTS.md MCP-серверы правится здесь C:/work/shop-front/AGENTS.md Править Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Символов: 164 Изменения применятся после перезапуска Codex CLI",
+      "shotAt": "2026-11-03T16:47:02.994Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Codex (OpenAI): экспериментально Проекты — конфигурация Конфигурация конкретного проекта — в проектных файлах активного провайдера Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front Внешние привязки Ничего не привязано Привязать AGENTS.md MCP-серверы правится здесь C:/work/shop-front/AGENTS.md Править Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Символов: 164 Изменения применятся после перезапуска Codex CLI",
       "en": {
         "file": "06-foreign.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:34:40.795Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Codex (OpenAI): experimental Projects — configuration A specific project's configuration — in the active provider's project files Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front External links Nothing linked Link AGENTS.md MCP servers edited here C:/work/shop-front/AGENTS.md Edit Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Characters: 164 Changes apply after restarting Codex CLI"
+        "shotAt": "2026-11-03T16:47:51.609Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Codex (OpenAI): experimental Projects — configuration A specific project's configuration — in the active provider's project files Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front External links Nothing linked Link AGENTS.md MCP servers edited here C:/work/shop-front/AGENTS.md Edit Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Characters: 164 Changes apply after restarting Codex CLI",
+        "seal": {
+          "png": "3eff3eab7a2a1f32",
+          "text": "2aa207d5a9ef7373"
+        }
       },
       "dark": {
         "file": "06-foreign.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:36:46.436Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Codex (OpenAI): экспериментально Проекты — конфигурация Конфигурация конкретного проекта — в проектных файлах активного провайдера Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front Внешние привязки Ничего не привязано Привязать AGENTS.md MCP-серверы правится здесь C:/work/shop-front/AGENTS.md Править Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Символов: 164 Изменения применятся после перезапуска Codex CLI"
+        "shotAt": "2026-11-03T16:48:50.252Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Codex (OpenAI): экспериментально Проекты — конфигурация Конфигурация конкретного проекта — в проектных файлах активного провайдера Добавить проект Что это Проектов: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front Внешние привязки Ничего не привязано Привязать AGENTS.md MCP-серверы правится здесь C:/work/shop-front/AGENTS.md Править Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Символов: 164 Изменения применятся после перезапуска Codex CLI",
+        "seal": {
+          "png": "0ee5a399ca23dc48",
+          "text": "5a7178de3227158e"
+        }
       },
       "darkEn": {
         "file": "06-foreign.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 980,
-        "shotAt": "2026-09-28T14:38:52.470Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Codex (OpenAI): experimental Projects — configuration A specific project's configuration — in the active provider's project files Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front External links Nothing linked Link AGENTS.md MCP servers edited here C:/work/shop-front/AGENTS.md Edit Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Characters: 164 Changes apply after restarting Codex CLI"
+        "shotAt": "2026-11-03T16:49:37.707Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Codex (OpenAI): experimental Projects — configuration A specific project's configuration — in the active provider's project files Add project What is this Projects: 1 Витрина магазина C:/work/shop-front Витрина магазина Codex CLI C:/work/shop-front External links Nothing linked Link AGENTS.md MCP servers edited here C:/work/shop-front/AGENTS.md Edit Витрина магазина Тот же проект, но инструкции лежат в AGENTS.md: у каждого CLI свой файл. Правки точечные, ответы по-русски. Каталог migrations не трогать. Characters: 164 Changes apply after restarting Codex CLI",
+        "seal": {
+          "png": "5d34faccf19b5418",
+          "text": "2aa207d5a9ef7373"
+        }
+      },
+      "seal": {
+        "png": "91c371a3081d9b6a",
+        "text": "5a7178de3227158e"
       }
     }
   ]

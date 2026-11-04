@@ -35,6 +35,19 @@ if (file) {
 // `--deny`: блокирующий отказ хука (код 2, причина в stderr) — так хук ядра запрещает вызов.
 if (argv.includes('--deny')) {
   process.stderr.write(`denied by ${role} hook`);
+  // `--json` — как хук ядра в режиме JSON (`run.ts hook --json`): отказ JSON-ом при коде 0.
+  if (argv.includes('--json')) {
+    process.stdout.write(
+      JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'deny',
+          permissionDecisionReason: `denied by ${role} hook`,
+        },
+      }),
+    );
+    process.exit(0);
+  }
   process.exit(2);
 }
 process.exit(0);

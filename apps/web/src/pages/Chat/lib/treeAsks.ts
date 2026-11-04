@@ -45,6 +45,8 @@ export function collectTreeAsks(
           toolName: ask.toolName ?? '',
           input: ask.input,
           toolUseId: ask.toolUseId,
+          // Вопрос права ядра: без его полей решение ушло бы маршрутом прогона (отказ сервера).
+          ...(ask.core ? { core: ask.core } : {}),
         });
         byRun.set(ask.runId, entry);
         continue;

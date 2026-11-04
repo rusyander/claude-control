@@ -20,6 +20,7 @@ import {
   pathWithoutAgentClis,
   ROWS,
   seedFiles,
+  seedLegacyGroup,
   seedThroughPanel,
   STORES,
   write,
@@ -67,7 +68,7 @@ const EXPOSED: Readonly<Record<Store, readonly [action: string, marker: string]>
   hookCommand: ['list_hooks', '--token'],
   permissionRule: ['list_permissions', 'api.example.com'],
   scriptBody: ['read_script', 'NOTIFY_API_TOKEN'],
-  groupEnv: ['list_env', 'SWEEP_GROUP_TOKEN'],
+  groupEnv: ['list_groups', 'SWEEP_GROUP_TOKEN'],
   contourKey: ['list_contours', CONTOUR],
   endpointToken: ['list_endpoints', ENDPOINT],
   jiraToken: ['list_integrations', 'jira'],
@@ -201,11 +202,11 @@ beforeAll(async () => {
   await instance.ready();
   app = instance;
 
-  const group = await seedThroughPanel(human, project);
+  await seedThroughPanel(human, project);
+  seedLegacyGroup(ctx.store);
   seeded = {
     home,
     project,
-    group,
     rule: await idOf(human, '/api/rules', 'Sweep rule'),
     hook: await idOf(human, '/api/hooks', 'notify.js'),
     skill: await idOf(human, '/api/skills', 'sweep-skill'),

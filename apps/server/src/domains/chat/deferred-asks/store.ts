@@ -206,7 +206,7 @@ export class DeferredAsks {
     const record: DeferredAskRecord = {
       id: `D-${this.state.next}`,
       state: 'waiting',
-      kind: input.kind ?? 'permission',
+      kind: 'permission',
       scope: input.scope,
       runKeys: [...new Set(input.runKeys.filter(Boolean))],
       toolName: input.toolName,
@@ -423,14 +423,6 @@ export class DeferredAsks {
   get(id: string): DeferredAskRecord | undefined {
     this.sweep();
     return this.state.records.find((record) => record.id === id);
-  }
-
-  /** Запись, поднятая с карточки этого вызова (кнопки карточки после «отложено»). */
-  byToolUse(keys: readonly string[], toolUseId: string): DeferredAskRecord | undefined {
-    return this.state.records.find(
-      (record) =>
-        record.toolUseId === toolUseId && record.runKeys.some((key) => keys.includes(key)),
-    );
   }
 
   all(): DeferredAskRecord[] {

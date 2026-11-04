@@ -29,6 +29,14 @@ const OWN_TEXTS = {
     ru: 'Модель молчит дольше {{seconds}} с после начала ответа — повторите позже',
     en: 'The model has been silent for more than {{seconds}} s after the answer began — retry later',
   },
+  'hop-contour-off': {
+    ru: 'Контур «{{id}}» выключен в панели',
+    en: 'Contour “{{id}}” is switched off in the panel',
+  },
+  'hop-untranslatable': {
+    ru: 'Контур «{{id}}» говорит на {{to}}; запрос {{from}} к нему звено не переводит',
+    en: 'Contour “{{id}}” speaks {{to}}; the hop does not translate a {{from}} request to it',
+  },
   'hop-upstream-unreachable': {
     ru: 'Нет связи с моделью: {{reason}}',
     en: 'No connection to the model: {{reason}}',

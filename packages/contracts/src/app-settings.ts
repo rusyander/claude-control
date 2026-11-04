@@ -10,14 +10,11 @@ import {
 } from 'zod';
 import { endpointProfileSchema } from './endpoints';
 import { modelSources } from './models';
-import { permissionRulesSchema } from './permission-rules';
 import { dlpSettingsSchema } from './dlp';
 import { NOTIFY_EVENTS } from './integrations';
 import { platformGatewaySettingsSchema, platformSchema } from './platform';
 import { promptGateSettingsSchema } from './prompt-gate';
 import { remoteAccessSettingsSchema } from './remote';
-import { groupEconomySchema, type GroupEconomy } from './group-economy';
-import { groupWatchSchema, type GroupWatch } from './group-watch';
 
 /**
  * Тариф за миллион токенов. Панель считает по нему справочную стоимость —
@@ -109,8 +106,6 @@ export const telegramSettingsSchema = object({
     // Бюджет — в подписке по умолчанию: про порог узнают ровно затем, чтобы
     // успеть до отказа 402, а канал всё равно молчит, пока его не включили.
     'budget',
-    // Сигналы сторожа групп — «внимание» и «тревога», не каждое событие.
-    'groupSignal',
   ]),
   // «Закончил» после долгой работы; не задано — порог по умолчанию (`integrations.ts`).
   doneAfterMinutes: number().int().min(0).max(1440).optional(),
@@ -144,8 +139,6 @@ export const webhookSettingsSchema = object({
     // Бюджет — в подписке по умолчанию: про порог узнают ровно затем, чтобы
     // успеть до отказа 402, а канал всё равно молчит, пока его не включили.
     'budget',
-    // Сигналы сторожа групп — «внимание» и «тревога», не каждое событие.
-    'groupSignal',
   ]),
 });
 
@@ -250,14 +243,6 @@ export const appSettingsSchema = object({
    */
   chatEffort: zodEnum(['', 'low', 'medium', 'high', 'xhigh', 'max']).default('xhigh'),
   /**
-   * Агент сам предлагает разделить список задач по нескольким чатам, увидев в
-   * одном сообщении три и более независимых задачи. Включено — к прогону
-   * дописывается строка о формате предложения. Выключено — инициативы нет, но
-   * кнопка «Разделить задачи» в поле ввода работает по-прежнему: она посылает ту
-   * же просьбу вручную.
-   */
-  taskSplitInitiative: boolean().default(true),
-  /**
    * Агент сам предлагает продолжить работу в чистой сессии, когда задача закрыта:
    * к прогону дописывается строка о формате предложения и о том, что перед ним
    * надо привести в порядок рабочие файлы (`.agent/PROGRESS.md`, `TASKS.md`).
@@ -303,14 +288,6 @@ export const appSettingsSchema = object({
    */
   deliverToMr: boolean().default(true),
   /**
-   * Правила прав: id правила → разрешено без вопроса. Пусто — как из коробки
-   * (см. `permission-rules.ts`: записи разрешены, снос спрашивает). Живут здесь,
-   * а не в разговоре, намеренно: «пусть агент сам пишет комментарии в MR» — это
-   * решение про себя и свои сервисы, и повторять его в каждом проекте, на
-   * телефоне и в каждом новом чате человек не должен.
-   */
-  autoApproveRules: permissionRulesSchema.default({}),
-  /**
    * Авторежим прав во всех чатах (владелец, 24.09.2026). Включено — обычный
    * чат с правом правок идёт как авторежим Claude Code: CLI получает
    * `--permission-mode auto`, а там, где у CLI авторежима нет (haiku, чужие
@@ -326,22 +303,8 @@ export const appSettingsSchema = object({
    * запроса, а вызовов за неделю — ноль. Выключено — CLI получает полный набор.
    */
   chatLeanTools: boolean().default(true),
-  /**
-   * Через сколько минут неотвеченная карточка прав одиночного чата сама
-   * становится отложенным вопросом D-n (решение владельца 23.10): человек мог
-   * уйти, а прогон стоял бы на нём часами. Ноль — не откладывать никогда.
-   * Группы и автономный чат, у которого не открыт ни один поток клиента,
-   * откладывают сразу, без этого срока: карточку там некому увидеть. Поток,
-   * закрытый меньше этого срока назад (и панель моложе его), ещё считается
-   * открытым: вкладка переподключается после перезапуска панели.
-   */
-  deferAfterMinutes: number().int().min(0).max(1440).default(10),
   /** Сколько суток отложенный вопрос D-n ждёт ответа, прежде чем истечь. */
   deferredTtlDays: number().int().min(1).max(90).default(7),
-  /** Рычаги экономии групп разделения (владелец, 21.10.2026): см. `groupEconomySchema`. */
-  groupEconomy: groupEconomySchema.default(() => groupEconomySchema.parse({})),
-  /** Сторож групп разделения (владелец, 21.10.2026): пороги правил, см. `groupWatchSchema`. */
-  groupWatch: groupWatchSchema.default(() => groupWatchSchema.parse({})),
   /**
    * Свои тарифы: фрагмент имени модели → цена за миллион токенов. Пустой
    * объект — считать по встроенным. Заведено потому, что тарифы меняются, а
@@ -474,12 +437,8 @@ export const appSettingsSchema = object({
 export type AppSettings = Infer<typeof appSettingsSchema>;
 
 /**
- * Тело `PATCH /settings`. Блоки экономии групп (`groupEconomy`) и сторожа групп
- * (`groupWatch`) едут ТОЛЬКО изменёнными ключами, а сервер сливает их с
- * сохранёнными: целый блок по снимку страницы терял правку, сделанную за миг до
- * этого, — вторая правка уходила раньше ответа на первую.
+ * Тело `PATCH /settings`: только изменённые поля. Блоки экономии и сторожа групп
+ * разделения сняты (этап 10, G15): рычаги экономии шагов задачи — раздел `economy`
+ * настройки ядра, своего сторожа у панели нет.
  */
-export type AppSettingsPatch = Omit<Partial<AppSettings>, 'groupEconomy' | 'groupWatch'> & {
-  groupEconomy?: Partial<GroupEconomy>;
-  groupWatch?: Partial<GroupWatch>;
-};
+export type AppSettingsPatch = Partial<AppSettings>;

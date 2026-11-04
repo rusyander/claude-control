@@ -47,11 +47,6 @@ export const homeEn: HomeTexts = {
   step: (current: number, total: number) => `${current} of ${total}`,
   openChat: 'Open chat',
   permission: 'Permission needed',
-  branchGate: 'First edit in the main copy',
-  branchGateHint:
-    'The agent is about to edit files right in the main copy of the project. A separate copy with a branch can be made in the panel.',
-  writeHere: 'Write here',
-  dontWrite: 'Do not write',
   allow: 'Allow',
   deny: 'Deny',
   details: 'Details',
@@ -72,15 +67,13 @@ export const homeEn: HomeTexts = {
   answered: {
     allow: 'Allowed',
     deny: 'Denied',
-    here: 'Write here',
-    stop: 'Do not write',
   },
   running: 'the agent is working — the answer goes when it finishes the turn',
   outside:
     'You cannot answer from here: the request waits in a terminal or VS Code window. To decide from the phone, turn on «The agent on the computer» in Settings and add the panel hooks.',
   deferredTitle: (count: number) => `Awaiting decision (${count})`,
   deferredHint:
-    'Calls only a human may decide. The agents put them on this list and kept working; «Allow» resumes the work with exactly that call.',
+    'Calls from the former path that only a human may decide. No new records appear; a decision is only recorded — the conversation does not continue, ask for the work in the chat in words.',
   deferredGroup: (number: number, title?: string) =>
     title ? `group ${number} — ${title}` : `group ${number}`,
   deferredExpired: 'Expired — you can allow it again',

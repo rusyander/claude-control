@@ -3,11 +3,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { triageStagePrompt } from '@agentdeck/contracts/split-plan';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
-import { pickableGroups } from '../../chat/group-auto-pick/group-auto-pick.ts';
 import { builtinKitDir } from '../../kit/service.ts';
-import { normalizePathSteps, withPathSteps } from '../path-edit.ts';
 import { BUILTIN_GROUPS } from './builtin-groups.constants.ts';
 import {
   builtinGroupsStatus,
@@ -134,17 +131,6 @@ describe('встроенные группы доставки', () => {
     expect(builtinGroupsStatus(store).edited).toEqual([]);
   });
 
-  it('сохранение шагов через схему без правки не делает группу изменённой', () => {
-    seedBuiltinGroups(deps());
-    const own = store.getGroups().find((group) => group.id === 'builtin-delivery')!;
-    // Тот же путь, что PUT /api/groups/:id/path/steps: схема переставляет ключи шага.
-    store.saveGroup(withPathSteps(own, normalizePathSteps({ steps: own.path!.steps })));
-    expect(builtinGroupsStatus(store).edited).toEqual([]);
-
-    store.updateSettings({ language: 'en' });
-    expect(seedBuiltinGroups(deps()).updated).toContain('builtin-delivery');
-  });
-
   it('запись отпечатка прежнего формата: нетронутая обновляется, а не считается изменённой', () => {
     seedBuiltinGroups(deps());
     const own = store.getGroups().find((group) => group.id === 'builtin-delivery-backend')!;
@@ -211,25 +197,7 @@ describe('встроенные группы доставки', () => {
     seedBuiltinGroups(deps());
     expect(builtinGroupsStatus(store).edited).toEqual(['builtin-delivery-design']);
   });
-
-  it('«Авто» помечает встроенные и ставит их после своих групп; правило старшинства в разборе', () => {
-    store.saveGroup({ ...ownGroup('mine', 0), when: 'login form tickets' });
-    seedBuiltinGroups(deps());
-    const catalog = pickableGroups(store.getGroups(), '/p', null);
-
-    expect(catalog[0]?.builtin).toBeUndefined();
-    expect(catalog.slice(1).every((entry) => entry.builtin === true)).toBe(true);
-    const prompt = triageStagePrompt({ groups: GROUPS, catalog });
-    expect(prompt).toContain('A built-in group is a fallback');
-    expect(prompt).toContain('— built-in');
-    // Без встроенных правило не едет — в каждый разбор лишних слов не добавляем.
-    expect(triageStagePrompt({ groups: GROUPS, catalog: catalog.slice(0, 1) })).not.toContain(
-      'built-in',
-    );
-  });
 });
-
-const GROUPS = [{ title: 'a', branch: 'b', tasks: ['t'] }];
 
 function ownGroup(id: string, order: number) {
   return {

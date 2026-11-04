@@ -370,14 +370,19 @@ function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
         const { [line.stepId]: _taken, ...observerParks } = next.observerParks;
         return { ...next, observerParks };
       }
-      if (d.class !== 'reconcile' || !out || out.verdict !== 'ask') return next;
+      if (d.class !== 'reconcile' || !out) return next;
+      // Человек ответил «повторить сверку» (`conductor/reconcile.ts` `settleReconcileAnswer`):
+      // действие снова начатое — сверка прочтёт факт заново. Такая строка бывает только после
+      // вопроса, поэтому старые журналы и снимки этой свёрткой не меняются.
+      const recheck = out.verdict === 'retry' && (out as { by?: unknown }).by === 'human-recheck';
+      if (out.verdict !== 'ask' && !recheck) return next;
       const actionId = typeof out.actionId === 'string' ? out.actionId : '';
       const action = own(next.actions, actionId);
-      if (!action) return anomaly(`reconcile ask for unknown action ${actionId}`);
-      return {
-        ...next,
-        actions: { ...next.actions, [actionId]: { ...action, status: 'awaiting-human' } },
-      };
+      if (!action)
+        return anomaly(`reconcile ${String(out.verdict)} for unknown action ${actionId}`);
+      if (recheck && action.status !== 'awaiting-human') return next;
+      const status = recheck ? ('started' as const) : ('awaiting-human' as const);
+      return { ...next, actions: { ...next.actions, [actionId]: { ...action, status } } };
     }
     case 'command.received': {
       const d = (line as JournalLine<'command.received'>).data;

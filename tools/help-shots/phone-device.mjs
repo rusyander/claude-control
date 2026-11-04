@@ -34,7 +34,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { hostname, userInfo } from 'node:os';
 import { join, parse } from 'node:path';
 import { chromium } from 'playwright';
-import { SHOTS_ROOT, writeVariantIndex } from './kit.mjs';
+import { SHOTS_ROOT, dropUnsealed, frameSeal, unsealedKey, writeVariantIndex } from './kit.mjs';
 import { NotChecked, startStand, wait } from '../qa/throwaway-stand.mjs';
 import { PACKAGE, device, firstDevice } from '../qa/android-device.mjs';
 import { startProxy, upstreamJson, json } from '../qa/mobile-device-fixtures.mjs';
@@ -111,6 +111,8 @@ function openPhoneScenario(scenario) {
     dir,
     record(id, lang, file, size, text) {
       const shot = { file, masked: 0, ...size, shotAt: new Date().toISOString(), text };
+      // Печать кадра — как у `kit.mjs`: байты PNG на диске и текст описи одного снимка.
+      shot.seal = frameSeal(readFileSync(join(dir, file)), text);
       const before = frames.get(id) ?? {};
       frames.set(
         id,
@@ -138,6 +140,13 @@ function openPhoneScenario(scenario) {
       writeFileSync(
         path,
         `${JSON.stringify({ topic: 'phone', scenario, frames: list }, null, 2)}\n`,
+      );
+      dropUnsealed(
+        list
+          .filter((frame) => taken.has(frame.id))
+          .flatMap((frame) => [frame.file, frame.en?.file])
+          .filter(Boolean)
+          .map((file) => unsealedKey('phone', scenario, file)),
       );
     },
   };
@@ -439,6 +448,9 @@ try {
   stand = await startStand({
     web: false,
     label: 'phone-shots',
+    // Чат панели идёт через ядро задач: без своего ядра `/api/chat/send` отвечает «core is not
+    // running», и разговор «работает» на главной телефона не появлялся (кадры day 01/05 — 0 работает).
+    core: true,
     fakeCli: { claude: PHONE_FAKE_CLI },
     // Телефон подписывает компьютер именем, которое машина называет сама (`/api/system`);
     // настоящее имя машины съёмки в кадр попадать не должно — сверка кадров его ищет.

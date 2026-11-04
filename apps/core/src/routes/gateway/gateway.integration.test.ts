@@ -98,6 +98,22 @@ describe('routes/gateway on the stub contour (R:PR-01, P111)', () => {
     expect(await gateway().read.context('stub-chat')).toEqual({ value: 128000 });
   });
 
+  // Живой стенд 03.11: каталог платформы честно пишет `function_calling: false`, а прослойка
+  // инструментов контура включена — сеанс Claude отказывался «no_tools» до первого запроса, хотя
+  // инструменты ему даёт звено текстом протокола. Без прослойки «нет» каталога остаётся «нет».
+  it('tool shim on: a catalog model without native tools still serves tools (the hop shims them)', async () => {
+    const bare = reply(
+      200,
+      JSON.stringify({
+        data: [{ id: 'plain-7b', function_calling: false, context_length: 32768 }],
+      }),
+    );
+    const shimmed = await gateway({ fetch: bare }, { toolShim: true }).read.models();
+    expect(shimmed).toEqual({ value: [{ id: 'plain-7b', contextTokens: 32768, tools: true }] });
+    const native = await gateway({ fetch: bare }, { toolShim: false }).read.models();
+    expect(native).toEqual({ value: [{ id: 'plain-7b', contextTokens: 32768, tools: false }] });
+  });
+
   it('price: declared by the catalog → money; not declared → tokens only, never guessed', async () => {
     const priced = gateway({}, { baseUrl: `${stub.url}/openrouter`, defaultModel: 'stub-chat' });
     expect(await priced.read.price('stub-chat')).toEqual({

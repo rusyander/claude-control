@@ -27,6 +27,11 @@ export const STEP_KINDS = [
   'report',
   'ask-human',
   'custom',
+  /**
+   * Разговор с человеком (этап 10, чат панели над ядром): сессия ждёт между ходами человека и
+   * кончается только командой `end-chat` или отменой задачи — конец хода не повод напоминать.
+   */
+  'chat',
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number];
 /**
@@ -84,6 +89,7 @@ export const STEP_TIER_OF: Readonly<Record<StepKind, ModelTier>> = {
   report: 'ceiling',
   'ask-human': 'lower-if-mechanical',
   custom: 'ceiling',
+  chat: 'ceiling',
 };
 export type OverBudget = (typeof OVER_BUDGET)[number];
 export const WIDTH_ORDER = {
@@ -186,6 +192,22 @@ export const PRESET_IDS = [
   'tracker-ticket',
   /** Открывает опрос форжа (05:77): поздние заметки ревьюеров в MR законченной задачи. */
   'answer-reviewers',
+  /**
+   * Чат панели (этап 10): один шаг `chat`, без хвоста доставки и без оценки; публикация — только
+   * через вопрос человеку. Место — копия, основная копия проекта — только с грантом (06:98).
+   */
+  'chat',
+  /**
+   * Лёгкая сессия «ask» (этап 10, F2): один ход без репозитория во временном каталоге ядра,
+   * без встроенных инструментов. Создаётся только `POST /v1/ask`, оценка его отказывает.
+   */
+  'ask',
+  /**
+   * Ревью MR по ссылке (этап 10, F8 — перенос карточки ревью старой панели): единица 0 — копия
+   * на ветке MR, после ревью человек решает «починить / отписать / оба / ничего», пуш — отдельным
+   * вопросом. Создаётся только `POST /v1/review-link` (нужна личность MR), оценка его отказывает.
+   */
+  'review-link',
 ] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
 

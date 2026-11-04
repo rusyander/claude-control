@@ -27,6 +27,7 @@
  * Запуск: `node tools/qa/check-platform-config.mjs` (выход 0 — всё сходится,
  * 1 — провал, 2 — стенд не поднялся).
  */
+import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { freePort, runOnStand, wait } from './throwaway-stand.mjs';
 import { startStubPlatform } from './stub-platform.mjs';
@@ -67,10 +68,24 @@ async function chatAt(base) {
   return { status: res.status, text: await res.text() };
 }
 
+/**
+ * Шлюз держит ядро на хосте звеньев, но правка панели действует к её ответу (s10 G7): панель
+ * просит ядро применить контур (`POST /v1/contours/apply`) и отвечает после него. Поэтому
+ * сценарий проверяет провод СРАЗУ после ответа API или щелчка — без ожидания такта ядра.
+ */
+
 // Порт шлюза задан ДО старта панели: активация поднимает шлюз сама, и по
 // умолчанию он пошёл бы на 5179 — порт шлюза рабочего стенда человека.
+// Шлюз контуров держит ядро (этап 10): стенду нужно своё ядро, а ядро видит каталог панели
+// (контуры, ключ, разделы) только явной переменной — она ставится в `seed`, когда путь известен.
+const env = {};
 const standOptions = {
   label: 'cfg',
+  core: true,
+  env,
+  seed: ({ cfg }) => {
+    env.AGENTDECK_PANEL_DATA = join(cfg, 'agentdeck');
+  },
   settings: { platformGateway: { enabled: true, port: gatewayPort, forceStream: true } },
 };
 
@@ -160,15 +175,16 @@ await runOnStand(standOptions, async (stand, check) => {
 
   // ── Раздел открыт ─────────────────────────────────────────────────────────
   const open = await chatAt(assistantUrl);
+  const openBody = lastChatCall().body;
   check(
-    'открытый раздел: адрес профиля отвечает 200 и ответом контура',
+    'открытый раздел: адрес профиля отвечает 200 и ответом контура — сразу после записи',
     open.status === 200 && open.text.includes('готов'),
     `${open.status}: ${open.text.slice(0, 200)}`,
   );
   check(
     '«оба набора»: правило контура ушло в запрос',
-    lastChatCall().body.generation_preset === PRESET,
-    JSON.stringify(lastChatCall().body).slice(0, 300),
+    openBody.generation_preset === PRESET,
+    JSON.stringify(openBody).slice(0, 300),
   );
 
   const browser = await chromium.launch();
@@ -185,8 +201,22 @@ await runOnStand(standOptions, async (stand, check) => {
       String(await assistantRow.getAttribute('data-open')),
     );
 
+    /**
+     * Щелчок человека и ответ панели на его запись. Чтение настроек видит запись раньше, чем
+     * ответ на неё ушёл; «действует» обещает именно ответ (ядро применило контур до него).
+     */
+    const clickSaved = async (locator) => {
+      const saved = page.waitForResponse(
+        (response) =>
+          response.request().method() === 'PUT' && response.url().includes(`/platforms/${CONTOUR}`),
+        { timeout: 15000 },
+      );
+      await locator.click();
+      return saved.catch(() => undefined);
+    };
+
     // ── Закрыть ассистента щелчком человека ─────────────────────────────────
-    await assistantRow.getByRole('switch').click();
+    await clickSaved(assistantRow.getByRole('switch'));
     const closed = await until(
       'раздел ассистента снят в настройке',
       (platform) => !platform.consumers.includes('assistant'),
@@ -202,6 +232,7 @@ await runOnStand(standOptions, async (stand, check) => {
       String(await assistantRow.getAttribute('data-open')),
     );
 
+    // Ответ панели на щелчок пришёл — ядро уже применило снятый раздел: первый же запрос отказан.
     const callsBefore = stub.calls.length;
     const refused = await chatAt(assistantUrl);
     check(
@@ -234,7 +265,7 @@ await runOnStand(standOptions, async (stand, check) => {
     );
 
     // ── «Только наши» на карточке ─────────────────────────────────────────────
-    await page.locator(`[data-contour-rules="${CONTOUR}"] [data-applies="ours"]`).click();
+    await clickSaved(page.locator(`[data-contour-rules="${CONTOUR}"] [data-applies="ours"]`));
     const ours = await until(
       'выбор «только наши» записан',
       (platform) => platform.rules?.applies === 'ours',
@@ -243,7 +274,7 @@ await runOnStand(standOptions, async (stand, check) => {
     await chatAt(gw('/_s/chat/v1'));
     const oursBody = lastChatCall().body;
     check(
-      '«только наши»: правила контура в запрос не ушли, ушло одно «инструментов не надо»',
+      '«только наши»: правила контура в запрос не ушли, ушло одно «инструментов не надо» — сразу',
       oursBody.generation_preset === undefined && oursBody.tool_choice === 'none',
       JSON.stringify(oursBody).slice(0, 300),
     );
@@ -298,17 +329,18 @@ await runOnStand(standOptions, async (stand, check) => {
     }
 
     // ── «Оба набора» с вкладки правил: значения не терялись ─────────────────
-    await page.locator('[data-rules-applies] [data-applies="both"]').first().click();
+    await clickSaved(page.locator('[data-rules-applies] [data-applies="both"]').first());
     const both = await until(
       'выбор «оба набора» записан',
       (platform) => platform.rules?.applies === 'both',
     );
     if (both) check('выбор «оба набора» записан', true);
     await chatAt(gw('/_s/chat/v1'));
+    const bothBody = lastChatCall().body;
     check(
-      '«оба набора»: правило контура снова в запросе',
-      lastChatCall().body.generation_preset === PRESET,
-      JSON.stringify(lastChatCall().body).slice(0, 300),
+      '«оба набора»: правило контура снова в запросе — сразу',
+      bothBody.generation_preset === PRESET,
+      JSON.stringify(bothBody).slice(0, 300),
     );
 
     // ── Два быстрых переключателя подряд (ревью 28.09 F-83) ─────────────────

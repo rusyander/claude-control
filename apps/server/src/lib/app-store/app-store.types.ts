@@ -34,13 +34,9 @@ import type {
   SplitOverlapView,
 } from '@agentdeck/contracts/chat-handoff';
 import type { StoredSplitSettings } from '@agentdeck/contracts/task-split';
-import type {
-  EscalationNotice,
-  StoredChatGroupSettings,
-} from '@agentdeck/contracts/chat-group-settings';
+import type { StoredChatGroupSettings } from '@agentdeck/contracts/chat-group-settings';
 import type { StoredSplitDefaults } from '@agentdeck/contracts/split-groups';
 import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
-import type { GroupWatchRecord } from '@agentdeck/contracts/group-watch';
 import type { SplitHumanStepView, SplitTicketView } from '@agentdeck/contracts/split-tickets';
 import type { SieveReportRow } from '@agentdeck/contracts/sieves';
 import type { ReviewDepthGap, ReviewTier } from '@agentdeck/contracts/model-cascade';
@@ -176,12 +172,6 @@ export interface ChatLink {
    */
   ceilingModel?: string;
   ceilingEffort?: string;
-  /**
-   * «Ревью после работы» выключено в проекте (R3(d), 26.10) — снято при запуске
-   * группы, как потолок: тумблер, переключённый посреди цепочки, её не меняет.
-   * Нет поля — ревью как раньше. Работа идёт сразу в доставку с причиной.
-   */
-  reviewAfterWork?: false;
   /**
    * Чем шла РАБОТА: на неё возвращается звено правок. У связи ревью `model` —
    * это потолок (им ведут проверку), и без отдельной пары правки уехали бы на
@@ -458,8 +448,6 @@ export interface SplitPlanGroupRecord {
    * «Перепроверить MR»): с этого хода доставка требует строки `task-N`.
    */
   taskTrace?: boolean;
-  /** Чего не хватило до доставки на последней проверке — хабу и напоминанию группе. */
-  deliveryMissing?: string[];
   /** Сколько раз панель напомнила группе доделать доставку. */
   deliveryNudges?: number;
   /**
@@ -644,12 +632,6 @@ export interface SplitPlanGroupRecord {
   stand?: { name: string; image: string; startedAt: string };
   /** Итог закрытия группы ревью по её копии (T13, T6/T11). */
   reviewClose?: SplitGroupReviewClose;
-  /**
-   * Прежнее место сигналов сторожа групп: загрузка переносит их в свой срез
-   * (`AppState.groupWatchSignals`, F-42) и стирает отсюда. Пишут сюда только
-   * проверки сторожа без хранилища.
-   */
-  watch?: GroupWatchRecord;
 }
 
 export type SplitReviewClose = SplitGroupReviewClose;
@@ -784,11 +766,6 @@ export interface SplitPlanRecord {
     model?: string;
     effort?: string;
     assignments?: Record<string, { model?: string; effort?: string }>;
-    /**
-     * «Доставка на Sonnet» с карточки: номер группы → выбор человека. Нет номера —
-     * доставку группы решает общий рычаг `groupEconomy.sonnetDeliver` (F-12).
-     */
-    sonnetDeliver?: Record<string, boolean>;
   };
   /** Предложение агента после применения разбора (задачи, границы, заметки). */
   proposal: {
@@ -902,12 +879,6 @@ export interface RunnerPrefs {
 export interface RunnerTargetMeta {
   projectPath?: string;
   dir?: string;
-}
-
-/** Заметка главного чата в `state.json`: ключ повтора и когда прочитана. */
-export interface StoredChatEscalation extends EscalationNotice {
-  id: string;
-  readAt?: string;
 }
 
 /**
@@ -1055,20 +1026,6 @@ export interface AppState {
    */
   projectCodeLayout?: ProjectCodeLayout;
   /**
-   * Где ВЫКЛЮЧЕН подбор модели под задачу: нормализованный путь проекта → false.
-   *
-   * Только отклонение от умолчания: правило включено везде, где его не трогали.
-   * Выключенное значит «дети разделения едут на модели, которую выбрал человек»
-   * — то самое поведение, что было до партии подбора.
-   */
-  projectCascade: Record<string, boolean>;
-  /**
-   * Где ВЫКЛЮЧЕНО ревью после работы группы: путь проекта → false (Telegram R3(d),
-   * 26.10). Отдельно от подбора: ревью держалось на потолке подбора, и снять его
-   * можно было только вместе с дешёвыми моделями. Только отклонение от умолчания.
-   */
-  projectReviewAfterWork: Record<string, boolean>;
-  /**
    * Откуда взялся чат: ключ разговора → его родитель. Заполняется разделением
    * задач и больше ничем.
    *
@@ -1099,19 +1056,6 @@ export interface AppState {
    * переезда, пишет запись под прежним ключом — по этой карте она ложится туда же.
    */
   splitPlanMoves?: Record<string, string>;
-  /**
-   * Сигналы сторожа групп (`token-ledger/watch`): родитель разделения → номер
-   * группы → сигналы. Свой срез, а не поле записи разделения (F-42): конвейер
-   * пересобирает запись и пишет её после долгих `await`, и запись, взятая до
-   * них, стирала бы сигналы, поднятые за это время. Пишет только сторож.
-   */
-  groupWatchSignals?: Record<string, Record<string, GroupWatchRecord>>;
-  /**
-   * Сигналы сторожа одиночных чатов панели (чат без связи с деревом): ключ чата →
-   * блок `{ signals }`. Свой срез рядом с групповым: у чата нет записи разделения.
-   * Пишет только сторож.
-   */
-  chatWatchSignals?: Record<string, GroupWatchRecord>;
   /**
    * Продолжения панели подряд у группы «по плану», чей ход кончился ожиданием
    * ответа текстом (`group-wait.ts`, F-87): номер сессии → счёт. На диске, а не в
@@ -1222,12 +1166,6 @@ export interface AppState {
    */
   platformGatewayPort?: number;
   /**
-   * Модели, замеченные с голым `</think>` в тексте ответа (L9): id контура →
-   * имена моделей. Факт, а не настройка: шлюз держит их ответы до тега, у
-   * остальных — только ответ, начатый с `<think>`. Уходит с контуром.
-   */
-  platformThinkTail?: Record<string, string[]>;
-  /**
    * Что человек привязал к проверяемому проекту: абсолютный путь проекта →
    * задачи Jira, страницы Confluence и репозиторий форджа (у самого проекта и
    * у каждой его группы тестов).
@@ -1251,15 +1189,16 @@ export interface AppState {
   /**
    * Группа и автономность ЧАТА (не проекта): ключ разговора → своё у него.
    * Нет записи — значения родителя по дереву разделения или умолчания
-   * (`resolveChatGroupSettings`). См. `chat-group-settings.ts`.
+   * (`resolveChatGroupSettings`). Только чтение записей прежнего меню чата: новых
+   * панель не пишет. См. `chat-group-settings.ts`. Заметки главным чатам
+   * (`chatEscalations`) убраны вместе с их маршрутами: прежний ключ в файле
+   * снимается при чтении (`state-file.ts`).
    */
   chatGroupSettings?: Record<string, StoredChatGroupSettings>;
   /** Временный ключ разговора `new-…` → его `sessionId`: чтение по старому находит новое. */
   chatKeyAliases?: Record<string, string>;
   /** Ветка правки реплики → разговор, от которого она ответвилась (`chat-forks.ts`). */
   chatForks?: Record<string, string>;
-  /** Критические замечания детей: главный чат дерева → заметки (с отметкой прочтения). */
-  chatEscalations?: Record<string, StoredChatEscalation[]>;
   /**
    * Общие правила групп разделения (вкладка «Группы»): разрешения, потолки
    * лёгкого и тяжёлого проекта, правило тяжести. Только отклонение от коробки.

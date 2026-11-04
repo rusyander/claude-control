@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TelegramLastSend, TelegramSettings } from '@agentdeck/contracts';
-import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from './run-notice.types.ts';
 import { compose, createTelegramNotifier, type TelegramNotice } from './telegram.ts';
 import {
   deliverTelegram,

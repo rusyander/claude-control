@@ -12,6 +12,13 @@ import {
   sandboxPaths,
   type SandboxSelection,
 } from '../../domains/sandbox/SandboxConfig.ts';
+import { ensureSandboxRepo } from '../../domains/sandbox/SandboxRepo.ts';
+import { TestsCoreRun } from '../../domains/project-tests/agent/core-run.ts';
+import { defaultTestsCorePort } from '../../domains/project-tests/agent/agent-runs.ts';
+import type { TestsAgentEvent } from '../../domains/project-tests/agent/agent-run.types.ts';
+import type { CoreChatPort } from '../../domains/chat/core-run/core-run.types.ts';
+import { isInternalChatEvent, type ChatEvent } from '../../domains/chat/chat-events.ts';
+import { readClaudeCredentials } from '../../lib/credentials/credentials.ts';
 import {
   EVENT_FIXTURES,
   runHookProbe,
@@ -21,9 +28,6 @@ import {
   type ProbeResult,
 } from '../../domains/sandbox/HookProbe.ts';
 import { listMcpTools, callMcpTool } from '../../domains/sandbox/McpProbe.ts';
-import { ChatRun, type ChatEvent } from '../../domains/chat/ChatRunner/ChatRunner.ts';
-import { isInternalChatEvent } from '../../domains/chat/chat-events.ts';
-import { readClaudeCredentials } from '../../lib/credentials/credentials.ts';
 import { readHooks } from '../../domains/hooks/hooks.ts';
 import { readEnvLookup } from '../../domains/env/env.ts';
 import { readMcpServers } from '../../domains/mcp/mcp.ts';
@@ -39,9 +43,17 @@ import { sectionGuard } from '../provider-guard/provider-guard.ts';
  * Три вида проверки, от дешёвой к дорогой. Хуки и скрипты запускаются напрямую
  * на заготовленном событии — мгновенно и без обращения к модели. MCP-сервер
  * поднимается и опрашивается по протоколу. Правила и скиллы иначе как
- * настоящим разговором не проверить, поэтому для них поднимается Claude Code
- * с временной конфигурацией, где есть только проверяемое.
+ * настоящим разговором не проверить; этот разговор — задача ядра `chat@1`
+ * (`/api/sandbox/run`), «Стоп» снимает её командой ядра `cancel`.
  */
+
+/** Причина снятия задачи песочницы по «Стоп» — в журнале задачи ядра. */
+export const SANDBOX_STOP_REASON = 'sandbox conversation stopped by the human in the panel';
+
+export interface SandboxRoutesDeps {
+  /** Порт ядра для разговора; нет — порт по умолчанию (запись ядра в его доме). */
+  corePort?: () => CoreChatPort;
+}
 /**
  * Путь к скрипту внутри hooks/ песочницы по имени из запроса.
  *
@@ -62,8 +74,15 @@ function safeScriptPath(hooksDir: string, name: string): string | undefined {
   return !rel || rel.startsWith('..') || isAbsolute(rel) ? undefined : full;
 }
 
-export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext): void {
-  const running = new Map<string, ChatRun>();
+export function registerSandboxRoutes(
+  app: FastifyInstance,
+  ctx: ServerContext,
+  deps: SandboxRoutesDeps = {},
+): void {
+  const running = new Map<string, TestsCoreRun>();
+  let port: CoreChatPort | undefined;
+  const corePort = (): CoreChatPort =>
+    deps.corePort ? deps.corePort() : (port ??= defaultTestsCorePort());
   // Сборка, прогоны и опрос MCP читают конфигурацию Claude, а разговор — это
   // процесс `claude`. При другом активном CLI песочница проверяла бы НЕ его
   // настройки и запускала бы Claude молча — отказ до сборки и до запуска.
@@ -107,8 +126,6 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
   );
 
   app.delete<{ Params: { id: string } }>('/api/sandbox/:id', (request) => {
-    running.get(request.params.id)?.stop();
-    running.delete(request.params.id);
     removeSandbox(request.params.id);
     return { ok: true };
   });
@@ -295,15 +312,19 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
   );
 
   /**
-   * Разговор внутри песочницы. Отличие от обычного чата одно, но решающее:
-   * Claude Code запускается с временным каталогом конфигурации, поэтому видит
-   * только проверяемые настройки и ничего из настоящих.
+   * Разговор внутри песочницы — задача ядра `chat@1` в рабочей папке песочницы (этап 10, F6).
+   * Отличие от обычного чата одно, но решающее: Claude Code видит только проверяемые настройки
+   * и ничего из настоящих. Ядро держит это тремя настройками сеанса задачи: каталог конфигурации
+   * песочницы — окружением задачи (`CLAUDE_CONFIG_DIR`, значение только в памяти ядра), источник —
+   * только слой человека (`--setting-sources user`: рабочая папка лежит под домашней, и слои
+   * проекта CLI собирал бы, поднимаясь по предкам до `~`), без брифа ядра (он примешался бы к
+   * проверке правила или скилла). Каждый вопрос — свой ход: клиент шлёт `{id, prompt}`.
    */
   app.post<{ Body: { id?: string; prompt?: string; sessionId?: string } }>(
     '/api/sandbox/run',
     claudeOnly,
     async (request, reply) => {
-      const { id, prompt, sessionId } = request.body;
+      const { id, prompt } = request.body;
 
       // Ни песочницу, ни вопрос домыслить нечем. Без этой проверки запрос без
       // тела уходил собирать пути из `undefined` и отвечал 500.
@@ -335,31 +356,46 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       }
 
       const { configDir, workDir } = sandboxPaths(id);
+      // Оценка ядра принимает только репозиторий: своего проекта у песочницы нет.
+      const repoFailed = ensureSandboxRepo(workDir);
+      if (repoFailed) {
+        return reply.code(500).send({
+          message: `Рабочая папка песочницы не подготовлена для ядра: ${repoFailed}`,
+          messageCode: 'sandbox-repo-failed',
+          params: { reason: repoFailed },
+        });
+      }
       // Доступ может быть не файлом, а ключом API: тогда он приходит
       // переменной окружения и в каталоге песочницы его нет.
       const { apiKey } = readClaudeCredentials(ctx.location.paths.root);
-      const env = apiKey ? { ANTHROPIC_API_KEY: apiKey } : undefined;
+      const env: Record<string, string> = {
+        CLAUDE_CONFIG_DIR: configDir,
+        ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+      };
 
+      reply.hijack();
       reply.raw.writeHead(200, {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         Connection: 'keep-alive',
       });
-
-      const send = (event: ChatEvent): void => {
+      const send = (event: TestsAgentEvent): void => {
         // Сжатие окна и результат вызова — для реестра и сторожа групп; песочнице они не нужны.
-        if (isInternalChatEvent(event)) return;
+        if (isInternalChatEvent(event as ChatEvent) || reply.raw.writableEnded) return;
         reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
       };
+      // Оценка, запуск и подъём сеанса ядра идут до первого слова молча: пинг не даёт прокси и
+      // браузеру закрыть соединение (кадр без `data:` клиент пропускает).
+      const heartbeat = setInterval(() => {
+        if (!reply.raw.writableEnded) reply.raw.write(': ping\n\n');
+      }, 10_000);
 
-      const run = new ChatRun();
+      const run = new TestsCoreRun({ port: corePort(), stopReason: SANDBOX_STOP_REASON });
       running.set(id, run);
-
       // Пока идёт прогон, подметание эту песочницу не трогает: длинный агентный
       // ход может часами ничего не писать на диск и по одним отметкам времени
       // выглядит брошенным.
       markSandboxBusy(id);
-
       reply.raw.on('close', () => {
         if (running.get(id) === run) {
           run.stop();
@@ -368,12 +404,22 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
       });
 
       try {
-        // Только `user` — то есть каталог песочницы. Рабочая папка лежит под
-        // домашней, и слои проекта CLI собирал бы, поднимаясь по предкам до `~`:
-        // настоящий `~/.claude/CLAUDE.md` вошёл бы в прогон, который должен
-        // видеть лишь проверяемое. Своего проекта у песочницы нет — терять нечего.
         await run.start(
-          { prompt, sessionId, cwd: workDir, configDir, settingSources: 'user', env },
+          {
+            adapter: 'claude',
+            providerName: 'Claude Code',
+            prompt,
+            cwd: workDir,
+            title: `sandbox ${id}`,
+            session: { brief: 'none', sources: 'user' },
+            env,
+            refused: (reason) => ({
+              kind: 'error',
+              message: `Ядро не провело разговор в песочнице: ${reason}`,
+              messageCode: 'sandbox-core-refused',
+              params: { reason },
+            }),
+          },
           send,
         );
       } catch (error) {
@@ -383,13 +429,15 @@ export function registerSandboxRoutes(app: FastifyInstance, ctx: ServerContext):
           ...codeOf(error),
         });
       } finally {
-        running.delete(id);
+        clearInterval(heartbeat);
+        if (running.get(id) === run) running.delete(id);
         markSandboxFree(id);
         reply.raw.end();
       }
     },
   );
 
+  /** «Стоп» — команда ядру `cancel`: задача песочницы снимается, ход CLI обрывает хост сеанса. */
   app.post<{ Params: { id: string } }>('/api/sandbox/:id/stop', (request) => {
     const run = running.get(request.params.id);
     run?.stop();

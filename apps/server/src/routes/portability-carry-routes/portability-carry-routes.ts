@@ -11,14 +11,14 @@ import {
   type HandoffChains,
 } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
+import { appendMessage, listChats, readChat } from '../../domains/provider-chat/store/store.ts';
+import type { CoreChatPort } from '../../domains/chat/core-run/core-run.types.ts';
 import {
-  appendMessage,
-  createChat,
-  deleteChat,
-  listChats,
-  readChat,
-} from '../../domains/provider-chat/store/store.ts';
-import type { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
+  startCoreForeignChat,
+  withRoutes,
+} from '../../domains/chat/core-foreign/core-foreign-start.ts';
+import type { ForeignCarryResolver } from '../../domains/chat/core-foreign/foreign-carry.ts';
+import { coreContourRoutes } from '../../domains/platform/routing/core-contour.ts';
 import {
   carryChats,
   planCarry,
@@ -51,7 +51,10 @@ export interface PortabilityCarryDeps {
   runs: ChatRunRegistry;
   chains: HandoffChains;
   session: ChatSession;
-  providerChats: ProviderChatService;
+  /** Разговор у чужого CLI заводится задачей ядра (`startCoreForeignChat`). */
+  coreChats: Pick<CoreChatPort, 'estimate' | 'command'>;
+  /** Слой панели разговору чужого CLI (G6): строка о тестах, набор для CLI. */
+  foreignCarry?: ForeignCarryResolver;
 }
 
 export function registerPortabilityCarryRoutes(
@@ -127,7 +130,7 @@ export function registerPortabilityCarryRoutes(
 
   app.post<{ Body: { keys?: unknown } }>(
     '/api/portability/carry/apply',
-    (request, reply): CarryApplyAnswer | FastifyReply => {
+    async (request, reply): Promise<CarryApplyAnswer | FastifyReply> => {
       const keys = Array.isArray(request.body?.keys)
         ? request.body.keys.filter((key): key is string => typeof key === 'string' && key !== '')
         : [];
@@ -139,17 +142,20 @@ export function registerPortabilityCarryRoutes(
       }
 
       const target = getActiveProvider(ctx.store);
-      const outcomes = carryChats(sourcesFor(target.id), keys, {
+      // Задачи ядра, заведённые этим переносом: в их ленту панель не пишет (лента — журнал
+      // ядра, о переносе там говорит само задание), и заметке туда лечь некуда.
+      const coreTasks = new Set<string>();
+      const outcomes = await carryChats(sourcesFor(target.id), keys, {
         chains: deps.chains,
         targetName: target.name,
         /**
          * Заводит разговор у НОВОГО CLI. Две ветки, потому что разговоры
          * устроены по-разному: у Claude прогон в реестре под временным ключом,
-         * у чужого — запись в собственном хранилище панели. Ветка Claude —
-         * общий с продолжением стартер: своя копия наследования прав, модели и
-         * набора проекта разошлась бы с ним на первой же правке.
+         * у чужого — задача ядра с его CLI. Ветка Claude — общий с продолжением
+         * стартер: своя копия наследования прав, модели и набора проекта
+         * разошлась бы с ним на первой же правке.
          */
-        open: (input) => {
+        open: async (input) => {
           if (target.id === 'claude') {
             const key = `new-${Date.now()}`;
             const started = continuationStarter(app, ctx, deps, selfBaseUrl, {
@@ -161,41 +167,43 @@ export function registerPortabilityCarryRoutes(
               : { ok: false, failure: 'run_not_started' };
           }
 
-          // Набор проекта тумблером Claude здесь НЕ включается: новый CLI файлов
-          // Claude не читает. Привязанные к каталогу группы он получает слоем на
-          // прогон при отправке ниже (`group-activation-wiring`), а у CLI без
-          // слоя в ленте остаётся заметка «не действует».
-          const created = createChat(appData(), target.id, {
-            title: input.title,
-            workdir: input.cwd,
-          });
-          if (!created) return { ok: false, failure: 'chat_not_created' };
+          // Разговор чужого CLI — задача ядра `chat@1` с этим CLI (этап 10, F2c): своего
+          // исполнителя чужих CLI у панели нет. Ключ и id — задача ядра: её лента и есть
+          // разговор. Отказ ядра (CLI без переходника, ядро не запущено) — «прогон не
+          // пошёл» с кодом ядра в журнале сервера; задачу, не дошедшую до запуска, снимает
+          // сам стартер.
           const prefix = initiativePrompt(ctx.store.getSettings(), { foreign: true });
-          const outcome = deps.providerChats.send(
-            appData(),
-            target.id,
-            created.id,
-            { text: input.prompt },
-            {
-              provider: target,
-              models: ctx.models.current(target.modelVendors ?? []).models,
-              ...(prefix ? { systemPrefix: prefix } : {}),
-            },
+          const routes = withRoutes(
+            coreContourRoutes(ctx.store, `foreign:${target.id}`, target.id),
           );
-          if (outcome.ok)
-            return { ok: true, key: foreignChatKey(target.id, created.id), chatId: created.id };
-          // Разговор заведён, а задание в него не ушло: это ТРЕТИЙ отказ —
-          // чинить надо CLI, а не хранилище. Заведённый разговор убирается:
-          // задание в нём машинное (опора плюс корневая задача), руками человек
-          // его не повторит, и «откройте и отправьте снова» было бы советом в
-          // пустоту — переносить надо заново. Уборка своя, потому что снаружи
-          // ключа на этот разговор ещё ни у кого нет.
-          try {
-            deleteChat(appData(), target.id, created.id);
-          } catch (error) {
-            app.log.warn({ err: error }, 'empty carried chat left behind');
+          // Слой панели (G6): строка о тестах и набор для CLI; не переносится — не заводим.
+          const carried = deps.foreignCarry?.({ cli: target.id, cwd: input.cwd, ...routes });
+          if (carried && !carried.ok) {
+            app.log.warn({ cli: target.id }, `carry: ${carried.reason}`);
+            return { ok: false, failure: 'run_not_started' };
           }
-          return { ok: false, failure: 'send_failed' };
+          try {
+            const outcome = await startCoreForeignChat(deps.coreChats, {
+              cli: target.id,
+              cwd: input.cwd,
+              prompt: input.prompt,
+              title: input.title,
+              ...(prefix ? { preface: prefix } : {}),
+              ...routes,
+              ...(carried ? { carry: carried.carry } : {}),
+            });
+            if (outcome.ok) {
+              coreTasks.add(outcome.taskId);
+              return { ok: true, key: outcome.taskId, chatId: outcome.taskId };
+            }
+            app.log.warn(
+              { code: outcome.code, cli: target.id },
+              `carry refused by the core: ${outcome.message}`,
+            );
+          } catch (error) {
+            app.log.warn({ err: error, cli: target.id }, 'carry: core unreachable');
+          }
+          return { ok: false, failure: 'run_not_started' };
         },
         /**
          * Слово в ленту разговора, каким бы провайдером он ни был. У чужого CLI
@@ -206,6 +214,7 @@ export function registerPortabilityCarryRoutes(
          * показывается человеку — умолчания здесь нет.
          */
         notice: (key, text) => {
+          if (coreTasks.has(key)) return false;
           const foreign = parseForeignChatKey(key);
           if (!foreign) {
             return deps.runs.emitExternal(key, { kind: 'notice', code: 'contextCarried', text });

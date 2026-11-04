@@ -8,7 +8,6 @@ import { groupKeyOf, parseGroupKey, scopeOf } from '@agentdeck/contracts/group-s
 import {
   AUTONOMOUS_PICK_MARKER,
   autonomousPickMessage,
-  pickRecommended,
   resolveChatGroupSettings,
 } from '@agentdeck/contracts/chat-group-settings';
 import { groupSchema } from '@agentdeck/contracts/groups';
@@ -112,31 +111,9 @@ describe('chat group settings', () => {
   });
 });
 
-describe('autonomous pick', () => {
-  const ask = (options: string[], header = 'Scope') => ({
-    questions: [{ question: 'Which scope?', header, options: options.map((label) => ({ label })) }],
-  });
-
-  it('takes the option marked (Recommended), not the first one', () => {
-    expect(pickRecommended(ask(['Narrow', 'Wide (Recommended)']))).toEqual([
-      { question: 'Which scope?', label: 'Wide (Recommended)', critical: false },
-    ]);
-  });
-
-  it('no recommendation on any question → the whole call goes to the human', () => {
-    expect(pickRecommended(ask(['Narrow', 'Wide']))).toBeNull();
-    const mixed = {
-      questions: [...ask(['A (Recommended)']).questions, ...ask(['B', 'C']).questions],
-    };
-    expect(pickRecommended(mixed)).toBeNull();
-    expect(pickRecommended({})).toBeNull();
-    expect(pickRecommended(null)).toBeNull();
-  });
-
-  it('a question headed critical is flagged for the main chat', () => {
-    expect(pickRecommended(ask(['Stop (Recommended)'], 'Critical'))?.[0]?.critical).toBe(true);
-  });
-
+// Выбор автономии (`pickRecommended`) снят вместе с хуком набора 02.11.2026; формат текста
+// остаётся — его пишут прежние транскрипты и личный двойник хука, разбирает лента.
+describe('autonomous pick message', () => {
   it('the refusal text carries the marker and every pick', () => {
     const text = autonomousPickMessage([{ question: 'Q1', label: 'L1', critical: false }]);
     expect(text.startsWith(AUTONOMOUS_PICK_MARKER)).toBe(true);

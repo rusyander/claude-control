@@ -5,22 +5,22 @@
       "light-ru": {
         "file": "01-modes.png",
         "width": 1140,
-        "height": 336
+        "height": 580
       },
       "light-en": {
         "file": "01-modes.en.png",
         "width": 1140,
-        "height": 336
+        "height": 543
       },
       "dark-ru": {
         "file": "01-modes.dark.png",
         "width": 1140,
-        "height": 336
+        "height": 580
       },
       "dark-en": {
         "file": "01-modes.dark.en.png",
         "width": 1140,
-        "height": 336
+        "height": 543
       }
     },
     "page/02-items": {

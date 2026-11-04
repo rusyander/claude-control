@@ -18,7 +18,10 @@ import { readProviderPermissions } from '../provider-permissions/dispatch.ts';
 import { readProviderPluginsInfo } from '../provider-plugins/info.ts';
 import { readProviderRulesInfo } from '../provider-rules/read.ts';
 import { readProviderSkillsInfo } from '../provider-skills/read.ts';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { envSkip } from './canon.ts';
+import { guardSection, unreadableSection } from './section-guard.ts';
+import { nested } from './intent-codes.ts';
 import { sectionTargets, type SectionTargets } from './project/project.ts';
 import { bodyAfterFrontmatter } from './markdown.ts';
 import {
@@ -85,27 +88,30 @@ export function readUniversalSections(deps: ImportDeps): ImportResult {
   // названный пропуск по каждому виду. Подставить сюда домашние пути значило бы
   // выдать глобальную среду за проектную.
   if (!targets.supported) {
-    const why = targets.why ?? 'уровень не поддержан';
-    return { items: [], skipped: UNIVERSAL_KINDS.map((kind) => envSkip(kind, 'no_section', why)) };
+    // `projectSupport` называет причину с кодом на каждой ветке «не поддержан».
+    const skip = (kind: EnvItemKind) =>
+      envSkip(kind, 'no_section', targets.why ?? '', targets.whyCode, targets.whyParams);
+    return { items: [], skipped: UNIVERSAL_KINDS.map(skip) };
   }
 
   const items: EnvItem[] = [];
   const skipped: EnvSkip[] = [];
   const sectionStates: EnvSectionState[] = [];
 
-  for (const stage of [
-    readInstructions,
-    readRules,
-    readInstructionsList,
-    readMcp,
-    readEnv,
-    readPermissions,
-    readHooks,
-    readSkills,
-    readPlugins,
-    readCommands,
-  ] satisfies Stage[]) {
-    const result = stage(deps, targets);
+  // Раздел, который бросил, назван непрочитанным; остальные разделы паспорта на месте.
+  for (const [stage, kinds, where] of [
+    [readInstructions, ['instructions'], targets.instructionsFile],
+    [readRules, ['instructions'], targets.instructionsRules?.rulesDir],
+    [readInstructionsList, ['instructions'], targets.instructionsList?.configPath],
+    [readMcp, ['mcpServer'], targets.mcp?.filePath],
+    [readEnv, ['envVar'], targets.env?.filePath],
+    [readPermissions, ['permission'], targets.permissions?.filePath],
+    [readHooks, ['hook'], targets.hooks?.filePath],
+    [readSkills, ['skill'], targets.skills?.skillsDir],
+    [readPlugins, ['plugin'], targets.plugins?.pluginsDir],
+    [readCommands, ['command'], targets.commands?.dir],
+  ] satisfies [Stage, EnvItemKind[], string | undefined][]) {
+    const result = guardSection(kinds, where ?? targets.root, () => stage(deps, targets));
     items.push(...result.items);
     skipped.push(...result.skipped);
     sectionStates.push(...(result.sectionStates ?? []));
@@ -127,12 +133,21 @@ function readInstructions(deps: ImportDeps, targets: SectionTargets): ImportResu
     if (targets.instructionsRules ?? targets.instructionsList) return { items: [], skipped: [] };
     return {
       items: [],
-      skipped: [envSkip('instructions', 'no_section', notSupported(provider.name, targets.scope))],
+      skipped: [
+        envSkip('instructions', 'no_section', ...notSupported(provider.name, targets.scope)),
+      ],
     };
   }
 
   if (!existsSync(filePath)) {
-    return { items: [], skipped: [envSkip('instructions', 'empty', `файла ${filePath} нет`)] };
+    return {
+      items: [],
+      skipped: [
+        envSkip('instructions', 'empty', `файла ${filePath} нет`, 'portability-skip-file-missing', {
+          path: filePath,
+        }),
+      ],
+    };
   }
 
   const source = sourceFactory(provider.id, deps.scope, filePath);
@@ -161,12 +176,21 @@ function readRules(deps: ImportDeps, targets: SectionTargets): ImportResult {
 
   const info = readProviderRulesInfo(target);
   if (info.error) {
-    return { items: [], skipped: [envSkip('instructions', 'not_readable', info.error)] };
+    return {
+      items: [],
+      skipped: [unreadableSection('instructions', target.rulesDir, info.error)],
+    };
   }
 
   const source = sourceFactory(deps.provider.id, deps.scope, target.rulesDir);
   const skipped: EnvSkip[] = info.ignored.map((file) =>
-    envSkip('instructions', 'unsupported_format', `${file.path}: расширение не читается этим CLI`),
+    envSkip(
+      'instructions',
+      'unsupported_format',
+      `${file.path}: расширение не читается этим CLI`,
+      'portability-skip-rule-extension',
+      { path: file.path },
+    ),
   );
   return {
     items: info.rules.map((rule) =>
@@ -193,7 +217,15 @@ function readInstructionsList(deps: ImportDeps, targets: SectionTargets): Import
   const skipped: EnvSkip[] = [];
   for (const entry of readProviderInstructionsEntries(target)) {
     if (!entry.exists) {
-      skipped.push(envSkip('instructions', 'not_readable', `${entry.raw}: файла нет на диске`));
+      skipped.push(
+        envSkip(
+          'instructions',
+          'not_readable',
+          `${entry.raw}: файла нет на диске`,
+          'portability-skip-file-absent',
+          { path: entry.raw },
+        ),
+      );
       continue;
     }
     items.push(
@@ -216,7 +248,7 @@ function readMcp(deps: ImportDeps, targets: SectionTargets): ImportResult {
     return {
       items: [],
       skipped: [
-        envSkip('mcpServer', 'no_section', notSupported(deps.provider.name, targets.scope)),
+        envSkip('mcpServer', 'no_section', ...notSupported(deps.provider.name, targets.scope)),
       ],
     };
   }
@@ -230,13 +262,19 @@ function readMcp(deps: ImportDeps, targets: SectionTargets): ImportResult {
       skipped: [
         ...normalized.skipped,
         ...section.skippedBlocks.map((block) =>
-          envSkip('mcpServer', 'unsupported_format', `${block.path}: ${block.reason}`),
+          envSkip(
+            'mcpServer',
+            'unsupported_format',
+            `${block.path}: ${block.reason}`,
+            'portability-skip-mcp-block',
+            { path: block.path, reason: nested(block.reasonCode) },
+          ),
         ),
       ],
     });
   } catch (error) {
     // Fail-closed: файл не разобран — записей нет, причина названа.
-    return { items: [], skipped: [envSkip('mcpServer', 'not_readable', messageOf(error))] };
+    return { items: [], skipped: [unreadableSection('mcpServer', target.filePath, error)] };
   }
 }
 
@@ -245,7 +283,9 @@ function readEnv(deps: ImportDeps, targets: SectionTargets): ImportResult {
   if (!target) {
     return {
       items: [],
-      skipped: [envSkip('envVar', 'no_section', notSupported(deps.provider.name, targets.scope))],
+      skipped: [
+        envSkip('envVar', 'no_section', ...notSupported(deps.provider.name, targets.scope)),
+      ],
     };
   }
 
@@ -265,7 +305,7 @@ function readEnv(deps: ImportDeps, targets: SectionTargets): ImportResult {
       skipped: [],
     });
   } catch (error) {
-    return { items: [], skipped: [envSkip('envVar', 'not_readable', messageOf(error))] };
+    return { items: [], skipped: [unreadableSection('envVar', target.filePath, error)] };
   }
 }
 
@@ -275,7 +315,7 @@ function readPermissions(deps: ImportDeps, targets: SectionTargets): ImportResul
     return {
       items: [],
       skipped: [
-        envSkip('permission', 'no_section', notSupported(deps.provider.name, targets.scope)),
+        envSkip('permission', 'no_section', ...notSupported(deps.provider.name, targets.scope)),
       ],
     };
   }
@@ -287,7 +327,17 @@ function readPermissions(deps: ImportDeps, targets: SectionTargets): ImportResul
   if (!existsSync(target.filePath)) {
     return {
       items: [],
-      skipped: [envSkip('permission', 'empty', `файла ${target.filePath} нет`)],
+      skipped: [
+        envSkip(
+          'permission',
+          'empty',
+          `файла ${target.filePath} нет`,
+          'portability-skip-file-missing',
+          {
+            path: target.filePath,
+          },
+        ),
+      ],
     };
   }
 
@@ -299,7 +349,7 @@ function readPermissions(deps: ImportDeps, targets: SectionTargets): ImportResul
       skipped: normalized.skipped,
     });
   } catch (error) {
-    return { items: [], skipped: [envSkip('permission', 'not_readable', messageOf(error))] };
+    return { items: [], skipped: [unreadableSection('permission', target.filePath, error)] };
   }
 }
 
@@ -308,12 +358,14 @@ function readHooks(deps: ImportDeps, targets: SectionTargets): ImportResult {
   if (!target) {
     return {
       items: [],
-      skipped: [envSkip('hook', 'no_section', notSupported(deps.provider.name, targets.scope))],
+      skipped: [envSkip('hook', 'no_section', ...notSupported(deps.provider.name, targets.scope))],
     };
   }
 
   const info = readProviderHooksInfo(target);
-  if (info.error) return { items: [], skipped: [envSkip('hook', 'not_readable', info.error)] };
+  if (info.error) {
+    return { items: [], skipped: [unreadableSection('hook', target.filePath, info.error)] };
+  }
 
   const source = sourceFactory(deps.provider.id, deps.scope, target.filePath);
   const inputs: HookInput[] =
@@ -364,6 +416,8 @@ function readHooks(deps: ImportDeps, targets: SectionTargets): ImportResult {
           kind: 'hook',
           enabled: false,
           detail: `${target.filePath}: ключ disableAllHooks выключает весь раздел`,
+          detailCode: 'portability-section-hooks-off',
+          detailParams: { path: target.filePath },
         },
       ]
     : [];
@@ -382,12 +436,14 @@ function readSkills(deps: ImportDeps, targets: SectionTargets): ImportResult {
   if (!target) {
     return {
       items: [],
-      skipped: [envSkip('skill', 'no_section', notSupported(deps.provider.name, targets.scope))],
+      skipped: [envSkip('skill', 'no_section', ...notSupported(deps.provider.name, targets.scope))],
     };
   }
 
   const info = readProviderSkillsInfo(target);
-  if (info.error) return { items: [], skipped: [envSkip('skill', 'not_readable', info.error)] };
+  if (info.error) {
+    return { items: [], skipped: [unreadableSection('skill', target.skillsDir, info.error)] };
+  }
 
   const source = sourceFactory(deps.provider.id, deps.scope, target.skillsDir);
   return orEmpty('skill', target.skillsDir, {
@@ -404,7 +460,13 @@ function readSkills(deps: ImportDeps, targets: SectionTargets): ImportResult {
       });
     }),
     skipped: info.ignored.map((dir) =>
-      envSkip('skill', 'unsupported_format', `${dir.dirName}: в каталоге нет SKILL.md`),
+      envSkip(
+        'skill',
+        'unsupported_format',
+        `${dir.dirName}: в каталоге нет SKILL.md`,
+        'portability-skip-no-skill-file',
+        { name: dir.dirName },
+      ),
     ),
   });
 }
@@ -414,7 +476,9 @@ function readPlugins(deps: ImportDeps, targets: SectionTargets): ImportResult {
   if (!target) {
     return {
       items: [],
-      skipped: [envSkip('plugin', 'no_section', notSupported(deps.provider.name, targets.scope))],
+      skipped: [
+        envSkip('plugin', 'no_section', ...notSupported(deps.provider.name, targets.scope)),
+      ],
     };
   }
 
@@ -472,8 +536,13 @@ function readPlugins(deps: ImportDeps, targets: SectionTargets): ImportResult {
   }
 
   const skipped: EnvSkip[] = [];
-  if (info.filesError) skipped.push(envSkip('plugin', 'not_readable', info.filesError));
-  if (info.packagesError) skipped.push(envSkip('plugin', 'not_readable', info.packagesError));
+  if (info.filesError) {
+    skipped.push(unreadableSection('plugin', target.pluginsDir, info.filesError));
+  }
+  if (info.packagesError) {
+    const where = target.configPath ?? target.pluginsDir;
+    skipped.push(unreadableSection('plugin', where, info.packagesError));
+  }
   return orEmpty('plugin', target.pluginsDir, { items, skipped });
 }
 
@@ -481,23 +550,33 @@ function readCommands(deps: ImportDeps, targets: SectionTargets): ImportResult {
   if (!targets.commands) {
     return {
       items: [],
-      skipped: [envSkip('command', 'no_section', notSupported(deps.provider.name, targets.scope))],
+      skipped: [
+        envSkip('command', 'no_section', ...notSupported(deps.provider.name, targets.scope)),
+      ],
     };
   }
 
   const commandsDir = targets.commands.dir;
   const { commands } = readProviderCommands(deps.provider);
+  const configPath = targets.commands.config.configPath?.();
   const source = sourceFactory(deps.provider.id, deps.scope, null);
   const items: EnvItem[] = [];
   const skipped: EnvSkip[] = [];
 
   for (const command of commands) {
-    const prompt = command.path ? commandPrompt(command.path) : undefined;
+    const declaredInConfig = command.path !== undefined && command.path === configPath;
+    const prompt = command.path && !declaredInConfig ? commandPrompt(command.path) : undefined;
     if (prompt === undefined) {
       // Тела нет — переносить нечего: команда, объявленная ключом конфига, живёт
       // внутри чужого файла, и вытащить её текст отсюда нельзя.
       skipped.push(
-        envSkip('command', 'unsupported_format', `${command.invocation}: тело команды не в файле`),
+        envSkip(
+          'command',
+          'unsupported_format',
+          `${command.invocation}: тело команды не в файле`,
+          'portability-skip-command-body-config',
+          { command: command.invocation },
+        ),
       );
       continue;
     }
@@ -526,10 +605,21 @@ function readCommands(deps: ImportDeps, targets: SectionTargets): ImportResult {
  * `AGENTS.md`, и «codex этого раздела не имеет» человек прочитал бы как приговор
  * всему CLI.
  */
-function notSupported(providerName: string, scope: EnvScope): string {
+function notSupported(
+  providerName: string,
+  scope: EnvScope,
+): [string, ServerMessageCode, { provider: string }] {
   return scope === 'project'
-    ? `${providerName} не имеет этого раздела на уровне проекта`
-    : `${providerName} этого раздела не имеет`;
+    ? [
+        `${providerName} не имеет этого раздела на уровне проекта`,
+        'portability-skip-no-section-project',
+        { provider: providerName },
+      ]
+    : [
+        `${providerName} этого раздела не имеет`,
+        'portability-skip-no-section',
+        { provider: providerName },
+      ];
 }
 
 /**
@@ -544,11 +634,12 @@ function notSupported(providerName: string, scope: EnvScope): string {
  */
 function orEmpty(kind: EnvItemKind, where: string, result: ImportResult): ImportResult {
   if (result.items.length > 0 || result.skipped.length > 0) return result;
-  return { items: [], skipped: [envSkip(kind, 'empty', `${where}: записей нет`)] };
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return {
+    items: [],
+    skipped: [
+      envSkip(kind, 'empty', `${where}: записей нет`, 'portability-skip-no-records', { where }),
+    ],
+  };
 }
 
 /**

@@ -12,15 +12,18 @@ import {
 } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
 import type { SplitPlanRecord } from '../../lib/app-store/app-store.types.ts';
 
 /**
  * Переполненный родитель разделения (живой прогон 25.09.2026): контекст вырос
  * до «Prompt is too long», и родитель не принимал ни одного сообщения — ни
  * слова человека, ни передачи группам. «Продолжить в новой сессии» заводит
- * свежий разговор сразу (просьбу обновить опору переполненный не примет), и
- * разделение переезжает к нему: запись, связи групп, сводка в первом ходе.
+ * свежий разговор сразу (просьбу обновить опору переполненный не примет).
+ *
+ * Этап 10: конвейер групп панели снят — перезапуск больше не переносит запись
+ * разделения и связи групп к продолжению и не кладёт сводку групп в первый ход.
+ * Прежний родитель с оставшейся записью продолжает по опоре, как любой разговор;
+ * главное прежнее обещание — переполненный разговор не застревает — держится.
  *
  * Маршрут, реестр прогонов и хранилище — настоящие; подменён только процесс CLI.
  */
@@ -44,13 +47,6 @@ describe('перезапуск переполненного разговора',
       stop: () => undefined,
     }));
     store = new AppStore(join(root, 'agentdeck'));
-    // Сводка — по записи, лежащей ПОД ключом прогона: так её ищет конвейер
-    // (`view` сравнивает `parentChatId` с ключами), без следования переездам.
-    registry.setChildrenBriefResolver((keys) =>
-      keys.some((key) => store.getSplitPlans()[key]?.parentChatId === key)
-        ? '<agentdeck-children>СВОДКА ГРУПП</agentdeck-children>'
-        : undefined,
-    );
     registry.setSessionListener((chatId, sessionId, from) =>
       store.linkChatSession(chatId, sessionId, from),
     );
@@ -75,7 +71,17 @@ describe('перезапуск переполненного разговора',
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      providerChats: new ProviderChatService(),
+      coreChats: {
+        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
+        estimate: async () => ({
+          ok: false as const,
+          code: 'no-core',
+          message: 'no core in this test',
+        }),
+        command: async () => {
+          throw new Error('no core in this test');
+        },
+      },
       session: new ChatSession(registry),
     });
     await app.ready();
@@ -122,43 +128,31 @@ describe('перезапуск переполненного разговора',
     return response.json<{ mode: string; chatId?: string }>();
   }
 
-  it('родитель разделения: свежая сессия сразу, группы переезжают, первый ход со сводкой', async () => {
+  it('прежний родитель разделения: свежая сессия сразу, продолжение по опоре, группы не переезжают', async () => {
     splitParent('parent-1');
 
     const outcome = await restart('parent-1', true);
 
     expect(outcome.mode).toBe('started');
     const next = outcome.chatId as string;
-    expect(store.getSplitPlans()[next]?.parentChatId).toBe(next);
-    expect(store.getSplitPlans()['parent-1']).toBeUndefined();
-    expect(store.getChatLink('g-0')?.parentChatId).toBe(next);
-    expect(store.getChatLink('g-1')?.parentChatId).toBe(next);
+    expect(next).not.toBe('parent-1');
     expect(started).toHaveLength(1);
     expect(started[0]?.chatId).toBe(next);
-    expect(started[0]?.prompt).toContain('СВОДКА ГРУПП');
-    expect(started[0]?.prompt).toContain('The work of this conversation goes on in split groups');
-    expect(started[0]?.prompt).toContain('agentdeck:tell');
+    expect(started[0]?.prompt).toContain('Continue the work from .agent/PROGRESS.md');
+    expect(started[0]?.prompt).not.toContain('split groups');
+    // Перенос записи снят вместе с конвейером: продолжение — обычный разговор.
+    expect(Object.keys(store.getSplitPlans())).toEqual(['parent-1']);
+    expect(store.getChatLink('g-0')?.parentChatId).toBe('parent-1');
   });
 
-  it('ход конвейера со старым ключом ложится к новому родителю, а не рядом', async () => {
-    splitParent('parent-1');
-    const stale = store.getSplitPlan('parent-1') as SplitPlanRecord;
-
-    const next = (await restart('parent-1', true)).chatId as string;
-    store.setSplitPlan({ ...stale, groups: [...stale.groups] });
-
-    expect(Object.keys(store.getSplitPlans())).toEqual([next]);
-    expect(store.getSplitPlan('parent-1')?.parentChatId).toBe(next);
-  });
-
-  it('настоящий id сессии продолжения забирает запись у временного ключа', async () => {
+  it('настоящий id сессии продолжения не уводит прежнюю запись разделения', async () => {
     splitParent('parent-1');
     const next = (await restart('parent-1', true)).chatId as string;
 
     store.linkChatSession(next, 'sess-fresh');
 
-    expect(Object.keys(store.getSplitPlans())).toEqual(['sess-fresh']);
-    expect(store.getChatLink('g-0')?.parentChatId).toBe('sess-fresh');
+    expect(Object.keys(store.getSplitPlans())).toEqual(['parent-1']);
+    expect(store.getChatLink('g-0')?.parentChatId).toBe('parent-1');
   });
 
   it('обычный чат: сразу свежая сессия по опоре, записи разделения не появляется', async () => {
@@ -167,7 +161,6 @@ describe('перезапуск переполненного разговора',
     expect(outcome.mode).toBe('started');
     expect(store.getSplitPlans()).toEqual({});
     expect(started[0]?.prompt).toContain('Continue the work from .agent/PROGRESS.md');
-    expect(started[0]?.prompt).not.toContain('СВОДКА ГРУПП');
   });
 
   it('без переполнения опора несвежая — как раньше, просьба агенту', async () => {

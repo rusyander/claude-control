@@ -22,7 +22,9 @@ const presets = new Map();
 let section;
 for (const line of readFileSync(arg('--models-preset'), 'utf8').split('\n')) {
   const head = /^\[(.+)\]$/.exec(line.trim());
-  if (head) section = head[1];
+  // Как сборка 11583 (замер 02.11): метка после двоеточия — заглавными (`qwen3.8:27b` →
+  // `qwen3.8:27B`), дальше имя ищется точно — `/models/load` с исходным именем получает отказ.
+  if (head) section = head[1].replace(/:([^:]+)$/, (_, tag) => `:${tag.toUpperCase()}`);
   const model = /^model\s*=\s*(.+)$/.exec(line.trim());
   if (model && section) presets.set(section, model[1]);
 }

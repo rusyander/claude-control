@@ -118,6 +118,10 @@ export async function startStand(
     config?: () => ConfigPort | undefined;
     routes?: ApiDeps['routes'];
     devices?: ApiDeps['devices'];
+    adapters?: ApiDeps['adapters'];
+    ask?: ApiDeps['ask'];
+    reviewLink?: ApiDeps['reviewLink'];
+    mcpOffers?: ApiDeps['mcpOffers'];
   } = {},
 ): Promise<Stand> {
   const layout = layoutOf(tasksDir ? dirname(tasksDir) : tempDir('api-'));
@@ -168,6 +172,10 @@ export async function startStand(
     ...(opts.config ? { config: opts.config } : {}),
     ...(opts.routes ? { routes: opts.routes } : {}),
     ...(opts.devices ? { devices: opts.devices } : {}),
+    ...(opts.adapters ? { adapters: opts.adapters } : {}),
+    ...(opts.mcpOffers ? { mcpOffers: opts.mcpOffers } : {}),
+    ...(opts.ask ? { ask: opts.ask } : {}),
+    ...(opts.reviewLink ? { reviewLink: opts.reviewLink } : {}),
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;

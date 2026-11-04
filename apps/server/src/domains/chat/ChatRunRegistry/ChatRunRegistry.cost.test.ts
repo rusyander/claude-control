@@ -5,7 +5,8 @@ import {
   type BufferedEvent,
   type RunSubscriber,
 } from './ChatRunRegistry.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * Цена шага в живом потоке.

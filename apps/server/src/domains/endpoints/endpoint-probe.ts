@@ -19,7 +19,7 @@ import { serverText } from '../../lib/server-texts/server-texts.ts';
 /** Потолок ожидания ответа. Локальная модель поднимается небыстро, но не минуту. */
 const PROBE_TIMEOUT_MS = 15_000;
 
-/** Сколько символов чужого текста ошибки показываем (как в assistant-runner). */
+/** Сколько символов чужого текста ошибки показываем. */
 const ERROR_BODY_LIMIT = 300;
 
 export type ProbeFetch = typeof globalThis.fetch;

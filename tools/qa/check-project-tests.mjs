@@ -11,7 +11,7 @@
  *
  * Данные подменяются на лету: настоящий прогон спавнит CLI и ходит по чужому
  * приложению — на чужой машине это невоспроизводимо. Тем же приёмом живут
- * `check-attention.mjs`, `check-provider-chat.mjs` и `check-project-code.mjs`.
+ * `check-attention.mjs` и `check-project-code.mjs`.
  *
  * Запуск: `node tools/qa/check-project-tests.mjs` при поднятом `pnpm dev`.
  */

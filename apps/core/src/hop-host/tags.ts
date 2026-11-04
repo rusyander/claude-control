@@ -34,6 +34,10 @@ export function credentialOf(request: Pick<IncomingMessage, 'headers'>): string 
   const apiKey = request.headers['x-api-key'];
   const direct = Array.isArray(apiKey) ? apiKey[0] : apiKey;
   if (direct?.trim()) return direct.trim();
+  // Gemini API (SDK Gemini CLI) несёт ключ своим заголовком, не `Authorization`.
+  const google = request.headers['x-goog-api-key'];
+  const googleKey = Array.isArray(google) ? google[0] : google;
+  if (googleKey?.trim()) return googleKey.trim();
   const auth = request.headers.authorization;
   const match = /^Bearer\s+(.+)$/i.exec((Array.isArray(auth) ? auth[0] : auth) ?? '');
   return match?.[1]?.trim() || undefined;

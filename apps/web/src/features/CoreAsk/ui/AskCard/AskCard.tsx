@@ -20,6 +20,14 @@ const LAUNCH_LABEL: Record<string, string> = {
   'edit-split': 'coreTimeline.ask.editSplit',
 };
 
+/** Источники, чей вопрос ядро пишет на языке задачи (запуск, точки 6 и 7 дирижёра, сверка). */
+const TASK_LANG_SOURCES: ReadonlySet<string> = new Set([
+  'launch',
+  'round-cap',
+  'budget',
+  'reconcile',
+]);
+
 /**
  * Карточка вопроса человеку (07:22): вопрос ядра дословно, варианты — кнопками, у вопроса модели —
  * свободный ответ, у вопроса права с «grant» — форма гранта. Ответ уходит командой с числом
@@ -59,7 +67,12 @@ export function AskCard({ taskId, ask, state }: AskCardProps) {
             </Badge>
           )}
         </Stack>
-        <Typography variant="body-sm" lang="en" data-ask-question>
+        {/* Вопросы запуска, кругов, срока и сверки ядро пишет на языке панели, с которой задача запущена; прочие — английской прозой. */}
+        <Typography
+          variant="body-sm"
+          lang={TASK_LANG_SOURCES.has(ask.source) ? undefined : 'en'}
+          data-ask-question
+        >
           {ask.question}
         </Typography>
         {ask.defaultAction && (

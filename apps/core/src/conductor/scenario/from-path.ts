@@ -14,6 +14,7 @@ import {
 } from '@agentdeck/contracts/group-path';
 import { presetStep } from './presets.ts';
 import { issuesOf } from './library.ts';
+import { STEP_TITLES, type TitleLang, type TitlePair } from './titles.ts';
 
 /**
  * Перенос «Пути» группы панели в сценарий ядра (02:23-28, P100): одна миграция на все хранимые
@@ -36,7 +37,14 @@ export interface PathSource {
   flow?: 'conveyor' | 'scenario';
   path?: { steps: PathStep[] };
   legacy?: LegacySteps;
+  /**
+   * Язык заголовков шагов — тот, что у панели: и стадии, и свои шаги называются на нём одном.
+   * Без него — русский, как у встроенных пресетов. Текст и ворота модель читает по-английски всегда.
+   */
+  lang?: TitleLang;
 }
+
+export type { TitleLang };
 
 export interface FromPathResult {
   /** `null`, если есть проблемы: сценарий без части пути хуже отказа (P100). */
@@ -50,6 +58,18 @@ export interface FromPathResult {
 const side = (t: { ru: string; en: string } | undefined): string =>
   (t?.en.trim() ? t.en : (t?.ru ?? '')).trim();
 
+/** Заголовок читает человек: сторона языка панели, пустая — другая сторона (не переведено). */
+const titleSide = (t: { ru: string; en: string }, lang: TitleLang): string => {
+  const other: TitleLang = lang === 'en' ? 'ru' : 'en';
+  return (t[lang].trim() || t[other]).trim();
+};
+
+/** Встроенные стадии называются теми же строками, что шаги пресетов (`titles.ts`). */
+const stageTitle = (id: StageStepId, lang: TitleLang): string =>
+  (STEP_TITLES[id] as TitlePair)[lang];
+
+type StageStepId = 'intake' | 'plan' | 'work' | 'review' | 'fix' | 'final-gate' | 'publish';
+
 const KNOWLEDGE_OF = {
   skill: 'skills',
   rule: 'rules',
@@ -60,9 +80,15 @@ const KNOWLEDGE_OF = {
 const TEXT_MAX = 16_000;
 const CRITERION_MAX = 2000;
 
-function customStep(step: PathStep, id: string, after: string[], problems: string[]): StepDef {
+function customStep(
+  step: PathStep,
+  id: string,
+  after: string[],
+  problems: string[],
+  lang: TitleLang,
+): StepDef {
   const where = `path step ${step.id}`;
-  const title = side(step.title) || `step ${id}`;
+  const title = titleSide(step.title, lang) || `step ${id}`;
   const base = presetStep(id, step.within ? 'work' : 'custom', title.slice(0, 200), after);
   if (title.length > 200) problems.push(`${where}: title longer than 200`);
   const text = side(step.prompt);
@@ -94,26 +120,29 @@ function customStep(step: PathStep, id: string, after: string[], problems: strin
 }
 
 /** Встроенная стадия → шаги ядра; канон тот же, что у пресета `feature`. */
-function stageSteps(stage: PathAnchor, after: string[]): StepDef[] {
+function stageSteps(stage: PathAnchor, after: string[], lang: TitleLang): StepDef[] {
+  const title = (id: StageStepId): string => stageTitle(id, lang);
   switch (stage) {
     case 'triage':
-      return [presetStep('intake', 'intake', 'Разбор запроса', after)];
+      return [presetStep('intake', 'intake', title('intake'), after)];
     case 'plan':
-      return [presetStep('plan', 'plan', 'План', after)];
+      return [presetStep('plan', 'plan', title('plan'), after)];
     case 'work':
-      return [presetStep('work', 'work', 'Работа', after)];
+      return [presetStep('work', 'work', title('work'), after)];
     case 'review':
       return [
-        presetStep('review', 'review', 'Ревью', after, { gate: [{ kind: 'review-no-blocking' }] }),
+        presetStep('review', 'review', title('review'), after, {
+          gate: [{ kind: 'review-no-blocking' }],
+        }),
       ];
     case 'fix':
-      return [presetStep('fix', 'fix', 'Правки по ревью', after)];
+      return [presetStep('fix', 'fix', title('fix'), after)];
     case 'deliver':
       return [
-        presetStep('final-gate', 'final-gate', 'Финальная проверка', after, {
+        presetStep('final-gate', 'final-gate', title('final-gate'), after, {
           gate: [{ kind: 'requirements-covered' }],
         }),
-        presetStep('publish', 'publish', 'Публикация', ['final-gate']),
+        presetStep('publish', 'publish', title('publish'), ['final-gate']),
       ];
   }
 }
@@ -131,6 +160,7 @@ function byAnchor(steps: readonly PathStep[]): Map<PathAnchor, PathStep[]> {
 export function fromPath(source: PathSource): FromPathResult {
   const problems: string[] = [];
   const ids: Record<string, string> = {};
+  const lang: TitleLang = source.lang ?? 'ru';
   let stored = source.path?.steps ?? [];
   // Старый «Порядок работы» идёт через ту же миграцию, что и в панели (02:28).
   if (stored.length === 0 && source.legacy)
@@ -143,17 +173,17 @@ export function fromPath(source: PathSource): FromPathResult {
     n += 1;
     const id = `path-${n}`;
     ids[step.id] = id;
-    steps.push(customStep(step, id, last, problems));
+    steps.push(customStep(step, id, last, problems, lang));
     last = [id];
   };
   if (source.flow === 'scenario') {
     for (const anchor of PATH_ANCHORS)
       for (const step of grouped.get(anchor) ?? []) pushCustom(step);
     // Публикуют и проверяют по-прежнему ядро: сценарий группы — это работа, не доставка.
-    steps.push(...stageSteps('deliver', last));
+    steps.push(...stageSteps('deliver', last, lang));
   } else {
     for (const anchor of PATH_ANCHORS) {
-      const builtin = stageSteps(anchor, last);
+      const builtin = stageSteps(anchor, last, lang);
       steps.push(...builtin);
       last = [builtin[builtin.length - 1]?.id as string];
       for (const step of grouped.get(anchor) ?? []) pushCustom(step);

@@ -8,8 +8,6 @@ import { useWorkspace, newChatId, openChat } from '../src/shared/lib/workspace';
 import { runNamed, useRuns, visibleStatus } from '../src/shared/lib/runs';
 import { useChats } from '../src/entities/chat/api';
 import { chatOrigin } from '../src/entities/chat/chatOrigin';
-import { useWatchSignals } from '../src/entities/chat/useWatchSignals';
-import { watchRowLine, watchRowText } from '../src/entities/chat/watchRowLine';
 import { ForeignChatsSection } from '../src/features/chat/foreign/ForeignChatsSection/ForeignChatsSection';
 
 /**
@@ -28,7 +26,6 @@ export default function ChatsScreen() {
   const workspace = useWorkspace();
   const chats = useChats();
   const runs = useRuns();
-  const watch = useWatchSignals();
   const [filter, setFilter] = useState('');
 
   const visible = useMemo(() => {
@@ -66,7 +63,7 @@ export default function ChatsScreen() {
           tone="accent"
           onPress={() => open(newChatId(), workspace.projectPath)}
         />
-        <ForeignChatsSection projectPath={workspace.projectPath} />
+        <ForeignChatsSection />
         <Field value={filter} onChangeText={setFilter} placeholder={t.chats.search} />
 
         {chats.isLoading ? <Loading /> : null}
@@ -77,7 +74,6 @@ export default function ChatsScreen() {
           // Ход со стола идёт под `new-…`, а строка списка названа сессией.
           const run = runNamed(runs, chat.id);
           const status = run ? visibleStatus(run) : '';
-          const watchLine = watchRowLine(watch.data, [chat.id, run?.id]);
           return (
             <Pressable key={chat.id} onPress={() => open(chat.id, chat.projectPath)}>
               <Card style={chat.id === workspace.chatId ? styles.current : undefined}>
@@ -89,16 +85,6 @@ export default function ChatsScreen() {
                   {status === 'running' ? <View style={styles.running} /> : null}
                 </Row>
                 {chat.preview ? <Muted>{trim(chat.preview)}</Muted> : null}
-                {watchLine ? (
-                  <Text
-                    style={
-                      watchLine.top.severity === 'alert' ? styles.watchAlert : styles.watchWarn
-                    }
-                    numberOfLines={2}
-                  >
-                    {watchRowText(watchLine, t)}
-                  </Text>
-                ) : null}
                 <Row gap={space.sm} style={styles.meta}>
                   <Mono style={styles.grow} numberOfLines={1}>
                     {chatOrigin(chat, t.chats)}
@@ -130,6 +116,4 @@ const styles = StyleSheet.create({
   waiting: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.waiting },
   running: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.running },
   failed: { color: colors.danger },
-  watchWarn: { color: colors.waiting, fontSize: font.small },
-  watchAlert: { color: colors.danger, fontSize: font.small },
 });

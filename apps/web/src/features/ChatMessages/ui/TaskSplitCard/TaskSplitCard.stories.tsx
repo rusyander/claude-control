@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TaskSplitCard } from './TaskSplitCard';
 
 /**
- * Предложение разделить задачи по чатам. Карточка — решение человека: состав
- * групп и две равноправные кнопки.
+ * Предложение разделить задачи по чатам из старого ответа агента — запись
+ * истории: состав групп и ветки, без кнопок.
  */
 const meta = {
   title: 'Организмы/TaskSplitCard',
@@ -25,8 +25,6 @@ const meta = {
         },
       ],
     },
-    onSplit: () => undefined,
-    onKeepHere: () => undefined,
   },
   render: (args) => (
     <div style={{ width: 640 }}>

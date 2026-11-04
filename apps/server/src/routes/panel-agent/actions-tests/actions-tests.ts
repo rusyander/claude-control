@@ -20,6 +20,7 @@ import {
   DRAFT_ADD_RESET_FIELDS,
   RUN_OWNED_FIELDS,
 } from '../../../domains/project-tests/drafts/drafts.ts';
+import { testsAgentDialectOf } from '../../../domains/project-tests/agent/agent-runs.ts';
 
 /**
  * Тело кейса глазами приёмки: поля прогона, которые `applyDraft` не возьмёт из
@@ -425,10 +426,12 @@ const runTests = definePanelAction({
     const selected = input.caseIds?.length
       ? new Set(input.caseIds).size
       : groups.reduce((sum, group) => sum + group.cases.length, 0);
-    // Прогон тестов исполняет `ChatRun` — всегда CLI Claude Code, какой бы CLI ни
-    // был активен; имя берётся из реестра провайдеров, а не строкой.
+    // Прогон тестов — задача ядра переходником АКТИВНОГО CLI (Claude Code, Qwen Code, Codex —
+    // `testsAgentDialectOf`); прочий активный CLI маршрут прогона отказывает по имени. Имя — из
+    // реестра провайдеров, а не строкой.
     const providers = await readRoute<ProvidersResponse>(inject, '/api/providers');
-    const providerName = providers.providers.find((item) => item.id === 'claude')?.name ?? 'claude';
+    const providerName =
+      providers.providers.find((item) => item.id === providers.active)?.name ?? providers.active;
     const model = plan.routed ? chooseRunModel(plan.rules, '').model : '';
     const fields = [
       dataField('label-project', input.projectPath),
@@ -439,7 +442,7 @@ const runTests = definePanelAction({
         : textField('label-group', 'value-group-all'),
       ...(input.environmentId ? [dataField('label-environment', input.environmentId)] : []),
       ...(input.scope ? [dataField('label-scope', input.scope)] : []),
-      providers.active === 'claude'
+      testsAgentDialectOf(providers.active)
         ? dataField('label-provider', providerName)
         : textField('label-provider', 'value-provider-other', {
             provider: providerName,

@@ -6,6 +6,8 @@ import { Readable } from 'node:stream';
 import type { NetFetch, ProxyEnv } from './net.types.ts';
 import {
   hasProxyEnv,
+  isLocalhostName,
+  loopbackLookup,
   netError,
   openTunnel,
   proxyRequestOptions,
@@ -80,13 +82,19 @@ function createFetch(
   stream: boolean,
   redirects: number,
   env: ProxyEnv,
+  ownTransport = false,
 ): NetFetch {
   const path = caCertPath.trim();
-  // Ни своего корня, ни прокси — встроенный `fetch`, нашего кода на этом пути нет.
-  if (!path && !hasProxyEnv(env)) {
-    return redirects > 0
-      ? globalThis.fetch
-      : (url, init) => globalThis.fetch(url, { ...init, redirect: 'manual' });
+  // Ни своего корня, ни прокси — встроенный `fetch`; свой путь только для имён под `.localhost`:
+  // встроенный спрашивает о них ОС, а резолвер Windows их не знает.
+  if (!ownTransport && !path && !hasProxyEnv(env)) {
+    const own = createFetch('', stream, redirects, env, true);
+    return (url, init) => {
+      if (isLocalhostName(new URL(url).hostname)) return own(url, init);
+      return redirects > 0
+        ? globalThis.fetch(url, init)
+        : globalThis.fetch(url, { ...init, redirect: 'manual' });
+    };
   }
   const ca = path ? readCaCert(path) : undefined;
 
@@ -216,7 +224,12 @@ function createFetch(
       wire(
         send(
           target,
-          { method: init.method ?? 'GET', headers: init.headers, ...(secure && ca ? { ca } : {}) },
+          {
+            method: init.method ?? 'GET',
+            headers: init.headers,
+            ...(secure && ca ? { ca } : {}),
+            ...(isLocalhostName(target.hostname) ? { lookup: loopbackLookup } : {}),
+          },
           onResponse,
         ),
       );

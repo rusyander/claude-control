@@ -8,7 +8,6 @@ export interface ModelRowProps {
   serverReady: boolean;
   busy: { pull: boolean; bench: boolean; connect: boolean };
   onPull: () => void;
-  onImport: () => void;
   onConnect: () => void;
   onBench: () => void;
   onRemove: () => void;

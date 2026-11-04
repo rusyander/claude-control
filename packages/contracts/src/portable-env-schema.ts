@@ -7,6 +7,7 @@ import {
   literal,
   union,
   discriminatedUnion,
+  record,
   enum as zodEnum,
   type infer as Infer,
 } from 'zod';
@@ -40,6 +41,16 @@ import {
  * значение невозможно ввести мимо словаря ни типом, ни разбором.
  */
 
+/**
+ * Код текста причины (`server-messages`) и его параметры: интерфейс переводит,
+ * русский `why` остаётся запасным. В отпечаток записи не входит — это подача, а
+ * не содержимое среды.
+ */
+const whyCode = {
+  whyCode: string().optional(),
+  whyParams: record(string(), string()).optional(),
+};
+
 /** Требования к рантайму: три исхода, и `facts` не бывает пустым. */
 export const envNeedsSchema = union([
   object({
@@ -48,8 +59,8 @@ export const envNeedsSchema = union([
     facts: array(zodEnum(envNeeds)).min(1),
     evidence: zodEnum(needsEvidences),
   }),
-  object({ resolution: literal('none'), why: string().min(1) }),
-  object({ resolution: literal('undetermined'), why: string().min(1) }),
+  object({ resolution: literal('none'), why: string().min(1), ...whyCode }),
+  object({ resolution: literal('undetermined'), why: string().min(1), ...whyCode }),
 ]);
 
 export type EnvNeedsShape = Infer<typeof envNeedsSchema>;
@@ -72,11 +83,27 @@ export const envSourceSchema = object({
   plugin: string().nullable(),
 });
 
+/**
+ * Подстановка кода фразы: строка, число или вложенный код с плоскими подстановками
+ * (необязательный хвост фразы, «без описания»). Глубже одного уровня сервер не вкладывает.
+ */
+const intentParamSchema = union([
+  string(),
+  number(),
+  object({
+    messageCode: string(),
+    params: record(string(), union([string(), number()])).optional(),
+  }),
+]);
+
 /** Общая часть записи; `kind` добавляет каждый вид сам — по нему идёт разметка объединения. */
 const itemBase = {
   id: string().min(1),
   source: envSourceSchema,
   intent: string().min(1),
+  /** Код `intent` и параметры — как `whyCode`; в отпечаток не входят. */
+  intentCode: string().optional(),
+  intentParams: record(string(), intentParamSchema).optional(),
   trigger: envTriggerSchema,
   blocking: zodEnum(envBlockings),
   needs: envNeedsSchema,
@@ -247,12 +274,16 @@ export const envSectionStateSchema = object({
   kind: zodEnum(envItemKinds),
   enabled: boolean(),
   detail: string(),
+  detailCode: string().optional(),
+  detailParams: record(string(), intentParamSchema).optional(),
 });
 
 export const envSkipSchema = object({
   kind: zodEnum(envItemKinds),
   reason: zodEnum(envSkipReasons),
   detail: string(),
+  detailCode: string().optional(),
+  detailParams: record(string(), intentParamSchema).optional(),
 });
 
 /**

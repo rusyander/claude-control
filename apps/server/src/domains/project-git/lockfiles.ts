@@ -1,5 +1,4 @@
-import { createHash } from 'node:crypto';
-import { readFile, rm } from 'node:fs/promises';
+import { rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { git } from './exec/exec.ts';
 import { parseDirtyPaths } from './read.ts';
@@ -82,35 +81,12 @@ export async function revertLockfileChurn(
   return churn.map((item) => item.path);
 }
 
-interface PrepLeft {
-  path: string;
-  /** sha256 содержимого после подготовки; `gone` — файл подготовка удалила. */
-  hash: string;
-}
-
-/**
- * Записи подготовки — в памяти панели, по каталогу копии (F-100). Прежде запись
- * лежала в каталоге git копии, куда пишет и агент: подложив её, он прятал бы
- * свою незакоммиченную работу от доставки. После перезапуска панели записей нет —
- * оставленное подготовкой снова видно как «не закоммичено» (в сторону осторожности).
- */
-const prepRecords = new Map<string, PrepLeft[]>();
 /** Грязные пути копии до подготовки; `unknown` — снимок не вышел (`snapshotPrepTree`). */
 const prepBefore = new Map<string, ReadonlySet<string> | 'unknown'>();
 
 function recordKey(dir: string): string {
   const path = resolve(dir).replace(/\\/g, '/').replace(/\/+$/, '');
   return process.platform === 'win32' ? path.toLowerCase() : path;
-}
-
-async function contentHash(file: string): Promise<string> {
-  try {
-    return createHash('sha256')
-      .update(await readFile(file))
-      .digest('hex');
-  } catch {
-    return 'gone';
-  }
 }
 
 async function dirtyNow(dir: string): Promise<string[] | undefined> {
@@ -123,9 +99,8 @@ async function dirtyNow(dir: string): Promise<string[] | undefined> {
 
 /**
  * Грязное копии ПЕРЕД подготовкой (F-64): повторная установка в копии посреди
- * работы иначе откатывала go.mod/go.sum/lock-файл агента и записывала его же
- * правки как «оставила подготовка» — доставка их не видела. Снимок не вышел —
- * `false`: тогда конец подготовки не откатывает и не записывает ничего.
+ * работы иначе откатывала go.mod/go.sum/lock-файл агента. Снимок не вышел —
+ * `false`: тогда конец подготовки не откатывает ничего.
  */
 export async function snapshotPrepTree(dir: string): Promise<boolean> {
   const dirty = await dirtyNow(dir);
@@ -138,46 +113,11 @@ export async function snapshotPrepTree(dir: string): Promise<boolean> {
 }
 
 /**
- * Что подготовка оставила в дереве после отката lock-файлов (своя команда
- * человека, генератор, кэш в отслеживаемом каталоге): путь и содержимое на
- * момент конца подготовки. Доставка по этой записи не считает такие пути
- * «незакоммиченной работой группы» — это правка панели, а не агента. Грязное
- * до подготовки (`before`) — работа агента, в запись не идёт.
- * Пустое дерево — запись пустая: прежняя от прошлой подготовки не живёт.
- */
-async function recordPrepLeftovers(
-  dir: string,
-  before: ReadonlySet<string> = new Set(),
-): Promise<string[]> {
-  const dirty = await dirtyNow(dir);
-  if (!dirty) return [];
-  const paths = dirty.filter((path) => !before.has(path));
-  const left: PrepLeft[] = [];
-  for (const path of paths) left.push({ path, hash: await contentHash(join(dir, path)) });
-  prepRecords.set(recordKey(dir), left);
-  return paths;
-}
-
-/**
- * Пути, которые сейчас ровно такие, какими их оставила подготовка копии.
- * Агент потом правил файл — содержимое другое, путь снова его работа.
- */
-export async function prepLeftovers(dir: string): Promise<Set<string>> {
-  const left = prepRecords.get(recordKey(dir)) ?? [];
-  const same = new Set<string>();
-  for (const item of left) {
-    if ((await contentHash(join(dir, item.path))) === item.hash) same.add(item.path);
-  }
-  return same;
-}
-
-/**
- * Конец подготовки копии: откат переписанных lock-файлов и манифестов, затем
- * запись того, что подготовка всё же оставила. Возвращает откаченное — для
- * лога и карточки, как `revertLockfileChurn`.
+ * Конец подготовки копии: откат переписанных lock-файлов и манифестов.
+ * Возвращает откаченное — для лога и карточки, как `revertLockfileChurn`.
  *
- * Снимок до подготовки (`snapshotPrepTree`) есть — откатывается и пишется только
- * то, что до неё было чистым (F-64); снимок не вышел — не трогаем ничего. Снимка
+ * Снимок до подготовки (`snapshotPrepTree`) есть — откатывается только то, что
+ * до неё было чистым (F-64); снимок не вышел — не трогаем ничего. Снимка
  * нет вовсе (свежая копия разделения) — дерево до подготовки считается чистым.
  */
 export async function settlePrepTree(dir: string): Promise<string[]> {
@@ -185,15 +125,13 @@ export async function settlePrepTree(dir: string): Promise<string[]> {
   const before = prepBefore.get(key);
   prepBefore.delete(key);
   if (before === 'unknown') return [];
-  const reverted = await revertLockfileChurn(dir, before);
-  await recordPrepLeftovers(dir, before).catch(() => []);
-  return reverted;
+  return revertLockfileChurn(dir, before);
 }
 
 /**
  * Обвязка подготовки копии для `WorktreeBootstraps`: снимок до команды и
- * откат с записью после. Одна на все пути запуска — кнопка карточки, создание
- * копии и группа разделения (`split-launch`) снимают дерево одинаково: прежде
+ * откат после. Одна на все пути запуска — кнопка карточки, создание
+ * копии и подготовка копии группы снимают дерево одинаково: прежде
  * снимок делал только маршрут кнопки, а повторная подготовка группы в копии с
  * работой агента считала дерево чистым и откатывала его lock-файл (F-64).
  */

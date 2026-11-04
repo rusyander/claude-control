@@ -1,7 +1,7 @@
 import type { SessionBinding, PermitCallDeps } from '../conductor/model-tools/model-tools.types.ts';
 import type { LiveTask } from '../journal/resume.ts';
 import { newId } from '../lib/ids/uuidv7.ts';
-import { judgeWithGrants, raisePermitPoint } from '../conductor/human/permit-point.ts';
+import { judgePermitCall, raisePermitPoint } from '../conductor/human/permit-point.ts';
 import { decidePermit } from '../policy/permit/permit.ts';
 
 /**
@@ -28,7 +28,7 @@ export function answerHookCall(
   deps: Pick<PermitCallDeps, 'mapPermission' | 'context'>,
 ): HookAnswer {
   const ask = deps.mapPermission({ tool: call.tool, input: call.input });
-  const { decision, ledger } = judgeWithGrants(task, b, deps.context, (ctx) =>
+  const { decision, ledger } = judgePermitCall(task, b, ask, deps.context, (ctx) =>
     decidePermit(ask, ctx),
   );
   const decided = task.append({

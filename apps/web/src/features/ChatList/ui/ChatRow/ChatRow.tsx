@@ -5,14 +5,10 @@ import { Icon } from '@shared/ui/icon';
 import { StatusDot } from '@shared/ui/status-dot';
 import { statusTone } from '@shared/lib/agent-runs';
 import { projectName } from '@entities/Project';
-import { topSeverity } from '@entities/ChatGroupSettings';
 import { highlightSnippet } from '../../model/highlight';
 import { formatWhen } from '../../lib/formatWhen';
 import type { ChatRowProps } from '../ChatList/ChatList.types';
 import styles from './ChatRow.module.scss';
-
-/** Цвет фишки сторожа по самому важному сигналу: тревога — красным, внимание — жёлтым. */
-const WATCH_TONE = { alert: 'danger', warn: 'warning', info: 'subtle' } as const;
 
 export function ChatRow({
   chat,
@@ -22,8 +18,6 @@ export function ChatRow({
   snippet,
   matchCount,
   query,
-  unreadEscalations,
-  watchSignals,
   status,
   depth,
   onTogglePin,
@@ -59,8 +53,6 @@ export function ChatRow({
   };
 
   const pinned = Boolean(chat.pinnedAt);
-  const watchCount = watchSignals?.length ?? 0;
-  const watchTop = watchSignals ? topSeverity(watchSignals) : undefined;
 
   return (
     <div className={`${styles.rowWrap} ${pinned ? styles.rowPinned : ''}`}>
@@ -103,34 +95,6 @@ export function ChatRow({
             {chat.paused && (
               <Typography variant="caption" color="subtle" as="span" className={styles.stage}>
                 {t('chat.cascade.tree.paused')}
-              </Typography>
-            )}
-            {/* Критичное от группы — метка у главного чата, пока человек не прочтёт. */}
-            {Boolean(unreadEscalations) && (
-              <Typography
-                variant="caption"
-                color="danger"
-                as="span"
-                className={styles.stage}
-                data-chat-escalations={unreadEscalations}
-                title={t('chat.escalation.unread', { count: unreadEscalations })}
-              >
-                {`! ${unreadEscalations}`}
-              </Typography>
-            )}
-            {/* Сторож одиночного чата видит беду — метка в строке, подробности
-              островом над лентой: без неё чат с бедой неотличим от просто молчащего. */}
-            {watchCount > 0 && watchTop && (
-              <Typography
-                variant="caption"
-                color={WATCH_TONE[watchTop]}
-                as="span"
-                className={styles.stage}
-                data-chat-watch-count={watchCount}
-                data-chat-watch-severity={watchTop}
-                title={t('groupWatch.chat.chipHint')}
-              >
-                {t('groupWatch.chat.chip', { count: watchCount })}
               </Typography>
             )}
             {/* Ждёт человека и принятая группа — те же слова, что в сводке хаба:

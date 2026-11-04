@@ -16,25 +16,3 @@
   border-radius: 12px;
   background-color: var(--color-surface);
 }
-
-/* «Любая модель»: поле и кнопка в одну строку, кнопка выровнена по низу поля. */
-.customForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--color-border);
-}
-
-.customRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--spacing-sm);
-}
-
-.customField {
-  flex: 1;
-  min-width: 240px;
-  max-width: 520px;
-}

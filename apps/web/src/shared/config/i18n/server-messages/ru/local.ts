@@ -1,19 +1,10 @@
 import type { LocalMessageCode } from '@agentdeck/contracts/server-messages';
 
 export const localRu: Record<LocalMessageCode, string> = {
-  'local-stalled':
-    'сервер моделей {{seconds}} с не двигался с запросом — запрос оборван и уйдёт заново',
-  'local-supervisor-gave-up':
-    'сервер упал и не поднялся после {{restarts}} попыток подряд; панель пробует снова раз в 10 минут',
-  'local-on-demand-backoff':
-    'сервер моделей не поднялся ({{attempts}} из {{max}} попыток): {{cause}}; следующая попытка через {{seconds}} с',
-  'local-on-demand-failed':
-    'сервер моделей не поднялся {{attempts}} раза подряд, и панель больше не запускает его по запросу чата: {{cause}}',
-  'local-port-busy': 'порт {{port}} занят другим сервером — остановите его или освободите порт',
-  'local-start-failed': 'не удалось запустить {{binary}}',
-  'local-exited': 'сервер моделей завершился сразу после запуска (код {{code}}) — журнал: {{log}}',
   'local-timeout': 'сервер моделей не ответил за {{seconds}} с — журнал: {{log}}',
   'local-stop-failed': 'сервер на порту {{port}} не остановился',
+  'local-hold-refused': 'ядро не взяло модель ({{code}}): {{reason}}',
+  'local-core-unreachable': 'ядро не отвечает — локальные модели идут через него: {{reason}}',
   'local-download-http': 'загрузка не удалась: HTTP {{status}}',
   'local-download-cut':
     'загрузка оборвалась: {{done}} из {{size}} байт — нажмите ещё раз, докачается',
@@ -37,14 +28,11 @@ export const localRu: Record<LocalMessageCode, string> = {
   'local-contour-activate': 'включение контура: {{reason}}',
   'local-contour-deactivate': 'выключение контура: {{reason}}',
   'local-npm-failed': 'установка Qwen Code не удалась: {{reason}}',
-  'local-kit-provider': 'набор панели для {{provider}} не поддерживается',
   'local-release-http': 'GitHub ответил {{status}} на запрос выпуска llama.cpp',
   'local-asset-missing': 'в {{version}} нет файла {{name}}',
   'local-sums-missing': '{{version}}: у файла в выпуске нет контрольной суммы',
   'local-checksum-missing': 'для {{name}} нет контрольной суммы',
   'local-binary-missing': 'в распакованном архиве нет исполняемого файла llama-server',
-  'local-import-failed': 'не удалось забрать {{tag}} из хранилища Ollama: {{reason}}',
-  'local-load-failed': 'llama.cpp не открыл модель {{tag}}: {{reason}} — скачайте её заново',
   'local-quant-unknown': 'у модели {{tag}} нет квантования {{quant}}',
   'local-context-range': 'окно контекста должно быть от {{min}} до {{max}} токенов',
   'local-choice-no-fit':
@@ -67,5 +55,5 @@ export const localRu: Record<LocalMessageCode, string> = {
   'kit-compose-failed':
     'Прогон не запущен: набор панели не собрался. Переключите режим набора на «Только ваши» или повторите',
   'kit-codex-too-large':
-    'Прогон не запущен: правила и навыки набора панели для Codex — {{size}} знаков, а командная строка Codex вмещает не больше {{limit}}. Ничего не обрезано: выключите часть элементов набора или переключите режим набора на «Только ваши»',
+    'Прогон не запущен: правила и навыки набора панели для Codex — {{size}} знаков, а поле инструкций сеанса Codex вмещает не больше {{limit}}. Ничего не обрезано: выключите часть элементов набора или переключите режим набора на «Только ваши»',
 };

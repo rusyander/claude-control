@@ -11,7 +11,8 @@ import {
 import { layoutOf, type ResourceKind } from '../../domains/resources/registry.ts';
 import { templatesFor, templateById } from '../../domains/resources/templates.ts';
 import { assistStructure } from '../../domains/resources/ResourceAssistant.ts';
-import { helperAskFor, type HelperRouteWiring } from '../../domains/assistant-route.ts';
+import { coreHelperAsk } from '../../domains/assistant/assistant.ts';
+import type { AskCarry, CoreAskPort } from '../../domains/core-ask/core-ask.types.ts';
 import { readAgentImages } from '../../lib/agent-images/agent-images.ts';
 import { assistHistorySchema, invalidAssistBody } from '../assistant-routes/assistant-routes.ts';
 
@@ -25,8 +26,10 @@ import { assistHistorySchema, invalidAssistBody } from '../assistant-routes/assi
 export function registerResourceRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
-  /** Маршрут провайдера для помощника структуры — тот же, что у помощника формы. */
-  helperRoute: HelperRouteWiring,
+  /** Ядро: помощник структуры — его вопрос «ask», тот же, что у помощника формы. */
+  ask: CoreAskPort,
+  /** Набор панели чужому CLI помощника (`helperCarryOf`, G13); нет — вопрос без набора. */
+  carry?: AskCarry,
 ): void {
   type Params = { kind: string; id: string };
 
@@ -125,7 +128,7 @@ export function registerResourceRoutes(
         request.params.id,
         request.body.prompt,
         ctx.location,
-        helperAskFor(ctx.store, ctx.location.paths.appData, helperRoute),
+        coreHelperAsk(ask, ctx.store, ctx.location.paths.appData, carry),
         history.data,
         images.images,
       );

@@ -60,9 +60,7 @@ export function DeferredAskRow({ item, onDecide, isBusy, onOpenChat }: DeferredA
     <li className={styles.row} data-deferred-id={item.id} data-deferred-state={item.state}>
       <div className={styles.rowHead}>
         <span className={styles.id}>{item.id}</span>
-        <span className={styles.tool}>
-          {item.kind === 'branchGate' ? t('deferredAsks.branchGate') : item.toolName}
-        </span>
+        <span className={styles.tool}>{item.toolName}</span>
         <Typography variant="caption" color="subtle" as="span" truncate>
           {ownerLabel(item, t)}
         </Typography>

@@ -1,6 +1,5 @@
-import { object, string, boolean, union, literal, enum as zodEnum, type infer as Infer } from 'zod';
 import { blockLang } from './brand.ts';
-import { parseGroupKey, type GroupKey } from './group-sources.ts';
+import type { GroupKey } from './group-sources.ts';
 
 /**
  * Группа и автономность — настройки ЧАТА, а не проекта: в одном проекте может
@@ -8,28 +7,19 @@ import { parseGroupKey, type GroupKey } from './group-sources.ts';
  *
  * `auto` — разбор сам выбирает группу по её `when` среди доступных в каталоге
  * чата (с учётом выбора пары глобальная/проектная). Дети разделения наследуют
- * значения родителя; ручная правка у ребёнка меняет только его.
+ * значения родителя. Правки из панели больше нет (развилки групп — у ядра):
+ * сохранённые значения прежних чатов только читаются.
  */
-export const chatGroupChoiceSchema = union([
-  literal('auto'),
-  string().refine((key) => parseGroupKey(key) !== null, {
-    message: 'group choice must be auto or a group key',
-  }),
-]);
 export type ChatGroupChoice = 'auto' | GroupKey;
 
 /** Что хранится у чата. Поля нет — значение по умолчанию (или от родителя). */
-export const chatGroupSettingsSchema = object({
-  groupChoice: chatGroupChoiceSchema.optional(),
-  autonomous: boolean().optional(),
-});
 export type StoredChatGroupSettings = {
   groupChoice?: ChatGroupChoice;
   autonomous?: boolean;
 };
 
 /** Автономность по умолчанию ВКЛЮЧЕНА (владелец, 26.09.2026). */
-export const CHAT_AUTONOMOUS_DEFAULT = true;
+const CHAT_AUTONOMOUS_DEFAULT = true;
 
 /** Действующие значения и откуда они: своё или унаследованное от родителя. */
 export interface ChatGroupSettingsView {
@@ -40,13 +30,6 @@ export interface ChatGroupSettingsView {
   /** Родитель, от которого пришли унаследованные значения, — для «из родителя: X». */
   parentChatId?: string;
 }
-
-/**
- * Метка автономного прогона в окружении CLI. Под ней хуки не задают вопросов
- * с рекомендованным вариантом — берут рекомендованный и пишут выбор строкой.
- * Интерактивный чат с выключенной автономностью её не получает.
- */
-export const AUTONOMOUS_ENV = 'AGENTDECK_AUTONOMOUS';
 
 /**
  * Метка «вывод тяжёлых команд — коротко» (2.2 плана экономии): панель ставит её
@@ -72,22 +55,6 @@ export const TESTS_PROJECT_ENV = 'AGENTDECK_TESTS_PROJECT';
  */
 export const TESTS_CLI_ENV = 'AGENTDECK_TESTS_CLI';
 
-/**
- * Метка «прогон — группа разделения» (E1 плана экономии). По ней глобальные хуки
- * советов «/clear» молчат: продолжение и следующую стадию группы ведёт панель,
- * а совет заставлял агента просить чистую сессию, которая перечитывала всё
- * заново. Имя повторено в хуках строкой — они не импортируют контракты.
- */
-export const SPLIT_CHILD_ENV = 'AGENTDECK_SPLIT_CHILD';
-
-/**
- * Метка звена группы, у которого личный `CLAUDE.md` снят из запроса. По ней хук
- * начала сессии (личный `session-brief` или его порт в наборе панели) кладёт
- * короткую карточку правил группы вместо снятого файла и повторяет её после
- * сжатия. Имя повторено в хуках строкой — они не импортируют контракты.
- */
-export const USER_MEMORY_OFF_ENV = 'AGENTDECK_USER_MEMORY_OFF';
-
 /** Действующие значения из своего и родительского — чистая функция для сервера и тестов. */
 export function resolveChatGroupSettings(
   own: StoredChatGroupSettings | undefined,
@@ -105,89 +72,14 @@ export function resolveChatGroupSettings(
   };
 }
 
-/**
- * Критическое замечание ребёнка: блок в его ответе. Панель кладёт карточку в
- * ГЛАВНЫЙ чат дерева (корень), со ссылкой на ребёнка и текстом; всё
- * некритическое остаётся в самом ребёнке.
- */
-export const ESCALATE_BLOCK_LANG = blockLang('escalate');
-
-export const escalationSchema = object({
-  severity: zodEnum(['critical']),
-  text: string().min(1).max(20_000),
-});
-export type Escalation = Infer<typeof escalationSchema>;
-
-/** Заметка в ленте главного чата: что сказал ребёнок и где его искать. */
-export interface EscalationNotice {
-  childChatId: string;
-  /** Имя группы разделения или заголовок ребёнка. */
-  childTitle: string;
-  text: string;
-  /** `block` — ребёнок сказал сам; `auto-pick` — автономия взяла вопрос с меткой critical. */
-  source: 'block' | 'auto-pick';
-  at: string;
-}
-
-/**
- * Автовыбор под автономией: строка в ленте ЭТОГО чата, приглушённая. Человек
- * видит, что вопрос был и что за него выбрали.
- */
-export interface AutonomousPick {
-  question: string;
-  picked: string;
-  at: string;
-}
-
 /** Метка в тексте отказа брокера: по ней лента узнаёт автовыбор и рисует его строкой. */
 // Метка — через `blockLang`, как у соседей (F-330).
 export const AUTONOMOUS_PICK_MARKER = blockLang('autonomous-pick');
-
-const RECOMMENDED = /\(recommended\)/i;
-const CRITICAL = /^\s*\[?critical\]?\s*$/i;
-
-interface QuestionOption {
-  label?: unknown;
-}
-interface QuestionItem {
-  question?: unknown;
-  header?: unknown;
-  options?: unknown;
-}
 
 export interface RecommendedPick {
   question: string;
   label: string;
   critical: boolean;
-}
-
-/**
- * Рекомендованный ответ на каждый вопрос вызова `AskUserQuestion`. Вариант с
- * «(Recommended)» в подписи — единственный признак: первый вариант списка
- * рекомендацией не считается, иначе автономия отвечала бы за человека там, где
- * агент ничего не советовал. Хоть у одного вопроса рекомендации нет — `null`:
- * такой вызов идёт человеку как сегодня, целиком.
- *
- * `critical` — вопрос помечен заголовком `critical`: выбор всё равно делается,
- * но о нём сообщается в главный чат дерева.
- */
-export function pickRecommended(input: unknown): RecommendedPick[] | null {
-  const questions = (input as { questions?: unknown } | null)?.questions;
-  if (!Array.isArray(questions) || questions.length === 0) return null;
-  const picks: RecommendedPick[] = [];
-  for (const raw of questions as QuestionItem[]) {
-    const options = Array.isArray(raw?.options) ? (raw.options as QuestionOption[]) : [];
-    const recommended = options.find(
-      (option) => typeof option?.label === 'string' && RECOMMENDED.test(option.label),
-    );
-    if (!recommended || typeof raw.question !== 'string') return null;
-    picks.push({
-      question: raw.question,
-      label: String(recommended.label),
-      critical: typeof raw.header === 'string' && CRITICAL.test(raw.header),
-    });
-  }
-  return picks;
 }
 
 /**
@@ -209,19 +101,7 @@ export function autonomousPickMessage(picks: readonly RecommendedPick[]): string
   ].join('\n');
 }
 
-// --- Дополнения полосы чата (26.09.2026): хранение заметок и лента автовыбора ---
-
-/** Заметка главного чата, как её отдаёт панель: с ключом и отметкой прочтения. */
-export interface ChatEscalationEntry extends EscalationNotice {
-  /** Ключ заметки: ребёнок + текст — один и тот же блок дважды не записывается. */
-  id: string;
-  read: boolean;
-}
-
-/** `GET /api/chat/escalations`: заметки по главным чатам деревьев. */
-export interface ChatEscalationsView {
-  chats: Record<string, ChatEscalationEntry[]>;
-}
+// --- Лента автовыбора (26.09.2026) ---
 
 /** Один автовыбор, как его рисует лента: вопрос и взятый вариант. */
 export interface AutonomousPickLine {

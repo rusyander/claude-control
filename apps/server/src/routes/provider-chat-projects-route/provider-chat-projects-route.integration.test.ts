@@ -3,11 +3,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { ProviderChatProject, ProviderChatSummary } from '@agentdeck/contracts';
+import type { ProviderChatProject } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import { ProviderChatService } from '../../domains/provider-chat/provider-chat.ts';
-import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
+import { createChat } from '../../domains/provider-chat/store/store.ts';
 import { registerProviderChatRoutes } from '../provider-chat-routes/provider-chat-routes.ts';
 
 /**
@@ -61,7 +60,6 @@ describe('GET /api/provider-chat/projects', () => {
   let root: string;
   let project: string;
   let app: FastifyInstance;
-  let chats: ProviderChatService;
 
   const appData = (): string => join(root, 'agentdeck');
 
@@ -75,10 +73,7 @@ describe('GET /api/provider-chat/projects', () => {
       backupDir: join(appData(), 'backups'),
     } as unknown as ServerContext;
     app = Fastify();
-    chats = new ProviderChatService(() => {
-      throw new Error('прогон в этом тесте не запускается');
-    });
-    registerProviderChatRoutes(app, ctx, chats, new HandoffChains());
+    registerProviderChatRoutes(app, ctx);
     await app.ready();
   };
 
@@ -95,7 +90,6 @@ describe('GET /api/provider-chat/projects', () => {
   });
 
   afterEach(async () => {
-    chats?.stopAll();
     await app?.close();
     rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     rmSync(project, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -132,20 +126,16 @@ describe('GET /api/provider-chat/projects', () => {
     expect(projects[0]).toMatchObject({ path: gone, startProblem: 'missing' });
   });
 
-  it('новый разговор активного провайдера в каталоге проекта Claude добавляет его бейдж', async () => {
+  it('старый разговор активного провайдера в каталоге проекта Claude добавляет его бейдж', async () => {
     claudeTranscript(root, 'enc-a', project, '2026-10-01T10:00:00.000Z');
     await boot('qwen');
 
     const before = await list();
     expect(before[0]?.providers.map((provider) => provider.id)).toEqual(['claude']);
 
-    const created = await app.inject({
-      method: 'POST',
-      url: '/api/provider-chat/chats',
-      payload: { workdir: before[0]?.path },
-    });
-    expect(created.statusCode).toBe(200);
-    expect(created.json<ProviderChatSummary>().workdir).toBe(project);
+    // Новый разговор заводит чат ядра; бейдж даёт разговор, уже лежащий в истории панели.
+    const created = createChat(appData(), 'qwen', { workdir: before[0]?.path ?? '' });
+    expect(created?.workdir).toBe(project);
 
     const after = await list();
     expect(after).toHaveLength(1);

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatTreeView } from '@agentdeck/contracts/chat-handoff';
 import { mascotRu } from '@shared/config/i18n/mascot/ru';
 import { mascotEn } from '@shared/config/i18n/mascot/en';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
@@ -10,7 +9,6 @@ import {
   REACTION_VARIANTS,
   pickReaction,
 } from './reactions';
-import { diffGroups, snapshotGroups } from './groupEvents';
 import { LONG_RUN_MS, diffRuns, snapshotRuns } from './runEvents';
 import type { ReactionKind, ReactionMemory } from './reactions.types';
 
@@ -18,11 +16,7 @@ const T0 = 1_000_000;
 
 describe('pickReaction', () => {
   it('a burst gives ONE line — the most important kind', () => {
-    const pick = pickReaction(
-      ['longDone', 'runFailed', 'linkLost', 'groupDelivered'],
-      EMPTY_MEMORY,
-      T0,
-    );
+    const pick = pickReaction(['longDone', 'runFailed', 'linkLost'], EMPTY_MEMORY, T0);
     expect(pick?.kind).toBe('linkLost');
   });
 
@@ -58,7 +52,7 @@ describe('pickReaction', () => {
   it('inside the global gap nothing speaks — except «back», which answers «lost»', () => {
     const lost = pickReaction(['linkLost'], EMPTY_MEMORY, T0);
     const soon = T0 + REACTION_GAP_MS - 1;
-    expect(pickReaction(['groupFailed'], lost!.memory, soon)).toBeNull();
+    expect(pickReaction(['runFailed'], lost!.memory, soon)).toBeNull();
     expect(pickReaction(['linkBack'], lost!.memory, soon)?.kind).toBe('linkBack');
   });
 
@@ -90,29 +84,5 @@ describe('diffRuns: limit and long turns', () => {
     const events = diffRuns(before, [], now);
     expect(events.find((event) => event.id === 'long')?.long).toBe(true);
     expect(events.find((event) => event.id === 'short')).not.toHaveProperty('long');
-  });
-});
-
-const tree = (statuses: string[]): ChatTreeView =>
-  ({
-    root: 'root',
-    running: 0,
-    nodes: [],
-    split: {
-      groups: statuses.map((status, index) => ({ index, title: `G${index}`, status })),
-    },
-  }) as unknown as ChatTreeView;
-
-describe('diffGroups', () => {
-  it('first sight of a tree says nothing — an old failure is not news', () => {
-    expect(diffGroups(undefined, tree(['failed', 'done']))).toEqual([]);
-  });
-
-  it('started → failed / paused / done give failed, stopped, delivered; no change — nothing', () => {
-    const before = snapshotGroups(tree(['started', 'started', 'started', 'started']));
-    const kinds = diffGroups(before, tree(['failed', 'paused', 'done', 'started'])).map(
-      (event) => `${event.kind}:${event.title}`,
-    );
-    expect(kinds).toEqual(['groupFailed:G0', 'groupStopped:G1', 'groupDelivered:G2']);
   });
 });

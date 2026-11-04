@@ -140,14 +140,13 @@ function linkedWorktree(dir) {
   }
 }
 
-const panelGroup = () =>
-  Boolean(String(process.env.AGENTDECK_GROUP_STAGE ?? '').trim()) ||
-  process.env.AGENTDECK_SPLIT_CHILD === '1';
-
-/** Where this project's ledger lives; `{path, rootBanned}`. */
+/**
+ * Where this project's ledger lives; `{path, rootBanned}`. A core task step needs no marker here: its copy
+ * is a linked worktree (`linkedWorktree`).
+ */
 export function ledgerOf(dir) {
   const root = join(dir, 'TASKS.md');
-  const rootBanned = panelGroup() || linkedWorktree(dir);
+  const rootBanned = linkedWorktree(dir);
   if (!rootBanned && existsSync(root)) return { path: root, rootBanned };
   return { path: join(dir, '.agent', 'TASKS.md'), rootBanned };
 }

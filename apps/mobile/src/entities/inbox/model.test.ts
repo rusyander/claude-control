@@ -102,7 +102,7 @@ describe('одно состояние на чат и значок по сути'
     expect(homeRu.groupCounts(single?.waiting ?? 0, single?.running ?? 0)).toBe('ждут: 1');
   });
 
-  it('значок различает вопросы и разрешения; первая правка — тоже разрешение', () => {
+  it('значок различает вопросы и разрешения', () => {
     const at = '2026-09-27T10:00:00.000Z';
     const question = {
       kind: 'question' as const,
@@ -111,9 +111,11 @@ describe('одно состояние на чат и значок по сути'
       askedAt: at,
       questions: [],
     };
-    const gate = { kind: 'branchGate' as const, key: 'g', toolUseId: 'g', askedAt: at };
     expect(askKinds([ask('p', at)])).toEqual({ questions: 0, permissions: 1 });
-    expect(askKinds([question, gate, ask('p', at)])).toEqual({ questions: 1, permissions: 2 });
+    expect(askKinds([question, ask('p', at), ask('p2', at)])).toEqual({
+      questions: 1,
+      permissions: 2,
+    });
     expect(homeRu.asksBadge(0, 1)).toBe('1 разрешение');
     expect(homeRu.asksBadge(1, 2)).toBe('1 вопрос · 2 разрешения');
     expect(homeRu.asksBadge(5, 11)).toBe('5 вопросов · 11 разрешений');

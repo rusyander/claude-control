@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { removeEntry } from '../../lib/safe-io/safe-io.ts';
 import { checkProvider, levelOf } from './provider-check.ts';
-import type { AssistantRunResult } from '../assistant-runner/assistant-runner.ts';
+import type { OneShotResult } from '../core-ask/core-ask.types.ts';
 
 /**
  * Проверка провайдера. Главное, что здесь доказывается: круг записи идёт на
@@ -30,15 +30,9 @@ args = ["server.js"]
 // Ядра в этих тестах нет: шаг «маршрут ядра» пропущен и уровень не трогает (его — свой файл).
 const noCore = () => Promise.resolve({ absent: 'procs.json: ENOENT' });
 
-function okAssistant(): Promise<AssistantRunResult> {
-  return Promise.resolve({
-    ok: true,
-    providerId: 'codex',
-    mode: 'cli',
-    reply: 'готов',
-    experimental: true,
-    reason: 'ok',
-  });
+/** Вопрос ядра названным CLI ответил (`core-ask/one-shot.ts`); ядро здесь не нужно. */
+function okAssistant(providerId: string): Promise<OneShotResult> {
+  return Promise.resolve({ ok: true, providerId, reply: 'готов' });
 }
 
 describe('checkProvider', () => {
@@ -70,7 +64,7 @@ describe('checkProvider', () => {
       coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
-      runAssistantImpl: okAssistant,
+      ask: okAssistant,
     });
 
     const byId = Object.fromEntries(result.steps.map((step) => [step.id, step]));
@@ -126,20 +120,33 @@ describe('checkProvider', () => {
       coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
-      runAssistantImpl: () =>
-        Promise.resolve({
-          ok: false,
-          providerId: 'codex',
-          mode: 'cli',
-          reply: '',
-          experimental: true,
-          reason: 'cli_error',
-          error: 'exit code 1',
-        }),
+      ask: () =>
+        Promise.resolve({ ok: false, providerId: 'codex', reason: 'failed', error: 'exit code 1' }),
     });
 
     expect(result.steps.find((step) => step.id === 'assistant')?.status).toBe('fail');
     expect(result.level).toBe('failed');
+  });
+
+  it('вопрос ядра идёт названным CLI; отказ панели «нет судьи ядра» — шаг пропущен, не провален', async () => {
+    const asked: string[] = [];
+    const result = await checkProvider('codex', {
+      appDataDir: appData,
+      coreRoutes: noCore,
+      withAssistant: true,
+      detectCli: () => true,
+      ask: (providerId) => {
+        asked.push(providerId);
+        return Promise.resolve({
+          ok: false,
+          providerId,
+          reason: 'unsupported',
+          error: 'нет судьи',
+        });
+      },
+    });
+    expect(asked).toEqual(['codex']);
+    expect(result.steps.find((step) => step.id === 'assistant')?.status).toBe('skipped');
   });
 
   it('claude: разделы на своих маршрутах пропускаются, а не проваливаются', async () => {
@@ -148,7 +155,7 @@ describe('checkProvider', () => {
       coreRoutes: noCore,
       withAssistant: true,
       detectCli: () => true,
-      runAssistantImpl: okAssistant,
+      ask: okAssistant,
     });
 
     for (const id of ['mcp', 'permissions', 'env']) {

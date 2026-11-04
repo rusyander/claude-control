@@ -12,6 +12,7 @@ import type {
 } from '@agentdeck/contracts/core/routes';
 import type { CliAdapter } from '../../adapters/index.ts';
 import { allowedRoutesOf } from '../../journal/reduce/fold-view.ts';
+import { USER_SERVER_DOWN, type UserServerRoute } from '../../routes/local/user/user.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 
 /**
@@ -39,8 +40,13 @@ export function allowedOf(task: LiveTask): AllowedTriple[] {
 }
 
 export function compatAdapterOf(adapter: CliAdapter): CompatAdapter {
-  const { login, channels, limitsChannel } = adapter.caps;
-  return { id: adapter.id, caps: { login, channels, limitsChannel }, bypassActive: {} };
+  const { login, channels, limitsChannel, preToolHooks, denyOverlay } = adapter.caps;
+  return {
+    id: adapter.id,
+    caps: { login, channels, limitsChannel, preToolHooks, denyOverlay },
+    bypassActive: {},
+    ...(adapter.built === false ? { built: false as const } : {}),
+  };
 }
 
 export interface CompatFacts {
@@ -98,15 +104,29 @@ function compatRouteOf(
           ? 'value'
           : 'absent'
       : stateOf(credential);
+  const down = humanServerDown(route, availability);
   return {
     id: route.id,
     caps: route.caps,
     availability: {
       state: stateOf(availability),
       onUnknown: decl('availability')?.onUnknown ?? 'refuse',
+      ...(down ? { downReason: down } : {}),
     },
     credential: credentialState,
   };
+}
+
+/**
+ * Маршрут сам назвал сервер человека лежащим (`local:user`, `lastProbe()` после `absent`): судья
+ * отказывает `user_server_down` с этой причиной. Узнаётся по возможности маршрута (метод пробы),
+ * не по id; иначе — обычная недоступность.
+ */
+function humanServerDown(route: Route, availability: Fact<unknown>): string | undefined {
+  if (!('absent' in availability)) return undefined;
+  const probe = (route as Partial<Pick<UserServerRoute, 'lastProbe'>>).lastProbe;
+  const last = typeof probe === 'function' ? probe.call(route) : undefined;
+  return last?.startsWith(USER_SERVER_DOWN) ? last : undefined;
 }
 
 function routeFacts(
@@ -195,7 +215,24 @@ export function compatRecord(decision: CompatDecision, inputs: CompatInputs): Ro
       decision.kind === 'refused'
         ? `refused: ${decision.code}${decision.setting ? ` (${decision.setting})` : ''}`
         : decision.kind,
+      // Почему сервер человека лежит — словами его пробы (человек видит, что поднимать).
+      ...(decision.kind === 'refused' && decision.code === 'user_server_down'
+        ? [inputs.facts.route.availability.downReason ?? '']
+        : []),
     ],
     output: decision,
   };
+}
+
+/**
+ * Причина отказа `compat` словами шага задачи. `model_absent` называет модель и маршрут: голое
+ * «compat refused: model_absent» не говорило, какую модель ключ контура не обслуживает, и
+ * человек не знал, что поправить (стенд, s10 G7). Модель берётся из запроса хода, а не из фактов
+ * маршрута — список моделей ключа её как раз не содержит.
+ */
+export function compatRefusalReason(code: string, model: string | null, routeId: string): string {
+  if (code === 'model_absent' && model) {
+    return `compat refused: model_absent: model ${model} is not in the model list of route ${routeId}`;
+  }
+  return `compat refused: ${code}`;
 }

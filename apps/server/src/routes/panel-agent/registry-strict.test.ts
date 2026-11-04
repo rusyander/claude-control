@@ -20,7 +20,6 @@ const ROUTE_SECTIONS: Record<string, readonly string[]> = {
   '/groups': ['groups'],
   '/history': ['history'],
   '/settings': ['settings', 'provider', 'endpoints', 'integrations'],
-  '/watcher': ['watcher'],
   '/dlp': ['dlp'],
   '/local-models': ['local-models'],
   '/kit': ['kit'],
@@ -42,7 +41,50 @@ const ROUTE_SECTIONS: Record<string, readonly string[]> = {
   '/env': ['env'],
   '/projects': ['projects'],
   '/tests': ['tests'],
+  // Страницы ядра: агенту — только открыть их; команды задаче ядра — рукой человека
+  // (`POST /api/core/commands` — `human:rights`), своих действий у агента там нет.
+  '/core': ['navigation'],
+  '/core/launch': ['navigation'],
+  '/core/scenarios': ['navigation'],
+  '/core/chat': ['navigation'],
 };
+
+/** Снятые действия: запись групп, разделение задач, общие правила разделения (этап 10, F3). */
+const RETIRED_ACTIONS = [
+  'read_group',
+  'draft_group',
+  'add_group_step',
+  'move_group_step',
+  'set_group_knobs',
+  'draft_scenario',
+  'copy_group',
+  'list_discovered_groups',
+  'run_group_discovery',
+  'import_discovered_group',
+  'copy_group_to_global',
+  'apply_group_advice',
+  'merge_group_origin',
+  'read_group_override',
+  'set_group_override',
+  'activate_groups_for_path',
+  'list_resource_catalog',
+  'draft_group_step',
+  'promote_group_step',
+  'save_group',
+  'toggle_group',
+  'delete_group',
+  'request_split',
+  'split_decline',
+  'set_chat_group',
+  'read_split_overlap',
+  'split_accept_group',
+  'split_resume_interrupted',
+  'summarize_resource',
+  'read_project_group_choice',
+  'set_project_group_choice',
+  'read_split_defaults',
+  'save_split_defaults',
+];
 
 /** Разделы действий без своей страницы. */
 const PAGELESS = ['navigation'];
@@ -84,6 +126,36 @@ describe('реестр действий агента: строгая сверк�
     const allowed = new Set([...Object.values(ROUTE_SECTIONS).flat(), ...PAGELESS]);
     const orphan = [...actionSections].filter((section) => !allowed.has(section));
     expect(orphan).toEqual([]);
+  });
+
+  it('действий записи групп, разделения и общих правил разделения нет (группы — только чтение)', () => {
+    // Этап 10, F3: группы ведёт ядро, у агента от групп остался только `list_groups`.
+    const names = new Set(PANEL_ACTIONS.map((action) => action.name));
+    expect(RETIRED_ACTIONS.filter((name) => names.has(name))).toEqual([]);
+    expect(names.has('list_groups')).toBe(true);
+    const tree = PANEL_ACTIONS.find((action) => action.name === 'split_control');
+    const modeOk = (mode: string): boolean =>
+      Boolean(tree?.input.safeParse({ chat: 'c1', mode }).success);
+    expect(['pause_all', 'resume_all'].filter(modeOk)).toEqual(['pause_all', 'resume_all']);
+    const groupModes = ['pause_group', 'resume_group', 'release_group'];
+    expect(groupModes.filter(modeOk)).toEqual([]);
+  });
+
+  /**
+   * `continue_group` назван, но не исполняется (решение 02.11 в `actions-chat-control.ts`):
+   * продолжить сдавшуюся задачу ядра может только ответ человека, и агент получает
+   * названный отказ до карточки, а не тихое «нет такого режима». Записью в группы
+   * режим так и не стал: маршрут не строится.
+   */
+  it('continue_group — названный отказ до карточки, без запроса к панели', async () => {
+    const tree = PANEL_ACTIONS.find((action) => action.name === 'split_control');
+    const input = { chat: 'c1', mode: 'continue_group' };
+    expect(tree?.input.safeParse(input).success).toBe(true);
+    const inject = (): never => {
+      throw new Error('no request may be made for continue_group');
+    };
+    const route = tree?.route as (input: unknown, inject: unknown) => Promise<unknown>;
+    await expect(route(input, inject)).rejects.toThrow(/^core-continue-human-only/);
   });
 
   it('каждое действие вызывается интеграционным тестом через маршрут', () => {

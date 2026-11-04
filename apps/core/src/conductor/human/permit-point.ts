@@ -53,6 +53,55 @@ export function judgeWithGrants(
   };
 }
 
+/** Варианты вопроса права, которые открывают вызов; «refuse» и любой иной текст — нет. */
+const OPENS: ReadonlySet<string> = new Set(['grant', 'allow']);
+
+/**
+ * Отвеченный вопрос с тем же ключом — последний по журналу. Ждущий сюда не попадает: его
+ * переиспользует подъём (`raise.ts`, повтор — `duplicate`).
+ */
+function answeredAsk(ledger: HumanLedger, dedupe: string) {
+  let found: { askId: string; text: string; seq: number } | null = null;
+  for (const ask of Object.values(ledger.asks)) {
+    const first = ask.answers[0];
+    if (ask.dedupe !== dedupe || !first) continue;
+    if (!found || first.seq > found.seq)
+      found = { askId: ask.askId, text: first.text, seq: first.seq };
+  }
+  return found;
+}
+
+/**
+ * Суд права с живыми грантами и ответом человека на тот же запрос (этап 10, G5). Модель повторяет
+ * отказанный вызов — ключ `dedupe` тот же (шаг + пункт + вид + цель), и вопрос тот же: человек уже
+ * ответил, второй раз его не спрашивают. «Разрешить»/«грант» открывают ровно этот вызов этого шага
+ * (ответ пришёл человеческой дорогой — команда `answer` класса human-strict); «отказать» и ответ
+ * вне вариантов — отказ без пункта, то есть без нового `human.asked`. Права шире этого вызова
+ * ответ не даёт: грант — отдельная команда `grant`.
+ */
+export function judgePermitCall(
+  task: Pick<LiveTask, 'dir' | 'taskId'>,
+  w: Pick<Where, 'unitId' | 'stepId'>,
+  ask: PermissionAsk,
+  ctx: PermitContext,
+  judge: (ctx: PermitContext) => PermitDecision,
+): { decision: PermitDecision; ledger: HumanLedger | null } {
+  const judged = judgeWithGrants(task, w, ctx, judge);
+  const { decision } = judged;
+  if (decision.allow || decision.humanPoint === null) return judged;
+  const ledger = judged.ledger ?? readHumanLedger(task);
+  const answered = answeredAsk(ledger, permitDedupe(w, decision.humanPoint, ask, ctx.copyRoot));
+  if (!answered) return { decision, ledger };
+  const said = `the human answered «${answered.text}» to ask ${answered.askId}`;
+  if (OPENS.has(answered.text)) {
+    return { decision: { allow: true, signal: null, reason: said }, ledger };
+  }
+  return {
+    decision: { ...decision, humanPoint: null, reason: `${decision.reason}; ${said}` },
+    ledger,
+  };
+}
+
 /**
  * Ключ ждущего запроса: шаг + пункт + вид + цель. Хук не знает номера вызова, сервер права знает,
  * но оба судят одно действие — ключ у обеих дорог один, и повтор того же действия (модель

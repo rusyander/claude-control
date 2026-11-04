@@ -81,17 +81,21 @@ export function AgentsPanel({
             role="dialog"
             aria-label={t('agents.title')}
           >
-            <Stack
-              direction="row"
-              align="center"
-              justify="between"
-              gap="var(--spacing-sm)"
-              className={styles.head}
-            >
-              <Stack direction="row" align="center" gap="var(--spacing-sm)">
+            {/* Шапка в две строки: счётчик с «Остановить всех» и отдельно звук. В одну
+                строку шириной 360px русские подписи не помещались — ползунок наезжал
+                на «Звук», а процент громкости обрезался. */}
+            <Stack direction="column" gap="var(--spacing-xs)" className={styles.head}>
+              <Stack direction="row" align="center" justify="between" gap="var(--spacing-sm)">
                 <Typography variant="body-sm" weight="medium">
                   {t('agents.active', { count: activeRuns.length })}
                 </Typography>
+                {activeRuns.length > 0 && (
+                  <Button variant="danger" size="sm" onClick={onStopAll}>
+                    {t('agents.stopAll')}
+                  </Button>
+                )}
+              </Stack>
+              <Stack direction="row" align="center" gap="var(--spacing-sm)">
                 {/* Звук уведомлений: слышно, когда агент ждёт ответа или упал. */}
                 <Stack
                   as="label"
@@ -144,11 +148,6 @@ export function AgentsPanel({
                   </Stack>
                 )}
               </Stack>
-              {activeRuns.length > 0 && (
-                <Button variant="danger" size="sm" onClick={onStopAll}>
-                  {t('agents.stopAll')}
-                </Button>
-              )}
             </Stack>
 
             <div className={styles.list}>

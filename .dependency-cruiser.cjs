@@ -207,7 +207,9 @@ module.exports = {
         '(dlp, ключи, цены); журнал и решения ядра в него не входят — расход и отказы он отдаёт ' +
         'клиенту `routes/hops` фактами.',
       severity: 'error',
-      from: { path: '^apps/core/src/hop-host/', pathNot: '\\.test\\.ts$' },
+      // Стенды `__fixtures__/` — код тестов, как и сами тесты: стенд шлюза человека собирает
+      // маршрут тем же `userRouteOf` ядра, что и рабочий путь, иначе проверял бы свою копию.
+      from: { path: '^apps/core/src/hop-host/', pathNot: '/__fixtures__/|\\.test\\.ts$' },
       to: { path: '^apps/core/src/(?!hop-host/|platform/|lib/)' },
     },
     {

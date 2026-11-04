@@ -59,6 +59,9 @@ export function CoreTopic() {
           <GuideStep title={tr('startOpen')} text={tr('startOpenText')}>
             <HelpShot topic="core" scenario="tasks" frame="01-list" side="panel" />
           </GuideStep>
+          <GuideStep title={tr('startFault')} text={tr('startFaultText')}>
+            <HelpShot topic="core" scenario="fault" frame="01-fault" side="panel" />
+          </GuideStep>
           <GuideStep title={tr('startAbsent')} text={tr('startAbsentText')}>
             <HelpShot topic="core" scenario="absent" frame="01-card" side="panel" />
           </GuideStep>
@@ -75,6 +78,9 @@ export function CoreTopic() {
           <GuideStep title={tr('launchForm')} text={tr('launchFormText')}>
             <HelpShot topic="core" scenario="launch" frame="01-form" side="panel" />
           </GuideStep>
+          <GuideStep title={tr('launchReview')} text={tr('launchReviewText')}>
+            <HelpShot topic="core" scenario="launch" frame="07-review-link" side="panel" />
+          </GuideStep>
           <GuideStep title={tr('launchEstimate')} text={tr('launchEstimateText')}>
             <HelpShot topic="core" scenario="launch" frame="02-estimate" side="panel" />
           </GuideStep>
@@ -89,6 +95,9 @@ export function CoreTopic() {
           </GuideStep>
           <GuideStep title={tr('launchGo')} text={tr('launchGoText')}>
             <HelpShot topic="core" scenario="launch" frame="06-launch" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('launchMcp')} text={tr('launchMcpText')}>
+            <HelpShot topic="core" scenario="launch" frame="08-mcp-picks" side="panel" />
           </GuideStep>
         </GuideSteps>
       </HelpSection>
@@ -164,12 +173,6 @@ export function CoreTopic() {
 
       <HelpSection title={tr('limitsTitle')}>
         <Stack gap="var(--spacing-xs)">
-          <Callout tone="warning" title={tr('limitPhoneTitle')}>
-            {tr('limitPhoneText')}
-          </Callout>
-          <Callout tone="info" title={tr('limitSignTitle')}>
-            {tr('limitSignText')}
-          </Callout>
           <Callout tone="info" title={tr('limitEnglishTitle')}>
             {tr('limitEnglishText')}
           </Callout>

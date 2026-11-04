@@ -3,8 +3,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
+import { CORE_BUSY_EXIT_ENV, CORE_HOME_BUSY_EXIT } from '@agentdeck/contracts/core/supervisor';
+import { launchdPlist, systemdUnit } from '../platform/keepalive.ts';
 import { system32, type ToolRun } from '../platform/run-tool.ts';
 import {
+  busyExitCode,
   coreKeepaliveSpec,
   homeFromArgv,
   parseKeepaliveArgs,
@@ -67,6 +70,18 @@ describe('core keepalive command (P57)', () => {
       '--home',
       '/core/home',
     ]);
+  });
+
+  it('the autostart entry tells the core to leave a busy home with 0, so systemd/launchd never respawn the extra core', () => {
+    const spec = coreKeepaliveSpec({ name: 'n', home: '/core/home', enabled: true });
+    expect(spec.env).toEqual({ [CORE_BUSY_EXIT_ENV]: '0' });
+    // Пути — POSIX-образные: на Windows путь ядра в юнит systemd не ложится, проверяется окружение.
+    const posix = { ...spec, command: '/usr/bin/node', args: ['index.ts'], cwd: '/opt/core' };
+    expect(systemdUnit(posix)).toContain(`Environment="${CORE_BUSY_EXIT_ENV}=0"`);
+    expect(launchdPlist(posix)).toContain(`<key>${CORE_BUSY_EXIT_ENV}</key>`);
+    expect(busyExitCode({ [CORE_BUSY_EXIT_ENV]: '0' })).toBe(0);
+    expect(busyExitCode({})).toBe(CORE_HOME_BUSY_EXIT);
+    expect(busyExitCode({ [CORE_BUSY_EXIT_ENV]: '1' })).toBe(CORE_HOME_BUSY_EXIT);
   });
 
   it('a refused registration is exit 1 with the reason, never a silent success', async () => {

@@ -18,7 +18,6 @@ const IN_FLIGHT = new Set(['queued', 'leased', 'running']);
 
 /** Прогоны проверок единицы, которые ещё идут: снятие сессии их не должно обрывать. */
 export function checksInFlight(state: TaskFoldState, unitId: string): number {
-  return Object.values(state.checks).filter(
-    (c) => IN_FLIGHT.has(c.state) && c.run?.unit === unitId,
-  ).length;
+  return Object.values(state.checks).filter((c) => IN_FLIGHT.has(c.state) && c.run?.unit === unitId)
+    .length;
 }

@@ -4,10 +4,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { ServerContext } from '../../context.ts';
+import { AppStore } from '../../lib/app-store/app-store.ts';
+import { createCoreAskPort } from '../../domains/core-ask/core-ask.ts';
+import { startFakeCore, type FakeCore } from '../../domains/core-ask/__fixtures__/fake-core.ts';
 import { registerResourceRoutes } from './resource-routes.ts';
-
-/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
-const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
 
 /**
  * Помощник структуры и секреты в файлах ресурса (U6, 28.09).
@@ -19,11 +19,10 @@ const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
  * не сошлось (строка переписана, маска в новом файле) — файл не пишется и
  * назван в `kept`.
  *
- * Настоящий маршрут, настоящее чтение и запись файлов ресурса, настоящий запуск
- * процесса; вместо `claude` — фальшивый CLI (PATH — только его каталог и
- * системный), он пишет stdin и отвечает заданными файлами.
+ * Настоящий маршрут, настоящее чтение и запись файлов ресурса, настоящий клиент ядра
+ * (`createCoreAskPort`) настоящим HTTP. Ядро — заглушка (этап 10, F2b: своего процесса CLI у
+ * помощника больше нет): запоминает текст вопроса и отвечает заданными файлами.
  */
-const isWindows = process.platform === 'win32';
 const SECRET_LINE = 'API_TOKEN=qa-struct-secret-5d1e';
 // Ревью F3: значения в кавычках и с пробелом (YAML, export) — тоже секреты файла.
 const BODY = (token: string, quoted: string, exported: string): string =>
@@ -33,24 +32,21 @@ const ORIGINAL = BODY(SECRET_LINE, 'hunter two 2', 'tok en 123');
 /** То, что модель видит (и возвращает, не трогая строк с секретами). */
 const MASKED = BODY('API_TOKEN=••••••', '••••••', '••••••');
 
-const FAKE = `
-import { readFileSync, writeFileSync } from 'node:fs';
-
-const chunks = [];
-for await (const chunk of process.stdin) chunks.push(chunk);
-const near = (name) => new URL('./' + name, import.meta.url);
-writeFileSync(near('stdin.txt'), Buffer.concat(chunks).toString('utf8'));
-process.stdout.write(JSON.stringify({ result: readFileSync(near('answer.json'), 'utf8') }));
-`;
-
 let app: FastifyInstance | undefined;
+let core: FakeCore | undefined;
 let dir: string;
 let root: string;
-let savedPath: string | undefined;
+/** Текст вопроса, дошедший до ядра, — то, что увидела бы модель. */
+let sent = '';
+let reply = '';
+let store: AppStore;
+/** CLI, для которых маршрут просил набор панели (G13). */
+let carried: string[] = [];
 
 const skillFile = (name: string): string => join(root, 'skills', 'demo', name);
-const answer = (files: Array<{ path: string; content: string }>): void =>
-  writeFileSync(join(dir, 'answer.json'), JSON.stringify({ reply: 'Сделал.', files }), 'utf8');
+const answer = (files: Array<{ path: string; content: string }>): void => {
+  reply = JSON.stringify({ reply: 'Сделал.', files });
+};
 const assist = async (): Promise<{ reply: string; applied: string[]; kept?: string[] }> => {
   const response = await app!.inject({
     method: 'POST',
@@ -66,19 +62,16 @@ beforeEach(async () => {
   root = join(dir, 'config');
   mkdirSync(join(root, 'skills', 'demo'), { recursive: true });
   writeFileSync(skillFile('SKILL.md'), ORIGINAL, 'utf8');
-  const script = join(dir, 'fake-claude.mjs');
-  writeFileSync(script, FAKE, 'utf8');
-  if (isWindows) {
-    writeFileSync(join(dir, 'claude.cmd'), `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`);
-  } else {
-    writeFileSync(join(dir, 'claude'), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
-      mode: 0o755,
-    });
-  }
-  savedPath = process.env.PATH;
-  const system = isWindows ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32') : '/bin';
-  process.env.PATH = [dir, system].join(isWindows ? ';' : ':');
+  sent = '';
+  core = await startFakeCore({
+    turn: async ({ fields, emit }) => {
+      sent = fields.prompt;
+      emit({ kind: 'assistant-text', data: { text: reply } });
+      emit({ kind: 'turn-end', data: { isError: false, numTurns: 1 } });
+    },
+  });
 
+  const appData = join(root, 'agentdeck');
   const ctx = {
     location: {
       paths: {
@@ -87,21 +80,31 @@ beforeEach(async () => {
         claudeMd: join(root, 'CLAUDE.md'),
         skills: join(root, 'skills'),
         hooks: join(root, 'hooks'),
-        appData: join(root, 'agentdeck'),
+        appData,
       },
     },
-    backupDir: join(root, 'agentdeck', 'backups'),
-    store: { getSettings: () => ({ provider: 'claude' }) },
+    backupDir: join(appData, 'backups'),
+    store: (store = new AppStore(appData)),
   } as unknown as ServerContext;
   app = Fastify();
-  registerResourceRoutes(app, ctx, NO_ROUTE);
+  carried = [];
+  registerResourceRoutes(
+    app,
+    ctx,
+    createCoreAskPort(() => core!.home, core.identity),
+    ({ cli }) => {
+      carried.push(cli);
+      return { ok: true, session: { env: ['QWEN_HOME'] }, env: { QWEN_HOME: join(dir, 'qwen') } };
+    },
+  );
   await app.ready();
 });
 
 afterEach(async () => {
   await app?.close();
   app = undefined;
-  process.env.PATH = savedPath;
+  await core?.close();
+  core = undefined;
   rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
@@ -117,17 +120,26 @@ describe('POST /api/resources/:kind/:id/assist — секреты файлов',
     ]);
     const body = await assist();
 
-    const stdin = readFileSync(join(dir, 'stdin.txt'), 'utf8');
+    expect(core!.asks).toHaveLength(1);
     for (const leak of ['qa-struct-secret-5d1e', 'hunter two 2', 'hunter', 'tok en 123']) {
-      expect(stdin, leak).not.toContain(leak);
+      expect(sent, leak).not.toContain(leak);
     }
-    expect(stdin).toContain('API_TOKEN=••••••');
+    expect(sent).toContain('API_TOKEN=••••••');
 
     expect(body.applied.sort()).toEqual(['README.md', 'SKILL.md']);
     expect(body.kept).toEqual(['notes.md']);
     const written = readFileSync(skillFile('SKILL.md'), 'utf8');
     expect(written).toBe(`${ORIGINAL}\n## Rollback\nRevert.\n`);
     expect(existsSync(skillFile('notes.md'))).toBe(false);
+  });
+
+  it('набор чужого CLI (G13): помощник структуры везёт его ядру, как прежнее окно', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    answer([]);
+    await assist();
+    expect(carried).toEqual(['qwen']);
+    expect(core!.asks[0]!.session).toEqual({ env: ['QWEN_HOME'] });
+    expect(core!.askEnvs[0]).toEqual({ QWEN_HOME: join(dir, 'qwen') });
   });
 
   it('строка с маской переписана — файл не тронут, назван в kept', async () => {

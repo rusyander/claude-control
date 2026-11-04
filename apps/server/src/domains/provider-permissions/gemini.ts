@@ -2,17 +2,9 @@ import type { GeminiApprovalMode, GeminiPermissionDraft } from '@agentdeck/contr
 import { readTextFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 import { parseProviderJsonObject, stableJson } from '../../lib/provider-json.ts';
-import {
-  DEFAULT_GEMINI_APPROVAL,
-  GEMINI_APPROVAL_MODES,
-  GEMINI_CLI_ONLY_APPROVAL_MODES,
-} from './constants.ts';
-import {
-  objectSection,
-  parseToolList,
-  readStringList,
-  stripManagedSectionKeys,
-} from './normalize.ts';
+import { GEMINI_APPROVAL_MODES } from '@agentdeck/contracts/permissions';
+import { DEFAULT_GEMINI_APPROVAL } from './constants.ts';
+import { objectSection, readStringList, stripManagedSectionKeys } from './normalize.ts';
 import { backupNameOf } from './target.ts';
 import type { GeminiPermissionsValues, ProviderPermissionsTarget } from './types.ts';
 
@@ -49,33 +41,6 @@ interface RawGeminiSettings {
   coreTools?: unknown;
   excludeTools?: unknown;
   [key: string]: unknown;
-}
-
-/**
- * Пользователь прислал режим аппрувов, который Gemini принимает только как флаг
- * CLI (`yolo`). Маршрут отвечает 400 с отдельным объяснением: это не «битый
- * ввод», а осознанный отказ панели портить settings.json.
- */
-export function isCliOnlyGeminiApprovalMode(body: unknown): boolean {
-  if (!body || typeof body !== 'object') return false;
-  const mode = (body as Record<string, unknown>).approvalMode;
-  return typeof mode === 'string' && GEMINI_CLI_ONLY_APPROVAL_MODES.includes(mode);
-}
-
-export function parseGeminiDraft(rec: Record<string, unknown>): GeminiPermissionDraft | undefined {
-  const approvalMode = rec.approvalMode;
-  // `yolo` не проходит именно здесь — он не входит в GEMINI_APPROVAL_MODES.
-  if (
-    typeof approvalMode !== 'string' ||
-    !GEMINI_APPROVAL_MODES.includes(approvalMode as GeminiApprovalMode)
-  )
-    return undefined;
-
-  const coreTools = parseToolList(rec.coreTools);
-  const excludeTools = parseToolList(rec.excludeTools);
-  if (!coreTools || !excludeTools) return undefined;
-
-  return { approvalMode: approvalMode as GeminiApprovalMode, coreTools, excludeTools };
 }
 
 /**

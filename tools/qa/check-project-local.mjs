@@ -4,16 +4,15 @@
  * Почему прогон нужен: Claude Code загружает скиллы, хуки и правила из каталога
  * репозитория поверх пользовательских, а панель до этого показывала только
  * `~/.claude`. Группа, привязанная к проекту, выглядела пустой, хотя агент в ней
- * работал с правилами и скиллами проекта. Теперь набор виден в двух местах:
- * вкладка «Из проекта» на странице проектов и компактный блок на карточке
- * привязанной группы, который раскрывается в тот же полный вид.
+ * работал с правилами и скиллами проекта. Теперь набор виден на вкладке «Из проекта»
+ * страницы проектов (блок на карточке группы ушёл с редактором прежних групп, этап 10).
  *
- * Данные подменяются целиком: реестр проектов, группы и оба адреса набора
+ * Данные подменяются целиком: реестр проектов и оба адреса набора
  * (`/projects/:id/local` и `/projects/local?path=`). Прогон не зависит ни от
  * реальных проектов, ни от установленного CLI, ни от того, приземлился ли уже
  * серверный маршрут.
  *
- * Снимки: `.agent/screenshots/before-after/project-local/after-{projects,groups}.png`.
+ * Снимки: `.agent/screenshots/before-after/project-local/after-projects.png`.
  *
  * Запуск: `node tools/qa/check-project-local.mjs` при поднятом `pnpm dev`.
  */
@@ -96,19 +95,6 @@ const LOCAL = {
   ],
 };
 
-const GROUP = {
-  id: 'qa-local-group',
-  name: 'QA привязанная группа',
-  description: 'Группа, привязанная к проекту с собственным .claude.',
-  color: 'accent',
-  icon: 'folder',
-  members: [],
-  env: {},
-  projectPaths: [PROJECT.path],
-  isEnabled: true,
-  order: 0,
-};
-
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
 await bypassOnboarding(page);
@@ -154,22 +140,6 @@ await page.route(`**/api/projects/${PROJECT.id}/rules`, (route) =>
 );
 await page.route(`**/api/projects/${PROJECT.id}/local`, (route) => route.fulfill({ json: LOCAL }));
 await page.route('**/api/projects/local?*', (route) => route.fulfill({ json: LOCAL }));
-await page.route('**/api/groups', (route) => route.fulfill({ json: [GROUP] }));
-// Карточка группы открывается на вкладке «Путь», и путь читается сразу.
-await page.route(`**/api/groups/${GROUP.id}/path`, (route) =>
-  route.fulfill({ json: { groupId: GROUP.id, entries: [] } }),
-);
-await page.route('**/api/groups/discovery', (route) =>
-  route.fulfill({ json: { groups: [], sources: [], running: false } }),
-);
-// Окно группы читает ещё описания участников и числа скиллов: пустые ответы —
-// ни описаний, ни чисел. Без подмены стенд отвечал 404, и это считалось ошибкой.
-await page.route(`**/api/groups/${GROUP.id}/members`, (route) =>
-  route.fulfill({ json: { groupId: GROUP.id, members: [], steps: [] } }),
-);
-await page.route(`**/api/groups/${GROUP.id}/knobs`, (route) =>
-  route.fulfill({ json: { groupId: GROUP.id, knobs: [] } }),
-);
 
 let bad = 0;
 const check = (ok, text) => {
@@ -241,57 +211,8 @@ check(await visible(ruleBody), 'тело правила раскрывается
 
 await page.screenshot({ path: `${SHOTS}/after-projects.png`, fullPage: true });
 
-// --- Страница групп: компактный блок на карточке привязанной группы ---
-await page.goto(`${BASE}/groups`);
-await page.waitForSelector('nav');
-await page.waitForTimeout(1200);
-
-check(await visible(page.getByText(GROUP.name, { exact: true })), 'карточка группы на экране');
-// Набор проекта — во вкладке «Состав» окна группы: карточка открывает окно
-// щелчком по имени, окно открывается на «Порядке работы».
-await page
-  .getByRole('heading', { name: GROUP.name, exact: true })
-  .getByRole('button', { name: GROUP.name, exact: true })
-  .click();
-const groupDialog = page.getByRole('dialog', { name: GROUP.name, exact: true });
-await groupDialog.waitFor({ timeout: 8000 });
-await groupDialog.getByRole('tab', { name: 'Состав', exact: true }).click();
-await page.waitForTimeout(400);
-check(
-  await visible(page.getByText('Из проекта', { exact: true })),
-  'на карточке есть блок «Из проекта»',
-);
-// Путь стоит дважды: в «Используется в» вкладки «Состав» и подписью блока.
-check(
-  (await groupDialog.getByText(PROJECT.path, { exact: true }).count()) === 2 &&
-    (await visible(groupDialog.getByText(PROJECT.path, { exact: true }).last())),
-  'блок подписан путём проекта (и путь есть в «Используется в»)',
-);
-for (const text of ['скиллов: 2', 'хуков: 2', 'правил: 2']) {
-  check(
-    await visible(page.getByText(text, { exact: true })),
-    `компактный блок показывает «${text}»`,
-  );
-}
-
-const skillInGroup = page.getByText('qa-skill-notes', { exact: true });
-check(!(await visible(skillInGroup)), 'до раскрытия полный набор скрыт');
-await page.getByRole('button', { name: 'Показать набор', exact: true }).click();
-await page.waitForTimeout(600);
-check(await visible(skillInGroup), 'после «Показать набор» виден полный набор');
-check(
-  await visible(page.getByText('settings.local.json', { exact: true })),
-  'в раскрытом наборе те же пометки хуков',
-);
-check(
-  await visible(page.getByRole('button', { name: 'Свернуть набор', exact: true })),
-  'кнопка переключилась на «Свернуть набор»',
-);
-
-await page.screenshot({ path: `${SHOTS}/after-groups.png`, fullPage: true });
-
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));
 
 await browser.close();
-console.log(bad === 0 ? 'Набор «Из проекта» виден на обеих страницах' : `Проблем: ${bad}`);
+console.log(bad === 0 ? 'Набор «Из проекта» виден на странице проектов' : `Проблем: ${bad}`);
 process.exit(bad === 0 ? 0 : 1);

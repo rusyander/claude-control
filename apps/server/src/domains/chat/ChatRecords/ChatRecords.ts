@@ -2,6 +2,7 @@ import type { ChatSummary, ChatBlock, MessageUsage } from '@agentdeck/contracts'
 import { splitAttachments } from '@agentdeck/contracts/uploads';
 import { mediaRequestOf } from '@agentdeck/contracts/media-block';
 import { mediaTitle } from '@agentdeck/contracts/chat-title';
+import { humanTextOf } from '@agentdeck/contracts/core/session-stream';
 import { stripChildrenBrief } from '../children-brief/children-brief.ts';
 import { withoutPanelPreamble } from '../panel-preamble.ts';
 
@@ -344,8 +345,10 @@ export function branchOf(record: Record): string | undefined {
 export function toBlocks(record: Record): ChatBlock[] {
   const content = record.message?.content;
   // Сводку детей (Д6) панель кладёт в начало хода родителя для агента, не для
-  // человека: в пузыре его реплики её быть не должно.
-  const said = (text: string): string => (record.type === 'user' ? stripChildrenBrief(text) : text);
+  // человека: в пузыре его реплики её быть не должно. Ход `/chat`, доставленный ядром, несёт
+  // в транскрипте шапку доставки (метка платформы, «от человека») — в пузыре только слова.
+  const said = (text: string): string =>
+    record.type === 'user' ? stripChildrenBrief(humanTextOf(text)) : text;
   if (typeof content === 'string') {
     const text = said(content);
     return text.trim() ? [{ type: 'text', text }] : [];
@@ -399,7 +402,8 @@ export function textOf(record: Record | undefined): string {
  * выглядят мусором, поэтому их вырезаем.
  */
 export function cleanText(text: string): string {
-  return stripChildrenBrief(text)
+  // Шапка доставки ядра — не слова человека: название и превью чата по ней не строятся.
+  return stripChildrenBrief(humanTextOf(text.trimStart()))
     .replace(/<(ide_[a-z_]+|command-[a-z]+|task-notification|system-reminder)>[\s\S]*?<\/\1>/g, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')

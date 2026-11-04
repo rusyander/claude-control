@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { splitFrontmatter } from '../skills/frontmatter.ts';
 
 /**
@@ -36,6 +37,8 @@ export interface ParsedSubagent {
 export interface SubagentProblem {
   filePath: string;
   detail: string;
+  /** Код `detail`; у текста ошибки ОС его нет — он показывается как есть. */
+  detailCode?: ServerMessageCode;
 }
 
 export interface SubagentScan {
@@ -76,8 +79,19 @@ export function readSubagentFile(filePath: string): ParsedSubagent | SubagentPro
   let raw: string;
   try {
     const stat = statSync(filePath);
-    if (!stat.isFile()) return { filePath, detail: 'это не обычный файл' };
-    if (stat.size > MAX_AGENT_BYTES) return { filePath, detail: 'файл слишком велик для разбора' };
+    if (!stat.isFile())
+      return {
+        filePath,
+        detail: 'это не обычный файл',
+        detailCode: 'portability-subagent-not-file',
+      };
+    if (stat.size > MAX_AGENT_BYTES) {
+      return {
+        filePath,
+        detail: 'файл слишком велик для разбора',
+        detailCode: 'portability-subagent-too-big',
+      };
+    }
     raw = readFileSync(filePath, 'utf8');
   } catch (error) {
     return { filePath, detail: error instanceof Error ? error.message : String(error) };
@@ -85,13 +99,22 @@ export function readSubagentFile(filePath: string): ParsedSubagent | SubagentPro
 
   const { frontmatter, body } = splitFrontmatter(raw);
   if (Object.keys(frontmatter).length === 0) {
-    return { filePath, detail: 'нет заголовочного блока — это не субагент' };
+    return {
+      filePath,
+      detail: 'нет заголовочного блока — это не субагент',
+      detailCode: 'portability-subagent-no-frontmatter',
+    };
   }
 
   // Имя субагента — то, чем его зовут. Ключа нет → берём имя файла, как делает и
   // сам CLI; выдумывать здесь нечего, файл именно так и адресуется.
   const name = stringOf(frontmatter.name) ?? basename(filePath).replace(/\.md$/i, '');
-  if (!name) return { filePath, detail: 'имя субагента пустое' };
+  if (!name)
+    return {
+      filePath,
+      detail: 'имя субагента пустое',
+      detailCode: 'portability-subagent-empty-name',
+    };
 
   return {
     name,

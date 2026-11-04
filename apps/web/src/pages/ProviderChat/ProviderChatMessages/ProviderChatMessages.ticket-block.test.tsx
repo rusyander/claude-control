@@ -18,18 +18,15 @@ const TICKET = [
 ].join('\n');
 
 describe('лента чужого провайдера — блок тикета группы не показывается', () => {
-  const renderForeign = (content: string, partial = ''): string =>
+  const renderForeign = (content: string): string =>
     renderToStaticMarkup(
       <ProviderChatMessages
         messages={
           content ? [{ id: 'm1', role: 'assistant', content, at: '2026-09-25T00:00:00Z' }] : []
         }
         providerName="Codex"
-        partial={partial}
-        isRunning={Boolean(partial)}
         isEmptyState={false}
         onCreate={() => {}}
-        isCreating={false}
       />,
     );
 
@@ -49,21 +46,11 @@ describe('лента чужого провайдера — блок тикета
           { id: 'u1', role: 'user', content: `Формат:\n\n${TICKET}`, at: '2026-09-25T00:00:00Z' },
         ]}
         providerName="Codex"
-        partial=""
-        isRunning={false}
         isEmptyState={false}
         onCreate={() => {}}
-        isCreating={false}
       />,
     );
 
     expect(html).toContain('Кнопка съезжает');
-  });
-
-  it('в недописанной реплике', () => {
-    const html = renderForeign('', `Отчёт.\n\n<${SPLIT_TICKET_TAG}>\ntitle: Кнопка съезжает`);
-
-    expect(html).not.toContain('Кнопка съезжает');
-    expect(html).toContain('Отчёт.');
   });
 });

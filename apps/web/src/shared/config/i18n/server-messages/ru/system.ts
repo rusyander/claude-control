@@ -21,4 +21,8 @@ export const systemRu: Record<SystemMessageCode, string> = {
   'core-absent': 'Ядро задач не запущено',
   'core-unverified': 'Ядро задач не подтвердило себя: запрос не отправлен',
   'core-unreachable': 'Ядро задач не отвечает',
+  'core-starting': 'Ядро задач поднимается',
+  'core-fault': 'Ядро задач не запускается: нужен перезапуск',
+  'core-link-missing': 'Ядро не найдено: {{reason}}',
+  'core-link-unreachable': 'Ядро не ответило: {{reason}}',
 };

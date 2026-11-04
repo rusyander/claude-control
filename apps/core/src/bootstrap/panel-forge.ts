@@ -1,9 +1,17 @@
 import { join } from 'node:path';
-import type { ForgePort, ForgeProject } from '@agentdeck/contracts/core/forge';
+import {
+  FORGE_CLOUD,
+  hostOf,
+  selectForge,
+  siteBaseUrl,
+  type ForgePort,
+  type ForgeProject,
+  type ForgeSites,
+} from '@agentdeck/contracts/core/forge';
 import { isKeysError } from '@agentdeck/keys/errors';
 import { integrationKeyId } from '@agentdeck/keys/integration-keys';
 import { readKeyStrict } from '@agentdeck/keys/provider-keys';
-import { createForgePort, selectForge, type ForgeSites } from '../adapters/forge/index.ts';
+import { createForgePort } from '../adapters/forge/index.ts';
 import type { NetFetch } from '../platform/net/net.types.ts';
 import { readBytesSync } from '../platform/safe-io/files.ts';
 import { panelAppDataDir } from './panel-profiles.ts';
@@ -112,4 +120,29 @@ export function forgeForRemote(url: string, deps: PanelForgeDeps = {}): RemoteFo
     ...(deps.timeoutMs === undefined ? {} : { timeoutMs: deps.timeoutMs }),
   });
   return { project, port, credential: cred.credential };
+}
+
+/**
+ * Форж по каталогу панели, который уже решила загрузка (`panelWiring` → `panel.appData`): `null`
+ * или нет — без панели. Каталог здесь не ищется: ядро в процессе теста с переданным каталогом
+ * иначе прочло бы настоящие настройки форжа человека.
+ */
+export function forgeOfPanel(appData: string | null | undefined): (url: string) => RemoteForge {
+  return (url) => forgeForRemote(url, { appData: appData ?? undefined });
+}
+
+/**
+ * Хосты форжей для правила `forge-mcp-read-only` (P82): облака видов всегда, плюс сайт каждой
+ * включённой настройки панели (своя инсталляция). Читается на каждом шаге — правка настроек
+ * действует без перезапуска ядра; `null` каталога — только облака.
+ */
+export function forgeHostsOfPanel(appData: string | null | undefined): string[] {
+  const hosts = new Set(Object.values(FORGE_CLOUD).map((url) => hostOf(url)));
+  const { sites } = readPanelForge(appData ?? undefined);
+  for (const kind of ['gitlab', 'github'] as const) {
+    const site = sites[kind];
+    if (site?.enabled) hosts.add(hostOf(siteBaseUrl(kind, site.baseUrl)));
+  }
+  hosts.delete('');
+  return [...hosts];
 }

@@ -3,8 +3,7 @@ import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { toAccess } from '../../integrations/atlassian/client.ts';
 import { readIssue } from '../../integrations/atlassian/jira.ts';
 import { readForgeIssue, toForgeAccess } from '../../integrations/forge.ts';
-import { pickForge } from '../../integrations/forge-pick.ts';
-import { readIntegrations, readToken } from '../../integrations/store/store.ts';
+import { pickForge, readIntegrations, readToken } from '../../integrations/store/store.ts';
 import { applyDefectStates, type DefectStatePatch } from '../store/store.ts';
 
 /**

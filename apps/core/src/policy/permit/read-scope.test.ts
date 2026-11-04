@@ -183,6 +183,48 @@ describe('F-87 read scope', () => {
     });
   });
 
+  it("s10 G11: the task's attachment dir (beside the core home) is read; a sibling task, the core home and a link out are not", () => {
+    // Раскладка ядра: `<родитель дома>/agentdeck-attachments/<имя дома>/<taskId>/<cmdId>/<имя>`
+    // — сосед дома, не внутри.
+    const home = join(base, 'agentdeck-attachments', 'core-home');
+    const attachments = join(home, 't1');
+    mkdirSync(join(attachments, 'c1'), { recursive: true });
+    writeFileSync(join(attachments, 'c1', 'shot.png'), 'x');
+    mkdirSync(join(home, 't2', 'c1'), { recursive: true });
+    writeFileSync(join(home, 't2', 'c1', 'other.png'), 'x');
+    symlinkSync(coreHome, join(attachments, 'home-link'), 'junction');
+    const c = ctx({ ...scope, attachments });
+    expect(decidePermit(read(join(attachments, 'c1', 'shot.png')), c)).toMatchObject({
+      allow: true,
+      reason: expect.stringContaining('attachment'),
+    });
+    // Без корня вложений в области та же копия — вне копии (дефект до s10 G11).
+    expect(decidePermit(read(join(attachments, 'c1', 'shot.png')), ctx(scope))).toMatchObject({
+      code: 'outside-copy',
+    });
+    expect(decidePermit(read(join(home, 't2', 'c1', 'other.png')), c)).toMatchObject({
+      code: 'outside-copy',
+    });
+    expect(decidePermit(read(join(attachments, '..', 't2', 'c1', 'other.png')), c)).toMatchObject({
+      code: 'outside-copy',
+    });
+    expect(decidePermit(read(join(attachments, 'home-link', 'token')), c)).toMatchObject({
+      code: 'platform-path',
+    });
+    expect(decidePermit(read(`${attachments}/**`, 'Glob'), c)).toMatchObject({
+      code: 'platform-path',
+    });
+    expect(decidePermit(read(token), c)).toMatchObject({ code: 'platform-path' });
+    // Корень вложений, который сам содержит путь платформы, не открывается.
+    const wide = ctx({ ...scope, attachments: base });
+    expect(decidePermit(read(join(coreHome, 'sessions', 's1', 'spec.json')), wide)).toMatchObject({
+      code: 'platform-path',
+    });
+    expect(decidePermit(read(join(home, 't2', 'c1', 'other.png')), wide)).toMatchObject({
+      code: 'outside-copy',
+    });
+  });
+
   it('a platform path inside an allowed root stays closed', () => {
     const c = ctx(scope, { platformPaths: [coreHome, join(toolchain, 'pkg.js')] });
     expect(decidePermit(read(join(toolchain, 'pkg.js')), c)).toMatchObject({

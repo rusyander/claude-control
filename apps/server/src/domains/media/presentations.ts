@@ -28,9 +28,9 @@ import { promptText } from '../prompts/prompts.ts';
 import { MediaError, isMediaError } from './errors.ts';
 import {
   activeContour,
+  askContour,
   askUpstream,
   EXCERPT,
-  gatewayUrl,
   isRecord,
   ownProfiles,
   readCapped,
@@ -136,9 +136,8 @@ export function planDeck(deps: MediaDeps, context: DeckPlanContext = {}): MediaD
   const viaEndpoint = endpointPlan(deps);
   if (viaEndpoint.available) return viaEndpoint;
 
-  // Причина — та, которую человек может снять: свой тумблер шлюза ближе, чем
-  // чужая настройка контура; профиль эндпоинта — его собственное поле.
-  if (viaContour?.reason === 'gateway-off') return viaContour;
+  // Причина — та, которую человек может снять: профиль эндпоинта — его собственное
+  // поле, настройка контура — чужая.
   if (ownProfiles(deps.store).length > 0) return viaEndpoint;
   return viaContour ?? viaEndpoint;
 }
@@ -146,9 +145,7 @@ export function planDeck(deps: MediaDeps, context: DeckPlanContext = {}): MediaD
 function contourPlan(deps: MediaDeps, contour: Platform): MediaDeckPlan {
   const model = contourModel(deps, contour);
   if (!model) return blocked(deps, 'no-model', contour.title);
-  if (!gatewayUrl(deps, contour, 'v1/chat/completions')) {
-    return blocked(deps, 'gateway-off', contour.title, model);
-  }
+  // Запрос идёт через звено ядра (C3b): его недоступность — отказ при отправке, не замок.
   return {
     available: true,
     source: 'contour',
@@ -192,7 +189,6 @@ function endpointPlan(deps: MediaDeps): MediaDeckPlan {
 const REFUSAL: Record<MediaDeckBlocker, string> = {
   'no-route': 'Собирать некому: ни разговора с агентом, ни контура, ни своего эндпоинта.',
   'no-model': 'У контура не выбрана модель, и каталог ключа пуст.',
-  'gateway-off': 'Шлюз панели не поднят: запрос в контур идёт через него.',
   'endpoint-api-kind': 'Разговор с моделью идёт только через эндпоинт OpenAI-вида.',
 };
 
@@ -478,28 +474,41 @@ async function dictate(
   prompt: string,
   previous?: Deck,
 ): Promise<{ deck: Deck; truncated: boolean }> {
-  const target = source === 'contour' ? contourTarget(deps, model) : endpointTarget(deps);
-  const fetchImpl = target.fetchImpl ?? deps.fetchImpl ?? (globalThis.fetch as PlatformFetch);
   // Вопросов на этой дороге не задают: отвечать на них некому — запрос одиночный.
   const ask = previous
     ? deckReviseRequest('', previous, prompt)
     : deckBlockRequest('', prompt, false);
+  const request = {
+    model,
+    stream: false,
+    messages: [
+      { role: 'system', content: deckPromptRules(deps.appDataDir) },
+      { role: 'user', content: ask },
+    ],
+  };
 
-  const response = await askUpstream(
-    fetchImpl,
-    target.url,
-    target.headers,
-    {
-      model,
-      stream: false,
-      messages: [
-        { role: 'system', content: deckPromptRules(deps.appDataDir) },
-        { role: 'user', content: ask },
-      ],
-    },
-    DECK_TIMEOUT_MS,
-    'Колоды',
-  );
+  let response: Response;
+  if (source === 'contour') {
+    response = await askContour(
+      deps,
+      contourOf(deps, model),
+      'v1/chat/completions',
+      request,
+      DECK_TIMEOUT_MS,
+      'deck',
+    );
+  } else {
+    const target = endpointTarget(deps);
+    const fetchImpl = target.fetchImpl ?? deps.fetchImpl ?? (globalThis.fetch as PlatformFetch);
+    response = await askUpstream(
+      fetchImpl,
+      target.url,
+      target.headers,
+      request,
+      DECK_TIMEOUT_MS,
+      'deck',
+    );
+  }
 
   const body = await readCapped(response, MAX_READ_BYTES);
   if (!response.ok) throw new MediaError(502, refusalOf(body, response.status));
@@ -521,18 +530,15 @@ async function dictate(
   );
 }
 
-function contourTarget(
-  deps: MediaDeps,
-  model: string,
-): { url: string; headers: Record<string, string>; fetchImpl?: PlatformFetch } {
+/**
+ * Контур колоды: к звену ядра — обычным `fetch` (`askContour`): оно слушает 127.0.0.1, и
+ * сертификат контура здесь ни при чём (его предъявляет уже звено, уезжая наверх).
+ */
+function contourOf(deps: MediaDeps, model: string): Platform {
   const contour = activeContour(deps.store);
   if (!contour) throw new MediaError(409, REFUSAL['no-route'], 'no-route');
-  const url = gatewayUrl(deps, contour, 'v1/chat/completions');
-  if (!url) throw new MediaError(409, REFUSAL['gateway-off'], 'gateway-off');
   if (!model) throw new MediaError(409, REFUSAL['no-model'], 'no-model');
-  // К своему шлюзу — обычным `fetch`: он слушает 127.0.0.1, и сертификат
-  // контура здесь ни при чём (его предъявляет уже шлюз, уезжая наверх).
-  return { url, headers: {} };
+  return contour;
 }
 
 function endpointTarget(deps: MediaDeps): {

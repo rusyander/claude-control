@@ -15,6 +15,7 @@ import type {
   SubagentItem,
 } from '@agentdeck/contracts/portable-env';
 import { agentEnvironmentSchema } from '@agentdeck/contracts/portable-env-schema';
+import { isServerMessageCode, serverMessageParams } from '@agentdeck/contracts/server-messages';
 import { claudeProvider } from '../../providers/claude.ts';
 import { CATALOG_PROVIDERS } from '../../providers/catalog/catalog.ts';
 import { importClaudeEnvironment } from './import/claude.ts';
@@ -305,6 +306,35 @@ describe('реестр импортёров', () => {
     });
     expect(agentEnvironmentSchema.safeParse(passport).success).toBe(true);
     expect(passport.root).toBe(home);
+  });
+
+  /**
+   * Паспорт показывают и под английским интерфейсом. Русская причина без кода
+   * — это фраза, которую en-кадр справки «Every entry of this kind needs the
+   * same:» показал по-русски. Каждая причина «не нужно / не определить» и фраза
+   * записи инструкций обязаны нести известный код с ровно объявленными
+   * подстановками — перевод по нему делает клиент.
+   */
+  it('причины требований и фразы инструкций несут код перевода', () => {
+    const passport = importHome();
+    const problems: string[] = [];
+    const check = (where: string, code: unknown, params: unknown) => {
+      if (typeof code !== 'string' || !isServerMessageCode(code)) {
+        problems.push(`${where}: нет кода (${String(code)})`);
+        return;
+      }
+      const given = Object.keys((params as Record<string, string> | undefined) ?? {}).sort();
+      if (JSON.stringify(given) !== JSON.stringify([...serverMessageParams[code]].sort()))
+        problems.push(`${where}: подстановки ${given.join(',')} ≠ ${code}`);
+    };
+    for (const item of passport.items) {
+      if (item.needs.resolution !== 'facts')
+        check(`${item.id} needs`, item.needs.whyCode, item.needs.whyParams);
+      if (item.kind === 'instructions')
+        check(`${item.id} intent`, item.intentCode, item.intentParams);
+    }
+    expect(passport.items.some((item) => item.needs.resolution !== 'facts')).toBe(true);
+    expect(problems).toEqual([]);
   });
 });
 
@@ -899,7 +929,11 @@ describe('карта соответствий первоисточника', () 
     // двоеточия в собственной записи `mode:<значение>` он объявлял `tool_input`
     // меткой «объявлено» — догадку под сильнейшим свидетельством, а по `needs`
     // матрица ВЫЧИСЛЯЕТ уровень верности переноса.
-    expect(mode?.needs).toEqual({ resolution: 'none', why: expect.any(String) });
+    expect(mode?.needs).toEqual({
+      resolution: 'none',
+      why: expect.any(String),
+      whyCode: 'portability-needs-permission-mode',
+    });
     expect(permissions.find((item) => item.rule === 'ReadFile')?.decision).toBe('allow');
     expect(permissions.find((item) => item.rule === 'ShellTool')?.decision).toBe('deny');
   });

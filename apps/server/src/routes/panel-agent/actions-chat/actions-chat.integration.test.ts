@@ -4,11 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Group } from '@agentdeck/contracts';
 import type { PanelActionResult, PanelPendingAction } from '@agentdeck/contracts/panel-agent';
 import { PANEL_AGENT_HEADER } from '@agentdeck/contracts/panel-agent';
-import { SPLIT_BLOCK_LANG, type TaskSplitResult } from '@agentdeck/contracts/task-split';
-import { SPLIT_PLAN_BLOCK_LANG } from '@agentdeck/contracts/split-plan';
+import { SPLIT_BLOCK_LANG } from '@agentdeck/contracts/task-split';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../../context.ts';
 import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
@@ -19,30 +17,23 @@ import {
   ChatRunRegistry,
   type RunLike,
 } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { RunOptions } from '../../../domains/chat/ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../../../domains/chat/run-options/run-options.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { sandboxRoot } from '../../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
-import { SplitConveyor } from '../../../domains/chat/split-conveyor/split-conveyor.ts';
 import { TreePause } from '../../../domains/chat/tree-pause/tree-pause.ts';
-import { describeIdle } from '../../../domains/groups/describe/describe.ts';
-import { ProviderChatService } from '../../../domains/provider-chat/provider-chat.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
 import { registerConfigRoutes } from '../../config-routes/config-routes.ts';
-import { registerGroupRoutes } from '../../group-routes/group-routes.ts';
 import { registerChatRoutes } from '../../chat-routes/chat-routes.ts';
-import { registerChatSplitRoutes } from '../../chat/split-routes.ts';
-import { pauseOnHumanStop } from '../../chat/split-control-routes.ts';
 import { registerChatTreeRoutes } from '../../chat/tree-routes/tree-routes.ts';
-import { registerChatGroupSettingsRoutes } from '../../chat/group-settings-routes/group-settings-routes.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
 
 /**
  * Действия агента над чатами (U1) на настоящих маршрутах панели: список чатов
- * и лента из транскриптов на диске, реестр прогонов, разделение с конвейером,
- * пауза дерева, группа чата. Подменён только процесс CLI (фабрика прогонов
- * реестра) и заведение копий git у групп разделения. Доказательство — что
- * дошло до процесса (промпт, сессия, модель), реестр прогонов и хранилище, а не
- * текст ответа действия.
+ * и лента из транскриптов на диске, реестр прогонов, пауза дерева. Подменён
+ * только процесс CLI (фабрика прогонов реестра). Доказательство — что дошло
+ * до процесса (промпт, сессия, модель), реестр прогонов и хранилище, а не
+ * текст ответа действия. Групп разделения нет с этапа 10: их действия ушли
+ * (см. registry-strict), осталась пауза дерева.
  */
 const ORIGIN = 'http://localhost:8888';
 /** Метка промпта, на которой фальшивый прогон держит ход до остановки. */
@@ -65,15 +56,11 @@ describe('panel-agent actions: chats', () => {
   let projectDir: string;
   let store: AppStore;
   let registry: ChatRunRegistry;
-  let conveyor: SplitConveyor;
   let pending: PanelPendingActions;
   let app: FastifyInstance;
   let started: Started[];
-  let resumed: number[];
   /** Режим прав каждого запущенного хода — чем CLI на деле разрешено править. */
   let modes: Array<string | undefined>;
-  /** Потолок параллельных групп конвейера; тест сверх потолка опускает его. */
-  let ceiling: number;
   /** Что действия отправили в маршруты продолжения — тело целиком. */
   let outgoing: Array<{ url: string; body: unknown }>;
   const ids = {
@@ -119,8 +106,6 @@ describe('panel-agent actions: chats', () => {
     projectDir = mkdtempSync(join(tmpdir(), 'cc-agent-u1-project-'));
     started = [];
     modes = [];
-    resumed = [];
-    ceiling = 5;
     outgoing = [];
 
     // Главный чат: просьба с ключом, предложение разделения и открытый вопрос.
@@ -225,77 +210,25 @@ describe('panel-agent actions: chats', () => {
         clear: (key) => store.clearTreePause(key),
       },
     });
-    conveyor = new SplitConveyor({
-      store: {
-        get: (parent) => store.getSplitPlan(parent),
-        set: (record) => store.setSplitPlan(record),
-        findByTriage: (keys) => store.findSplitPlanByTriage(keys),
-        all: () => store.getSplitPlans(),
-      },
-      launch: async (record, groups): Promise<TaskSplitResult> => ({
-        chats: groups.map((index) => {
-          const chatId = `group-${ids.parent}-${index}`;
-          const branch = record.groups[index]?.branch ?? '';
-          store.setChatLink(chatId, {
-            parentChatId: record.parentChatId,
-            createdAt: now(),
-            branch,
-            groupIndex: index,
-            stage: 'work',
-          });
-          const run = registry.start(chatId, { prompt: `работа ${HOLD}`, cwd: projectDir }, {});
-          return {
-            index,
-            title: record.groups[index]?.title ?? '',
-            branch,
-            chatId,
-            path: join(projectDir, `copy-${index}`),
-            isWorktree: true,
-            started: run,
-            prompt: 'работа',
-          };
-        }),
-        failures: [],
-      }),
-      startTriage: () => ({ chatId: 'triage', started: true, deferred: false }),
-      parallel: () => ceiling,
-      resume: (group) => {
-        resumed.push(group.index);
-        return 'sent';
-      },
-      log: () => undefined,
-    });
-    registry.setHumanStopListener(pauseOnHumanStop(store, conveyor));
-
     pending = new PanelPendingActions(10_000);
     app = Fastify();
     // Вызов, который действие сделало внутри панели, — перехватом на входе
     // маршрута: так видно тело, дошедшее до него, а не то, что действие вернуло.
     app.addHook('preHandler', async (request) => {
-      if (/\/(resume-paused|tree\/resume)$/.test(request.url)) {
+      if (/\/tree\/resume$/.test(request.url)) {
         outgoing.push({ url: request.url, body: request.body });
       }
     });
     registerAccessGate(app, access);
     registerEmptyBodyGuard(app);
     registerConfigRoutes(app, ctx);
-    registerGroupRoutes(app, ctx);
     registerChatRoutes(app, ctx, registry, session);
-    registerChatGroupSettingsRoutes(app, ctx);
-    registerChatSplitRoutes(app, ctx, {
-      runs: registry,
-      providerChats: new ProviderChatService(),
-      session,
-      gate: treePause,
-      conveyor,
-    });
-    registerChatTreeRoutes(app, ctx, treePause, (keys) => conveyor.view(keys));
+    registerChatTreeRoutes(app, ctx, treePause);
     registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
     await app.ready();
   });
 
   afterEach(async () => {
-    await describeIdle();
     pending.cancelAll();
     registry.stopAll();
     await app.close();
@@ -381,7 +314,7 @@ describe('panel-agent actions: chats', () => {
     throw new Error('ход так и не начался');
   };
 
-  it('read_chat: лента по названию, маска секрета, предложение разделения и вопрос агента', async () => {
+  it('read_chat: лента по названию, маска секрета, блок прежнего разделения вырезан, вопрос агента', async () => {
     const result = await read(call('read_chat', { chat: 'сделай форму входа и тесты. токен ' }));
     // Название совпадает без учёта регистра только целиком — тут нет: отказ.
     expect(result.outcome).toBe('failed');
@@ -390,7 +323,7 @@ describe('panel-agent actions: chats', () => {
     expect(byId.outcome).toBe('done');
     const view = byId.result as {
       chat: { id: string; running: boolean; awaitingReply?: boolean };
-      messages: Array<{ role: string; text: string; split?: { groups: unknown[] } }>;
+      messages: Array<{ role: string; text: string }>;
       splitProposal?: { groups: Array<{ title: string; tasks: string[] }>; note: string };
       question?: { questions: Array<{ question: string; options: string[] }> };
     };
@@ -398,13 +331,11 @@ describe('panel-agent actions: chats', () => {
     const text = JSON.stringify(view);
     expect(text).not.toContain(SECRET);
     expect(text).toContain('••••••');
-    // Блок предложения не течёт сырым JSON — он разобран в группы.
+    // Блок прежнего предложения разделения не течёт сырым JSON и больше не
+    // разбирается в группы: разделения нет, задачи ведёт ядро (этап 10).
     expect(text).not.toContain(SPLIT_BLOCK_LANG);
-    expect(view.splitProposal?.groups.map((group) => group.title)).toEqual([
-      'Форма входа',
-      'Тесты',
-    ]);
-    expect(view.splitProposal?.note).toMatch(/Разделить на 2 чата/);
+    expect(text).toContain('Предлагаю разделить.');
+    expect(view.splitProposal).toBeUndefined();
     expect(view.question?.questions[0]).toMatchObject({
       question: 'Какие браузеры поддерживать?',
       options: ['Все (Recommended)', 'Только Chrome'],
@@ -512,80 +443,6 @@ describe('panel-agent actions: chats', () => {
     expect(started.filter((run) => run.prompt === 'после хода')).toEqual([]);
   });
 
-  it('request_split: стандартная просьба уходит в чат, карточка — без текста просьбы; песочница — отказ', async () => {
-    const { card, result } = await decided('request_split', { chat: ids.main });
-    expect(card).toMatchObject({ name: 'request_split', risk: 'danger' });
-    const cardText = JSON.stringify(card?.preview);
-    expect(cardText).not.toContain('Split the tasks of this conversation');
-    expect(field(card, 'label-what-happens')?.valueCode).toBe('value-split-next-human');
-    expect(result.outcome).toBe('done');
-    expect(started).toHaveLength(1);
-    expect(started[0]?.prompt).toMatch(/^Split the tasks of this conversation/);
-    expect(started[0]?.sessionId).toBe(ids.main);
-    // План не заведён: разделяет только человек своей кнопкой.
-    expect(store.getSplitPlans()).toEqual({});
-
-    const sandbox = await decided('request_split', { chat: ids.sandbox });
-    expect(sandbox.card).toBeUndefined();
-    expect(sandbox.result.outcome).toBe('failed');
-  });
-
-  it('split_decline: отметка «работать здесь» ставится только по одобрению', async () => {
-    const rejected = await decided('split_decline', { chat: ids.main }, 'reject');
-    expect(rejected.result.outcome).toBe('rejected');
-    expect(registry.isSplitMuted(ids.main)).toBe(false);
-    const { card, result } = await decided('split_decline', { chat: ids.main });
-    expect(card).toMatchObject({ name: 'split_decline', risk: 'change' });
-    expect(result.outcome).toBe('done');
-    expect(registry.isSplitMuted(ids.main)).toBe(true);
-  });
-
-  it('set_chat_group: группа по имени и автономность; чужая проектная группа — отказ', async () => {
-    const global = {
-      id: 'fast',
-      name: 'Быстрая',
-      description: '',
-      color: 'accent',
-      icon: 'folder',
-      members: [],
-      env: {},
-      projectPaths: [],
-      isEnabled: false,
-      order: 0,
-      when: '',
-    } as unknown as Group;
-    store.saveGroup(global);
-    store.saveGroup({
-      ...global,
-      id: 'alien',
-      name: 'Чужая',
-      scope: { kind: 'project', path: join(tmpdir(), 'somewhere-else'), provider: 'claude' },
-    } as unknown as Group);
-
-    const { card, result } = await decided('set_chat_group', {
-      chat: ids.other,
-      group: 'быстрая',
-      autonomous: false,
-    });
-    expect(card).toMatchObject({ name: 'set_chat_group', risk: 'change' });
-    expect(card?.preview.diff).toContain('Быстрая');
-    expect(result.outcome).toBe('done');
-    expect(store.getChatGroupSettings(ids.other)).toEqual({
-      groupChoice: 'global:fast',
-      autonomous: false,
-    });
-
-    // Та же правка второй раз — менять нечего, карточки нет.
-    const same = await decided('set_chat_group', { chat: ids.other, group: 'global:fast' });
-    expect(same.card).toBeUndefined();
-    expect(same.result.outcome).toBe('failed');
-
-    const alien = await decided('set_chat_group', { chat: ids.other, group: 'Чужая' });
-    expect(alien.card).toBeUndefined();
-    expect(alien.result.outcome).toBe('failed');
-    expect(store.getChatGroupSettings(ids.other)?.groupChoice).toBe('global:fast');
-  });
-
   it('stop_chat_run: идущий ход останавливается по одобрению; молчащий чат — отказ до карточки', async () => {
     const idle = await decided('stop_chat_run', { chat: ids.main });
     expect(idle.card).toBeUndefined();
@@ -599,214 +456,55 @@ describe('panel-agent actions: chats', () => {
     expect((await running()).map((run) => run.chatId)).not.toContain(ids.main);
   });
 
-  describe('split_control', () => {
-    beforeEach(async () => {
-      await conveyor.begin({
-        parentChatId: ids.parent,
-        projectPath: projectDir,
-        proposal: {
-          groups: [
-            { title: 'Раз', branch: 'feature/one', tasks: ['первая'] },
-            { title: 'Два', branch: 'feature/two', tasks: ['вторая'] },
-            { title: 'Три', branch: 'feature/three', tasks: ['третья'] },
-          ],
-        },
-        request: {},
-      });
-      conveyor.onTriageFinished(
-        {
-          chatId: 'triage',
-          projectPath: projectDir,
-          ok: true,
-          startedAt: 1,
-          text: [
-            'Развёл.',
-            '```' + SPLIT_PLAN_BLOCK_LANG,
-            JSON.stringify({
-              groups: [{ index: 3, after: [1, 2], hold: 'какие браузеры?' }],
-              order: [1, 2, 3],
-            }),
-            '```',
-          ].join('\n'),
-        } as Parameters<SplitConveyor['onTriageFinished']>[0],
-        ['triage'],
-      );
-      await sleep(30);
-    });
+  // Этап 10: групп разделения нет — у split_control остались только режимы дерева.
+  it('split_control: пауза и продолжение всего дерева; повторная пауза — отказ до карточки', async () => {
+    await holdTurn(ids.parent);
+    const pauseAll = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
+    expect(pauseAll.card?.preview.summaryCode).toBe('summary-tree-pause');
+    expect(field(pauseAll.card, 'label-what-happens')?.valueCode).toBe('value-tree-pause-effect');
+    expect(pauseAll.result.outcome).toBe('done');
+    expect(store.getTreePause(ids.parent)).toBeDefined();
+    expect(await running()).toEqual([]);
 
-    const group = (index: number) => store.getSplitPlan(ids.parent)?.groups[index];
+    // Уже стоит — второй паузы не будет.
+    const again = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
+    expect(again.card).toBeUndefined();
+    expect(again.result.outcome).toBe('failed');
 
-    it('read_chat показывает план разделения родителя', async () => {
-      const view = (await read(call('read_chat', { chat: ids.parent }))).result as {
-        split?: { parentChatId: string; groups: Array<{ index: number; status: string }> };
-      };
-      expect(view.split?.parentChatId).toBe(ids.parent);
-      expect(view.split?.groups.map((item) => item.status)).toEqual(['started', 'started', 'held']);
-    });
+    const view = (await read(call('read_chat', { chat: ids.parent }))).result as {
+      treePaused?: { since: string };
+    };
+    expect(view.treePaused?.since).toBeTruthy();
 
-    it('пауза и продолжение группы, ответ на вопрос разбора и «отпустить»', async () => {
-      const pause = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'pause_group',
-        group: 'Раз',
-      });
-      expect(pause.card?.preview.summaryCode).toBe('summary-split-pause');
-      expect(pause.result.outcome).toBe('done');
-      expect(group(0)?.status).toBe('paused');
+    const resumeAll = await decided('split_control', { chat: ids.parent, mode: 'resume_all' });
+    expect(resumeAll.card?.preview.summaryCode).toBe('summary-tree-resume');
+    expect(resumeAll.result.outcome).toBe('done');
+    expect(store.getTreePause(ids.parent)).toBeUndefined();
+    // force (согласие сверх потолка) агент не шлёт.
+    const toTree = outgoing.filter((item) => item.url.endsWith('/tree/resume'));
+    expect(toTree).toHaveLength(1);
+    expect((toTree[0]?.body as { force?: unknown } | undefined)?.force).toBeUndefined();
 
-      const resume = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'resume_group',
-        group: 0,
-      });
-      expect(resume.result.outcome).toBe('done');
-      expect(resumed).toEqual([0]);
+    const notPaused = await decided('split_control', { chat: ids.parent, mode: 'resume_all' });
+    expect(notPaused.card).toBeUndefined();
+    expect(notPaused.result.outcome).toBe('failed');
+  });
 
-      // Отвечать нечего у группы без вопроса — отказ до карточки.
-      const noQuestion = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'answer_group',
-        group: 1,
-        answer: 'все',
-      });
-      expect(noQuestion.card).toBeUndefined();
-      expect(noQuestion.result.outcome).toBe('failed');
+  // Этап 10, F2b: «Продолжить» сдавшуюся группу — ответ ядру «continue» на вопрос потолка кругов,
+  // а его ядро принимает только с доказательством человека. Отказ назван, до карточки и до ядра.
+  it('split_control: «Продолжить» сдавшуюся задачу — названный отказ без карточки, ничего не исполнено', async () => {
+    const result = await decided('split_control', { chat: ids.parent, mode: 'continue_group' });
+    expect(result.card).toBeUndefined();
+    expect(result.result.outcome).toBe('failed');
+    expect(result.result.message).toContain('core-continue-human-only');
+    expect(await listPending()).toEqual([]);
+    expect(store.getTreePause(ids.parent)).toBeUndefined();
+  });
 
-      const answer = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'answer_group',
-        group: 'Три',
-        answer: 'Все браузеры',
-      });
-      expect(field(answer.card, 'label-question')?.value).toBe('какие браузеры?');
-      expect(answer.result.outcome).toBe('done');
-      expect(group(2)?.holdAnswer).toBe('Все браузеры');
-
-      const release = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'release_group',
-        group: 2,
-      });
-      expect(release.result.outcome).toBe('done');
-      expect(group(2)?.status).toBe('started');
-    });
-
-    it('«Продолжить» сдавшуюся группу агент жмёт сам (владелец 25.10); работающую — отказ', async () => {
-      const busy = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'continue_group',
-        group: 0,
-      });
-      expect(busy.card?.preview.summaryCode).toBe('summary-split-continue');
-      expect(busy.result.outcome).toBe('failed');
-      expect(group(0)?.status).toBe('started');
-
-      const plan = store.getSplitPlan(ids.parent);
-      const gaveUp = plan?.groups[0];
-      if (!plan || !gaveUp) throw new Error('нет группы');
-      gaveUp.status = 'failed';
-      gaveUp.error = 'повторы доставки исчерпаны';
-      store.setSplitPlan(plan);
-      const proceed = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'continue_group',
-        group: 0,
-      });
-      expect(proceed.result.outcome).toBe('done');
-      // Конвейер отдал группу её же разговору — статус сменит старт прогона.
-      expect(resumed).toEqual([0]);
-    });
-
-    it('продолжение паузы из очереди честно говорит: группа вернётся в очередь', async () => {
-      const plan = store.getSplitPlan(ids.parent);
-      const queued = plan?.groups[2];
-      if (!plan || !queued) throw new Error('нет группы');
-      queued.status = 'pending';
-      delete queued.hold;
-      delete queued.startedAt;
-      delete queued.chatId;
-      delete queued.path;
-      store.setSplitPlan(plan);
-      const pause = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'pause_group',
-        group: 2,
-      });
-      // N7: у группы из очереди прогонов нет — карточка не обещает их остановить.
-      expect(field(pause.card, 'label-what-happens')?.valueCode).toBe(
-        'value-split-pause-queued-effect',
-      );
-      expect(pause.result.outcome).toBe('done');
-
-      const resume = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'resume_group',
-        group: 2,
-      });
-      expect(field(resume.card, 'label-what-happens')?.valueCode).toBe(
-        'value-split-requeue-effect',
-      );
-      expect(resume.result.outcome).toBe('done');
-      expect(group(2)?.status).not.toBe('paused');
-    });
-
-    it('пауза и продолжение всего дерева', async () => {
-      const pauseAll = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
-      expect(pauseAll.card?.preview.summaryCode).toBe('summary-tree-pause');
-      expect(pauseAll.result.outcome).toBe('done');
-      expect(store.getTreePause(ids.parent)).toBeDefined();
-      expect(await running()).toEqual([]);
-
-      // Уже стоит — второй паузы не будет.
-      const again = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
-      expect(again.card).toBeUndefined();
-      expect(again.result.outcome).toBe('failed');
-
-      const resumeAll = await decided('split_control', { chat: ids.parent, mode: 'resume_all' });
-      expect(resumeAll.result.outcome).toBe('done');
-      expect(store.getTreePause(ids.parent)).toBeUndefined();
-    });
-
-    it('force не уходит ни группе, ни дереву; пауза продолжается своим местом', async () => {
-      const pause = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'pause_group',
-        group: 0,
-      });
-      expect(pause.result.outcome).toBe('done');
-      expect(group(0)?.status).toBe('paused');
-
-      // Потолок полон, но пауза держит своё место (живой прогон 29.09): группа
-      // продолжается без согласия, и согласия агент всё равно не шлёт.
-      ceiling = 1;
-      const resume = await decided('split_control', {
-        chat: ids.parent,
-        mode: 'resume_group',
-        group: 0,
-      });
-      const toGroup = outgoing.filter((call) => call.url.endsWith('/resume-paused'));
-      expect(toGroup).toHaveLength(1);
-      expect((toGroup[0]?.body as { force?: unknown }).force).toBeUndefined();
-      expect(resume.result.outcome).toBe('done');
-      expect(resumed).toHaveLength(1);
-
-      const pauseAll = await decided('split_control', { chat: ids.parent, mode: 'pause_all' });
-      expect(pauseAll.result.outcome).toBe('done');
-      const resumeAll = await decided('split_control', { chat: ids.parent, mode: 'resume_all' });
-      expect(resumeAll.result.outcome).toBe('done');
-      const toTree = outgoing.filter((call) => call.url.endsWith('/tree/resume'));
-      expect(toTree).toHaveLength(1);
-      expect((toTree[0]?.body as { force?: unknown } | undefined)?.force).toBeUndefined();
-    });
-
-    it('разделения нет — режимы групп отказывают до карточки', async () => {
-      const none = await decided('split_control', {
-        chat: ids.other,
-        mode: 'pause_group',
-        group: 0,
-      });
-      expect(none.card).toBeUndefined();
-      expect(none.result.outcome).toBe('failed');
-    });
+  it('split_control: режимы одной группы ушли — вход их отклоняет без карточки', async () => {
+    for (const mode of ['pause_group', 'resume_group', 'answer_group', 'release_group']) {
+      const result = await read(call('split_control', { chat: ids.parent, mode, group: 0 }));
+      expect(result.outcome).toBe('invalid');
+    }
   });
 });

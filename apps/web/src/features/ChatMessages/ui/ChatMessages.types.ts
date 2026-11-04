@@ -1,16 +1,11 @@
 import type { ChatMessage } from '@agentdeck/contracts';
 import type { MessageTiming } from '@agentdeck/contracts/chat-timing';
-import type { TaskSplitProposal, TaskSplitReviewDecision } from '@agentdeck/contracts/task-split';
-import type { CascadeAssignment, CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
 import type { StreamState } from '@entities/Chat';
 import type { MediaRevision } from '@entities/Media';
 import type { PendingPermission, QueuedMessage } from '@shared/lib/agent-runs';
 import type { ChildStageGroup } from './ChildStages.types';
-import type { ReviewDecisionItem } from './ReviewDecisionCard.types';
 import type { TurnTrail } from '../lib/turnTrail.types';
-import type { BranchGateCardProps, PendingBranchGate } from './BranchGateCard.types';
-import type { ChildBranch } from './TaskSplitCard.types';
 import type { ChildQuestion } from './ChildQuestion.types';
 import type { ChildPermission } from './ChildPermission.types';
 
@@ -33,18 +28,6 @@ export interface HandoffControls {
   maxChain: number;
   /** Новый разговор заводится прямо сейчас. */
   isPending: boolean;
-}
-
-/**
- * Согласие на разделение: запускать ли прогоны и что человек поменял руками в
- * карточке. Замены едут отдельно от предложения агента намеренно — его просьба
- * о модели действует только вверх, а выбор человека в обе стороны.
- */
-export interface SplitDecision {
-  startRuns: boolean;
-  assignments?: Record<number, CascadeAssignment>;
-  /** «Доставка на Sonnet», тронутая человеком у группы: номер → да/нет. */
-  sonnetDeliver?: Record<number, boolean>;
 }
 
 /** Вопрос, заданный агентом дочернего разговора, и подпись, чей он. */
@@ -93,18 +76,12 @@ export interface ChatMessagesProps {
   localRun?: boolean;
   /** Запросы прав, ждущие решения человека (карточка «Разрешить/Запретить»). */
   permissions?: PendingPermission[];
-  /** Карточки прав, отложенные как D-n: агент работает дальше, ответ — тем же `onPermissionDecide`. */
-  deferredPermissions?: PendingPermission[];
   /**
    * Решение по запросу прав. `message` уходит агенту текстом результата вызова —
    * им же отвечается и вопрос с вариантами: на нём агент стоит и ждёт, поэтому
    * ответ обязан прийти тем же каналом, а не отдельной репликой в чат.
    */
   onPermissionDecide?: (toolUseId: string, behavior: 'allow' | 'deny', message?: string) => void;
-  /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
-  branchGates?: PendingBranchGate[];
-  /** Ответ воротам; обещание — заведение копии может не пройти у git. */
-  onBranchDecide?: BranchGateCardProps['onDecide'];
   /**
    * Вопросы ДОЧЕРНИХ разговоров, ждущие ответа. Разделение задач разводит работу
    * по нескольким агентам, но человек остаётся один: обходить их чаты по кругу
@@ -139,39 +116,6 @@ export interface ChatMessagesProps {
   onPauseTree?: () => void;
   onResumeTree?: () => void;
   treeBusy?: boolean;
-  /**
-   * Ответ на вопрос разбора (Т1) группе, у которой чата ещё нет: уходит
-   * родителю с номером группы, а конвейер заводит копию по ответу.
-   */
-  onAnswerHold?: (index: number, answer: string) => void;
-  holdBusy?: boolean;
-  /**
-   * «Отпустить» группу, которая ждёт предшественников (Т1): их цепочка могла не
-   * кончиться вовсе, и тогда это единственное, чем группу можно сдвинуть.
-   */
-  onRelease?: (index: number) => void;
-  releaseBusy?: boolean;
-  /** «Продолжить» оборванные группы (WP1c): без номера — все, с номером — одну. */
-  onResumeInterrupted?: (index?: number) => void;
-  resumeInterruptedBusy?: boolean;
-  /** Пересчитать пересечения веток разделения (Т6) — кнопка в сводке групп. */
-  onCheckOverlap?: () => void;
-  overlapBusy?: boolean;
-  /**
-   * Ревью чужих MR по ссылке (Т7), ждущие решения человека.
-   *
-   * В родительском разговоре это все группы дерева, в чате самой группы — она
-   * одна. Список, а не флаг: разделение на пять ссылок даёт пять карточек, и
-   * каждая про свой MR.
-   */
-  reviews?: ReviewDecisionItem[];
-  /** Что человек выбрал; `all` — то же решение остальным ждущим группам дерева. */
-  onReviewDecide?: (chatId: string, decision: TaskSplitReviewDecision, all: boolean) => void;
-  /** «Закоммитить и отправить в MR» — отдельным кликом после правок. */
-  onReviewPush?: (chatId: string) => void;
-  /** «Повторить итог ревью» — ответ ревью без блока итога (Д4). */
-  onReviewRetry?: (chatId: string) => void;
-  reviewBusy?: boolean;
   /** Повторить упавший запрос — кнопка прямо в карточке ошибки. */
   onRetry?: () => void;
   /**
@@ -194,25 +138,6 @@ export interface ChatMessagesProps {
   costUnit?: 'tokens' | 'money';
   /** Глубина продумывания текущего прогона — идёт в разбивку расхода. */
   effort?: string;
-  /** Согласиться на разделение задач по чатам (карточка в ответе агента). */
-  onSplit?: (proposal: TaskSplitProposal, options: SplitDecision) => void;
-  /** Отказаться от разделения — продолжаем в этом же разговоре. */
-  onKeepHere?: () => void;
-  /** Копии заводятся прямо сейчас: кнопка карточки показывает ожидание. */
-  isSplitPending?: boolean;
-  /**
-   * Потолок разговора, когда подбор модели в проекте включён: карточка
-   * предложения показывает по нему класс, модель и глубину каждой группы и даёт
-   * поменять их до запуска. Пусто — правило выключено, все дети поедут на
-   * выбранной человеком модели.
-   */
-  splitCeiling?: CascadeCeiling;
-  /**
-   * Ветки чатов, уже выделенных из этого разговора. По ним карточка предложения
-   * понимает, что разделение состоялось: без этого кнопка живёт до следующей
-   * реплики агента, и второе нажатие заводит те же копии ещё раз.
-   */
-  childBranches?: readonly ChildBranch[];
   /** Продолжение в чистой сессии (карточка в ответе агента). */
   handoff?: HandoffControls;
   /**
@@ -268,16 +193,6 @@ export interface MessageBubbleProps {
   costUnit?: 'tokens' | 'money';
   /** Время этого шага и, у последней записи прогона, его сумма — для бейджа. */
   timing?: MessageTiming;
-  /** Согласиться на разделение задач по чатам (карточка вместо блока в тексте). */
-  onSplit?: (proposal: TaskSplitProposal, options: SplitDecision) => void;
-  /** Отказаться от разделения — продолжаем в этом же разговоре. */
-  onKeepHere?: () => void;
-  /** Копии заводятся прямо сейчас. */
-  isSplitPending?: boolean;
-  /** Потолок разговора: по нему карточка показывает и даёт менять модель группы. */
-  splitCeiling?: CascadeCeiling;
-  /** Ветки уже выделенных чатов — признак, что предложение отработано. */
-  childBranches?: readonly ChildBranch[];
   /** Продолжение в чистой сессии (карточка вместо блока в тексте). */
   handoff?: HandoffControls;
   /** Разговор, к которому привязать файл вложения из блока агента (Т10). */

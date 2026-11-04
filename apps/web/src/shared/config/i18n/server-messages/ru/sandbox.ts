@@ -11,6 +11,8 @@ export const sandboxRu: Record<SandboxMessageCode, string> = {
   'sandbox-ask-incomplete': 'Нужны песочница и текст вопроса',
   'sandbox-reaped-idle':
     'Песочница убрана по простою: копия доступа к аккаунту в ней не должна лежать часами. Откройте её заново — состав соберётся снова.',
+  'sandbox-core-refused': 'Ядро не провело разговор в песочнице: {{reason}}',
+  'sandbox-repo-failed': 'Рабочая папка песочницы не подготовлена для ядра: {{reason}}',
   'sandbox-nothing-to-run': 'Нечего запускать: команда не найдена',
   'sandbox-ps1-needs-pwsh':
     'Скрипты .ps1 запускаются через PowerShell — вне Windows нужен pwsh (PowerShell Core). Установите его или перепишите хук на .sh либо .mjs.',

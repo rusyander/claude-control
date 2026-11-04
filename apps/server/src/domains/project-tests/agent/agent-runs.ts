@@ -1,26 +1,24 @@
-import { ChatRun } from '../../chat/ChatRunner/ChatRunner.ts';
-import type { TestsAgentRun } from './agent-run.types.ts';
-import { CodexTestsRun } from './codex-run.ts';
-import { QwenTestsRun } from './qwen-run.ts';
+import { coreHomeOf } from '../../../lib/hop-recorder.mjs';
+import { createCoreCaller } from '../../core-ask/core-ask.ts';
+import { createCoreChatPort } from '../../chat/core-run/core-chat-port.ts';
+import type { CoreChatPort } from '../../chat/core-run/core-run.types.ts';
+import { testsCoreAdapterOf, type TestsCoreAdapter } from './core-run.ts';
 
 /**
- * Кем идёт агент тестов. Claude — без команды: `ChatRun` берёт CLI по
- * умолчанию, как и прежде. Чужой CLI — с путём, найденным маршрутом в PATH
- * панели, и именем для текстов отказов.
+ * Кем идёт агент тестов: переходник ядра (`set-cli`) и имя CLI для текстов отказов. Бинарь CLI
+ * находит ядро само (`cliPaths`, PATH ядра) — панель путь больше не ищет.
  */
-export type TestsAgentProvider =
-  { id: 'claude' } | { id: 'qwen' | 'codex'; name: string; command: string };
-
-/** Провайдеры, у которых есть запуск с проверкой каждой записи агента. */
-export function testsAgentDialectOf(providerId: string): TestsAgentProvider['id'] | undefined {
-  return providerId === 'claude' || providerId === 'qwen' || providerId === 'codex'
-    ? providerId
-    : undefined;
+export interface TestsAgentProvider {
+  id: TestsCoreAdapter;
+  name: string;
 }
 
-/** Прогон под провайдера. Claude — прежний `ChatRun`, нетронутый. */
-export function makeAgentRun(provider: TestsAgentProvider): ChatRun | TestsAgentRun {
-  if (provider.id === 'qwen') return new QwenTestsRun();
-  if (provider.id === 'codex') return new CodexTestsRun();
-  return new ChatRun();
+/** Провайдеры, у которых агент тестов идёт через ядро (переходник с хуком ядра). */
+export function testsAgentDialectOf(providerId: string): TestsCoreAdapter | undefined {
+  return testsCoreAdapterOf(providerId);
+}
+
+/** Порт ядра по умолчанию: запись ядра в его доме, проверка слушателя, число загрузки. */
+export function defaultTestsCorePort(): CoreChatPort {
+  return createCoreChatPort(createCoreCaller(() => coreHomeOf()));
 }

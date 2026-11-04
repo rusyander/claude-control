@@ -10,7 +10,7 @@ import type { Identity } from '../../session-host/protocol.ts';
 import { launchCli } from '../launcher/launch.ts';
 import { stopSession } from '../launcher/session-io.ts';
 import type { SpawnedFacts, StopMode, StopOutcome } from '../launcher/launcher.types.ts';
-import type { SdkRule } from './normalise.ts';
+import { SdkNormaliser, type SdkRule } from './normalise.ts';
 import type {
   AdapterCaps,
   AdapterChannelSummary,
@@ -77,6 +77,12 @@ export interface SdkAdapterDef {
   /** Лестница уровня шага из фактов запуска CLI; нет — ранга модели не знаем. */
   ladder?: CliAdapter['ladder'];
   transcriptPresent?: CliAdapter['transcriptPresent'];
+  ownsTranscript?: CliAdapter['ownsTranscript'];
+  /** Серверы MCP человека в конфиге CLI (`CliAdapter.mcpSource`, P73). */
+  mcpSource?: CliAdapter['mcpSource'];
+  toolsNone?: true;
+  userSourcesOnly?: true;
+  sessionCarry?: CliAdapter['sessionCarry'];
   echo: boolean;
   bindEndpoint(
     channel: AdapterChannelSummary,
@@ -213,6 +219,11 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
     },
     ...(def.ladder ? { ladder: def.ladder } : {}),
     ...(def.transcriptPresent ? { transcriptPresent: def.transcriptPresent } : {}),
+    ...(def.ownsTranscript ? { ownsTranscript: def.ownsTranscript } : {}),
+    ...(def.mcpSource ? { mcpSource: def.mcpSource } : {}),
+    ...(def.toolsNone ? { toolsNone: true as const } : {}),
+    ...(def.userSourcesOnly ? { userSourcesOnly: true as const } : {}),
+    ...(def.sessionCarry ? { sessionCarry: def.sessionCarry } : {}),
     caps: def.caps,
     readLayer: (pin) => def.readLayer(pin),
     inventory: (pin, cwd, repoLayer) => def.layer.inventory(pin, cwd, repoLayer),
@@ -289,8 +300,12 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
       return need(handle).events();
     },
 
-    send(handle, message, cmdId, origin) {
-      return need(handle).send(cmdId, markText(message, origin));
+    send(handle, message, cmdId, origin, images) {
+      // Картинки — только у CLI с доказанной подачей (`caps.images`): иначе отказ, не тихий пропуск.
+      if (images && images.length > 0 && !def.caps.images) {
+        return Promise.reject(new Error(`${def.id} does not take images`));
+      }
+      return need(handle).send(cmdId, markText(message, origin), images);
     },
 
     async stop(handle, mode: StopMode): Promise<StopOutcome> {
@@ -306,6 +321,10 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
     usage(handle): TurnUsage[] {
       return need(handle).usage();
     },
+
+    // Отдельный нормализатор на каждый повтор: вид сеанса читает журнал с начала, живой насос
+    // сессии он не трогает (его ожидания и учёт — для ядра, не для показа).
+    streamNormaliser: () => new SdkNormaliser(ruleFor(null, null)),
 
     session: (handle) => sessions.get(handle.sessionId),
 

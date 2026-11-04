@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
 import {
   mkdirSync,
@@ -11,35 +11,24 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { ProjectTestsView } from '@agentdeck/contracts';
+import type { ProjectTestRunRecord, ProjectTestsView } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
+import { readRuns, writeRun } from '../../domains/project-tests/runs-store/runs-store.ts';
 import {
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
 } from '../../domains/project-tests/project-tests.ts';
 import { registerProjectTestsRoutes } from './project-tests-routes.ts';
-import { QwenTestsRun } from '../../domains/project-tests/agent/qwen-run.ts';
+import {
+  fakeCorePort,
+  waitFor,
+  type FakeCoreOptions,
+} from '../../domains/project-tests/agent/__fixtures__/fake-core-port.ts';
 import { createGroup, upsertCase } from '../../domains/project-tests/store/store.ts';
 
 /**
- * Поиск CLI в PATH — подменён только для Qwen и Codex: ответ «есть ли CLI на
- * этой машине» не должен решать исход теста. Прочие имена ищутся по-настоящему.
- */
-const detected = vi.hoisted(() => ({ found: new Set<string>() }));
-vi.mock('../../providers/detect/detect.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../providers/detect/detect.ts')>();
-  return {
-    ...actual,
-    detectCliOnPath: (command: string) =>
-      /^(qwen|codex)(\.cmd|\.exe)?$/i.test(command)
-        ? detected.found.has(command)
-        : actual.detectCliOnPath(command),
-  };
-});
-
-/**
- * Маршруты тест-кейсов. Прогон агента здесь не запускается: он спавнит
- * настоящий CLI, и проверять им нечего — важно другое. Чужой каталог не
+ * Маршруты тест-кейсов. Прогон агента идёт задачей ядра, и ядро здесь подменено
+ * портом (`setCorePort`) — граница процесса ядра. Главное другое: чужой каталог не
  * читается, сломанная группа не роняет ответ, а правка кейса возвращает уже
  * пересобранный список, чтобы клиенту не приходилось делать второй запрос.
  */
@@ -176,8 +165,9 @@ describe('project-tests-routes', () => {
 
   // Выбор провайдера один на всю панель: прогон агента тестов через Claude при
   // выбранном другом CLI — это «молча через Claude», запрещённое владельцем
-  // (07.10). Qwen Code и Codex идут сами, с проверкой прав; прочие — отказ.
-  describe('агент на чужом CLI', () => {
+  // (07.10). Claude, Qwen Code и Codex идут задачей ядра (этап 10); прочие — отказ.
+  // Подменена только граница процесса ядра (`setCorePort`).
+  describe('агент на выбранном CLI', () => {
     const withCase = async (): Promise<void> => {
       createGroup(project, 'gui');
       upsertCase(project, 'gui', { title: 'Вход', steps: ['x'] }, '2026-10-06T00:00:00.000Z');
@@ -191,58 +181,79 @@ describe('project-tests-routes', () => {
 
     afterEach(() => {
       runs.stop(project);
-      detected.found.clear();
-      vi.restoreAllMocks();
     });
 
-    it('Qwen Code в PATH — прогон начат его запуском, вид знает CLI', async () => {
+    it('Qwen Code — прогон начат задачей ядра с его переходником, вид знает CLI', async () => {
       activeProvider = 'qwen';
-      detected.found.add(process.platform === 'win32' ? 'qwen.cmd' : 'qwen');
-      const qwen = vi
-        .spyOn(QwenTestsRun.prototype, 'start')
-        .mockImplementation(() => new Promise(() => {}));
+      const core = fakeCorePort({ hold: true });
+      runs.setCorePort(core.port);
       await withCase();
 
       const response = await start();
 
       expect(response.statusCode).toBe(200);
-      await vi.waitFor(() => expect(qwen).toHaveBeenCalledTimes(1));
-      expect((await view()).run).toMatchObject({ status: 'running', provider: 'qwen' });
+      await waitFor(() => core.calls.some((c) => c.kind === 'launch'));
+      expect(core.calls[0]!.fields).toMatchObject({ adapter: 'qwen' });
+      await waitFor(() => runs.get(project)?.coreTaskId === core.taskId);
+      expect((await view()).run).toMatchObject({
+        status: 'running',
+        provider: 'qwen',
+        coreTaskId: core.taskId,
+      });
+      // Задача ядра — и в записи на диске: по ней перезапущенная панель снимет сироту.
+      expect(readRuns(project).find((r) => r.status === 'running')?.coreTaskId).toBe(core.taskId);
     });
 
-    it('CLI нет в PATH — 409 cli-not-found, прогон не начат', async () => {
+    it('запись «идёт» от прошлой жизни панели: закрыта как сорвавшаяся, её задаче ядра — cancel', async () => {
+      const core = fakeCorePort();
+      runs.setCorePort(core.port);
+      writeRun(project, {
+        id: 'run-from-previous-panel',
+        mode: 'run',
+        actor: 'agent',
+        status: 'running',
+        startedAt: '2026-11-01T00:00:00.000Z',
+        coreTaskId: core.taskId,
+        results: [],
+        summary: { total: 0, passed: 0, failed: 0, blocked: 0, skipped: 0 },
+      } as unknown as ProjectTestRunRecord);
+
+      await view();
+
+      await waitFor(() => core.calls.some((c) => c.kind === 'cancel'));
+      expect(core.calls.find((c) => c.kind === 'cancel')?.fields).toMatchObject({
+        reason: expect.stringMatching(/panel restarted/),
+      });
+      expect(readRuns(project)[0]).toMatchObject({
+        status: 'error',
+        messageCode: 'orphan-run-stopped',
+      });
+    });
+
+    it('отказ ядра (нет CLI, контур, не репозиторий) приходит в итог прогона кодом tests-agent-core-refused', async () => {
       activeProvider = 'codex';
+      const core = fakeCorePort({
+        estimate: { ok: false, code: 'not-a-repo', message: 'the root is not a git repository' },
+      } as FakeCoreOptions);
+      runs.setCorePort(core.port);
       await withCase();
 
       const response = await start();
 
-      expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({
-        error: 'cli_not_found',
-        messageCode: 'tests-agent-cli-not-found',
-        params: { provider: 'Codex (OpenAI)' },
+      expect(response.statusCode).toBe(200);
+      await waitFor(() => runs.get(project)?.status === 'error');
+      expect((await view()).run).toMatchObject({
+        status: 'error',
+        provider: 'codex',
+        messageCode: 'tests-agent-core-refused',
+        params: {
+          provider: 'Codex (OpenAI)',
+          reason: 'not-a-repo: the root is not a git repository',
+        },
       });
-      expect((await view()).run).toBeUndefined();
     });
 
-    it('агент тестов идёт через контур — 409 contour-foreign, прогон не начат', async () => {
-      activeProvider = 'codex';
-      detected.found.add(process.platform === 'win32' ? 'codex.cmd' : 'codex');
-      runs.setPlatformRouting(() => ({ env: { ANTHROPIC_BASE_URL: 'http://127.0.0.1:1' } }));
-      await withCase();
-
-      const response = await start();
-
-      expect(response.statusCode).toBe(409);
-      expect(response.json()).toMatchObject({
-        error: 'contour_foreign',
-        messageCode: 'tests-agent-contour-foreign',
-        params: { provider: 'Codex (OpenAI)' },
-      });
-      expect((await view()).run).toBeUndefined();
-    });
-
-    it('CLI без проверяемого запуска (Gemini) — 409 unsupported с именем CLI', async () => {
+    it('CLI без переходника ядра (Gemini) — 409 unsupported с именем CLI', async () => {
       activeProvider = 'gemini';
       await withCase();
 

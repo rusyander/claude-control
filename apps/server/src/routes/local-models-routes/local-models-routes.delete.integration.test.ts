@@ -24,6 +24,7 @@ import { localPaths, readState, updateState } from '../../domains/local-models/p
 import { modelFilePath } from '../../domains/local-models/hf.ts';
 import type { KitService } from '../../domains/kit/service.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
+import { fakeCoreHold } from '../../domains/local-models/__fixtures__/fake-core-hold.ts';
 
 /**
  * Удаление скачанных моделей из интерфейса (L5) по настоящему сокету: маршрут, сервис и
@@ -128,20 +129,21 @@ beforeEach(async () => {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: (() => {
-      const pid = nextPid++;
-      up = true;
-      alive.add(pid);
-      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      kills += 1;
-      alive.delete(pid);
-      up = false;
-    },
+    hold: fakeCoreHold({
+      hold: () => {
+        const pid = nextPid++;
+        up = true;
+        alive.add(pid);
+        return pid;
+      },
+      release: (pid) => {
+        kills += 1;
+        alive.delete(pid);
+        up = false;
+      },
+    }),
     supervise: { pidAlive: (pid) => alive.has(pid) },
     runActive: () => running,
-    testLoad: async () => ({ ok: true }),
   });
 
   app = Fastify();
@@ -255,7 +257,7 @@ describe('модель, забранная из Ollama: жёсткая ссыл�
     const blob = join(root, 'ollama', 'blobs', 'sha256-abc');
     mkdirSync(dirname(blob), { recursive: true });
     const bytes = stubs.writeGguf(blob, { nextn: 0, padBytes: 2048 });
-    const link = join(paths().ollamaImport, 'qwen3.5-9b.gguf');
+    const link = join(paths().models, 'ollama-import', 'qwen3.5-9b.gguf');
     mkdirSync(dirname(link), { recursive: true });
     linkSync(blob, link);
     updateState(paths(), (state) => {

@@ -4,18 +4,6 @@
  * `actions` правят несколько задач разом, этот набор вносится одной строкой-спредом.
  */
 export const panelActionsGroupsEntitiesRu = {
-  list_discovered_groups: 'Найденные наборы ресурсов',
-  run_group_discovery: 'Искать наборы ресурсов заново',
-  import_discovered_group: 'Сделать находку группой',
-  copy_group_to_global: 'Скопировать группу в общие',
-  apply_group_advice: 'Применить советы к копии группы',
-  merge_group_origin: 'Слить копию группы с оригиналом',
-  read_group_override: 'Переопределение группы в проекте',
-  set_group_override: 'Включить или выключить переопределение группы',
-  activate_groups_for_path: 'Включить группы папки',
-  list_resource_catalog: 'Каталог готовых ресурсов',
-  draft_group_step: 'Черновик шага пути',
-  promote_group_step: 'Шаг пути — в отдельный ресурс',
   rename_skill: 'Переименовать скилл',
   move_hook: 'Переставить хук',
   move_env: 'Перенести переменную в другой файл',

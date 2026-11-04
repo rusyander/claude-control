@@ -2,8 +2,7 @@ import { z } from 'zod';
 import type { ChatMessagesPage, ChatProgress, ChatSummary } from '@agentdeck/contracts';
 import type { ChatInbox } from '@agentdeck/contracts/chat-inbox';
 import type { ChatAwaitingView } from '@agentdeck/contracts/chat-handoff';
-import type { ChatEscalationsView } from '@agentdeck/contracts/chat-group-settings';
-import { scanSplitBlocks, type TaskSplitProposal } from '@agentdeck/contracts/task-split';
+import { scanSplitBlocks } from '@agentdeck/contracts/task-split';
 import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
 import type { ProjectInfo } from '../../../domains/chat/ChatProjects/ChatProjects.ts';
 import { encode, readRoute } from '../action-kit/action-kit.ts';
@@ -55,25 +54,20 @@ function askOf(input: string): { questions: Array<Record<string, unknown>> } | u
   }
 }
 
-const proposalView = (proposal: TaskSplitProposal) => ({
-  groups: proposal.groups.map((group) => ({
-    title: maskSecretsInText(group.title),
-    tasks: group.tasks.map((task) => clip(maskSecretsInText(task), 200)),
-  })),
-});
-
 type MessageView = {
   role: string;
   at: string;
   text: string;
   tools?: string[];
-  split?: ReturnType<typeof proposalView>;
 };
 
-/** Сообщение ленты глазами модели: текст без блоков предложения, имена инструментов. */
+/**
+ * Сообщение ленты глазами модели: текст, имена инструментов. Блоки предложения
+ * разделения из старых чатов вырезаются из текста — применять их больше нечем
+ * (задачи ведёт ядро), а сырой JSON блока съедал бы бюджет чтения.
+ */
 function messageView(message: ChatMessagesPage['messages'][number]): {
   view: MessageView;
-  proposals: TaskSplitProposal[];
   ask?: ReturnType<typeof askOf>;
 } {
   const texts: string[] = [];
@@ -86,48 +80,22 @@ function messageView(message: ChatMessagesPage['messages'][number]): {
       if (block.name === 'AskUserQuestion') ask = askOf(block.input) ?? ask;
     }
   }
-  const scan = scanSplitBlocks(texts.join('\n\n'));
-  const proposal = scan.proposals.at(-1);
   return {
     view: {
       role: message.role,
       at: message.timestamp,
-      text: clip(maskSecretsInText(scan.text), MESSAGE_CHARS),
+      text: clip(maskSecretsInText(scanSplitBlocks(texts.join('\n\n')).text), MESSAGE_CHARS),
       ...(tools.length > 0 ? { tools } : {}),
-      ...(proposal ? { split: proposalView(proposal) } : {}),
     },
-    proposals: scan.proposals,
     ...(ask ? { ask } : {}),
   };
 }
 
-/** План разделения дерева чата — только то, чем агент управляет `split_control`. */
-async function splitOf(inject: InjectRoute, chatId: string) {
+/** Пауза дерева чата — её снимает `split_control` resume_all. */
+async function treePauseOf(inject: InjectRoute, chatId: string) {
   try {
     const tree = await readTree(inject, chatId);
-    return {
-      ...(tree.paused ? { treePaused: { since: tree.paused.at, chats: tree.paused.chats } } : {}),
-      ...(tree.split
-        ? {
-            split: {
-              parentChatId: tree.split.parentChatId,
-              ...(tree.split.cancelledAt ? { cancelledAt: tree.split.cancelledAt } : {}),
-              groups: tree.split.groups.map((group) => ({
-                index: group.index,
-                title: maskSecretsInText(group.title),
-                status: group.status,
-                ...(group.waitingFor ? { waitingFor: group.waitingFor } : {}),
-                ...(group.hold && !group.holdAnswer
-                  ? { question: maskSecretsInText(group.hold) }
-                  : {}),
-                ...(group.after.length > 0 ? { after: group.after } : {}),
-                ...(group.chatId ? { chatId: group.chatId } : {}),
-                ...(group.mr ? { mr: group.mr } : {}),
-              })),
-            },
-          }
-        : {}),
-    };
+    return tree.paused ? { treePaused: { since: tree.paused.at, chats: tree.paused.chats } } : {};
   } catch {
     // Дерево — довесок к ленте: без него лента всё равно ответ.
     return {};
@@ -197,9 +165,8 @@ const readChat = definePanelAction({
   description:
     'Read a chat: its latest messages (newest last, text clipped, secrets masked), whether the ' +
     'chat agent is running now, an open question of the chat agent (answer it with ' +
-    'send_chat_message only with the human’s choice), a split proposal (the human applies it ' +
-    'with the «Разделить на N чата» button — you never can) and the split plan of its tree ' +
-    '(groups with index and status, for split_control).',
+    'send_chat_message only with the human’s choice), its plan progress and whether its tree is ' +
+    'paused (split_control resumes it).',
   input: readChatInput,
   route: async (input, inject) => {
     const chat = await findChat(inject, input.chat);
@@ -216,8 +183,7 @@ const readChat = definePanelAction({
     const page = body as ChatMessagesPage;
     const run = await runningOf(inject, chat.id);
     const views = page.messages.map(messageView);
-    // Последнее предложение ленты и открытый вопрос — отдельно: ради них и читают.
-    const lastProposal = views.flatMap((item) => item.proposals).at(-1);
+    // Открытый вопрос — отдельно: ради него и читают.
     const lastAsk = chat.awaitingReply ? views.findLast((item) => item.ask)?.ask : undefined;
     let messages = views.map((item) => item.view);
     const head = {
@@ -231,20 +197,9 @@ const readChat = definePanelAction({
       },
       total: page.total,
       ...(page.hasMore ? { nextOffset: (input.offset ?? 0) + page.messages.length } : {}),
-      ...(lastProposal
-        ? {
-            splitProposal: {
-              ...proposalView(lastProposal),
-              note:
-                `The human applies it with the «Разделить на ${lastProposal.groups.length} чата» ` +
-                'button under that message in the chat. You cannot press it: offer to open the ' +
-                'chat (open_page /chat with focus = chat id).',
-            },
-          }
-        : {}),
       ...(lastAsk ? { question: lastAsk } : {}),
       ...(await progressOf(inject, chat.id)),
-      ...(await splitOf(inject, chat.id)),
+      ...(await treePauseOf(inject, chat.id)),
     };
     // Сначала уходят старые сообщения: модели нужнее конец разговора.
     let dropped = 0;
@@ -316,28 +271,15 @@ const listWaiting = definePanelAction({
   description:
     'What in the chats waits for the human or runs now: chat agents asking a question, ' +
     'permission requests and first-edit branch gates (humanOnly — the human decides those in ' +
-    'the chat, never you), running chats, unread critical notes from split groups and split ' +
-    'trees standing on the human.',
+    'the chat, never you), running chats and chat trees standing on the human.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/chat/inbox' }),
   afterRoute: async (_input, body, inject) => {
     const inbox = body as ChatInbox;
-    const [escalations, awaiting] = await Promise.all([
-      readRoute<ChatEscalationsView>(inject, '/api/chat/escalations').catch(() => undefined),
-      readRoute<ChatAwaitingView>(inject, '/api/chat/awaiting').catch(() => undefined),
-    ]);
-    const busy = inbox.chats.filter((chat) => chat.status !== 'idle' || chat.asks.length > 0);
-    const notes = Object.entries(escalations?.chats ?? {}).flatMap(([chatId, entries]) =>
-      entries
-        .filter((entry) => !entry.read)
-        .map((entry) => ({
-          chat: chatId,
-          from: entry.childChatId,
-          fromTitle: maskSecretsInText(entry.childTitle),
-          text: clip(maskSecretsInText(entry.text), 400),
-          at: entry.at,
-        })),
+    const awaiting = await readRoute<ChatAwaitingView>(inject, '/api/chat/awaiting').catch(
+      () => undefined,
     );
+    const busy = inbox.chats.filter((chat) => chat.status !== 'idle' || chat.asks.length > 0);
     return {
       total: busy.length,
       chats: busy.slice(0, WAITING_LIMIT).map((chat) => ({
@@ -350,7 +292,6 @@ const listWaiting = definePanelAction({
         updatedAt: chat.updatedAt,
         ...(chat.asks.length > 0 ? { asks: chat.asks.map(askView) } : {}),
       })),
-      ...(notes.length > 0 ? { criticalNotes: notes } : {}),
       ...(awaiting && awaiting.chats.length > 0 ? { treesWaiting: awaiting.chats } : {}),
     };
   },

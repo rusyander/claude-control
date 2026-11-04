@@ -14,6 +14,7 @@ import {
   type CoreForward,
   type CoreLocation,
 } from '../../domains/core-proxy/core-proxy.ts';
+import type { CoreSupervisorStatus } from '@agentdeck/contracts/core/supervisor';
 import { hopGateFromEnv, type HopGate } from '../../domains/core-proxy/hop-gate.ts';
 import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 import {
@@ -40,7 +41,21 @@ import { CLIENT_PORT_HEADER } from '../chat/human-only/human-only.ts';
  *
  * Поток событий задачи (`stream: true`) идёт насквозь, без накопления: лента живёт часами, а
  * `Last-Event-ID` браузера доезжает до ядра — возобновление с последней полученной строки.
+ *
+ * Надзор ядра (этап 10): ядро поднимает сама панель. Ядра нет, а надзор его поднимает — запрос
+ * ждёт подъёма (до `STARTING_WAIT_MS`) и уходит; не дождался — 503 `core-starting`; надзор
+ * сдался после пяти неудач — 503 `core-fault` (карточка сбоя с кнопкой «Перезапустить»).
+ * `core-absent` остаётся только панели без надзора (`AGENTDECK_CORE_SUPERVISE=0`).
  */
+
+/** Сколько запрос ждёт поднимающееся ядро, прежде чем ответить `core-starting`. */
+export const STARTING_WAIT_MS = 15_000;
+
+/** Что прокладке нужно от надзора: состояние и ожидание подъёма. */
+export interface CoreProxySupervisor {
+  status(): CoreSupervisorStatus | null;
+  whenUp(ms: number): Promise<boolean>;
+}
 
 export interface CoreProxyDeps {
   home(): string;
@@ -53,6 +68,10 @@ export interface CoreProxyDeps {
    * строки. Нет — сервер запущен без сторожа, ждать некого.
    */
   hopGate?: HopGate;
+  /** Надзор ядра этой панели; нет — ядро запускает человек, отказ `core-absent`. */
+  supervisor?: CoreProxySupervisor;
+  /** Срок ожидания поднимающегося ядра (тесты укорачивают). */
+  startingWaitMs?: number;
 }
 
 const firstHeader = (v: string | string[] | undefined): string | undefined =>
@@ -78,7 +97,8 @@ export async function requesterPid(
   return client ?? peer;
 }
 
-type RefusalCode = 'core-absent' | 'core-unverified' | 'core-unreachable';
+type RefusalCode =
+  'core-absent' | 'core-unverified' | 'core-unreachable' | 'core-starting' | 'core-fault';
 
 function refuse(reply: FastifyReply, status: number, code: RefusalCode, detail: string) {
   return reply.code(status).send({ error: serverText(code), code, messageCode: code, detail });
@@ -94,36 +114,71 @@ export function corePathOf(route: CorePanelRoute, request: Pick<FastifyRequest, 
   return `${CORE_API_PREFIX}${path}${at >= 0 ? request.url.slice(at) : ''}`;
 }
 
-/** Строка найдена и подтверждена — или уже отправленный отказ. */
-async function verifiedCore(
-  reply: FastifyReply,
+type Located = CoreLocation | { absent: string } | { unverified: string };
+
+/** Строка дома ядра и её сверка ОС: подтверждена, ядра нет вовсе или строка не подтвердилась. */
+async function locateVerified(
   deps: CoreProxyDeps,
   identity: (port: number) => CoreIdentityDeps,
-): Promise<CoreLocation | undefined> {
+): Promise<Located> {
   const core = locateCore(deps.home());
-  if ('missing' in core) {
-    await refuse(reply, 503, 'core-absent', core.missing);
-    return undefined;
-  }
+  if ('missing' in core) return { absent: core.missing };
   const os = identity(core.entry.port);
   const proven = await verifyCore(core, os);
   if ('value' in proven) return core;
   const reason = 'unknown' in proven ? proven.unknown : 'absent';
-  // Процесса строки нет вовсе (ядро убито, строка осталась) — ядро не запущено, а не
-  // самозванец: человеку нужна карточка «запустите ядро». Токен не ушёл в обоих случаях.
-  if ((await os.exists(core.entry.pid)) === false) {
-    await refuse(reply, 503, 'core-absent', `core pid ${core.entry.pid} is gone: ${reason}`);
+  // Процесса строки нет вовсе (ядро убито, строка осталась) — ядра нет, а не самозванец.
+  // Токен не ушёл в обоих случаях.
+  if ((await os.exists(core.entry.pid)) === false)
+    return { absent: `core pid ${core.entry.pid} is gone: ${reason}` };
+  return { unverified: reason };
+}
+
+/** Строка найдена и подтверждена — или уже отправленный отказ. */
+export async function verifiedCore(
+  reply: FastifyReply,
+  deps: CoreProxyDeps,
+  identity: (port: number) => CoreIdentityDeps,
+): Promise<CoreLocation | undefined> {
+  let got = await locateVerified(deps, identity);
+  const supervisor = deps.supervisor;
+  const state = supervisor?.status();
+  if ('absent' in got && supervisor && state) {
+    if (state.state !== 'fault') {
+      // Ядро поднимает панель: запрос ждёт подъёма, а не отдаёт человеку карточку на секунду.
+      const up = await supervisor.whenUp(deps.startingWaitMs ?? STARTING_WAIT_MS);
+      if (up) got = await locateVerified(deps, identity);
+    }
+    if ('absent' in got) {
+      const code = supervisor.status()?.state === 'fault' ? 'core-fault' : 'core-starting';
+      await refuse(reply, 503, code, got.absent);
+      return undefined;
+    }
+  }
+  if ('absent' in got) {
+    await refuse(reply, 503, 'core-absent', got.absent);
     return undefined;
   }
-  await refuse(reply, 503, 'core-unverified', reason);
-  return undefined;
+  if ('unverified' in got) {
+    await refuse(reply, 503, 'core-unverified', got.unverified);
+    return undefined;
+  }
+  return got;
 }
 
 const reasonOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** Обычная ручка: ответ ядра целиком, с его статусом и типом. */
-async function relayOnce(reply: FastifyReply, core: CoreLocation, call: CoreForward) {
+/**
+ * Обычная ручка: ответ ядра целиком, с его статусом и типом. `decorate` — дописка ручки панели к
+ * телу ответа (старт чата добавляет маршрут контура); без неё тело идёт байт в байт.
+ */
+export async function relayOnce(
+  reply: FastifyReply,
+  core: CoreLocation,
+  call: CoreForward,
+  decorate?: (status: number, text: string) => string,
+) {
   let got: Response;
   let text: string;
   try {
@@ -135,7 +190,7 @@ async function relayOnce(reply: FastifyReply, core: CoreLocation, call: CoreForw
   reply.code(got.status);
   const type = got.headers.get('content-type');
   if (type) reply.type(type);
-  return reply.send(text);
+  return reply.send(decorate ? decorate(got.status, text) : text);
 }
 
 /**
@@ -207,12 +262,29 @@ export function createCoreProxyRoutes(deps: CoreProxyDeps) {
   };
 }
 
-/** Прокладка этого процесса: дом ядра и ворота записи звена — из окружения, что дал сторож. */
-export function registerCoreProxyRoutes(app: FastifyInstance): void {
-  const hopGate = hopGateFromEnv();
-  createCoreProxyRoutes({
+export interface CoreProxyRegistration {
+  supervisor?: CoreProxySupervisor;
+  /** Ворота записи звена от надзора панели, когда сторожа нет (P131). */
+  hopGate?: HopGate;
+}
+
+/**
+ * Прокладка этого процесса: дом ядра из окружения; ворота записи звена — сторожа (`dev-watch`,
+ * `keepalive`, стенд), а без него — надзора панели, который пишет звено сам.
+ */
+export function coreProxyDepsOf(registration: CoreProxyRegistration = {}): CoreProxyDeps {
+  const hopGate = hopGateFromEnv() ?? registration.hopGate;
+  return {
     home: () => coreHomeOf(),
     readTcp: (wanted) => readTcpTable(wanted),
     ...(hopGate ? { hopGate } : {}),
-  })(app);
+    ...(registration.supervisor ? { supervisor: registration.supervisor } : {}),
+  };
+}
+
+export function registerCoreProxyRoutes(
+  app: FastifyInstance,
+  registration: CoreProxyRegistration = {},
+): void {
+  createCoreProxyRoutes(coreProxyDepsOf(registration))(app);
 }

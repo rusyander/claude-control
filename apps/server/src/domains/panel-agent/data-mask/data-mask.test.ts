@@ -43,6 +43,13 @@ describe('maskPanelAgentMessages — ключи без префикса венд
     expect(masked).toMatch(/\[КЛЮЧ_1\]/);
   });
 
+  it('ключ после «key:» в английской реплике — одна метка [КЛЮЧ_1], а не перемаска метки', () => {
+    // Второй проход (детектор секретов) принимал метку первого за значение «key:» и давал
+    // [КЛЮЧ_2]; журнал ядра затем прятал её в «••••••», и модель метки не видела.
+    const key = j('s', 'k-demo-', '7f3a91c2d8e04b65a1');
+    expect(mask(`Here is the key: ${key}`)).toBe('Here is the key: [КЛЮЧ_1]');
+  });
+
   it('одно значение в двух репликах — одна метка', () => {
     const key = j('gor_live_7Hk2mP9qR4sT6v', 'W8xY0zA1bC3dE5fG');
     const result = maskPanelAgentMessages(appData, [

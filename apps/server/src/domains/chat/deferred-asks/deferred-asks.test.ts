@@ -10,13 +10,9 @@ import {
 import {
   DEFERRED_ASKS_FILE,
   DeferredAsks,
-  allowMainCopyPrompt,
-  allowResumePrompt,
-  denyResumePrompt,
   alreadyQueuedDenial,
   callHash,
   deferralDenial,
-  deferredScopeOf,
   deferredView,
   humanRefusedDenial,
 } from './deferred-asks.ts';
@@ -212,25 +208,19 @@ describe('deferred-asks › запись', () => {
 });
 
 describe('deferred-asks › тексты и метка', () => {
-  it('все три отказа несут метку с номером, продолжение — вход знак в знак', () => {
+  it('все три отказа несут метку с номером', () => {
     expect(deferredIdOf(deferralDenial('D-7', 'row database'))).toBe('D-7');
     expect(deferredIdOf(alreadyQueuedDenial('D-7'))).toBe('D-7');
     expect(deferredIdOf(humanRefusedDenial('D-7', 'нет'))).toBe('D-7');
     expect(deferredIdOf('Exit code 1 agentdeck(deferred D-7)')).toBeUndefined();
-    const prompt = allowResumePrompt({ id: 'D-7', toolName: 'Bash', input: DROP });
-    expect(prompt).toContain('psql -c "DROP TABLE users"');
-    expect(prompt).not.toContain('drop users');
   });
 
-  it('каждое продолжение после решения велит снять черновик, когда ждать нечего (RF-DL-11)', () => {
-    const record = { id: 'D-7', toolName: 'Bash', input: DROP };
-    for (const prompt of [
-      allowResumePrompt(record),
-      allowMainCopyPrompt({ id: 'D-7', input: { path: '/repo' } }),
-      denyResumePrompt(record),
-    ]) {
-      expect(prompt).toContain('take the MR out of draft');
-    }
+  // Разовый грант снят вместе с карточкой правила (этап 10): решение только записывается,
+  // и отказ не обещает модели продолжения, которого не будет.
+  it('первый отказ не обещает разового гранта и продолжения панелью', () => {
+    const text = deferralDenial('D-7', 'row database');
+    expect(text).not.toMatch(/one-time grant|panel resumes/);
+    expect(text).toContain('does not resume this work');
   });
 
   it('строки «Waiting for the human: D-n» вырезаются, прочий текст остаётся', () => {
@@ -239,25 +229,6 @@ describe('deferred-asks › тексты и метка', () => {
     expect(withoutDeferredWaitLines(text)).toBe('Done with the rest.');
     expect(deferredIdsIn(text)).toEqual(['D-7', 'D-8']);
     expect(deferredIdsIn('PD-7 and D-70x')).toEqual([]);
-  });
-});
-
-describe('deferred-asks › чьё это', () => {
-  it('связь с группой — группа, иначе ключи чата', () => {
-    const links: Record<string, { parentChatId?: string; groupIndex?: number }> = {
-      child: { parentChatId: 'parent', groupIndex: 3 },
-      manual: { parentChatId: 'parent' },
-    };
-    const linkOf = (key: string) => links[key];
-    expect(deferredScopeOf(linkOf, ['new-1', 'child'])).toEqual({
-      kind: 'group',
-      parentChatId: 'parent',
-      groupIndex: 3,
-    });
-    expect(deferredScopeOf(linkOf, ['manual', undefined, 'manual'])).toEqual({
-      kind: 'chat',
-      chatKeys: ['manual'],
-    });
   });
 });
 

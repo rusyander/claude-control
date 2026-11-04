@@ -8,6 +8,7 @@ import type {
   TmsKind,
   TmsSettings,
 } from '@agentdeck/contracts';
+import { forgeOfHost, hostOf, type ForgeSites } from '@agentdeck/contracts/core/forge';
 import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
 import { integrationKeyId } from '@agentdeck/keys/integration-keys';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
@@ -18,7 +19,9 @@ import {
   setStoredKey,
   MAX_KEY_LENGTH,
 } from '../../../lib/provider-keys/provider-keys.ts';
+import { gitSync } from '../../project-git/exec/exec.ts';
 import { IntegrationError, invalidField } from '../errors.ts';
+import { parseMergeRequestUrl } from '../forge.ts';
 import { readHealth } from '../health.ts';
 import { readLastSend } from '../../notify/telegram-delivery.ts';
 import { coded } from '../../../lib/server-text/server-text.ts';
@@ -230,4 +233,53 @@ export function forgeToken(
   kind: ForgeKind,
 ): string | undefined {
   return isConnected(store, appDataDir, kind) ? readToken(appDataDir, kind) : undefined;
+}
+
+/** Подключённый фордж с ключом — то, чем клиенты форджа панели ходят в API. */
+export interface PickedForge {
+  kind: ForgeKind;
+  settings: ForgeSettings;
+  token: string;
+}
+
+function picked(store: AppStore, appDataDir: string, kind: ForgeKind): PickedForge | undefined {
+  const token = forgeToken(store, appDataDir, kind);
+  return token ? { kind, settings: forgeSettingsOf(store, kind), token } : undefined;
+}
+
+/**
+ * Какой фордж обслуживает запрос, когда GitLab и GitHub подключены оба (владелец 10.10.2026:
+ * каждая интеграция — своя). Ссылка (MR, issue) называет фордж сама — по ней; без ссылки — хост
+ * origin проекта. Сверка хоста — общий чистый источник с ядром (`contracts/core/forge`). Своё у
+ * панели только «совпадения нет»: по названию в хосте (`gitlab.company.ru`), иначе первый
+ * подключённый — при ЧТЕНИИ дефекта отказ хуже попытки, у которой есть ответ форджа с причиной
+ * (ядро же при публикации не угадывает и уходит в `generic`).
+ */
+export function pickForge(
+  store: AppStore,
+  appDataDir: string,
+  where: { root?: string; url?: string } = {},
+): PickedForge | undefined {
+  const connected = FORGE_KINDS.filter((kind) => isConnected(store, appDataDir, kind));
+  if (connected.length === 0) return undefined;
+  if (connected.length === 1) return picked(store, appDataDir, connected[0]!);
+
+  const host =
+    hostOf(where.url) ||
+    (where.root ? hostOf(gitSync(where.root, ['remote', 'get-url', 'origin']) ?? '') : '');
+  const sites: ForgeSites = {};
+  for (const kind of connected) sites[kind] = { ...forgeSettingsOf(store, kind), enabled: true };
+  const byHost = forgeOfHost(host, sites);
+  const byName = connected.find((kind) => host.includes(kind));
+  return picked(store, appDataDir, byHost ?? byName ?? connected[0]!);
+}
+
+/** Ключ форджа для ссылки на MR: вид берётся из самой ссылки. */
+export function forgeTokenForUrl(
+  store: AppStore,
+  appDataDir: string,
+  url: string,
+): string | undefined {
+  const kind = parseMergeRequestUrl(url)?.kind;
+  return kind ? forgeToken(store, appDataDir, kind) : undefined;
 }

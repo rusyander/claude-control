@@ -160,6 +160,7 @@ function buildSplitEnv(deps: ConductorWiringDeps): SplitEnv {
       pin: (deps.loop ? deps.loop.pin : undefined) ?? (() => processPin()),
     }),
     grantRequired: grantRequiredPort(deps.layout),
+    ...(deps.taskEnv ? { taskEnv: deps.taskEnv } : {}),
   };
 }
 

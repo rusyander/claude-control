@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1400,
       "height": 1300,
-      "shotAt": "2026-10-10T12:10:33.710Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Настройки Приложение, доступность и путь к конфигурации Общие Доступ Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, отчёты CI и вебхук — каждая система своей карточкой: откуда панель берёт внешний контекст и куда отдаёт результат. Что панель делает с этими ключами Добавить интеграцию Выберите систему Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT Отчёты CI Вебхук Найти уже подключённые Пока ни одной интеграции Добавьте нужную систему вручную или найдите те, что уже подключены к агенту как MCP-серверы: адрес и ключ перенесутся оттуда.",
+      "shotAt": "2026-11-03T15:42:44.118Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Настройки Приложение, доступность и путь к конфигурации Общие Доступ Телефон Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, отчёты CI и вебхук — каждая система своей карточкой: откуда панель берёт внешний контекст и куда отдаёт результат. Что панель делает с этими ключами Добавить интеграцию Выберите систему Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT Отчёты CI Вебхук Найти уже подключённые Пока ни одной интеграции Добавьте нужную систему вручную или найдите те, что уже подключены к агенту как MCP-серверы: адрес и ключ перенесутся оттуда.",
       "en": {
         "file": "01-cards.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:11:39.904Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Settings Application, accessibility and configuration path General Access Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each system on its own card: where the panel takes outside context from and where it hands results back. What the panel does with these keys Add integration Choose a system Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT CI reports Webhook Find already connected No integrations yet Add the system you need by hand, or find those already connected to the agent as MCP servers: the URL and key are carried over from there."
+        "shotAt": "2026-11-03T15:56:58.492Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Settings Application, accessibility and configuration path General Access Phone Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each system on its own card: where the panel takes outside context from and where it hands results back. What the panel does with these keys Add integration Choose a system Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT CI reports Webhook Find already connected No integrations yet Add the system you need by hand, or find those already connected to the agent as MCP servers: the URL and key are carried over from there.",
+        "seal": {
+          "png": "5789c5108fa2e596",
+          "text": "7b24f2c007b99680"
+        }
       },
       "dark": {
         "file": "01-cards.dark.png",
         "masked": 0,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:12:58.268Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Настройки Приложение, доступность и путь к конфигурации Общие Доступ Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, отчёты CI и вебхук — каждая система своей карточкой: откуда панель берёт внешний контекст и куда отдаёт результат. Что панель делает с этими ключами Добавить интеграцию Выберите систему Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT Отчёты CI Вебхук Найти уже подключённые Пока ни одной интеграции Добавьте нужную систему вручную или найдите те, что уже подключены к агенту как MCP-серверы: адрес и ключ перенесутся оттуда."
+        "shotAt": "2026-11-03T16:06:31.824Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Настройки Приложение, доступность и путь к конфигурации Общие Доступ Телефон Провайдеры Модели Промпты Группы Глобальный слой Интеграции Расходы Безопасность Перенос Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, отчёты CI и вебхук — каждая система своей карточкой: откуда панель берёт внешний контекст и куда отдаёт результат. Что панель делает с этими ключами Добавить интеграцию Выберите систему Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT Отчёты CI Вебхук Найти уже подключённые Пока ни одной интеграции Добавьте нужную систему вручную или найдите те, что уже подключены к агенту как MCP-серверы: адрес и ключ перенесутся оттуда.",
+        "seal": {
+          "png": "2558c59848886a67",
+          "text": "3bf1d2f4ca4efa96"
+        }
       },
       "darkEn": {
         "file": "01-cards.dark.en.png",
         "masked": 0,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:14:19.533Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Settings Application, accessibility and configuration path General Access Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each system on its own card: where the panel takes outside context from and where it hands results back. What the panel does with these keys Add integration Choose a system Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT CI reports Webhook Find already connected No integrations yet Add the system you need by hand, or find those already connected to the agent as MCP servers: the URL and key are carried over from there."
+        "shotAt": "2026-11-03T16:12:06.946Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Settings Application, accessibility and configuration path General Access Phone Providers Models Prompts Groups Global layer Integrations Spend Safety Transfer Jira, Confluence, GitLab, GitHub, Telegram, Zephyr, Xray, Test IT, CI reports and a webhook — each system on its own card: where the panel takes outside context from and where it hands results back. What the panel does with these keys Add integration Choose a system Jira Confluence GitLab GitHub Telegram Zephyr Scale Xray Test IT CI reports Webhook Find already connected No integrations yet Add the system you need by hand, or find those already connected to the agent as MCP servers: the URL and key are carried over from there.",
+        "seal": {
+          "png": "3a7a6b83545f72e8",
+          "text": "7b24f2c007b99680"
+        }
+      },
+      "seal": {
+        "png": "e90bf8c55b1b2419",
+        "text": "3bf1d2f4ca4efa96"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 3,
       "width": 1116,
       "height": 500,
-      "shotAt": "2026-10-10T12:10:36.110Z",
+      "shotAt": "2026-11-03T15:42:47.001Z",
       "text": "Jira не проверялось Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь",
       "en": {
         "file": "02-filled.en.png",
         "masked": 3,
         "width": 1116,
         "height": 482,
-        "shotAt": "2026-10-10T12:11:42.292Z",
-        "text": "Jira not checked Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection"
+        "shotAt": "2026-11-03T15:57:00.858Z",
+        "text": "Jira not checked Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection",
+        "seal": {
+          "png": "4f216f2922439bd2",
+          "text": "f94ea40d24eedd24"
+        }
       },
       "dark": {
         "file": "02-filled.dark.png",
         "masked": 3,
         "width": 1116,
         "height": 500,
-        "shotAt": "2026-10-10T12:13:00.679Z",
-        "text": "Jira не проверялось Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь"
+        "shotAt": "2026-11-03T16:06:34.226Z",
+        "text": "Jira не проверялось Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь",
+        "seal": {
+          "png": "75a6d048fb2620ba",
+          "text": "99dee19eba134561"
+        }
       },
       "darkEn": {
         "file": "02-filled.dark.en.png",
         "masked": 3,
         "width": 1116,
         "height": 482,
-        "shotAt": "2026-10-10T12:14:21.935Z",
-        "text": "Jira not checked Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection"
+        "shotAt": "2026-11-03T16:12:09.358Z",
+        "text": "Jira not checked Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token No key yet. It goes into the encrypted store and never returns to this screen. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection",
+        "seal": {
+          "png": "7b347d2294c37632",
+          "text": "f94ea40d24eedd24"
+        }
+      },
+      "seal": {
+        "png": "375193bd97da27bc",
+        "text": "99dee19eba134561"
       }
     },
     {
@@ -77,65 +109,97 @@
       "masked": 2,
       "width": 1116,
       "height": 590,
-      "shotAt": "2026-10-10T12:10:43.582Z",
-      "text": "Jira связь есть облако Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключ сохранён: atl…42a0. Новое значение заменит его, пустое поле — оставит как есть. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь Забыть ключ Вошли как Отдел контроля качества (облако). вошли как Отдел контроля качества проверено 10.10.2026, 17:10:38",
+      "shotAt": "2026-11-03T15:42:54.783Z",
+      "text": "Jira связь есть облако Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключ сохранён: atl…42a0. Новое значение заменит его, пустое поле — оставит как есть. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь Забыть ключ Вошли как Отдел контроля качества (облако). вошли как Отдел контроля качества проверено 03.11.2026, 20:42:49",
       "dark": {
         "file": "03-checked.dark.png",
         "masked": 2,
         "width": 1116,
         "height": 590,
-        "shotAt": "2026-10-10T12:13:08.194Z",
-        "text": "Jira связь есть облако Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключ сохранён: atl…42a0. Новое значение заменит его, пустое поле — оставит как есть. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь Забыть ключ Вошли как Отдел контроля качества (облако). вошли как Отдел контроля качества проверено 10.10.2026, 17:13:03"
+        "shotAt": "2026-11-03T16:06:41.743Z",
+        "text": "Jira связь есть облако Включена Задачи и требования: откуда агент берёт постановку и куда уходят дефекты по проваленным кейсам. Адрес сайта https://•••••••••••• для облака, свой адрес для своей установки. Почта Только для облака: там ключ работает в паре с почтой. Установка Не выбрано Облако Server / Data Center Не выбрано — определится живой проверкой и запомнится. Подключить MCP Atlassian Jira и Confluence с адресами и ключами этих карточек, но доступные агенту прямо в разговоре. Один сервер на обе системы. Сервер добавится в раздел MCP — оттуда его можно и убрать. Токен Ключ сохранён: atl…42a0. Новое значение заменит его, пустое поле — оставит как есть. Облако: API-токен из •••••••••••• вместе с почтой выше. Своя установка: personal access token из профиля Jira, почту оставьте пустой. Сохранить Проверить связь Забыть ключ Вошли как Отдел контроля качества (облако). вошли как Отдел контроля качества проверено 03.11.2026, 21:06:36",
+        "seal": {
+          "png": "357105c58d87ca2e",
+          "text": "f30b5343ed6a3f39"
+        }
       },
       "darkEn": {
         "file": "03-checked.dark.en.png",
         "masked": 2,
         "width": 1116,
         "height": 572,
-        "shotAt": "2026-10-10T12:14:29.439Z",
-        "text": "Jira connected cloud Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token Key saved: atl…42a0. A new value replaces it, an empty field leaves it alone. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection Forget key Logged in as Отдел контроля качества (cloud). signed in as Отдел контроля качества checked 10/10/2026, 5:14:24 PM"
+        "shotAt": "2026-11-03T16:12:16.840Z",
+        "text": "Jira connected cloud Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token Key saved: atl…42a0. A new value replaces it, an empty field leaves it alone. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection Forget key Logged in as Отдел контроля качества (cloud). signed in as Отдел контроля качества checked 11/3/2026, 9:12:12 PM",
+        "seal": {
+          "png": "094c4c4f9e643f7d",
+          "text": "5970d5611726322f"
+        }
       },
       "en": {
         "file": "03-checked.en.png",
         "masked": 2,
         "width": 1116,
         "height": 572,
-        "shotAt": "2026-10-10T12:11:49.779Z",
-        "text": "Jira connected cloud Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token Key saved: atl…42a0. A new value replaces it, an empty field leaves it alone. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection Forget key Logged in as Отдел контроля качества (cloud). signed in as Отдел контроля качества checked 10/10/2026, 5:11:44 PM"
+        "shotAt": "2026-11-03T15:57:08.346Z",
+        "text": "Jira connected cloud Enabled Issues and requirements: where the agent takes its task from and where defects for failed cases go. Site URL •••••••••••• for cloud, your own URL for an own installation. Email Cloud only: the key works there in a pair with the email. Deployment Not set Cloud Server / Data Center Unset — detected by a live check and remembered. Connect Atlassian MCP Jira and Confluence with the URLs and keys of these cards, but available to the agent inside a conversation. One server for both systems. The server is added to the MCP section — it can be removed from there too. Token Key saved: atl…42a0. A new value replaces it, an empty field leaves it alone. Cloud: an API token from •••••••••••• together with the email above. Own installation: a personal access token from the Jira profile, leave the email empty. Save Check connection Forget key Logged in as Отдел контроля качества (cloud). signed in as Отдел контроля качества checked 11/3/2026, 8:57:03 PM",
+        "seal": {
+          "png": "692abbc0963e1606",
+          "text": "59b3edec5d6dfdaf"
+        }
+      },
+      "seal": {
+        "png": "171705f58b442a6d",
+        "text": "653c365708767558"
       }
     },
     {
       "id": "04-mcp",
       "file": "04-mcp.png",
       "side": "panel",
-      "masked": 1,
+      "masked": 2,
       "width": 1400,
       "height": 1300,
-      "shotAt": "2026-10-10T12:10:50.940Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает agentdeck-atlassian stdio C:\\Program Files\\nodejs\\node.exe •••••••••••• Проверить Инструменты",
+      "shotAt": "2026-11-03T15:43:19.196Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает agentdeck-atlassian stdio •••••••••••• •••••••••••• Проверить Инструменты",
       "dark": {
         "file": "04-mcp.dark.png",
-        "masked": 1,
+        "masked": 2,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:13:16.294Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает agentdeck-atlassian stdio C:\\Program Files\\nodejs\\node.exe •••••••••••• Проверить Инструменты"
+        "shotAt": "2026-11-03T16:06:49.523Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 1 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно MCP-серверы Внешние источники инструментов для Claude Добавить сервер Как это работает agentdeck-atlassian stdio •••••••••••• •••••••••••• Проверить Инструменты",
+        "seal": {
+          "png": "56168ffb26fc14fd",
+          "text": "01201c4b3e5eee38"
+        }
       },
       "darkEn": {
         "file": "04-mcp.dark.en.png",
-        "masked": 1,
+        "masked": 2,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:14:36.815Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help MCP servers External tool providers for Claude Add server How it works agentdeck-atlassian stdio C:\\Program Files\\nodejs\\node.exe •••••••••••• Check Tools"
+        "shotAt": "2026-11-03T16:12:24.243Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet MCP servers External tool providers for Claude Add server How it works agentdeck-atlassian stdio •••••••••••• •••••••••••• Check Tools",
+        "seal": {
+          "png": "06634b96f13bf773",
+          "text": "16abb4892ba7d4a1"
+        }
       },
       "en": {
         "file": "04-mcp.en.png",
-        "masked": 1,
+        "masked": 2,
         "width": 1400,
         "height": 1300,
-        "shotAt": "2026-10-10T12:11:57.224Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help MCP servers External tool providers for Claude Add server How it works agentdeck-atlassian stdio C:\\Program Files\\nodejs\\node.exe •••••••••••• Check Tools"
+        "shotAt": "2026-11-03T15:57:15.759Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 1 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet MCP servers External tool providers for Claude Add server How it works agentdeck-atlassian stdio •••••••••••• •••••••••••• Check Tools",
+        "seal": {
+          "png": "2c3050957518dc83",
+          "text": "16abb4892ba7d4a1"
+        }
+      },
+      "seal": {
+        "png": "db85801596524d29",
+        "text": "01201c4b3e5eee38"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 4,
       "width": 1116,
       "height": 431,
-      "shotAt": "2026-10-10T12:11:06.641Z",
-      "text": "GitLab связь есть Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключ сохранён: glp…60f4. Новое значение заменит его, пустое поле — оставит как есть. Токен проекта или личный, scope api. Сохранить Проверить связь Забыть ключ Вошли как qa-release-bot. вошли как qa-release-bot проверено 10.10.2026, 17:11:01",
+      "shotAt": "2026-11-03T15:43:36.500Z",
+      "text": "GitLab связь есть Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключ сохранён: glp…60f4. Новое значение заменит его, пустое поле — оставит как есть. Токен проекта или личный, scope api. Сохранить Проверить связь Забыть ключ Вошли как qa-release-bot. вошли как qa-release-bot проверено 03.11.2026, 20:43:31",
       "en": {
         "file": "05-forge.en.png",
         "masked": 4,
         "width": 1116,
         "height": 431,
-        "shotAt": "2026-10-10T12:12:11.439Z",
-        "text": "GitLab connected Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token Key saved: glp…60f4. A new value replaces it, an empty field leaves it alone. A project or personal token with the api scope. Save Check connection Forget key Logged in as qa-release-bot. signed in as qa-release-bot checked 10/10/2026, 5:12:06 PM"
+        "shotAt": "2026-11-03T15:57:31.488Z",
+        "text": "GitLab connected Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token Key saved: glp…60f4. A new value replaces it, an empty field leaves it alone. A project or personal token with the api scope. Save Check connection Forget key Logged in as qa-release-bot. signed in as qa-release-bot checked 11/3/2026, 8:57:26 PM",
+        "seal": {
+          "png": "5e7ade0a69ddf19c",
+          "text": "5a57d7292ca19e83"
+        }
       },
       "dark": {
         "file": "05-forge.dark.png",
         "masked": 4,
         "width": 1116,
         "height": 431,
-        "shotAt": "2026-10-10T12:13:32.237Z",
-        "text": "GitLab связь есть Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключ сохранён: glp…60f4. Новое значение заменит его, пустое поле — оставит как есть. Токен проекта или личный, scope api. Сохранить Проверить связь Забыть ключ Вошли как qa-release-bot. вошли как qa-release-bot проверено 10.10.2026, 17:13:27"
+        "shotAt": "2026-11-03T16:07:05.619Z",
+        "text": "GitLab связь есть Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключ сохранён: glp…60f4. Новое значение заменит его, пустое поле — оставит как есть. Токен проекта или личный, scope api. Сохранить Проверить связь Забыть ключ Вошли как qa-release-bot. вошли как qa-release-bot проверено 03.11.2026, 21:07:00",
+        "seal": {
+          "png": "81393a3886ed8f7a",
+          "text": "96cba32265613823"
+        }
       },
       "darkEn": {
         "file": "05-forge.dark.en.png",
         "masked": 4,
         "width": 1116,
         "height": 431,
-        "shotAt": "2026-10-10T12:14:51.023Z",
-        "text": "GitLab connected Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token Key saved: glp…60f4. A new value replaces it, an empty field leaves it alone. A project or personal token with the api scope. Save Check connection Forget key Logged in as qa-release-bot. signed in as qa-release-bot checked 10/10/2026, 5:14:46 PM"
+        "shotAt": "2026-11-03T16:12:40.040Z",
+        "text": "GitLab connected Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token Key saved: glp…60f4. A new value replaces it, an empty field leaves it alone. A project or personal token with the api scope. Save Check connection Forget key Logged in as qa-release-bot. signed in as qa-release-bot checked 11/3/2026, 9:12:35 PM",
+        "seal": {
+          "png": "5f49170b61d650c9",
+          "text": "c520af3d7feae27c"
+        }
+      },
+      "seal": {
+        "png": "66119282c1493be5",
+        "text": "c0149095b5d2205c"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 1,
       "width": 1116,
       "height": 341,
-      "shotAt": "2026-10-10T12:11:10.075Z",
+      "shotAt": "2026-11-03T15:43:40.267Z",
       "text": "GitLab не проверялось Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Токен проекта или личный, scope api. Сохранить Проверить связь",
       "en": {
         "file": "06-forgotten.en.png",
         "masked": 1,
         "width": 1116,
         "height": 341,
-        "shotAt": "2026-10-10T12:12:14.887Z",
-        "text": "GitLab not checked Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. A project or personal token with the api scope. Save Check connection"
+        "shotAt": "2026-11-03T15:57:34.957Z",
+        "text": "GitLab not checked Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. A project or personal token with the api scope. Save Check connection",
+        "seal": {
+          "png": "721a634b1bd3ac49",
+          "text": "e6451d11fd8b3b4e"
+        }
       },
       "dark": {
         "file": "06-forgotten.dark.png",
         "masked": 1,
         "width": 1116,
         "height": 341,
-        "shotAt": "2026-10-10T12:13:35.694Z",
-        "text": "GitLab не проверялось Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Токен проекта или личный, scope api. Сохранить Проверить связь"
+        "shotAt": "2026-11-03T16:07:09.101Z",
+        "text": "GitLab не проверялось Включена Задачи и merge request-ы напрямую по токену, без установленного glab. Адрес установки Свой GitLab — адрес инсталляции. Пусто = ••••••••••••. Репозиторий group/project или числовой id. Пусто — выведется из origin проверяемого проекта. Токен Ключа ещё нет. Он уйдёт в зашифрованное хранилище и на экран больше не вернётся. Токен проекта или личный, scope api. Сохранить Проверить связь",
+        "seal": {
+          "png": "d9049e639aa379c2",
+          "text": "68049e177fc15f3b"
+        }
       },
       "darkEn": {
         "file": "06-forgotten.dark.en.png",
         "masked": 1,
         "width": 1116,
         "height": 341,
-        "shotAt": "2026-10-10T12:14:54.464Z",
-        "text": "GitLab not checked Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. A project or personal token with the api scope. Save Check connection"
+        "shotAt": "2026-11-03T16:12:43.489Z",
+        "text": "GitLab not checked Enabled Issues and merge requests directly by token, without glab installed. Installation URL Own GitLab — the installation URL. Empty = ••••••••••••. Repository group/project or a numeric id. Empty — derived from the checked project origin. Token No key yet. It goes into the encrypted store and never returns to this screen. A project or personal token with the api scope. Save Check connection",
+        "seal": {
+          "png": "4a40621f112b895b",
+          "text": "e6451d11fd8b3b4e"
+        }
+      },
+      "seal": {
+        "png": "6422c5de9a8f8765",
+        "text": "68049e177fc15f3b"
       }
     },
     {
@@ -213,31 +309,47 @@
       "masked": 4,
       "width": 1116,
       "height": 423,
-      "shotAt": "2026-10-10T12:11:17.688Z",
+      "shotAt": "2026-11-03T15:43:49.212Z",
       "text": "Найдено среди MCP-серверов Закрыть Панель прочитала ~/.claude.json, .mcp.json проектов и файл секретов MCP. Ключ остаётся на этой машине: здесь только маска, а перенос перечитает его из того же места. GitLab сервер «gitlab-qa» · ~/.claude.json · npx @zereight/mcp-gitlab Адрес установки: http://127.0.0.1:5297 ключ glp…60f4 Telegram сервер «telegram-inbox» · ~/.claude.json · npx mcp-telegram ключ 812…:bot не хватает: Чат Перенести выбранные (1)",
       "en": {
         "file": "07-discover.en.png",
         "masked": 4,
         "width": 1116,
         "height": 423,
-        "shotAt": "2026-10-10T12:12:22.455Z",
-        "text": "Found among MCP servers Close The panel read ~/.claude.json, the projects’ .mcp.json and the MCP secrets file. The key stays on this machine: only its mask is shown here, and the transfer re-reads it from the same place. GitLab server \"gitlab-qa\" · ~/.claude.json · npx @zereight/mcp-gitlab Installation URL: http://127.0.0.1:5297 key glp…60f4 Telegram server \"telegram-inbox\" · ~/.claude.json · npx mcp-telegram key 812…:bot missing: Chat Transfer selected (1)"
+        "shotAt": "2026-11-03T15:57:42.754Z",
+        "text": "Found among MCP servers Close The panel read ~/.claude.json, the projects’ .mcp.json and the MCP secrets file. The key stays on this machine: only its mask is shown here, and the transfer re-reads it from the same place. GitLab server \"gitlab-qa\" · ~/.claude.json · npx @zereight/mcp-gitlab Installation URL: http://127.0.0.1:5297 key glp…60f4 Telegram server \"telegram-inbox\" · ~/.claude.json · npx mcp-telegram key 812…:bot missing: Chat Transfer selected (1)",
+        "seal": {
+          "png": "4d1f60da533b8c5a",
+          "text": "7ee33182053f23bc"
+        }
       },
       "dark": {
         "file": "07-discover.dark.png",
         "masked": 4,
         "width": 1116,
         "height": 423,
-        "shotAt": "2026-10-10T12:13:43.537Z",
-        "text": "Найдено среди MCP-серверов Закрыть Панель прочитала ~/.claude.json, .mcp.json проектов и файл секретов MCP. Ключ остаётся на этой машине: здесь только маска, а перенос перечитает его из того же места. GitLab сервер «gitlab-qa» · ~/.claude.json · npx @zereight/mcp-gitlab Адрес установки: http://127.0.0.1:5297 ключ glp…60f4 Telegram сервер «telegram-inbox» · ~/.claude.json · npx mcp-telegram ключ 812…:bot не хватает: Чат Перенести выбранные (1)"
+        "shotAt": "2026-11-03T16:07:16.990Z",
+        "text": "Найдено среди MCP-серверов Закрыть Панель прочитала ~/.claude.json, .mcp.json проектов и файл секретов MCP. Ключ остаётся на этой машине: здесь только маска, а перенос перечитает его из того же места. GitLab сервер «gitlab-qa» · ~/.claude.json · npx @zereight/mcp-gitlab Адрес установки: http://127.0.0.1:5297 ключ glp…60f4 Telegram сервер «telegram-inbox» · ~/.claude.json · npx mcp-telegram ключ 812…:bot не хватает: Чат Перенести выбранные (1)",
+        "seal": {
+          "png": "64d3078d01dfee11",
+          "text": "2780aba4d376fd3f"
+        }
       },
       "darkEn": {
         "file": "07-discover.dark.en.png",
         "masked": 4,
         "width": 1116,
         "height": 423,
-        "shotAt": "2026-10-10T12:15:02.047Z",
-        "text": "Found among MCP servers Close The panel read ~/.claude.json, the projects’ .mcp.json and the MCP secrets file. The key stays on this machine: only its mask is shown here, and the transfer re-reads it from the same place. GitLab server \"gitlab-qa\" · ~/.claude.json · npx @zereight/mcp-gitlab Installation URL: http://127.0.0.1:5297 key glp…60f4 Telegram server \"telegram-inbox\" · ~/.claude.json · npx mcp-telegram key 812…:bot missing: Chat Transfer selected (1)"
+        "shotAt": "2026-11-03T16:12:51.257Z",
+        "text": "Found among MCP servers Close The panel read ~/.claude.json, the projects’ .mcp.json and the MCP secrets file. The key stays on this machine: only its mask is shown here, and the transfer re-reads it from the same place. GitLab server \"gitlab-qa\" · ~/.claude.json · npx @zereight/mcp-gitlab Installation URL: http://127.0.0.1:5297 key glp…60f4 Telegram server \"telegram-inbox\" · ~/.claude.json · npx mcp-telegram key 812…:bot missing: Chat Transfer selected (1)",
+        "seal": {
+          "png": "5f99b86066cb54a2",
+          "text": "7ee33182053f23bc"
+        }
+      },
+      "seal": {
+        "png": "89ec9fea78d8a537",
+        "text": "2780aba4d376fd3f"
       }
     }
   ]

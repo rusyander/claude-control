@@ -82,7 +82,6 @@ function info(over: {
     hardware: { gpus: [RTX_4090], ramGb: 95, platform: 'win32', arch: 'x64', detectedBy: '' },
     catalog: { version: 1, checkedAt: '2026-10', models: over.models ?? [QWEN_27, QWEN_4] },
     installed: over.installed ?? [],
-    importable: [],
     jobs: over.jobs ?? [],
     choices: over.choices ?? {},
     connect: { model: over.connectModel ?? '' },

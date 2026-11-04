@@ -29,6 +29,8 @@ import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const SERVER = 'apps/server/src';
+/** Шлюз контуров и его отказы — у ядра (этап 10, C3d: шлюз панели снят). */
+const CORE = 'apps/core/src';
 const WEB = 'apps/web/src';
 /**
  * Таблица живёт в документе для человека: план партии, где она стояла раньше,
@@ -63,7 +65,7 @@ const SCENARIOS = [
       ],
       [`${SERVER}/domains/platform/probe/probe.test.ts`, 'но про админку не выдумываем'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '404 на чате называет ОБА чтения',
       ],
     ],
@@ -102,7 +104,7 @@ const SCENARIOS = [
     expects: 'русской причиной',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'контур не отвечает ⇒ 502 с русской причиной',
       ],
     ],
@@ -130,7 +132,7 @@ const SCENARIOS = [
       'клиенту приходит плоское «invalid API key». Панель называет все пять.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
       // Текст отказа переехал в драйвер (Т1), а оттуда — в таблицу текстов по кодам
@@ -146,7 +148,7 @@ const SCENARIOS = [
     expects: 'все ПЯТЬ причин',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '401 называет ВСЕ ПЯТЬ причин',
       ],
       // Якорь в САМОМ ТЕКСТЕ отказа, а не в комментарии рядом с ним: комментарий
@@ -166,14 +168,14 @@ const SCENARIOS = [
       '(budgetRefusals), а молчащий контур оставляет поля пустыми.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '402 платформы компании назван бюджетом КЛЮЧА',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/contour-book/contour-book.test.ts`,
         'новый отказ заменяет прежний целиком',
       ],
-      [`${SERVER}/domains/platform/spend/spend.test.ts`, 'чей это лимит доезжает до экрана'],
+      ['packages/pricing/src/contour-spend.test.ts', 'чей это лимит доезжает до экрана'],
     ],
   },
   {
@@ -182,7 +184,7 @@ const SCENARIOS = [
     expects: '403 с именем модели',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '403 называет МОДЕЛЬ и место',
       ],
       [`${SERVER}/domains/platform/probe/probe.test.ts`, '403 — ключу не разрешено'],
@@ -194,12 +196,12 @@ const SCENARIOS = [
     expects: 'когда повторить',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
+        `${SERVER}/domains/platform/upstream/upstream.test.ts`,
         'повторяем только временное и только на стороне контура',
       ],
-      [`${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`, 'третьей попытки нет'],
+      [`${SERVER}/domains/platform/upstream/upstream.test.ts`, 'третьей попытки нет'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '429 говорит, ЧЕРЕЗ СКОЛЬКО повторить',
       ],
     ],
@@ -210,10 +212,10 @@ const SCENARIOS = [
     expects: 'перечень нарушений без текста',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
-        '451 в потоке приходит клиенту терминальной ошибкой',
+        `${CORE}/hop-host/spend.integration.test.ts`,
+        '451 контура → отказ запроса с названием проверки, текст запроса не наружу',
       ],
-      [`${SERVER}/domains/platform/gateway/status/status.test.ts`, 'похожая на секрет'],
+      [`${SERVER}/domains/platform/status/status.test.ts`, 'похожая на секрет'],
     ],
   },
   {
@@ -222,12 +224,12 @@ const SCENARIOS = [
     expects: 'stream_interrupted',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
+        `${CORE}/hop-host/gateway/frames/frames.test.ts`,
         'после обрыва в поток клиента больше ничего не пишется',
       ],
       // Вторая половина обещания: клиенту уходит ТЕРМИНАЛЬНАЯ ошибка, а не тишина.
       [
-        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
+        `${CORE}/hop-host/gateway/frames/frames.test.ts`,
         'openai получает терминальную ошибку и [DONE]',
       ],
       [
@@ -243,7 +245,7 @@ const SCENARIOS = [
     closedBy: [
       [`${SERVER}/domains/platform/probe/probe.test.ts`, '503 — контур ещё поднимается'],
       [
-        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
+        `${SERVER}/domains/platform/upstream/upstream.test.ts`,
         '503 переживается одной повторной попыткой',
       ],
     ],
@@ -254,7 +256,7 @@ const SCENARIOS = [
     expects: 'пометка в списке',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         '404 на чате называет ОБА чтения',
       ],
       [
@@ -274,7 +276,7 @@ const SCENARIOS = [
     closedBy: [
       [`${SERVER}/domains/platform/probe/probe.test.ts`, 'не JSON при 200'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'и не поток, и не ответ модели',
       ],
     ],
@@ -285,11 +287,11 @@ const SCENARIOS = [
     expects: 'шлюз ходит потоком',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'наверх всё равно уходит поток',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'anthropic без потока получает цельное сообщение',
       ],
     ],
@@ -299,13 +301,10 @@ const SCENARIOS = [
     title: 'Поток оборвался на середине сети — учёт не удваивается',
     expects: 'учёт не удваивается',
     closedBy: [
+      [`${CORE}/hop-host/user-gateway.negatives.integration.test.ts`, 'обрыв не удваивает учёт'],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
-        'обрыв не удваивает учёт',
-      ],
-      [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
-        'клиент видит ошибку, панель — событие и расход',
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
+        'клиент видит ошибку, повтора нет',
       ],
     ],
   },
@@ -318,41 +317,38 @@ const SCENARIOS = [
       'запрос мог дойти и исполниться, и второй такой же — второй списанный расход у контура.',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
+        `${SERVER}/domains/platform/upstream/upstream.test.ts`,
         '503 переживается одной повторной попыткой',
       ],
       [
-        `${SERVER}/domains/platform/gateway/upstream/upstream.test.ts`,
+        `${SERVER}/domains/platform/upstream/upstream.test.ts`,
         'обрыв связи не повторяется: запрос мог дойти',
       ],
     ],
   },
   {
     id: '18',
-    title: 'Панель выключена, CLI направлен на шлюз',
+    title: 'Ядро выключено, CLI направлен на шлюз',
     expects: 'отказ соединения',
     closedBy: [
       [`${WEB}/shared/config/i18n/ru.ts`, 'он получит отказ соединения, а не тихо уйдёт в облако'],
       // Поведение, а не подпись: остановленный шлюз ОТПУСКАЕТ порт, и именно
       // поэтому направленный на него CLI получает отказ соединения.
-      [
-        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
-        'остановленный шлюз не держит порт',
-      ],
+      [`${CORE}/hop-host/user-gateway.integration.test.ts`, 'закрытие отпускает порт'],
     ],
   },
   {
     id: '19',
     title: 'Порт шлюза занят другим процессом',
-    expects: 'соседний порт',
+    expects: 'расхождение №4',
+    note:
+      'Соседний порт не берётся: шлюз держит ядро, и адрес в конфигах CLI должен остаться прежним. ' +
+      'Занят — ядро ждёт, пока порт отпустят, и забирает его за секунды; карточка шлюза говорит, что он ждёт.',
     closedBy: [
+      [`${CORE}/hop-host/user-gateway.integration.test.ts`, 'порт занят прежним шлюзом — ждёт'],
       [
-        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
-        'занятый порт уступается соседнему',
-      ],
-      [
-        `${SERVER}/domains/platform/gateway/listener/listener.test.ts`,
-        'доставшийся порт публикуется',
+        `${CORE}/bootstrap/boot.user-gateway.integration.test.ts`,
+        'прежний шлюз держит порт — отвечает он; отпустил — ядро берёт порт',
       ],
     ],
   },
@@ -402,13 +398,10 @@ const SCENARIOS = [
     expects: 'журнал диагностики',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
+        `${CORE}/hop-host/gateway/frames/frames.test.ts`,
         'незнакомый кадр попадает в след ИМЕНАМИ ПОЛЕЙ',
       ],
-      [
-        `${SERVER}/domains/platform/gateway/frames/frames.test.ts`,
-        'нечитаемый кадр наружу не идёт',
-      ],
+      [`${CORE}/hop-host/gateway/frames/frames.test.ts`, 'нечитаемый кадр наружу не идёт'],
     ],
   },
   {
@@ -417,13 +410,13 @@ const SCENARIOS = [
     expects: 'поток без потолка',
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'тело больше 32 МБ отклоняется, не читаясь',
       ],
       // Вторая половина строки, и до ревью Т10 её не было вовсе: потолок
       // ЗАПРОСА закрывал строку про ответ.
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'собранный ответ больше потолка',
       ],
     ],
@@ -437,7 +430,7 @@ const SCENARIOS = [
         `${SERVER}/domains/platform/ca-fetch/ca-fetch.test.ts`,
         'ключ контура не подписывается временем',
       ],
-      [`${SERVER}/domains/platform/spend/spend.test.ts`, 'день местный, а не UTC'],
+      ['packages/pricing/src/contour-spend.test.ts', 'день местный, а не UTC'],
     ],
   },
   {
@@ -448,14 +441,17 @@ const SCENARIOS = [
     // «Failed to authenticate.». Все три места отказа — мост, родная ручка, прокси.
     closedBy: [
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.integration.test.ts`,
-        'правило «отклонить» останавливает запрос, и наружу он не уходит',
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
+        'останавливает запрос, и наружу он не уходит',
       ],
       [
-        `${SERVER}/domains/platform/gateway/pipeline/pipeline.native.integration.test.ts`,
+        `${CORE}/hop-host/user-gateway.negatives.integration.test.ts`,
         'правило «отклонить» на родной ручке — 400 invalid_request_error',
       ],
-      [`${SERVER}/domains/dlp/DlpProxy.test.ts`, 'отклоняет запрос правилом block'],
+      [
+        'apps/core/src/bootstrap/boot.dlp-proxy.integration.test.ts',
+        'правило «блок» — отказ в форме API без похода к модели',
+      ],
     ],
   },
 ];

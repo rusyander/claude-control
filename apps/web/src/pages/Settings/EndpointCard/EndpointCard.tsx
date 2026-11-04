@@ -17,9 +17,12 @@ import {
   useProbeEndpoint,
   useApplyEndpoint,
   newEndpointProfile,
-  replaceProfile,
+  mergeProfileEdit,
+  shownProfile,
+  sameProfile,
   removeProfile,
   isProfileComplete,
+  endpointProfileName,
 } from '@entities/Endpoint';
 import { usePlatforms } from '@entities/Platform';
 import { EndpointProfileForm } from '../EndpointProfileForm/EndpointProfileForm';
@@ -47,6 +50,9 @@ export function EndpointCard() {
   const [selectedId, setSelectedId] = useState('');
   const [probes, setProbes] = useState<Record<string, EndpointProbeResult>>({});
   const [applyingTo, setApplyingTo] = useState('');
+  // Набранное в форме профиля — до того, как кеш настроек оповестит отрисовку
+  // (см. `shownProfile`): иначе быстрый набор теряет буквы.
+  const [typed, setTyped] = useState<EndpointProfile | null>(null);
   // `/settings?tab=models&id=<профиль>` — так агент панели ведёт к полю токена
   // только что сохранённого профиля: выбираем его, как только профиль в списке.
   const { id: urlProfileId } = useSearch({ strict: false }) as { id?: string };
@@ -62,13 +68,33 @@ export function EndpointCard() {
   const apply = useApplyEndpoint();
   const platforms = usePlatforms();
 
+  const fromSettings =
+    settings?.endpointProfiles.find((item) => item.id === selectedId) ??
+    settings?.endpointProfiles[0];
+  useEffect(() => {
+    // Настройки догнали набранное — или показан уже другой профиль.
+    if (
+      typed &&
+      (!fromSettings || typed.id !== fromSettings.id || sameProfile(typed, fromSettings))
+    )
+      setTyped(null);
+  }, [typed, fromSettings]);
+
   if (!settings) return null;
 
   const profiles = settings.endpointProfiles;
-  const active = profiles.find((item) => item.id === selectedId) ?? profiles[0];
+  const active = fromSettings;
+  const shown = shownProfile(active, typed);
 
-  const saveProfiles = (next: EndpointProfile[]): void => {
-    updateSettings.mutate({ endpointProfiles: next });
+  // Список собирается от настроек в кеше на момент правки, а не от снимка этой
+  // отрисовки: сервер заменяет `endpointProfiles` целиком, и две быстрые правки
+  // (имя, затем адрес) из одного снимка затирали друг друга.
+  const saveProfiles = (edit: (current: EndpointProfile[]) => EndpointProfile[]): void => {
+    updateSettings.mutate(
+      (current) => ({ endpointProfiles: edit(current?.endpointProfiles ?? profiles) }),
+      // Отказ: настройки перечитаны с сервера, набранное поверх них не держим.
+      { onError: () => setTyped(null) },
+    );
   };
 
   const addProfile = (): void => {
@@ -77,7 +103,7 @@ export function EndpointCard() {
     // по http на 127.0.0.1.
     const id = `ep-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
     const profile = newEndpointProfile(id, t('endpoints.newName', { n: profiles.length + 1 }));
-    saveProfiles([...profiles, profile]);
+    saveProfiles((current) => [...current, profile]);
     setSelectedId(id);
   };
 
@@ -151,7 +177,10 @@ export function EndpointCard() {
                 label={t('endpoints.profile')}
                 value={active.id}
                 onChange={setSelectedId}
-                options={profiles.map((item) => ({ value: item.id, label: item.name }))}
+                options={profiles.map((item) => ({
+                  value: item.id,
+                  label: endpointProfileName(item),
+                }))}
               />
             )}
 
@@ -165,10 +194,14 @@ export function EndpointCard() {
             )}
 
             <EndpointProfileForm
-              profile={active}
+              profile={shown ?? active}
               tokenMask={data?.tokenMasks[active.id] ?? ''}
               probe={activeProbe}
-              onChange={(next) => saveProfiles(replaceProfile(profiles, next))}
+              onChange={(next) => {
+                const base = shown ?? active;
+                setTyped(next);
+                saveProfiles((current) => mergeProfileEdit(current, base, next));
+              }}
             />
 
             <Stack direction="row" align="center" gap="var(--spacing-xs)" wrap>
@@ -193,7 +226,7 @@ export function EndpointCard() {
                   size="sm"
                   leftIcon={<Icon name="trash" size={16} />}
                   onClick={() => {
-                    saveProfiles(removeProfile(profiles, active.id));
+                    saveProfiles((current) => removeProfile(current, active.id));
                     setSelectedId('');
                   }}
                 >
@@ -224,7 +257,7 @@ export function EndpointCard() {
               onChange={(assistantEndpointId) => updateSettings.mutate({ assistantEndpointId })}
               options={[
                 { value: '', label: t('endpoints.assistantOff') },
-                ...profiles.map((item) => ({ value: item.id, label: item.name })),
+                ...profiles.map((item) => ({ value: item.id, label: endpointProfileName(item) })),
               ]}
               hint={t('endpoints.assistantHint')}
             />

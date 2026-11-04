@@ -7,14 +7,9 @@ import {
   readChats,
   readChatMessages,
   findTranscript,
-  findSessionCwd,
-  findSessionStart,
 } from '../../../domains/chat/ChatHistory/ChatHistory.ts';
-import { summarizedMessageIds } from '../../../domains/platform/gateway/summarized-ledger/summarized-ledger.ts';
 import { genTimesById } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
 import { readChatProgressWithTree } from '../../../domains/chat/subagent-tree/subagent-tree.ts';
-import { readStepsFile } from '../../../domains/chat/steps-file/steps-file.ts';
-import { heavyQueueDir, heavyQueueWait } from '../../../domains/group-progress/heavy-wait.ts';
 import { searchChats } from '../../../domains/chat/ChatSearch/ChatSearch.ts';
 import { listProjects } from '../../../domains/chat/ChatProjects/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../../domains/chat/ChatExport/ChatExport.ts';
@@ -47,12 +42,10 @@ export function registerChatTranscriptRoutes(
   /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке. */
   awaitsYou: (chatId: string) => boolean = () => false,
   /**
-   * Модель, назначенная разговору панелью вне дерева: лёгкий чат вопросов о
-   * ходе групп (5.1). Без неё следующий вопрос в нём ушёл бы на модели из настроек.
+   * Id сообщений, перед которыми контур сжал историю (`context-managed`), — журнал сжатий звена
+   * ядра (C3b). Читатель не бросает: ядро молчит — пусто, лента без подписи, но не встаёт.
    */
-  assignedOf: (chatId: string) => { model: string; effort: string } | undefined = () => undefined,
-  /** Есть ли живой процесс, которому послать `stop_task`, — «Остановить» у субагентов. */
-  canStopAgents: (chatId: string) => boolean = () => false,
+  summarizedIds: () => Promise<Set<string>> = () => Promise.resolve(new Set()),
 ): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
@@ -229,11 +222,7 @@ export function registerChatTranscriptRoutes(
             const title = titles.get(origin);
             return { ...chat, forkOf: { id: origin, ...(title ? { title } : {}) } };
           });
-    const withAssigned = withForks.map((chat) => {
-      const assigned = chat.assignedModel ? undefined : assignedOf(chat.id);
-      return assigned ? { ...chat, assignedModel: assigned.model, effort: assigned.effort } : chat;
-    });
-    return sendConditional(request, reply, withAssigned);
+    return sendConditional(request, reply, withForks);
   });
 
   /**
@@ -291,8 +280,8 @@ export function registerChatTranscriptRoutes(
       const page = await readChatMessages(projectsDir(ctx), request.params.chatId, {
         limit,
         offset,
-        // Подпись «контур сжал историю» — по журналу сжатий шлюза (`context-managed`).
-        summarizedIds: summarizedMessageIds(ctx.location.paths.appData),
+        // Подпись «контур сжал историю» — по журналу сжатий звена ядра (`context-managed`).
+        summarizedIds: await summarizedIds().catch(() => new Set<string>()),
         // Скорость ответа локальной модели — по журналу времени генерации живого потока.
         genTimes: genTimesById(ctx.location.paths.appData),
       });
@@ -332,30 +321,11 @@ export function registerChatTranscriptRoutes(
     // Субагенты — деревом: вложенные, потерянные в середине большого файла, с
     // моделью, вызовами и расходом каждого (по их собственным транскриптам).
     const progress = readChatProgressWithTree(projectsDir(ctx), request.params.chatId);
-    // Файл шагов в рабочей папке разговора (у группы — её копия): «Шаг N из M»
-    // без плана агента (решение владельца 29.09).
-    // Файл, записанный раньше начала разговора, — от прежней задачи в той же
-    // папке, а не его шаг (ревью 30.09).
-    const file = readStepsFile(findSessionCwd(projectsDir(ctx), request.params.chatId));
-    const start = findSessionStart(projectsDir(ctx), request.params.chatId);
-    const steps =
-      file && start && file.updatedAt && Date.parse(file.updatedAt) < Date.parse(start)
-        ? undefined
-        : file;
     // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
     // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
-    // Очередь тяжёлых шагов (3.2): хук ждёт места, а транскрипт показывает
-    // обычный незакрытый вызов. Каталог — тот же, что раздаёт группам панель.
-    const heavyQueue = heavyQueueWait(
-      heavyQueueDir(ctx.location.paths.appData),
-      request.params.chatId,
-    );
     return {
       ...progress,
-      ...(steps ? { steps } : {}),
-      ...(heavyQueue ? { heavyQueue } : {}),
       processAlive: isProcessAlive(request.params.chatId),
-      canStopAgents: canStopAgents(request.params.chatId),
     };
   });
 

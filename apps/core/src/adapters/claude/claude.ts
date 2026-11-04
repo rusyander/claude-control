@@ -13,7 +13,10 @@ import type {
   LocalLimits,
   SessionSpec,
 } from '../adapter.types.ts';
-import { READ_ONLY_DENIED } from '../read-only.ts';
+import { isRemoteMcp } from '../mcp-carry.ts';
+import { claudeMcpSource } from './mcp-source.ts';
+import { claudeEconomy } from './economy.ts';
+import { deniedClassesOf } from '../read-only.ts';
 import { trustedLayer, type LayerPolicy } from '../sdk-stream/layer-run.ts';
 import { claudeInventory, claudeLayerParts, EMPTY_PARTS } from './layer-parts.ts';
 import { claudeLayerSupply } from './layer-supply.ts';
@@ -39,11 +42,14 @@ import {
   type HookTable,
 } from './user-layer.ts';
 import { copyParity } from './copy-parity.ts';
+import { dropsUserKeepsProject, personalMemoryExcludes } from './personal-memory.ts';
 import { claudeReadLayer } from './read-layer.ts';
 import { claudeRepoDeny, claudeRepoRules } from './repo-deny.ts';
 import { repoDenyDetail, repoDenyRefusal } from '../sdk-stream/repo-deny.ts';
 import { claudeTrustMark } from './trust.ts';
-import { claudeTranscriptPresent } from './transcript.ts';
+import { claudeOwnsTranscript, claudeTranscriptPresent } from './transcript.ts';
+import { localLayerRefusal, localLayerSettings } from './local-layer-carry.ts';
+import { pluginCarryRefusal } from './plugin-carry.ts';
 import { readClaudeWindow } from './window.ts';
 
 /**
@@ -57,6 +63,7 @@ const FILES = {
   settings: 'claude/settings.json',
   mcp: 'claude/mcp.json',
   brief: 'claude/brief.md',
+  systemPrompt: 'claude/system-prompt.md',
   observed: 'claude/observed-hooks.json',
   plugin: 'claude/plugin',
 } as const;
@@ -106,8 +113,9 @@ export const CLAUDE_CAPS: AdapterCaps = {
   attribution: true,
   stream: true,
   effort: true,
-  // Без случая в наборе соответствия возможность не объявляется (P121).
-  images: false,
+  // Картинки — блоками `image` в строке пользователя stream-json (вопрос «ask», этап 10 F2):
+  // случай в наборе соответствия + живой ход на маршруте-заглушке (`ask.integration.test.ts`).
+  images: true,
   subagents: false,
   // Проба Q6: `--disable-slash-commands` снимает инструмент `Skill`, навыки и команды.
   skillControl: true,
@@ -230,7 +238,8 @@ export function planClaude(
   layer: LayerRun,
 ): SdkLaunchPlan {
   const path = (name: string): string => join(spec.dir, name);
-  const extraTools = spec.tools === 'read-only' ? READ_ONLY_DENIED : [];
+  const carry = spec.layer.carry;
+  const extraTools = deniedClassesOf(spec.tools);
   const deny = claudeDenyRules(spec.deny, extraTools, spec.cwd);
   const permitTool = spec.permitServer
     ? `mcp__${spec.permitServer.name}__${spec.permitServer.tool}`
@@ -257,7 +266,16 @@ export function planClaude(
   // Привязка адреса старше окружения из настроек человека и репозитория (F-07): `--settings`
   // ядра — источник выше user/project, и в `on` тоже, иначе `env` репозитория уводит сеанс
   // на свой адрес со своим ключом (проба K1).
-  const settingsEnv = { ...(user?.env ?? {}), ...(binding?.env ?? {}) };
+  const economy = claudeEconomy(spec);
+  // Локальный слой проекта (s10 G14 p6) — командные настройки вместо источника `project`.
+  const local = localLayerSettings(carry);
+  // Рычаги экономии — ниже привязки адреса: адрес и ключ шага сильнее любого рычага.
+  const settingsEnv = {
+    ...local.env,
+    ...(user?.env ?? {}),
+    ...(economy.settings.env ?? {}),
+    ...(binding?.env ?? {}),
+  };
   // Недоверенная копия: из файлов репозитория — только `deny`, данными (F-86).
   const repoDeny = layer.repoLayer ? null : claudeRepoDeny(spec);
   // Копия грузит ровно то, что источник (E1): исключения инструкций источника — на корень копии.
@@ -265,13 +283,24 @@ export function planClaude(
     mode === 'on' && spec.trust
       ? copyParity({ sourceRepo: spec.trust.sourceRepo, cwd: spec.cwd, pin: spec.env.pin })
       : null;
+  // Набор «наш» снял `user`, `project` остался: личный `CLAUDE.md` не вернётся правилами
+  // проекта `~` (проект под домом, поиск вверх от cwd) — исключение ровно личных файлов (s10 p9).
+  const personal =
+    mode === 'on' && spec.layer.sources !== 'user' && dropsUserKeepsProject(carry?.settingSources)
+      ? personalMemoryExcludes(spec.env.pin, spec.cwd)
+      : [];
+  const mdExcludes = [...new Set([...(parity?.excludes ?? []), ...personal])];
 
+  const allow = [...(user ? user.allow.filter(keepHumanAllow) : []), ...local.allow];
+  const ask = [...(user?.ask ?? []), ...local.ask];
   const settings = {
     permissions: {
-      ...(user ? { allow: user.allow.filter(keepHumanAllow), ask: user.ask } : {}),
+      ...(user || allow.length > 0 ? { allow: [...new Set(allow)] } : {}),
+      ...(user || ask.length > 0 ? { ask: [...new Set(ask)] } : {}),
       deny: [
         ...new Set([
           ...(user?.deny ?? []),
+          ...local.deny,
           ...(repoDeny ? claudeRepoRules(repoDeny, spec) : []),
           ...deny.rules,
           ...settingsEditDeny(spec),
@@ -280,11 +309,14 @@ export function planClaude(
       defaultMode: 'default',
     },
     ...(Object.keys(settingsEnv).length > 0 ? { env: settingsEnv } : {}),
+    ...(economy.settings.bashOutputMaxChars
+      ? { bashOutputMaxChars: economy.settings.bashOutputMaxChars }
+      : {}),
     // `disableAllHooks: true` человека в `on` снял бы и хук ядра (проба K2): наш `--settings`
     // старше, значение ядра — «хуки включены» (F-08).
     disableAllHooks: false,
-    hooks: mergeHooks(layered.hooks, coreHooks),
-    ...(parity && parity.excludes.length > 0 ? { claudeMdExcludes: parity.excludes } : {}),
+    hooks: mergeHooks(layered.hooks, local.hooks, coreHooks),
+    ...(mdExcludes.length > 0 ? { claudeMdExcludes: mdExcludes } : {}),
   };
   const files: Record<string, string> = {
     [FILES.settings]: JSON.stringify(settings, null, 2),
@@ -292,14 +324,24 @@ export function planClaude(
       mcpServers: Object.fromEntries(
         Object.entries(spec.mcpServers).map(([name, s]) => [
           name,
-          { type: 'stdio', command: s.command, args: s.args, ...(s.env ? { env: s.env } : {}) },
+          // Удалённый (s10 p8) — форма `--mcp-config` Claude Code: `type` http|sse, `url`, `headers`.
+          isRemoteMcp(s)
+            ? { type: s.transport, url: s.url, ...(s.headers ? { headers: s.headers } : {}) }
+            : { type: 'stdio', command: s.command, args: s.args, ...(s.env ? { env: s.env } : {}) },
         ]),
       ),
     }),
-    [FILES.brief]: `${spec.brief}${supply.briefTail}`,
+    // Инструкции локального слоя — после брифа, как прежняя дописка панели (в `on` `CLAUDE.md`
+    // проекта CLI без источника `project` не читает — их место занимает слой).
+    [FILES.brief]: [`${spec.brief}${supply.briefTail}`, carry?.localLayer?.instructions ?? '']
+      .filter((part) => part.trim())
+      .join('\n\n'),
     ...supply.files,
   };
   if (layered.observed.length > 0) files[FILES.observed] = JSON.stringify(layered.observed);
+  // Промпт контура — файлом (многострочный, с примерами JSON: разбор кавычек cmd.exe ломает
+  // такой аргумент молча) и ВМЕСТО промпта CLI; бриф ядра дописывается после него.
+  if (carry?.systemPrompt) files[FILES.systemPrompt] = carry.systemPrompt;
 
   const args = [
     '-p',
@@ -317,15 +359,31 @@ export function planClaude(
     '--strict-mcp-config',
     '--mcp-config',
     path(FILES.mcp),
-    '--append-system-prompt-file',
-    path(FILES.brief),
   ];
+  // Пустой бриф (чат без брифа ядра, `session.brief = 'none'`, и без инструкций человека в
+  // брифе) — без флага: системный промпт CLI остаётся ровно его собственным.
+  if (files[FILES.systemPrompt]) args.push('--system-prompt-file', path(FILES.systemPrompt));
+  if (files[FILES.brief]) args.push('--append-system-prompt-file', path(FILES.brief));
   // `on` — источники CLI как есть; иначе ни один файл человека, его права — нашим `--settings`.
+  // `sources: user` (песочница) — источник человека из CLAUDE_CONFIG_DIR пина, без проекта и предков.
   if (mode !== 'on') args.push('--setting-sources', '');
+  else if (spec.layer.sources === 'user') args.push('--setting-sources', 'user');
+  // Перенос слоя панели (G6): сужение источников (набор «наш» снимает `user`) — только в `on`;
+  // вне его ядро уже держит `''`, у́же некуда (режим шага отказывает `refuseClaude`).
+  else if (carry?.settingSources) args.push('--setting-sources', carry.settingSources.join(','));
   args.push(...supply.args);
   if (supply.copies.length > 0) args.push('--plugin-dir', path(FILES.plugin));
+  for (const dir of carry?.plugins ?? []) args.push('--plugin-dir', dir);
+  if (carry?.localLayer?.plugin) args.push('--plugin-dir', carry.localLayer.plugin);
   if (spec.resume) args.push('--resume', spec.resume.conversationId);
   else if (UUID.test(spec.sessionId)) args.push('--session-id', spec.sessionId);
+  // `none` (вопрос «ask»): встроенных инструментов нет вовсе — только `ToolSearch`, без него CLI
+  // не загрузит отложенные инструменты моста панели; он трогает лишь состояние разговора.
+  if (spec.tools === 'none') args.push('--tools', 'ToolSearch');
+  // Белый список встроенных панели (облегчённый набор): `ToolSearch` добавлен по той же причине.
+  else if (carry?.builtinTools) {
+    args.push('--tools', [...new Set([...carry.builtinTools, 'ToolSearch'])].join(','));
+  }
   if (spec.model) args.push('--model', spec.model);
   if (spec.effort && claudeRunFacts.effort?.values.includes(spec.effort)) {
     args.push('--effort', spec.effort);
@@ -337,7 +395,11 @@ export function planClaude(
   else args.push('--permission-prompts', 'none');
 
   // Сессия ядра не обновляет CLI посреди задачи: версия — та, по справке которой собран argv.
-  const env: Record<string, string> = { DISABLE_AUTOUPDATER: '1', ...supply.env };
+  const env: Record<string, string> = {
+    DISABLE_AUTOUPDATER: '1',
+    ...economy.env,
+    ...supply.env,
+  };
   const details = [
     repoDeny ? repoDenyDetail(repoDeny) : undefined,
     parity?.detail,
@@ -390,6 +452,12 @@ export function refuseClaude(
       return `human settings unreadable, their deny rules would be lost: ${unreadable.join(', ')}`;
     }
   }
+  // Слой проекта — первым (s10 G14 p7): его сеанс всегда сужает источники, и общий отказ набора
+  // «источники едут при слое `on`» назвал бы человеку набор панели, а не локальный слой.
+  const localLayer = localLayerRefusal(spec.layer.carry, layer);
+  if (localLayer) return localLayer;
+  const carried = pluginCarryRefusal(spec.layer.carry, layer);
+  if (carried) return carried;
   // Недоверенная копия несёт запреты репозитория данными: файл не разобран — отказ (F-86).
   if (!layer.repoLayer) return repoDenyRefusal(claudeRepoDeny(spec));
   return null;
@@ -404,10 +472,26 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       command: claudeRunFacts.binary.command,
       ...(ladder ? { ladder } : {}),
       transcriptPresent: claudeTranscriptPresent,
+      ownsTranscript: claudeOwnsTranscript,
+      // `--tools ToolSearch` (справка 2.1.310: «"" to disable all tools»): встроенных нет.
+      toolsNone: true,
+      // `--setting-sources user`: только источник человека из CLAUDE_CONFIG_DIR пина (песочница).
+      userSourcesOnly: true,
+      // Перенос слоя панели (G6): `--setting-sources a,b`, `--plugin-dir` на каждый, `--tools`.
+      // Промпт контура (s10 G13 p7) — `--system-prompt-file`, как у прежнего исполнителя панели.
+      // Локальный слой проекта (s10 G14 p6) — источники без `project`, плагин, `--settings`, бриф.
+      sessionCarry: {
+        settingSources: true,
+        plugins: true,
+        builtinTools: true,
+        systemPrompt: true,
+        localLayer: true,
+      },
       echo: true,
       bindEndpoint: bindClaudeEndpoint,
       layer: CLAUDE_LAYER,
       readLayer: claudeReadLayer,
+      mcpSource: claudeMcpSource,
       refuse: (spec, layer) => refuseClaude(spec, options, layer),
       plan: planClaude,
       mapPermission: mapClaudePermission,

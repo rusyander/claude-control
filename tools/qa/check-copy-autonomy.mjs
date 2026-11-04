@@ -198,7 +198,7 @@ function makeStubCli() {
   return bin;
 }
 
-/** Путь до настоящего CLI — тем же правилом, что и в `check-run-layers.mjs`. */
+/** Путь до настоящего CLI: `CLAUDE_CLI`, иначе `claude` из PATH. */
 function resolveClaude() {
   if (process.env.CLAUDE_CLI) return process.env.CLAUDE_CLI;
   if (process.platform !== 'win32') return 'claude';

@@ -4,6 +4,14 @@
  * (G2) её словарь узнаёт каждый текст. Порождено из шаблонов панели; правка — там и здесь.
  */
 export const HOP_TEXTS = {
+  'gateway-images-not-declared': {
+    ru: 'У контура «{{title}}» ручка картинок манифестом не объявлена',
+    en: 'Contour “{{title}}” has no images endpoint declared in its manifest',
+  },
+  'gateway-images-too-large': {
+    ru: 'Ответ ручки картинок больше 16 МБ — шлюз его не собирает',
+    en: 'The images endpoint answer is over 16 MB — the gateway does not assemble it',
+  },
   'gateway-answer-truncated': {
     ru: 'Ответ контура оборвался: поток закончился без завершающего кадра — ответ неполон',
     en: "The contour's answer broke off: the stream ended without a final frame — the answer is incomplete",
@@ -15,6 +23,34 @@ export const HOP_TEXTS = {
   'gateway-checks-stopped-named': {
     ru: 'Проверки контента контура остановили ответ: {{names}}',
     en: "The contour's content checks stopped the answer: {{names}}",
+  },
+  'gateway-section-closed-chat': {
+    ru: 'Раздел «Чат» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-groups': {
+    ru: 'Раздел «Группы» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Groups section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-tests': {
+    ru: 'Раздел «Агент тестов» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Tests agent section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-assistant': {
+    ru: 'Раздел «Ассистент панели» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Panel assistant section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-terminal': {
+    ru: 'Раздел «Терминал (файлы CLI)» закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The Terminal (CLI files) section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-closed-foreign': {
+    ru: 'Чат {{cli}} закрыт для контура «{{title}}» — запрос не отправлен. Открыть раздел можно на карточке контура',
+    en: 'The {{cli}} chat is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',
+  },
+  'gateway-section-unknown': {
+    ru: 'Адрес шлюза несёт незнакомую отметку раздела — запрос не отправлен. Примените контур заново, чтобы адрес переписался',
+    en: 'The gateway address carries an unknown section mark — the request was not sent. Apply the contour again to rewrite the address',
   },
   'gateway-flaw-args': {
     ru: 'аргументы не разбираются как объект',
@@ -227,6 +263,26 @@ export const HOP_TEXTS = {
   'gateway-redirect-to': {
     ru: 'Контур ответил перенаправлением на {{where}} ({{status}}) — панель за ним не пошла: запрос ушёл бы на другой адрес. Впишите в настройку контура тот адрес, на который он перенаправляет',
     en: 'The contour answered with a redirect to {{where}} ({{status}}) — the panel did not follow it: the request would have gone to another address. Put the address it redirects to into the contour settings',
+  },
+  'gateway-responses-previous-id': {
+    ru: 'previous_response_id шлюз не поддерживает: пришлите весь разговор в input (store: false)',
+    en: 'The gateway does not support previous_response_id: send the whole conversation in input (store: false)',
+  },
+  'gateway-responses-not-request': {
+    ru: 'Тело запроса /v1/responses без model или input — это не запрос Responses',
+    en: 'A /v1/responses body without model or input is not a Responses request',
+  },
+  'gateway-google-not-request': {
+    ru: 'Тело запроса Gemini без contents — это не запрос generateContent',
+    en: 'A Gemini request body without contents is not a generateContent request',
+  },
+  'gateway-google-empty': {
+    ru: 'В запросе Gemini нет ни одного сообщения, на которое можно ответить',
+    en: 'The Gemini request has no message to answer',
+  },
+  'gateway-contour-unknown': {
+    ru: 'Контур «{{id}}» в панели не заведён',
+    en: 'Contour “{{id}}” is not set up in the panel',
   },
   'gateway-route-unknown': {
     ru: 'Шлюз панели принимает только {{routes}} по адресу /<контур>/v1/...',

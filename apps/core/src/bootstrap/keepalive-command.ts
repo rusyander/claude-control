@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import { CORE_BUSY_EXIT_ENV, CORE_HOME_BUSY_EXIT } from '@agentdeck/contracts/core/supervisor';
 import { defaultCoreHome } from '../platform/core-home.ts';
 import {
   installKeepalive,
@@ -65,8 +66,16 @@ export function coreKeepaliveSpec(
     command: process.execPath,
     args: ['--experimental-strip-types', '--no-warnings', ENTRY, HOME_FLAG, args.home],
     cwd: CORE_DIR,
+    // Лишнее ядро при живом первом уходит с кодом 0: иначе systemd и launchd перезапускают его
+    // без конца (Планировщик Windows окружения не несёт, но и не перезапускает).
+    env: { [CORE_BUSY_EXIT_ENV]: '0' },
     enabled: args.enabled,
   };
+}
+
+/** Код выхода ядра из занятого дома: 0 под автозапуском ОС, иначе «дом занят» для надзора панели. */
+export function busyExitCode(env: NodeJS.ProcessEnv): number {
+  return env[CORE_BUSY_EXIT_ENV] === '0' ? 0 : CORE_HOME_BUSY_EXIT;
 }
 
 /** Код выхода: 0 — сделано, 1 — отказ (причина в `err`), 2 — неверные аргументы. */

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { pathStepSchema } from '../group-path.ts';
 import { commandProofSchema } from './commands.ts';
 import { uuidv7 } from './ids.ts';
 import type { CheckRecord, Profile } from './records.ts';
@@ -26,14 +27,25 @@ export const CORE_PANEL_ROUTES = [
   { method: 'GET', path: '/tasks/:id' },
   // Поток событий задачи: прокси не копит тело и передаёт Last-Event-ID (возобновление ленты).
   { method: 'GET', path: '/tasks/:id/events', stream: true },
+  // Вид сеанса чата (этап 10): с `?follow=1` — поток кадров `page`, прокси не копит тело и
+  // передаёт Last-Event-ID (курсор `next`); без него — одна страница JSON.
+  { method: 'GET', path: '/tasks/:id/sessions/:sid/stream', stream: true },
   { method: 'GET', path: '/tasks/:id/report' },
+  // Проба сдачи копии единицы (s10 G16): тот же суд, что шаг публикации; читает `tests-cli delivery`.
+  { method: 'GET', path: '/delivery' },
   { method: 'GET', path: '/routes' },
+  // Серверы MCP человека по CLI (s10 p9): экран выбора; сам выбор пишется через `/config`.
+  { method: 'GET', path: '/mcp-offers' },
   { method: 'GET', path: '/profiles/:repoKey' },
   { method: 'GET', path: '/records/:id' },
   { method: 'GET', path: '/scenarios' },
   { method: 'GET', path: '/scenarios/:ref' },
   { method: 'POST', path: '/scenarios' },
+  // «Путь» старой группы → сценарий (этап 10, F1): только перевод, суд по токену чтения.
+  { method: 'POST', path: '/scenarios/from-path' },
   { method: 'POST', path: '/estimate' },
+  // Ревью MR по ссылке (этап 10, F8): открывает задачу `review-link@1` — строгий суд человека.
+  { method: 'POST', path: '/review-link' },
   { method: 'GET', path: '/config' },
   { method: 'POST', path: '/config' },
   { method: 'GET', path: '/nonce' },
@@ -188,6 +200,46 @@ export interface RoutesReply {
   routes: RouteView[];
 }
 
+/**
+ * `GET /v1/mcp-offers` (этап 10, s10 p9): серверы MCP человека, которые предложил бы каждый CLI
+ * ядра из СВОЕГО конфига (`adapter.mcpSource`), и виды шага, куда их можно выбрать. Выбор
+ * человека живёт в `config.mcpPicks` (`/v1/config`), здесь только предложения. Слой пользователя:
+ * файлы проекта CLI читает дорога при запуске, с доверием к репозиторию, — экран их не видит.
+ * Значения `env` и заголовков не уходят никогда: только имя, область, файл и вид запуска.
+ */
+export interface McpOfferServer {
+  id: string;
+  scope: 'user' | 'project';
+  /** Файл последней записи сервера по порядку CLI. */
+  file: string;
+  /** Запуск: процесс (`stdio`) или адрес (`remote`); не переносится — `null`, причина в `skipped`. */
+  transport: 'stdio' | 'remote' | null;
+  skipped?: string;
+}
+
+export interface McpOfferCli {
+  cli: string;
+  servers: McpOfferServer[];
+  /** Файл есть, но не разобран — назван, а не «серверов нет». */
+  unread: { file: string; reason: string }[];
+}
+
+export interface McpPickKind {
+  kind: string;
+  /** Вид берёт серверы человека: только чтения — нет (инструменты сервера не прочитаны, P73). */
+  takesHuman: boolean;
+  /** Нет выбора для вида — берутся все предложенные (чат панели, s10 p8). */
+  allByDefault: boolean;
+}
+
+export interface McpOffersReply {
+  kinds: McpPickKind[];
+  /** CLI ядра с читателем конфига MCP; у прочих серверы человека не предлагаются вовсе. */
+  clis: McpOfferCli[];
+  /** CLI ядра без читателя: их сеанс получает только серверы ядра. */
+  noReader: string[];
+}
+
 /** `GET /v1/records/:id`: запись проверки, на которой стоит вердикт (ссылка из ленты). */
 export interface RecordReply {
   record: CheckRecord;
@@ -222,6 +274,38 @@ export interface ScenarioSaveReply {
   ref: ScenarioRef;
 }
 
+/**
+ * `POST /v1/scenarios/from-path` (этап 10, F1): «Путь» старой группы панели → сценарий ядра той же
+ * миграцией `fromPath` (P100), что у ядра. Только перевод: ничего не пишет и не запускает — человек
+ * видит шаги и сохраняет их обычным `POST /v1/scenarios` (суд `save-scenario`). Поэтому суд — по
+ * токену чтения, без доказательства человека.
+ */
+export const fromPathBodySchema = z.strictObject({
+  /** id будущего сценария (slug библиотеки). */
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  title: z.string().max(400),
+  flow: z.enum(['conveyor', 'scenario']).optional(),
+  path: z.object({ steps: z.array(pathStepSchema).max(200) }).optional(),
+  /** Старый «Порядок работы» (`group.scenario.steps`) — у группы без «Пути». */
+  legacy: z
+    .object({
+      steps: z.array(z.object({ title: z.string(), body: z.string(), gate: z.string() })).max(200),
+    })
+    .optional(),
+  /** Язык панели: все заголовки шагов — на нём одном. Без него — русский, как у пресетов. */
+  lang: z.enum(['ru', 'en']).optional(),
+});
+
+export type FromPathBody = z.infer<typeof fromPathBodySchema>;
+
+export interface FromPathReply {
+  /** `null` — есть проблемы: сценарий без части пути хуже отказа (P100). */
+  scenario: Scenario | null;
+  problems: string[];
+  /** id шага «Пути» → id шага сценария. */
+  ids: Record<string, string>;
+}
+
 /** `GET /v1/scenarios`: пресеты кода, их последние версии, библиотека человека и её сбои. */
 export interface ScenariosReply {
   presets: readonly Scenario[];
@@ -245,6 +329,13 @@ export interface ScenarioReply {
 export const ADOPT_DEVICES_MAX = 32;
 export const adoptDevicesBodySchema = z.strictObject({
   cmdId: uuidv7,
+  /**
+   * Номер машины панели (`~/.agentdeck/machine-id`, этап 10, Q5): телефон подписывает им, и ядро
+   * принимает его своим номером в подписанном сообщении — иначе ни одна подпись телефона ядру не
+   * годится. Переносится вместе со списком: устройства без номера, под который они подписывают,
+   * бесполезны.
+   */
+  machineId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/),
   devices: z
     .array(
       z.strictObject({
@@ -260,6 +351,8 @@ export type AdoptDevicesBody = z.infer<typeof adoptDevicesBodySchema>;
 
 export interface AdoptDevicesReply {
   cmdId: string;
+  /** Номер машины, которым ядро теперь проверяет подписи устройств. */
+  machineId: string;
   adopted: string[];
   digest: string;
 }

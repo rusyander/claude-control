@@ -1,9 +1,6 @@
 /**
  * Охрана картинок в полях агента от быстрых рук (ревью 28.09: F-92, F-93, F-94).
  *
- * - send  — чат чужого CLI: два Enter подряд, пока картинка кладётся к панели,
- *   отправляют сообщение ОДИН раз и кладут картинку один раз; набранное за время
- *   отправки остаётся в поле, а ушедшее — нет.
  * - count — агент панели: две вставки по пять картинок подряд, не дожидаясь
  *   ужатия, дают восемь чипов, а не десять, и две лишние названы в отказе.
  * - drop  — агент панели занят ответом: файл, брошенный на поле, перехвачен
@@ -13,12 +10,15 @@
  * - unmount — окно агента закрыто посреди ужатия: object URL, созданные после
  *   ухода поля, тоже отозваны (F-341).
  *
- * API агента, чата чужого CLI и склада картинок подменены; любая иная запись
- * (не GET) до сервера не доходит, настройки подменяются только в ответе этой
- * вкладке — конфигурация человека не трогается, CLI не запускается.
+ * Двойной Enter в чате чужого CLI (F-92, режим `send`) снят вместе с полем ввода этого
+ * чата (этап 10, F2c): чат чужого CLI только читает прежние разговоры, ход идёт в `/core/chat`.
+ *
+ * API агента и склада картинок подменены; любая иная запись (не GET) до сервера
+ * не доходит, настройки подменяются только в ответе этой вкладке — конфигурация
+ * человека не трогается, CLI не запускается.
  *
  * Запуск: `node tools/qa/check-image-attach-guards.mjs` при поднятом `pnpm dev`
- * (`APP_URL`, по умолчанию http://localhost:8888). `--only send,count,drop,size,unmount`.
+ * (`APP_URL`, по умолчанию http://localhost:8888). `--only count,drop,size,unmount`.
  * `SHOTS=<каталог>` — кадр отказа по размеру.
  */
 import { chromium } from 'playwright';
@@ -40,8 +40,6 @@ const check = (pass, label, seen = '') => {
 /** Настоящий PNG 1×1: панель его читает и ужимает, как любой снимок. */
 const PNG_B64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const PNG = Buffer.from(PNG_B64, 'base64');
-const at = '2026-09-28T10:00:00.000Z';
 
 /** Поток `/api/events` подменён: кадров сценарию не нужно, а стенд не мешает. */
 const pageStubs = () => {
@@ -140,102 +138,6 @@ const deliver = (field, kind, names) =>
     },
     { b64: PNG_B64, kind, names },
   );
-
-// ── F-92: двойной Enter в чате чужого CLI ────────────────────────────────────
-if (wants('send')) {
-  console.log('\n— чат чужого CLI: отправка с картинкой');
-  const blocked = [];
-  const stored = [];
-  const sent = [];
-  const { page, context } = await openPage('codex', blocked);
-  const chat = {
-    id: 'qa-img',
-    providerId: 'codex',
-    title: 'QA картинки',
-    createdAt: at,
-    updatedAt: at,
-    messageCount: 0,
-    workdir: process.cwd(),
-  };
-  await page.route('**/api/provider-runner', (route) =>
-    route
-      .fulfill({ json: { providerId: 'codex', providerName: 'Codex', mode: 'cli' } })
-      .catch(() => undefined),
-  );
-  await page.route('**/api/provider-chat/chats', (route) =>
-    route.request().method() === 'GET'
-      ? route.fulfill({ json: [chat] }).catch(() => undefined)
-      : route.fallback(),
-  );
-  await page.route(`**/api/provider-chat/chats/${chat.id}`, (route) =>
-    route.request().method() === 'GET'
-      ? route.fulfill({ json: { ...chat, messages: [] } }).catch(() => undefined)
-      : route.fallback(),
-  );
-  await page.route(`**/api/provider-chat/chats/${chat.id}/status`, (route) =>
-    route.fulfill({ json: { chatId: chat.id, isRunning: false } }).catch(() => undefined),
-  );
-  await page.route(`**/api/provider-chat/chats/${chat.id}/stream`, (route) =>
-    route
-      .fulfill({
-        status: 200,
-        headers: { 'content-type': 'text/event-stream' },
-        body: ': ping\n\n',
-      })
-      .catch(() => undefined),
-  );
-  await page.route(`**/api/provider-chat/chats/${chat.id}/send`, (route) => {
-    const body = route.request().postDataJSON();
-    sent.push(body);
-    return route
-      .fulfill({
-        json: { message: { id: `u${sent.length}`, role: 'user', content: body.text, at } },
-      })
-      .catch(() => undefined);
-  });
-  // Склад картинок отвечает медленно — как на большом снимке.
-  await page.route('**/api/media/agent-files', async (route) => {
-    const body = route.request().postDataJSON();
-    stored.push(body.images.length);
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
-    return route
-      .fulfill({
-        json: {
-          files: body.images.map((image, i) => ({ name: image.name, path: `C:/qa/${i}.png` })),
-        },
-      })
-      .catch(() => undefined);
-  });
-
-  await page.goto(`${BASE}/chat`);
-  const input = page.getByRole('textbox', { name: 'Сообщение провайдеру…' });
-  await input.waitFor({ timeout: 30_000 });
-  await page
-    .locator('[data-image-attach-input]')
-    .first()
-    .setInputFiles({ name: 'shot.png', mimeType: 'image/png', buffer: PNG });
-  await page.locator('[data-image-chip]').first().waitFor({ timeout: 10_000 });
-  await input.fill('Посмотри на снимок');
-  await input.press('Enter');
-  await page.waitForTimeout(100);
-  await input.press('Enter');
-  // Пока картинка кладётся, человек пишет следующее.
-  await input.press('End');
-  await input.type(' и ещё');
-  await page.waitForTimeout(2_500);
-  check(stored.length === 1, 'картинка положена к панели один раз', String(stored.length));
-  check(sent.length === 1, 'сообщение ушло один раз', String(sent.length));
-  check(
-    sent[0]?.text === 'Посмотри на снимок' && (sent[0]?.attachments ?? []).length === 1,
-    'ушёл текст до Enter и путь картинки',
-    JSON.stringify(sent[0] ?? {}),
-  );
-  const left = await input.inputValue();
-  check(left === 'и ещё', 'набранное за время отправки осталось в поле, ушедшее — нет', left);
-  check((await page.locator('[data-image-chip]').count()) === 0, 'ушедшая картинка убрана из поля');
-  check(blocked.length === 0, 'иных записей не было', blocked.join(', '));
-  await context.close();
-}
 
 /** Агент панели с подменённым ходом; `hang` — ход не кончается (поле занято). */
 const openAgent = async (blocked, runs, { hang = false } = {}) => {

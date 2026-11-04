@@ -18,7 +18,13 @@ export {
   venvPython,
   type ConfiguredInstall,
 } from './install-plan.ts';
-export { journaledSetup, pinnedBaseOf, unitCopyOf, unitRepoOf } from './journal-view.ts';
+export {
+  journaledSetup,
+  pinnedBaseOf,
+  reviewBaseOf,
+  unitCopyOf,
+  unitRepoOf,
+} from './journal-view.ts';
 export { copyDirFor, worktreeDirName } from './location.ts';
 export { firstErrorLine, logTail, quietLog } from './log.ts';
 export { mirrorLocalLayer } from './mirror.ts';

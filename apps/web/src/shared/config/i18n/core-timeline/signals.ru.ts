@@ -16,6 +16,8 @@ export const signalsRu: SignalTexts = {
   titles: {
     preflight: 'Предпроверка запуска',
     'ask-reminder': 'Напоминание о вопросе человеку',
+    'ask-refused': 'Вопрос не принят — задача закрыта',
+    'mcp-human': 'Серверы MCP человека в сеансе',
     'estimate-refused': 'Оценка отказала — задача не пойдёт',
     'base-pin': 'База репозитория приколота',
     'user-layer-report': 'Слой пользователя на запуске',
@@ -34,6 +36,8 @@ export const signalsRu: SignalTexts = {
     'hook-loop': 'Хук отказывает по кругу',
     'keep-warm': 'Сессия прогрета',
     'session-refused': 'Сессия не открылась',
+    'resume-refused': 'Разговор CLI не продолжен — транскрипт не подтверждён',
+    'chat-in-place': 'Чат идёт в папке проекта, без копии',
     'read-allow-unread': 'Список разрешённого чтения не прочитан',
     'read-scope-refused': 'Запись области чтения не принята',
     'permit-sources-unread': 'Источник грантов не прочитан',

@@ -8,6 +8,7 @@ import { localPaths, updateState } from './paths.ts';
 import { readRecord } from './server.ts';
 import { modelFilePath } from './hf.ts';
 import type { FetchLike } from './download.ts';
+import { fakeCoreHold } from './__fixtures__/fake-core-hold.ts';
 import type { KvCacheType } from '@agentdeck/contracts/local-models';
 
 /**
@@ -85,15 +86,16 @@ function service() {
         return counters(args.join(' '));
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, args: string[]) => {
-      spawned.push(args);
-      up = true;
-      const pid = nextPid++;
-      return { pid, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: () => {
-      up = false;
-    },
+    hold: fakeCoreHold({
+      hold: ({ flags }) => {
+        spawned.push(flags);
+        up = true;
+        return nextPid++;
+      },
+      release: () => {
+        up = false;
+      },
+    }),
   });
 }
 

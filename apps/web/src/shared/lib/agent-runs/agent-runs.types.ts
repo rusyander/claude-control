@@ -1,5 +1,5 @@
 import type { MessageUsage, PermissionGuardReason } from '@agentdeck/contracts';
-import type { HandoffRefusal, SplitGroupStatusView } from '@agentdeck/contracts/chat-handoff';
+import type { CorePermitAsk, HandoffRefusal } from '@agentdeck/contracts/chat-handoff';
 import type {
   ServerMessageCode,
   ServerMessageNestedParams,
@@ -24,37 +24,20 @@ export interface PendingPermission {
   toolUseId: string;
   /** Защита бэкенда проекта узнала команду — карточка называет причину. */
   guard?: PermissionGuardReason;
-  /**
-   * Карточка, не дождавшаяся ответа, отложена как D-n: агент работает дальше,
-   * а кнопки карточки решают уже запись списка «Ждёт решения».
-   */
-  deferredId?: string;
-}
-
-/** Группа разделения, которой отдана работа разговора (Д15). */
-export interface BranchGateChild {
-  /** Номер с единицы — им агент адресует группу в `agentdeck:tell N`. */
-  number: number;
-  title: string;
-  branch: string;
-  status: SplitGroupStatusView;
-  chatId?: string;
+  /** Вопрос права задачи ядра: кнопки шлют команду ядру сами (с числом страницы). */
+  core?: CorePermitCard;
 }
 
 /**
- * Первая правка в основной рабочей копии — придержана до ответа человека. Это
- * тот же запрос прав (`toolUseId` общий), но спрашивают здесь не «можно ли», а
- * «где»: завести копию с веткой, писать на месте или не писать вовсе.
+ * Вопрос права задачи ядра (этап 10): ответ `answer` у ядра — только с доказательством страницы
+ * браузера, поэтому «Разрешить»/«Запретить» шлёт ядру окно, а не сервер панели.
  */
-export interface PendingBranchGate extends PendingPermission {
-  /** Каталог, в котором идёт прогон, — основная копия репозитория. */
-  cwd: string;
-  /** Имя ветки, предложенное панелью; человек правит его прямо в карточке. */
-  branch: string;
-  /** Работа разговора отдана группам разделения — карточка говорит, кому (Д15). */
-  children?: BranchGateChild[];
-  /** Копия встанет на ветку MR детей, а не на HEAD основной копии (Д15). */
-  base?: string;
+export type CorePermitCard = CorePermitAsk;
+
+/** Задача ядра, которая ведёт ход чата: ей автоподтверждение выдаёт грант правки. */
+export interface CoreTaskRef {
+  taskId: string;
+  project: string;
 }
 
 /**
@@ -161,14 +144,8 @@ export interface AgentRun {
   askedQuestion: boolean;
   /** Запросы на права, ждущие ответа человека (интерактивный permission-prompt). */
   permissions: PendingPermission[];
-  /**
-   * Карточки этого разговора, отложенные как D-n: агента они не держат (статус
-   * не «ждёт вас»), но ответить на них можно прямо в ленте. Живут до старта
-   * следующего хода; дальше их держит список «Ждёт решения».
-   */
-  deferredPermissions?: PendingPermission[];
-  /** Ворота ветки: первая правка в основной копии ждёт решения человека. */
-  branchGates: PendingBranchGate[];
+  /** Задача ядра, которая ведёт ход (чат `/chat` через ядро): грант автоподтверждения — ей. */
+  coreTask?: CoreTaskRef;
   /** Дописанное, пока агент занят: уйдёт по очереди, как только он освободится. */
   queued: QueuedMessage[];
   /**
@@ -381,6 +358,8 @@ export type ChatEvent =
       params?: ServerMessageNestedParams;
       /** Контекст переполнен — и тогда, когда главный код другой. */
       overflow?: boolean;
+      /** Текст — сама панель по коду (отказ ядра, потерянный процесс): показывается перевод кода. */
+      panel?: boolean;
     }
   | {
       kind: 'permission';
@@ -388,35 +367,20 @@ export type ChatEvent =
       input: unknown;
       toolUseId: string;
       guard?: PermissionGuardReason;
+      core?: CorePermitCard;
     }
+  /** Задача ядра этого хода и ключ её репозитория — для гранта автоподтверждения. */
+  | { kind: 'coreTask'; taskId: string; project: string }
   | {
       kind: 'permissionResolved';
       toolUseId: string;
       behavior: 'allow' | 'deny';
-      /** Карточка не дождалась ответа и стала записью D-n (`deferAfterMinutes`). */
-      deferredId?: string;
     }
   /** Вопрос закрыт автономией чата — выбор ложится на свой вызов по id. */
   | {
       kind: 'autoPick';
       toolUseId: string;
       picks: { question: string; label: string; critical?: boolean }[];
-    }
-  /**
-   * Критичное от ребёнка — в ленту главного чата. Сама карточка читает список
-   * заметок сервера (его освежает рассылка `chat-escalations`); здесь событие
-   * только объявлено, чтобы поток его не спотыкался.
-   */
-  | { kind: 'escalation'; notice: { childChatId: string; text: string } }
-  | {
-      kind: 'branchGate';
-      toolName: string;
-      input: unknown;
-      toolUseId: string;
-      cwd: string;
-      branch: string;
-      children?: BranchGateChild[];
-      base?: string;
     }
   /**
    * Заметка панели про прогон: подхвачен после перезапуска сервера без потока
@@ -445,8 +409,6 @@ export type ChatEvent =
        * 'defaultDrift' — основная ветка ушла вперёд и задела файлы идущей группы (находка 61);
        * 'deliveryUnchecked' — часть готовности группы (описание MR) панель не проверила.
        * 'pathStep' / 'pathGateFailed' — шаг «Пути» группы пошёл в этом чате / не прошёл проверку.
-       * 'autonomyDeferred' — галочку автономии переключили, а процесс держит фоновые
-       *   команды: перезапуск с новой меткой ждёт их конца (F-31).
        * 'stopUnconfirmed' — «Остановить» не сняло процесс: номер не проверить без
        *   снимка процессов, а чужое панель не трогает; прогон остаётся идущим (F-145).
        * 'conversationLost' — файла сессии группы нет на диске, ход пошёл новым разговором (Q2).
@@ -484,7 +446,6 @@ export type ChatEvent =
         | 'deliveryUnchecked'
         | 'pathStep'
         | 'pathGateFailed'
-        | 'autonomyDeferred'
         | 'stopUnconfirmed'
         | 'conversationLost'
         | 'autoContinue'

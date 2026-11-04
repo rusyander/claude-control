@@ -11,36 +11,16 @@
 // ~130k context each; edits at other spots or in other files are independent and go as parallel Edit
 // calls in one message.
 // Throttled: at most once per 20 tool calls; silent in subagents (their context is small).
-//
-// Split group (AGENTDECK_SPLIT_CHILD=1): 595 of 1197 main messages carried ONE
-// read-only call, 389 right after another (~46M cache_read at ~119k context); the PostToolUse line fired
-// ~16 times — the post-any matcher skips Read/Grep/Glob, a Read turn broke the Bash-only run, and
-// EVERY=20 throttled the rest. There the read run is judged at PreToolUse (`batchPre`; that matcher
-// covers every read tool): Read/Grep/Glob count as reads, one line per EVERY_SPLIT calls, and after
-// IGNORED_MAX lines with no batched turn between, an INDEPENDENT lone read is refused once (its key
-// argument is absent from the previous result; the identical call repeated goes through). Judged on
-// COMPLETED turns only: the CLI streams tool calls, so call 1 of a parallel message runs its PreToolUse
-// before call 2 is written (a measured group transcript) — the in-flight turn never decides.
-// A human session keeps the post path exactly as it was.
+// The split-group PreToolUse refusal of lone reads is gone: the core observer reads waste in a task step.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sessionKey, stateDir } from './kit-paths.mjs';
-import {
-  deny,
-  inSubagent,
-  readTail,
-  resultFor,
-  toolEvents,
-  wasJustRefused,
-} from './transcript.mjs';
+import { inSubagent, readTail } from './transcript.mjs';
 import { runnable } from './rule-injector.mjs';
 
 const RUN = 3;
 const EVERY = 20;
-const EVERY_SPLIT = 6;
-const IGNORED_MAX = 2;
 const SHORT = 200;
-const splitChild = () => process.env.AGENTDECK_SPLIT_CHILD === '1';
 const stateFile = (input) => {
   const session = sessionKey(input);
   const dir = session ? stateDir('batch-nudge') : null;
@@ -120,8 +100,6 @@ export default function batchNudge(input) {
   const shell = tool === 'Bash' || tool === 'PowerShell';
   if (!shell && !EDIT_TOOLS.has(tool)) return null;
   if (inSubagent(input)) return null;
-  // A split child judges reads at PreToolUse (`batchPre`): one line per run, not two.
-  if (shell && splitChild()) return null;
   const records = readTail(input.transcript_path, 1024 * 1024, 200);
   if (!(shell ? readRun(records) : editRun(records))) return null;
   const file = stateFile(input);
@@ -146,128 +124,4 @@ export default function batchNudge(input) {
     'reads go in ONE call (`a; b; c`) or as parallel calls in one message. A read that depends on the ' +
     'previous answer stays separate.'
   );
-}
-
-// ── split child: the read run at PreToolUse ──
-
-const READ_TOOLS = new Set(['Read', 'Grep', 'Glob']);
-
-/** One turn, one read: a short read-only shell command, or (split child) a Read/Grep/Glob. */
-export function loneRead(turn) {
-  if (turn.length !== 1) return false;
-  return READ_TOOLS.has(turn[0].name) || singleShortRead(turn);
-}
-
-/** The turns that finished: every use has its result. The in-flight turn (this call's) never decides. */
-export function finishedTurns(records) {
-  const events = toolEvents(records);
-  const done = new Set(events.filter((e) => e.kind === 'result').map((e) => e.id));
-  const all = turns(records);
-  let end = all.length;
-  while (end > 0 && !all[end - 1].every((u) => done.has(u.id))) end--;
-  return all.slice(0, end);
-}
-
-/** What the call reads: path tails, patterns, path-like command words — matched against the last result. */
-export function readKeys(tool, ti = {}) {
-  const tail = (p) =>
-    String(p ?? '')
-      .replace(/\\/g, '/')
-      .split('/')
-      .filter(Boolean)
-      .pop() ?? '';
-  if (tool === 'Read') return [tail(ti.file_path)];
-  if (tool === 'Grep') return [String(ti.pattern ?? ''), tail(ti.path)];
-  if (tool === 'Glob')
-    return [
-      String(ti.pattern ?? '')
-        .replace(/[*?{}[\]]+/g, ' ')
-        .trim(),
-      tail(ti.path),
-    ];
-  const words = String(ti.command ?? '').match(/[\w.@-]*[/.][\w./@-]+/g) ?? [];
-  return words.map(tail);
-}
-
-/** Independent = no key of this call (≥3 chars) appears in the previous call's result. */
-export function independentOf(prevBody, tool, ti) {
-  const body = String(prevBody ?? '').toLowerCase();
-  const keys = readKeys(tool, ti)
-    .map((k) => k.toLowerCase())
-    .filter((k) => k.length >= 3);
-  if (keys.length === 0) return false;
-  return !keys.some((k) => body.includes(k));
-}
-
-let pending = null;
-/** The [batch] line `batchPre` decided on for this call, handed once to the dispatcher's context. */
-export function takeNudge() {
-  const text = pending;
-  pending = null;
-  return text;
-}
-
-const NUDGE_SPLIT =
-  '[batch] 3 turns in a row each made one read. Every turn re-bills the whole context (~120k in a ' +
-  'group): independent reads (Read/Grep/Glob/cat of other files or spots) go as parallel calls in ONE ' +
-  'message, or one Bash `a; b; c`. A read that needs the previous answer stays separate.';
-
-/**
- * PreToolUse, split child only: null (silence or a [batch] line left for `takeNudge`) | deny.
- * State per session: `at` = last tool id when a line went out (throttle), `ignored` = lines since the
- * last batched turn, `refusedAt` = the tool id the last refusal followed (one refusal per run).
- */
-export function batchPre(input) {
-  pending = null;
-  if (!splitChild() || inSubagent(input)) return null;
-  const tool = String(input?.tool_name ?? '');
-  const ti = input?.tool_input ?? {};
-  const isRead = READ_TOOLS.has(tool) || singleShortRead([{ name: tool, input: ti }]);
-  if (!isRead) return null;
-  const records = readTail(input.transcript_path, 1024 * 1024, 300);
-  const done = finishedTurns(records);
-  const file = stateFile(input);
-  if (!file || done.length < RUN) return null;
-  const state = loadState(file);
-  const ids = done.flat().map((u) => u.id);
-  const lastId = ids[ids.length - 1];
-  // A batched turn after the last line = the line was heard; the count starts over.
-  const since = state.at ? ids.lastIndexOf(state.at) : -1;
-  if (since >= 0 && done.flat().length > 0) {
-    const after = [];
-    let seen = 0;
-    for (const t of done) {
-      if (seen > since) after.push(t);
-      seen += t.length;
-    }
-    if (after.some((t) => t.length > 1)) state.ignored = 0;
-  }
-  if (!done.slice(-RUN).every(loneRead)) {
-    if (state.ignored) saveState(file, { ...state, ignored: 0 });
-    return null;
-  }
-  const events = toolEvents(records);
-  const prev = done[done.length - 1][0];
-  const prevBody = resultFor(events, prev.id)?.body ?? '';
-  const same = (other) => JSON.stringify(other ?? {}) === JSON.stringify(ti);
-  if (
-    (state.ignored ?? 0) >= IGNORED_MAX &&
-    state.refusedAt !== lastId &&
-    independentOf(prevBody, tool, ti)
-  ) {
-    if (wasJustRefused(events, tool, same)) return null;
-    saveState(file, { ...state, ignored: 0, refusedAt: lastId, at: lastId });
-    return deny(
-      `batch-nudge: ${RUN}+ turns in a row were one read each, after ${IGNORED_MAX} [batch] lines. This read ` +
-        'does not use the previous result: send it in ONE message together with the other reads you need ' +
-        'next (parallel calls), or as one Bash `a; b; c`. Repeat this identical call if it truly stands alone.',
-    );
-  }
-  if (since >= 0 && ids.length - 1 - since < EVERY_SPLIT) {
-    saveState(file, state);
-    return null;
-  }
-  saveState(file, { ...state, at: lastId, ignored: (state.ignored ?? 0) + 1 });
-  pending = NUDGE_SPLIT;
-  return null;
 }

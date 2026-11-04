@@ -18,6 +18,7 @@
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { dropLinkedStand, makeLinkedStand } from './linked-stand.mjs';
+import { shotLanguage, shotTheme } from './kit.mjs';
 
 /** Куда кладётся одноразовый каталог конфигурации. Имени человека в нём нет. */
 export const HOME_DIR = 'C:/work/claude-help-config';
@@ -364,7 +365,7 @@ export function makeHome(home = HOME_DIR) {
   );
   putJson(join(home, 'agentdeck', 'state.json'), {
     projects: [],
-    settings: { onboardingDone: true, theme: 'light', language: 'ru' },
+    settings: { onboardingDone: true, theme: shotTheme(), language: shotLanguage() },
   });
 
   setSkills(home);

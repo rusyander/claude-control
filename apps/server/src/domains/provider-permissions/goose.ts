@@ -23,18 +23,6 @@ import type { GoosePermissionsValues, ProviderPermissionsTarget } from './types.
  */
 
 /**
- * Разобрать черновик прав Goose: ОДИН ключ `mode` из задокументированного
- * набора (`auto`, `approve`, `smart_approve`, `chat`). Списков у Goose нет.
- */
-export function parseGooseDraft(rec: Record<string, unknown>): GoosePermissionDraft | undefined {
-  const mode = rec.mode;
-  if (typeof mode !== 'string' || !(GOOSE_MODES as readonly string[]).includes(mode)) {
-    return undefined;
-  }
-  return { mode: mode as GooseMode };
-}
-
-/**
  * Прочитать режим Goose. Ключа нет → дефолт CLI (`auto`: именно в нём идут
  * неинтерактивные сессии), и панель его НЕ пишет. Значение вне набора показываем
  * дефолтом, но раздел НЕ считается «на дефолтах»: в файле что-то задано, и

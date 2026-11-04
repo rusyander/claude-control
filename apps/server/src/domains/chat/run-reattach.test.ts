@@ -2,7 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ledgerLaunchOf, ledgerRunOptions, providerOfCommand } from './run-reattach.ts';
+import { createServer } from 'node:net';
+import { randomBytes } from 'node:crypto';
+import {
+  endRelayInput,
+  ledgerLaunchOf,
+  ledgerRunOptions,
+  providerOfCommand,
+} from './run-reattach.ts';
 import { readRunLedger, type RunLedgerEntry } from './run-ledger/run-ledger.ts';
 
 const BASE: RunLedgerEntry = { key: 'new-a', cwd: '/w', startedAt: 1, pid: 10 };
@@ -79,5 +86,36 @@ describe('журнал прогонов: команда запуска (EF-190)'
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('посредник прежней версии: конец ввода (этап 10, G14)', () => {
+  const pipeOf = (name: string): string =>
+    process.platform === 'win32' ? `\\\\.\\pipe\\${name}` : join(tmpdir(), `${name}.sock`);
+
+  it('ключ канала первой строкой, затем relay_end; канал закрыт', async () => {
+    const pipe = pipeOf(`agentdeck-g14-end-${randomBytes(4).toString('hex')}`);
+    const received = new Promise<string>((resolve) => {
+      const server = createServer((socket) => {
+        let data = '';
+        socket.on('data', (chunk) => (data += String(chunk)));
+        socket.on('end', () => {
+          server.close();
+          resolve(data);
+        });
+      });
+      server.listen(pipe);
+    });
+    endRelayInput({ ...BASE, relay: { pipe, pid: process.pid, token: 'k-1', signature: 's' } });
+    const lines = (await received)
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as unknown);
+    expect(lines).toEqual([{ type: 'relay_hello', token: 'k-1' }, { type: 'relay_end' }]);
+  });
+
+  it('канала нет — тихо, без исключения', () => {
+    const pipe = pipeOf('agentdeck-g14-absent-end');
+    expect(() => endRelayInput({ ...BASE, relay: { pipe, pid: 1, signature: 's' } })).not.toThrow();
   });
 });

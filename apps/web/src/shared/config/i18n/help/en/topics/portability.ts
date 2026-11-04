@@ -65,7 +65,11 @@ export const portabilityEn = {
         'every entry of a kind stands once above the list instead of on every row. ' +
         'An omission is a named reason: no such section, unreadable, ' +
         'format not parsed, empty, disabled. Only the unreadable ones are ' +
-        'coloured: an empty section is a lawful part of an ordinary home.',
+        'coloured: an empty section is a lawful part of an ordinary home. A ' +
+        'broken file (a stray comma in settings.json) does not hide the whole ' +
+        'passport: the sections of that file are named "section not read" with ' +
+        'the path and the cause, never quoting the content, while instructions, ' +
+        'skills and commands from other files stay in place.',
       transferFidelity: 'Fidelity report: what reaches the target',
       transferFidelityText:
         'The summary "N natively · M emulated · K wired · L as text · P ' +
@@ -141,11 +145,15 @@ export const portabilityEn = {
         'another CLI it stays there for good, while with Claude the feed is its own ' +
         'transcript, which the panel never writes into — it can only speak into a ' +
         'RUNNING run, and a conversation without one says so in the outcome instead ' +
-        'of passing it over in silence. Groups bound to the directory are not ' +
+        'of passing it over in silence. A new conversation at another CLI is a core ' +
+        '“chat” task with that CLI in the same directory, visible in “Core chat”. Its ' +
+        'feed is the core journal, and the panel does not write into it: the task ' +
+        'itself tells about the carry. Its session gets what a panel turn would: the ' +
+        'Tests section line when the directory is a project with tests, and the panel ' +
+        'kit for that CLI — Qwen Code gets its own settings directory, Codex the rules ' +
+        'as text after the core brief. Groups bound to the directory are not ' +
         'switched on with Claude’s toggle for the new CLI — it does not read Claude’s ' +
-        'files: Codex and Qwen Code get them as a layer on every run, and for the ' +
-        'other CLIs the new conversation’s feed shows a note that the group does not ' +
-        'act. With Claude the new conversation takes the project set the same way a ' +
+        'files. With Claude the new conversation takes the project set the same way a ' +
         'clean-session continuation does.',
       carryRefusal: 'Why a row cannot be picked',
       carryRefusalText:
@@ -156,12 +164,14 @@ export const portabilityEn = {
         'exactly what the previous one read. An unusable row stays in the list — ' +
         'were it to vanish, the list would read as "I have no such work". Apart from ' +
         'the safeguards there is the target itself: the run at the new CLI may never ' +
-        'start, the storage may not create the conversation, and a created ' +
-        'conversation may not receive the task. Those three are different troubles, ' +
-        'fixed differently, and each is named in its own words after the count. In ' +
-        'the last case the empty conversation is removed: the panel assembled that ' +
-        'task from the checkpoint and the original goal, and no one retypes it by ' +
-        'hand. Fix the CLI and carry again.',
+        'start, and that is named in its own words after the count. At another CLI ' +
+        'this is a core refusal — the CLI has no adapter, the core is not running or ' +
+        'did not accept the task — or a panel refusal: the kit did not compose or ' +
+        'carries a flag the core does not carry into a session (a conversation without ' +
+        'the kit that is on is worse than a refusal); the refusal code goes to the server log. A task that ' +
+        'never reached launch is removed at once, so no empty conversation is left. ' +
+        'Conversations are carried one at a time, in the order picked: each spends the ' +
+        'new CLI’s limits. Remove the cause and carry again.',
     },
 
     notTitle: 'What this section is NOT',

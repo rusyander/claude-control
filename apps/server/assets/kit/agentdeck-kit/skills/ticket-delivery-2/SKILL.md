@@ -32,22 +32,24 @@ radius printed past the T2 cap · a migration or DDL in the diff · the panel gr
 strict. The tier only rises: one recompute when the diff gains a file outside the printed radius or
 a new marker, never a drop.
 
-| Check                                                  | T0                 | T1                         | T2                         | T3                                          |
-| ------------------------------------------------------ | ------------------ | -------------------------- | -------------------------- | ------------------------------------------- |
-| narrow (touched files' tests, package type-check/lint) | per edit batch     | per edit batch             | per edit batch             | per edit batch                              |
-| style pass, end of §5                                  | once               | once                       | once                       | once                                        |
-| §9 review                                              | self row           | one `deep-review`          | one `deep-review`          | one `deep-review` + cold verify of each fix |
-| `mustfail`                                             | —                  | bug-fix files, once        | + marked behaviour files   | every behaviour file                        |
-| §10 walk                                               | skip, why named    | 1 pos + 1 neg + entries ≤3 | + 2 variations, entries ≤6 | + 3 variations incl. role, every entry      |
-| red run of the table                                   | —                  | cheapest real red          | full, pre-fix              | full, pre-fix                               |
-| §6 gate                                                | `--affected`, once | `--affected`, once         | `--affected`, once         | `--full`, once                              |
+| Check                                                  | T0                 | T1                              | T2                                                                        | T3                                          |
+| ------------------------------------------------------ | ------------------ | ------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------- |
+| narrow (touched files' tests, package type-check/lint) | per edit batch     | per edit batch                  | per edit batch                                                            | per edit batch                              |
+| style pass, end of §5                                  | once               | once                            | once                                                                      | once                                        |
+| §9 review                                              | self row           | one `deep-review`               | one `deep-review`                                                         | one `deep-review` + cold verify of each fix |
+| `mustfail`                                             | —                  | bug-fix files (`--files`), once | default run (critical files, own tests, 10 min/pkg) + bug-fix files, once | as T2; `--all` only on an explicit ask      |
+| §10 walk                                               | skip, why named    | 1 pos + 1 neg + entries ≤3      | + 2 variations, entries ≤6                                                | + 3 variations incl. role, every entry      |
+| red run of the table                                   | —                  | cheapest real red               | full, pre-fix                                                             | full, pre-fix                               |
+| §6 gate                                                | `--affected`, once | `--affected`, once              | `--affected`, once                                                        | `--full`, once                              |
 
 **Every check runs once per tree.** Each run is a ledger row carrying the head sha it ran on; the
 same check on the same tree reuses that row. After an edit only what the edit touched re-runs: the
 touched files' narrow checks, the §10 rows whose screens or endpoints it touched, `mustfail` of a
 newly bug-fixed file. The gate runner and `mustfail` memoise per tree; `--fresh` only on an explicit
 ask. Twice-run full checks are what this skill exists to remove — a group once ran its gate 11× at
-8–13 min each.
+8–13 min each. A project with a Tests block (`.agent/tests/`): the run of a test set IS the recorded
+`tests-cli run` — never the plain runner first and the recorded one after; review lanes read that
+record (deep-review `lanes.md` step 0; a group once ran the same tests 5× on one tree).
 
 ## Working discipline — the whole run
 

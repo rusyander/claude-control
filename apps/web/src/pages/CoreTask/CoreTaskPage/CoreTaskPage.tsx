@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { CORE_TASKS_ROUTE } from '@shared/config/routes';
-import { CoreHopsNotice, coreRefusalOf, useCoreTask } from '@entities/CoreTask';
+import { CoreHopsNotice, coreRefusalOf, taskStateLabel, useCoreTask } from '@entities/CoreTask';
 import { AskCard } from '@features/CoreAsk';
+import { CoreFaultCard } from '@features/CoreFault';
 import { ReportView } from '@features/CoreReport';
 import { BudgetsPanel, CoreTimeline, SignalsPanel, useCoreTimeline } from '@features/CoreTimeline';
 import { Badge } from '@shared/ui/badge';
@@ -14,7 +15,6 @@ import { SkeletonList } from '@shared/ui/skeleton';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { openAsks, streamState, taskTitle } from '../model/taskPage';
-import { CoreRefusalCard } from '../CoreRefusalCard/CoreRefusalCard';
 import type { CoreTaskPageProps } from './CoreTaskPage.types';
 import styles from './CoreTaskPage.module.scss';
 
@@ -45,7 +45,7 @@ export function CoreTaskPage({ taskId }: CoreTaskPageProps) {
       </Link>
       <PageHeader title={title} subtitle={taskId} helpTopic="core" />
       <CoreHopsNotice />
-      {refusal && <CoreRefusalCard refusal={refusal} />}
+      {refusal && <CoreFaultCard refusal={refusal} />}
       {notFound && (
         <EmptyState icon="warning" title={t('coreTimeline.page.noTask')} text={taskId} />
       )}
@@ -55,7 +55,9 @@ export function CoreTaskPage({ taskId }: CoreTaskPageProps) {
       {isLoading && <SkeletonList rows={4} />}
       <Stack direction="row" gap="var(--spacing-xs)" align="center" wrap data-core-stream>
         {view && (
-          <Badge tone="neutral">{t('coreTimeline.page.state', { state: view.state })}</Badge>
+          <Badge tone="neutral">
+            {t('coreTimeline.page.state', { state: taskStateLabel(t, view.state) })}
+          </Badge>
         )}
         {view?.ended && (
           <Badge tone={view.ended === 'done' ? 'success' : 'danger'} data-core-ended={view.ended}>

@@ -10,42 +10,45 @@ import type {
   ProviderPermissionInfo,
   QwenPermissionDraft,
 } from '@agentdeck/contracts';
-import { readTextFile } from '../../lib/safe-io/safe-io.ts';
-import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
-import { GOOSE_DEFAULT_MODE, GOOSE_MODES } from '../../lib/goose-yaml.ts';
-import { KIMI_DECISIONS, KIMI_DEFAULT_MODE, KIMI_MODES } from '../../lib/kimi-toml.ts';
 import {
+  CODEX_APPROVAL_POLICIES,
+  CODEX_SANDBOX_MODES,
+  CURSOR_RULE_KINDS,
+  GEMINI_APPROVAL_MODES,
+  GOOSE_MODES,
+  KIMI_DECISIONS,
+  KIMI_MODES,
   OPENCODE_PATTERN_TOOLS,
   OPENCODE_PERMISSION_LEVELS,
   OPENCODE_PERMISSION_TOOLS,
-} from '../../lib/opencode-permission.ts';
+  parseCodexDraft,
+  parseContinueDraft,
+  parseCursorDraft,
+  parseGeminiDraft,
+  parseGooseDraft,
+  parseKimiDraft,
+  parseOpencodeDraft,
+} from '@agentdeck/contracts/permissions';
+import { readTextFile } from '../../lib/safe-io/safe-io.ts';
+import { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
+import { errorBody } from '../../lib/server-text/server-text.ts';
+import { GOOSE_DEFAULT_MODE } from '../../lib/goose-yaml.ts';
+import { KIMI_DEFAULT_MODE } from '../../lib/kimi-toml.ts';
 import {
-  APPROVAL_POLICIES,
-  CURSOR_RULE_KINDS,
   DEFAULT_APPROVAL,
   DEFAULT_GEMINI_APPROVAL,
   DEFAULT_QWEN_APPROVAL,
   DEFAULT_SANDBOX,
-  GEMINI_APPROVAL_MODES,
   QWEN_APPROVAL_MODES,
-  SANDBOX_MODES,
 } from './constants.ts';
-import { parseCodexDraft, readCodexPermissions, saveCodexPermissions } from './codex.ts';
-import { parseGeminiDraft, readGeminiPermissions, saveGeminiPermissions } from './gemini.ts';
+import { readCodexPermissions, saveCodexPermissions } from './codex.ts';
+import { readGeminiPermissions, saveGeminiPermissions } from './gemini.ts';
 import { parseQwenDraft, readQwenPermissions, saveQwenPermissions } from './qwen.ts';
-import {
-  parseContinueDraft,
-  readContinuePermissions,
-  saveContinuePermissions,
-} from './continue.ts';
-import { parseCursorDraft, readCursorPermissions, saveCursorPermissions } from './cursor.ts';
-import { parseGooseDraft, readGoosePermissions, saveGoosePermissions } from './goose.ts';
-import { parseKimiDraft, readKimiPermissions, saveKimiPermissions } from './kimi.ts';
-import {
-  parseOpencodeDraft,
-  readOpencodePermissions,
-  saveOpencodePermissions,
-} from './opencode.ts';
+import { readContinuePermissions, saveContinuePermissions } from './continue.ts';
+import { readCursorPermissions, saveCursorPermissions } from './cursor.ts';
+import { readGoosePermissions, saveGoosePermissions } from './goose.ts';
+import { readKimiPermissions, saveKimiPermissions } from './kimi.ts';
+import { readOpencodePermissions, saveOpencodePermissions } from './opencode.ts';
 import type {
   ProviderPermissionsFormat,
   ProviderPermissionsTarget,
@@ -62,7 +65,7 @@ import type {
  * задаёт файл провайдера, а не клиент: так подложить codex-черновик в
  * gemini-файл невозможно. Всё, что не прошло проверку, → `undefined` (маршрут
  * ответит 400, в файл не пишем). Схему contracts (zod) в рантайме сервера
- * использовать нельзя, проверяем руками.
+ * использовать нельзя: разбор руками, одной копией с ядром — `@agentdeck/contracts/permissions`.
  */
 export function parseProviderPermissionsDraft(
   body: unknown,
@@ -132,21 +135,31 @@ export function saveProviderPermissions(
 export function buildProviderPermissionInfo(
   target: ProviderPermissionsTarget,
 ): ProviderPermissionInfo {
-  const base = {
-    providerId: target.provider.id,
-    providerName: target.provider.name,
-    filePath: target.filePath,
-    cliDetected: target.cliDetected,
-  };
-
   let values: ProviderPermissionsValues | undefined;
   let error: string | undefined;
+  let errorText: ReturnType<typeof errorBody> | undefined;
   try {
     values = readProviderPermissions(target);
   } catch (caught) {
     if (!(caught instanceof UnrecognizedFormatError)) throw caught;
     error = caught.message;
+    errorText = errorBody(caught, 'error');
   }
+
+  // Причина с кодом (Kimi: значение режима вне набора) — клиент покажет её на языке человека;
+  // общий текст «формат не распознан» шаблоном не читается и кода не получает.
+  const base = {
+    providerId: target.provider.id,
+    providerName: target.provider.name,
+    filePath: target.filePath,
+    cliDetected: target.cliDetected,
+    ...(errorText?.messageCode
+      ? {
+          messageCode: errorText.messageCode,
+          ...(errorText.params ? { params: errorText.params } : {}),
+        }
+      : {}),
+  };
   const readOnly = values === undefined;
 
   if (target.format === 'gemini-json') {
@@ -270,8 +283,8 @@ export function buildProviderPermissionInfo(
     format: 'toml',
     approvalPolicy: codex?.approvalPolicy ?? DEFAULT_APPROVAL,
     sandboxMode: codex?.sandboxMode ?? DEFAULT_SANDBOX,
-    approvalPolicies: [...APPROVAL_POLICIES],
-    sandboxModes: [...SANDBOX_MODES],
+    approvalPolicies: [...CODEX_APPROVAL_POLICIES],
+    sandboxModes: [...CODEX_SANDBOX_MODES],
     usingDefaults: codex?.usingDefaults ?? true,
     readOnly,
     error,

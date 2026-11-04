@@ -1,5 +1,4 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { logRenderCrash } from '@shared/lib/watch-capture';
 import type { ErrorBoundaryProps, ErrorBoundaryState } from './error-boundary.types';
 
 /**
@@ -20,15 +19,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidCatch(error: unknown, info: ErrorInfo): void {
     // В консоли — место сбоя словами: стек компонентов React длинный, а имя
-    // границы говорит сразу, что именно отвалилось. Фоновому наблюдателю (если
-    // включён) — сигналом ДО записи в консоль: иначе перехват консоли отправил
-    // бы тот же сбой второй раз.
-    logRenderCrash(
+    // границы говорит сразу, что именно отвалилось.
+    console.error(
       this.props.scope
         ? `[agentdeck] сбой отрисовки в границе «${this.props.scope}»`
         : '[agentdeck] сбой отрисовки компонента',
       error,
-      info.componentStack,
+      ...(info.componentStack ? [info.componentStack] : []),
     );
     this.props.onError?.(error, info);
   }

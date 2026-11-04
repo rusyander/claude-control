@@ -5,7 +5,7 @@ import { SkeletonList, SkeletonText } from '@shared/ui/skeleton';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { LocalLayerWarning, LocalRunStatus } from '@entities/LocalModels';
+import { LocalRunStatus } from '@entities/LocalModels';
 import { TokenBadge } from '@shared/ui/token-badge';
 import { CrashCard, ErrorBoundary } from '@shared/ui/error-boundary';
 import { isOpenAsk } from '@shared/lib/chat-stream';
@@ -21,11 +21,7 @@ import { StreamedAnswer } from '../StreamedAnswer/StreamedAnswer';
 import { QuestionCard } from '../QuestionCard/QuestionCard';
 import { AutoPickLine } from '../AutoPickLine/AutoPickLine';
 import { PermissionCard } from '../PermissionCard/PermissionCard';
-import { DeferredPermissionCard } from '../PermissionCard/DeferredPermissionCard';
-import { BranchGateCard } from '../BranchGateCard/BranchGateCard';
 import { ChildBlocks } from '../ChildBlocks/ChildBlocks';
-import { ReviewDecisionCard } from '../ReviewDecisionCard/ReviewDecisionCard';
-import { waitsDecision } from '../../lib/reviewWaiting';
 import { taskNoticesOf } from '../../lib/taskNotice';
 import { FeedNotices } from '../FeedNotices/FeedNotices';
 import { FeedErrorCard } from '../FeedErrorCard/FeedErrorCard';
@@ -55,10 +51,7 @@ export function ChatMessages({
   onPickOption,
   isRunning,
   permissions,
-  deferredPermissions,
   onPermissionDecide,
-  branchGates,
-  onBranchDecide,
   childQuestions,
   onChildAnswer,
   childPermissions,
@@ -69,19 +62,6 @@ export function ChatMessages({
   onPauseTree,
   onResumeTree,
   treeBusy,
-  onAnswerHold,
-  holdBusy,
-  onRelease,
-  releaseBusy,
-  onResumeInterrupted,
-  resumeInterruptedBusy,
-  onCheckOverlap,
-  overlapBusy,
-  reviews,
-  onReviewDecide,
-  onReviewPush,
-  onReviewRetry,
-  reviewBusy,
   onRetry,
   onContinue,
   onDismissError,
@@ -91,11 +71,6 @@ export function ChatMessages({
   onKeepSession,
   costUnit,
   effort,
-  onSplit,
-  onKeepHere,
-  isSplitPending,
-  splitCeiling,
-  childBranches,
   handoff,
   queued,
   onCancelQueued,
@@ -214,11 +189,6 @@ export function ChatMessages({
               {...(mediaModel ? { mediaModel } : {})}
               {...(mediaTopic ? { mediaTopic } : {})}
               {...(mediaRevision ? { mediaRevision } : {})}
-              onSplit={onSplit}
-              onKeepHere={onKeepHere}
-              isSplitPending={isSplitPending}
-              splitCeiling={splitCeiling}
-              childBranches={childBranches}
               handoff={handoff}
             />
           </ErrorBoundary>
@@ -309,7 +279,6 @@ export function ChatMessages({
                 каждое слово, и разборы его блоков не должны трогать всю ленту. */}
             <StreamedAnswer
               stream={stream}
-              {...(splitCeiling ? { splitCeiling } : {})}
               {...(costUnit ? { costUnit } : {})}
               {...(effort ? { effort } : {})}
             />
@@ -356,12 +325,11 @@ export function ChatMessages({
 
             {stream.isRunning && stream.text && <span className={styles.caret} />}
 
-            {/* Локальная модель: что сервер делает с ходом прямо сейчас (L6). */}
+            {/* Локальная модель: сервер, ожидание разрешения и отказ сервера в этом ходе (L6). */}
             {stream.isRunning && localRun && (
               <LocalRunStatus
                 waitingPermission={(permissions?.length ?? 0) > 0}
                 {...(runStartedAt !== undefined ? { since: runStartedAt } : {})}
-                {...(conversationId ? { session: conversationId } : {})}
                 className={styles.liveTimer}
               />
             )}
@@ -379,14 +347,6 @@ export function ChatMessages({
 
       <FeedNotices stream={stream} onRefresh={onRefresh} onKeepSession={onKeepSession} />
 
-      {/* Слой прогона не влезает в окно локальной модели — видно и между ходами (L6). */}
-      {localRun && !stream.isRunning && (
-        <LocalLayerWarning
-          {...(conversationId ? { session: conversationId } : {})}
-          className={styles.liveTimer}
-        />
-      )}
-
       {/*
         Дописанное, ждущее конца хода, — в ленте, а не только полоской над
         полем ввода. Ответ занятому агенту иначе не оставлял на экране следа
@@ -396,14 +356,6 @@ export function ChatMessages({
 
       {permissions && permissions.length > 0 && onPermissionDecide && (
         <PermissionCard permissions={permissions} onDecide={onPermissionDecide} />
-      )}
-
-      {deferredPermissions && deferredPermissions.length > 0 && onPermissionDecide && (
-        <DeferredPermissionCard permissions={deferredPermissions} onDecide={onPermissionDecide} />
-      )}
-
-      {branchGates && branchGates.length > 0 && onBranchDecide && (
-        <BranchGateCard gates={branchGates} onDecide={onBranchDecide} />
       )}
 
       {/*
@@ -418,42 +370,11 @@ export function ChatMessages({
         onPauseTree={onPauseTree}
         onResumeTree={onResumeTree}
         treeBusy={treeBusy}
-        onAnswerHold={onAnswerHold}
-        holdBusy={holdBusy}
-        onRelease={onRelease}
-        releaseBusy={releaseBusy}
-        onResumeInterrupted={onResumeInterrupted}
-        resumeInterruptedBusy={resumeInterruptedBusy}
-        onCheckOverlap={onCheckOverlap}
-        overlapBusy={overlapBusy}
         permissions={childPermissions}
         onPermissionDecide={onChildPermissionDecide}
         questions={childQuestions}
         onAnswer={onChildAnswer}
       />
-
-      {/*
-        Ревью чужих MR (Т7) — после сводки детей и перед ошибкой: это решение
-        человека, а не отчёт, и стоять ему там же, где стоят вопросы и права,
-        — внизу ленты, куда человек и смотрит, вернувшись к разговору.
-      */}
-      {onReviewDecide &&
-        (reviews ?? []).map((item) => (
-          <ReviewDecisionCard
-            key={item.chatId}
-            item={item}
-            // «Ко всем» считается по СОСЕДЯМ: сколько ещё карточек этого дерева
-            // ждут решения. Своя в счёт не идёт — иначе тумблер обещал бы
-            // применить решение к самой себе.
-            others={
-              (reviews ?? []).filter((other) => waitsDecision(other) && other !== item).length
-            }
-            onDecide={onReviewDecide}
-            {...(onReviewPush ? { onPush: onReviewPush } : {})}
-            {...(onReviewRetry ? { onRetry: onReviewRetry } : {})}
-            {...(reviewBusy !== undefined ? { busy: reviewBusy } : {})}
-          />
-        ))}
 
       <FeedErrorCard
         stream={stream}

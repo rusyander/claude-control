@@ -1,4 +1,3 @@
-import type { spawn as nodeSpawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -24,34 +23,30 @@ import {
   writePanelAgentConversation,
 } from '../../../domains/panel-agent/conversations/conversations.ts';
 import { maskPanelAgentMessages } from '../../../domains/panel-agent/data-mask/data-mask.ts';
-import { resolvePanelAgentLaunch } from '../../../domains/panel-agent/launch.ts';
-import { startPanelAgentRun } from '../../../domains/panel-agent/runner/runner.ts';
+import { resolvePanelAgentRoute } from '../../../domains/panel-agent/route/route.ts';
+import { startPanelAgentTurn } from '../../../domains/panel-agent/core-turn/core-turn.ts';
+import type { CoreAskPort } from '../../../domains/core-ask/core-ask.types.ts';
+import type { BridgeTokenLedger } from '../../../lib/bridge-tokens/bridge-tokens.ts';
 import { SSE_HEADERS } from '../../../domains/chat/ChatStream/ChatStream.ts';
 import type { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
-import { PanelAgentProcesses } from '../../../domains/panel-agent/processes/processes.ts';
 import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { singleIssueCode } from '../../../lib/zod-issue-codes/zod-issue-codes.ts';
 import { readAgentImages } from '../../../lib/agent-images/agent-images.ts';
 import { TurnFeed, seqFrame } from '../../../domains/panel-agent/turn-feed/turn-feed.ts';
 
 export interface PanelAgentRunRouteDeps {
-  /** Адрес панели для переходника: `http://127.0.0.1:<port>`. */
+  /** Адрес панели для моста сессии: `http://127.0.0.1:<port>` (ядро пускает только loopback). */
   selfBaseUrl: string;
-  /** Порт живого шлюза контура; 0 — не поднят. */
-  gatewayPort: () => number;
-  /** Окружение переключателя «Claude Code на локальной модели» (пусто — выключен). */
-  claudeSwitchEnv?: () => Record<string, string>;
-  /** Подмены для проверок. */
-  spawnImpl?: typeof nodeSpawn;
-  detect?: (command: string) => boolean;
-  bridgeScript?: string;
+  /** Ядро: ход агента — его сессия «ask»; своего процесса CLI у панели нет. */
+  ask: CoreAskPort;
+  /** Книга токенов моста — та же, что у рубежа доступа и маршрутов действий. */
+  bridges: BridgeTokenLedger;
   /** Ждущие карточки: пока у разговора висит карточка, потолок хода стоит. */
   pending?: PanelPendingActions;
-  /** Журнал процессов агента; по умолчанию — в каталоге данных панели. */
-  processes?: PanelAgentProcesses;
-  /** Потолок хода и шаг его счёта — подмена для проверок. */
+  /** Потолок хода, шаг его счёта и опрос ядра до сессии — подмена для проверок. */
   timeoutMs?: number;
   ceilingTickMs?: number;
+  pollMs?: number;
   /** Сколько отцепившийся ход ждёт возвращения клиента — подмена для проверок. */
   detachGraceMs?: number;
   /** Сколько законченный ход отдаёт свои кадры опоздавшему клиенту. */
@@ -162,7 +157,6 @@ export function registerPanelAgentRunRoutes(
   // Живёт в памяти процесса — после перезапуска панели ход просто читает заново.
   const actionMemory = new Map<string, string[]>();
   const appData = (): string => ctx.location.paths.appData;
-  const processes = deps.processes ?? new PanelAgentProcesses(appData);
 
   const refuse = (
     code: PanelAgentRunRefusal['error'],
@@ -208,18 +202,8 @@ export function registerPanelAgentRunRoutes(
           );
       }
 
-      const launch = resolvePanelAgentLaunch({
-        store: ctx.store,
-        appDataDir: appData(),
-        gatewayPort: deps.gatewayPort,
-        ...(deps.claudeSwitchEnv ? { claudeSwitchEnv: deps.claudeSwitchEnv } : {}),
-        detect: deps.detect,
-      });
-      if (!launch.ok) {
-        return reply
-          .code(409)
-          .send(refuse(launch.code, launch.message, launch.messageCode, launch.params));
-      }
+      const launch = resolvePanelAgentRoute(ctx.store, appData());
+      if (!launch.ok) return reply.code(409).send(refuse(launch.code, launch.message));
 
       // Маска — до ВСЕГО, что уносит текст из запроса: и до модели, и до файла
       // разговора. Ключ, вставленный в сообщение, не должен лечь и на диск панели.
@@ -311,26 +295,24 @@ export function registerPanelAgentRunRoutes(
 
       // Срок карточек хода — по CLI: у Goose вызов переходника ждёт 300 с, и
       // карточка, обещающая 10 минут, снималась бы обрывом посреди ожидания.
-      deps.pending?.setDeadline(conversationId, panelAgentConfirmTimeoutMs(launch.dialect));
-      const run = startPanelAgentRun({
-        command: launch.command,
-        dialect: launch.dialect,
-        env: launch.env,
+      deps.pending?.setDeadline(conversationId, panelAgentConfirmTimeoutMs(launch.providerId));
+      const run = startPanelAgentTurn({
+        ask: deps.ask,
+        bridges: deps.bridges,
         selfBaseUrl: deps.selfBaseUrl,
         conversationId,
         context: body.context,
         messages,
         priorActions: actionMemory.get(conversationId) ?? [],
+        route: launch.fields,
+        // Картинки этой реплики — в вопрос ядру: CLI без подачи картинок ядро отказывает с причиной.
         ...(images.images.length > 0 ? { images: images.images } : {}),
         ...(launch.contourPrompt ? { contourPrompt: launch.contourPrompt } : {}),
         onEvent: send,
-        spawnImpl: deps.spawnImpl,
-        bridgeScript: deps.bridgeScript,
         waitingHuman: () => deps.pending?.hasOpenFor(conversationId) ?? false,
         ...(deps.timeoutMs === undefined ? {} : { timeoutMs: deps.timeoutMs }),
         ...(deps.ceilingTickMs === undefined ? {} : { ceilingTickMs: deps.ceilingTickMs }),
-        onSpawn: (pid) => processes.started(conversationId, pid, appData()),
-        onExit: () => processes.exited(conversationId),
+        ...(deps.pollMs === undefined ? {} : { pollMs: deps.pollMs }),
       });
       const turn: LiveTurn = { feed, stop: () => run.stop(), detach };
       if (detach) turns.set(conversationId, turn);

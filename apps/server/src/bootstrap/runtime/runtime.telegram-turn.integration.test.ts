@@ -2,10 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
-import type { RunNotice } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from '../../domains/notify/run-notice.types.ts';
 import { writeToken } from '../../domains/integrations/store/store.ts';
 import { TURN_SETTLE_MS } from '../../domains/notify/telegram.ts';
 import { removeWhenFree } from '../../lib/remove-when-free.ts';
@@ -121,13 +120,6 @@ describe('сборка панели: конец хода в Telegram судит�
     expect(await endTurn('run-busy')).toEqual([]);
     // Тот же реестр о другом чате говорит «свободен» — и карточка уходит.
     expect(await endTurn('run-other')).toHaveLength(1);
-  });
-
-  it('чат чужого CLI снова занят — тишина: справка взята у сервиса чужих чатов по разобранному ключу', async () => {
-    runtime.chatRuns.isRunning = () => false;
-    runtime.providerChats.isChatRunning = (chatId: string) => chatId === 'pc-busy';
-    expect(await endTurn(foreignChatKey('gemini', 'pc-busy'))).toEqual([]);
-    expect(await endTurn(foreignChatKey('gemini', 'pc-free'))).toHaveLength(1);
   });
 
   it('звено группы (связь с родителем) — тишина: итог скажет группа', async () => {

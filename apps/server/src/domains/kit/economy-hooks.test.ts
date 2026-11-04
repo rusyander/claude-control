@@ -71,7 +71,7 @@ function run(
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: join(dir, 'state'),
       ...env,
     },
@@ -205,23 +205,6 @@ describe('cmd-duration: длительность команды выучивае
     );
     expect(local).toMatch(/timeout is 120 s/);
     expect(local).not.toMatch(/run_in_background/);
-    // Группа разделения гоняет на переднем плане — ей нужен только достаточный timeout.
-    const inGroup = reason(
-      run(
-        'pre',
-        {
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Bash',
-          tool_input: { command },
-          transcript_path: transcript([prompt('собери')]),
-          session_id: 'kit-economy',
-          cwd: dir,
-        },
-        { AGENTDECK_HEAVY_QUEUE_DIR: dir },
-      ),
-    );
-    expect(inGroup).toMatch(/timeout is 120 s/);
-    expect(inGroup).not.toMatch(/run_in_background/);
     expect(
       pre(command, [prompt('собери')], { tool_input: { run_in_background: true } }),
     ).toBeUndefined();

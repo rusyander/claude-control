@@ -1,9 +1,19 @@
 import type { EndpointProfile, Platform } from '@agentdeck/contracts';
+import type { CoreContourLinkReply } from '@agentdeck/contracts/core/hops';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
 import { readPlatforms } from '../platform/store/store.ts';
 import { MediaError } from './errors.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
+import { serverText } from '../../lib/server-texts/server-texts.ts';
+
+/** Что ждали от чужой стороны — им назван отказ по потолку ожидания. */
+export type UpstreamSubject = 'image' | 'deck';
+
+const TIMEOUT_TEXT = {
+  image: 'media-upstream-timeout-image',
+  deck: 'media-upstream-timeout-deck',
+} as const satisfies Record<UpstreamSubject, string>;
 
 /**
  * Общее для картинок и презентаций: куда панель ходит и как читает чужой ответ.
@@ -19,21 +29,12 @@ export interface MediaDeps {
   appDataDir: string;
   store: AppStore;
   /**
-   * Порт ЖИВОГО слушателя шлюза; 0 — шлюз не поднят. Спрашивается у слушателя, а
-   * не у настроек: задуманный порт мог быть занят, и запрос ушёл бы чужому
-   * процессу (та же ловушка, что закрыта в `apply/profile.ts`).
+   * Адрес звена ядра для запросов в контур (`ContourLinker.link`, метка `panelHopTag`, C3b):
+   * ключ контура, маска, расход, бюджет и след — у звена, как у запросов CLI этого контура.
+   * Не задан — дорога через контур отвечает отказом при отправке.
    */
-  gatewayPort?: () => number;
-  /**
-   * Поднять СВОЙ шлюз, если его тумблер включён, а слушателя нет (A-1). Защёлка
-   * и потолок попыток — внутри (`platform/gateway/auto-start.ts`): расчёт плана
-   * идёт на каждое открытие меню, и подъём без потолка превратил бы занятый порт
-   * в бесконечную череду попыток. Не задан — план отвечает по тому, что есть.
-   */
-  raiseGateway?: () => Promise<void>;
-  /** Чем кончился НАШ последний подъём. Пусто — не пробовали или получилось. */
-  gatewayFailure?: () => string | undefined;
-  /** Транспорт: и к своему шлюзу, и к чужой ручке. Подставляется в тестах. */
+  contourLink?: (platformId: string, fresh?: boolean) => Promise<CoreContourLinkReply>;
+  /** Транспорт: и к звену, и к чужой ручке. Подставляется в тестах. */
   fetchImpl?: PlatformFetch;
   now?: () => Date;
   /**
@@ -61,10 +62,55 @@ export function ownProfiles(store: AppStore): EndpointProfile[] {
   return store.getSettings().endpointProfiles.filter((profile) => !profile.ownerPlatformId);
 }
 
-/** Адрес своего шлюза для контура. Пусто — шлюз не поднят. */
-export function gatewayUrl(deps: MediaDeps, contour: Platform, tail: string): string {
-  const port = deps.gatewayPort?.() ?? 0;
-  return port > 0 ? `http://127.0.0.1:${port}/${contour.id}/${tail}` : '';
+/**
+ * Цель запроса в контур через звено ядра: адрес ручки и заглушка ключа (настоящий ключ
+ * подставляет звено). Ядро или звено не дали адрес — отказ словами ядра: 409, если дело в
+ * контуре (выключен, звено его не приняло), 503 — если ядра нет.
+ */
+export async function contourTarget(
+  deps: MediaDeps,
+  contour: Platform,
+  tail: string,
+  fresh = false,
+): Promise<{ url: string; headers: Record<string, string> }> {
+  if (!deps.contourLink)
+    throw new MediaError(503, serverText('media-core-not-connected'), undefined, {
+      code: 'media-core-not-connected',
+    });
+  try {
+    const link = await deps.contourLink(contour.id, fresh);
+    return { url: `${link.baseUrl}/${tail}`, headers: { authorization: `Bearer ${link.key}` } };
+  } catch (error) {
+    const status = (error as { status?: unknown }).status;
+    const said = error instanceof Error ? error.message : String(error);
+    // Без явного кода: слова ядра бывают и строкой `serverText` (ядра нет), и английским
+    // отказом звена — маршрут найдёт код разбором и переведёт вложенную причину, если сможет.
+    throw new MediaError(
+      status === 404 || status === 409 ? 409 : 503,
+      serverText('media-contour-link-failed', { contour: contour.title, reason: said }),
+    );
+  }
+}
+
+/**
+ * POST в контур через звено. Заглушку отверг хост (401: метку сняли, хост сменился) — один
+ * повтор с новой: на 401 работа наверху не случилась, и повтор её не удвоит.
+ */
+export async function askContour(
+  deps: MediaDeps,
+  contour: Platform,
+  tail: string,
+  body: unknown,
+  timeoutMs: number,
+  subject: UpstreamSubject,
+): Promise<Response> {
+  const fetchImpl = deps.fetchImpl ?? (globalThis.fetch as PlatformFetch);
+  const first = await contourTarget(deps, contour, tail);
+  const response = await askUpstream(fetchImpl, first.url, first.headers, body, timeoutMs, subject);
+  if (response.status !== 401) return response;
+  await response.body?.cancel().catch(() => undefined);
+  const again = await contourTarget(deps, contour, tail, true);
+  return askUpstream(fetchImpl, again.url, again.headers, body, timeoutMs, subject);
 }
 
 /** POST с потолком ожидания. Отказ транспорта переводится в причину. */
@@ -74,7 +120,7 @@ export async function askUpstream(
   headers: Record<string, string>,
   body: unknown,
   timeoutMs: number,
-  subject: string,
+  subject: UpstreamSubject,
 ): Promise<Response> {
   try {
     return await fetchImpl(url, {
@@ -86,10 +132,11 @@ export async function askUpstream(
   } catch (error) {
     const name = error instanceof Error ? error.name : '';
     if (name === 'TimeoutError' || name === 'AbortError') {
-      throw new MediaError(
-        504,
-        `${subject} не пришло за ${timeoutMs / 1_000} с — панель не ждёт дольше`,
-      );
+      const seconds = timeoutMs / 1_000;
+      throw new MediaError(504, serverText(TIMEOUT_TEXT[subject], { seconds }), undefined, {
+        code: TIMEOUT_TEXT[subject],
+        params: { seconds },
+      });
     }
     throw coded(
       new MediaError(502, `До адреса не дошли: ${String(error)}`),

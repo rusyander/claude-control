@@ -12,7 +12,7 @@ import { uuidv7 } from '@agentdeck/contracts/core/ids';
 import { openAppendLog, type AppendLog } from '../platform/safe-io/append-log.ts';
 import { writeFileAtomic } from '../platform/safe-io/atomic-write.ts';
 import { pathExists } from '../platform/safe-io/files.ts';
-import { chainHash, maskData, sha256OfText, validateData } from './line.ts';
+import { chainHash, issueText, maskData, sha256OfText, validateData } from './line.ts';
 import {
   JournalDurabilityError,
   JournalInputError,
@@ -150,7 +150,7 @@ export function openWriter(dir: string, options: WriterOptions): JournalWriter {
       if (!shape.success) {
         return reject(
           input,
-          shape.error.issues.map((i) => `${i.path.join('.') || '(input)'}: ${i.message}`),
+          shape.error.issues.map((i) => issueText(i, '(input)')),
         );
       }
       if (!options.holdsLease()) throw new LeaseLostError(options.taskId);

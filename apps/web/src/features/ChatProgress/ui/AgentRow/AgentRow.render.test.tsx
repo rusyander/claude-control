@@ -82,7 +82,6 @@ describe('AgentRow', () => {
     isSelected: false,
     onToggle: () => undefined,
     onOpen: () => undefined,
-    isStopping: false,
   };
 
   it('узел дерева: ARIA-уровень, остановка Tab, модель, вызовы, токены, время, последнее', () => {
@@ -109,7 +108,7 @@ describe('AgentRow', () => {
     expect(html).toContain('последнее: Отчёты в src/reports/build.ts');
   });
 
-  it('идущий с остановкой: кнопка, итог запроса строкой; остановленный — «остановлен»', () => {
+  it('идущий раскрытый: без кнопки остановки; остановленный — «остановлен»', () => {
     const running = { ...agent, agentId: 'a2e0', toolCalls: 1 };
     const html = renderToStaticMarkup(
       <AgentRow
@@ -117,12 +116,11 @@ describe('AgentRow', () => {
         isRunning={false}
         processAlive
         now={now}
-        tree={{ ...tree, expanded: true, onStop: () => undefined, stopNote: 'остановка запрошена' }}
+        tree={{ ...tree, expanded: true }}
       />,
     );
-    expect(html).toContain('data-agent-stop');
+    expect(html).not.toContain('data-agent-stop');
     expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain('остановка запрошена');
     const stopped = renderToStaticMarkup(
       <AgentRow
         agent={{ ...running, status: 'failed', stopped: true }}

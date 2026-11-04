@@ -39,7 +39,8 @@ export const endpointsEn: typeof endpointsRu = {
     step2Text:
       'The hint under the field says what the chosen API kind expects: the host root or ' +
       'the address including the version. For a local model this is usually an address ' +
-      'on 127.0.0.1.',
+      'on 127.0.0.1. Until the address is filled in, the profile is a draft: it is saved, ' +
+      'but you can neither check the connection nor apply it, and runs do not use it.',
     step3: 'Press "Check connection"',
     step3Text:
       'The panel asks the address for its model list. On success a badge appears next to ' +
@@ -100,7 +101,10 @@ export const endpointsEn: typeof endpointsRu = {
     targetAssistant: 'Panel assistant',
     targetAssistantText:
       'A separate choice in the same block. It writes nothing: the panel calls the ' +
-      'address directly, bypassing both the cloud and the provider CLI.',
+      'address through the core, bypassing both the cloud and the provider CLI. The core ' +
+      'inserts the profile key; the panel never puts it into the request. If the core is ' +
+      'not running, the assistant refuses and names the reason; the request never goes ' +
+      'around the core.',
     targetAnyKind: 'any kind',
     targetSkipped: 'not accepted',
     targetNoVar:
@@ -211,11 +215,18 @@ export const endpointsEn: typeof endpointsRu = {
       localAssistant: '7. The panel assistant switches separately',
       localAssistantText:
         'The “Panel assistant” switch chooses between the vendor cloud “as before” and ' +
-        'the profile. With the profile picked, the hints in forms go to that address, ' +
-        'bypassing both the cloud and the provider’s CLI. Without a profile the hints go ' +
-        'through the active CLI: Claude Code on its subscription, another CLI along its ' +
-        'chat’s route (through the contour when it is ticked there); when it cannot, the ' +
-        'helper refuses with the reason instead of falling back to Claude. It does not ' +
+        'the profile. The hints in forms always go as a core session of the active CLI with ' +
+        'no tools at all. With the profile picked, the core hands that CLI the profile’s ' +
+        'address and key, and the model answers from there, bypassing the vendor cloud. ' +
+        'Without a profile: Claude Code on its subscription, another CLI along its chat’s ' +
+        'route (through the contour when it is ticked there). Gemini CLI, Cursor, Aider and Continue are not trusted with the ' +
+        'helper: they have no way to refuse a built-in tool on every call, so the panel ' +
+        'refuses at once and names the reason instead of falling back to Claude. A core ' +
+        'refusal (no key, route closed) arrives in the core’s own words. For another CLI the ' +
+        'form and resource-structure helper carries the panel kit: environment and rules ' +
+        'text, as its chat does (Claude goes without a kit, as before). A kit that fails to ' +
+        'build, or needs what a helper question does not take (plugins, tool narrowing), is a ' +
+        'refusal with the reason, never a turn without part of the kit. The helper does not ' +
         'follow what was applied to a CLI: these are different jobs.',
     },
 
@@ -242,10 +253,10 @@ export const endpointsEn: typeof endpointsRu = {
       'of the CLI’s environment is edited in its own section and untouched by a profile.',
     notContour: 'Not the contour',
     notContourText:
-      'The corporate contour is its own section with a gateway inside the panel’s ' +
-      'process, its own models and spend accounting. This is just an address in a foreign ' +
+      'The corporate contour is its own section with a gateway held by the AgentDeck ' +
+      'core, its own models and spend accounting. This is just an address in a foreign ' +
       'config. They meet in one place: the active contour creates its own profile here — ' +
-      'the address points at the panel’s local gateway, and the owning contour is named ' +
+      'the address points at the local contour gateway, and the owning contour is named ' +
       'above it. Such a profile cannot be deleted by hand, and editing its fields takes the ' +
       'CLI past the contour; its only button is “Back to the default provider”, the same ' +
       'action as on the contour card. One exception: the contour is gone and the profile ' +

@@ -1,8 +1,7 @@
 import { basename } from 'node:path';
 import type { TelegramEvent, TelegramLastSend, TelegramSettings } from '@agentdeck/contracts';
-import type { GroupSignalSeverity, GroupWatchRule } from '@agentdeck/contracts/group-watch';
 import { TELEGRAM_DONE_AFTER_MINUTES } from '@agentdeck/contracts/integrations';
-import type { RunNotice } from '../chat/ChatRunRegistry/ChatRunRegistry.ts';
+import type { RunNotice } from './run-notice.types.ts';
 import { describeFailure, failureCode, parseJson, sendRequest } from '../integrations/http/http.ts';
 import { unreachable } from '../integrations/errors.ts';
 import type { CodedText } from '../../lib/server-text/server-text.ts';
@@ -73,7 +72,7 @@ export interface TelegramAnswersCover {
   covers: () => boolean;
 }
 
-export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice | GroupSignalNotice;
+export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice;
 
 export interface TelegramDeps {
   settings: () => TelegramSettings;
@@ -151,8 +150,6 @@ export function noticeEvent(notice: TelegramNotice): TelegramEvent {
       // Одно событие подписки на оба порога: подписка отвечает на вопрос
       // «сообщать ли про бюджет», а какой именно порог — сказано в тексте.
       return 'budget';
-    case 'groupSignal':
-      return 'groupSignal';
     default:
       return 'testFailed';
   }
@@ -178,8 +175,6 @@ export function compose(notice: TelegramNotice): string {
       )} %`;
     case 'budgetOver':
       return `⛔ Оценка расхода контура «${notice.platformTitle}» дошла до введённого бюджета`;
-    case 'groupSignal':
-      return composeGroupSignal(notice);
     default:
       return `🔴 Тесты провалены (${notice.failed}${
         notice.total ? ` из ${notice.total}` : ''
@@ -334,9 +329,6 @@ function judgeTurn(
  * уведомление и нужно.
  */
 function subscribed(settings: TelegramSettings, notice: TelegramNotice): boolean {
-  // Сигнал сторожа «внимание» — телеметрия (кэш, окна, расход, дубли вопросов):
-  // в Telegram уходит только «тревога» (решение владельца 25.10.2026).
-  if (notice.kind === 'groupSignal' && notice.severity !== 'alert') return false;
   if (notice.kind !== 'done') return settings.events.includes(noticeEvent(notice));
   const minutes = settings.doneAfterMinutes ?? TELEGRAM_DONE_AFTER_MINUTES;
   return minutes > 0 && (notice.durationMs ?? 0) >= minutes * 60_000;
@@ -365,9 +357,7 @@ async function send(
 }
 
 /**
- * Текст Telegram разметкой HTML. События прогона — `composeRich`; сигнал
- * сторожа — «⚠️ ТРЕВОГА» словами, с чатом и группой, правило и числа в цитате
- * («внимание» в Telegram не уходит, `subscribed`); бюджет — своей
+ * Текст Telegram разметкой HTML. События прогона — `composeRich`; бюджет — своей
  * строкой. Вебхук и push получают прежнюю строку `compose`.
  */
 function telegramText(
@@ -377,24 +367,6 @@ function telegramText(
   via: string | undefined,
   turn?: TurnEnd,
 ): string {
-  if (notice.kind === 'groupSignal') {
-    // Словами: что с группой; группа, код правила и числа — в свёрнутой цитате.
-    const parts = groupSignalParts(notice);
-    const group = notice.group
-      ? `группа ${notice.group.index}${notice.group.title ? ` «${notice.group.title}»` : ''}`
-      : '';
-    const details = [group, [notice.rule, parts.details].filter(Boolean).join(' · ')]
-      .filter(Boolean)
-      .join(' · ');
-    return composeSignal({
-      type: '⚠️ ТРЕВОГА',
-      essence: GROUP_SIGNAL_TITLES[notice.rule] ?? parts.essence,
-      ...(title ? { session: title } : {}),
-      project: parts.project,
-      details,
-      ...(openId ? { openId } : {}),
-    });
-  }
   if (notice.kind === 'budgetNear' || notice.kind === 'budgetOver') {
     return composeSignal({ type: '💰 БЮДЖЕТ', essence: compose(notice).replace(/^\S+\s+/, '') });
   }
@@ -461,142 +433,4 @@ function safeCode(code: CodedText): CodedText {
     ]),
   );
   return { ...code, params };
-}
-
-/**
- * Сигнал сторожа групп (фаза 2, W.5): «внимание» и «тревога» — правило, числа
- * и имя папки проекта. Названия группы и текста вопроса здесь нет: это уже
- * содержимое разговора, а наружу уходит только заголовок.
- *
- * Подписка — тем же списком событий (`groupSignal`), что у всех адресатов:
- * отдельный выключатель у сторожа давал два источника одной подписки, и вебхук
- * сигналов не получал вовсе.
- */
-export interface GroupSignalNotice {
-  kind: 'groupSignal';
-  rule: GroupWatchRule;
-  severity: GroupSignalSeverity;
-  numbers: Record<string, number>;
-  projectPath?: string;
-  stage?: string;
-  /** Чат звена, где сработало: имя чата и ссылка в Telegram. */
-  chatId?: string;
-  /** Группа словами: номер (с 1) и имя. */
-  group?: { index: number; title?: string };
-}
-
-/** Короткое имя правила для строки в Telegram — только правила, что туда уходят. */
-const GROUP_SIGNAL_TITLES: Partial<Record<GroupWatchRule, string>> = {
-  R1: 'группа молчит',
-  R1b: 'вопрос ждёт ответа',
-  R2: 'кэш остыл, окно переписано',
-  R3: 'сжатия подряд',
-  R4: 'одна проверка по кругу',
-  R5: 'ревью на стадии работы',
-  R6: 'пуш или MR раньше звена доставки',
-  R9: 'пятичасовое окно к сбросу кончится',
-  R11: 'цикл опроса со сном',
-  R13: 'веер субагентов',
-  R15: 'вызов упёрся в свой срок',
-  R17: 'долгое ожидание очереди тяжёлых шагов',
-  R20: 'группа действует на паузе',
-  R21: 'тяжёлые проверки по кругу',
-  R22: 'группа стоит без хода',
-  R23: 'одна беда в нескольких группах',
-  R24: 'тот же вызов падает той же ошибкой',
-  R25: 'отбитое действие сделано другим путём',
-  R26: 'останавливает чужие процессы',
-  R27: 'вопрос текстом ждёт ответа',
-  R28: 'напоминания о доставке впустую',
-  R29: 'инструмента нет в сессии',
-  R30: 'внешний сервис не отвечает',
-  R31: 'правки вне своей копии',
-  R33: 'вердикт ревью без блока',
-  R34: 'новый разговор поверх тёплого',
-  R35: 'переделка закоммиченного',
-  R36: 'сервер звена пережил паузу',
-};
-
-/** Числа сигнала словами: человек читает строку, а не ключи кода. Неизвестный ключ — как есть. */
-const GROUP_SIGNAL_NUMBERS: Record<string, (value: number) => string> = {
-  idleMin: (value) => `без событий ${value} мин`,
-  waitMin: (value) => `ждёт ${value} мин`,
-  writeK: (value) => `переписано ${value}k токенов`,
-  gapMin: (value) => `перерыв ${value} мин`,
-  lostW: (value) => `потеря ≈${value} W`,
-  count: (value) => `сжатий за час: ${value}`,
-  runs: (value) => `запусков без правки: ${value}`,
-  spawns: (value) => `спавнов: ${value}`,
-  ops: (value) => `публикаций: ${value}`,
-  nowPct: (value) => `сейчас ${value} %`,
-  projectedPct: (value) => `к сбросу ≈${value} %`,
-  resetMin: (value) => `сброс через ${value} мин`,
-  polls: (value) => `циклов: ${value}`,
-  subW: (value) => `расход субагентов ${value} W`,
-  timeoutMin: (value) => `срок ${value} мин`,
-  timeouts: (value) => `упоров в срок: ${value}`,
-  ahead: (value) => `впереди в очереди: ${value}`,
-  tools: (value) => `вызовов: ${value}`,
-  afterMin: (value) => `через ${value} мин после паузы`,
-  gates: (value) => `проходов тяжёлых проверок: ${value}`,
-  totalMin: (value) => `всего ${value} мин`,
-  fails: (value) => `падений: ${value}`,
-  kills: (value) => `остановок: ${value}`,
-  calls: (value) => `вызовов: ${value}`,
-  failures: (value) => `сбоев: ${value}`,
-  spanMin: (value) => `за ${value} мин`,
-  writes: (value) => `действий вне копии: ${value}`,
-  nudges: (value) => `напоминаний: ${value}`,
-  groups: (value) => `групп: ${value}`,
-  insertK: (value) => `вставок ${value} тыс. знаков`,
-  prevK: (value) => `окно было ${value}k`,
-  files: (value) => `файлов: ${value}`,
-  ports: (value) => `портов: ${value}`,
-};
-
-/** Тот же ключ числа у правила значит другое: `afterMin` R25 — после отказа, не после паузы. */
-const GROUP_SIGNAL_NUMBERS_BY_RULE: Partial<
-  Record<GroupWatchRule, Record<string, (value: number) => string>>
-> = {
-  R25: { afterMin: (value) => `через ${value} мин после отказа` },
-};
-
-const STAGE_TITLES: Record<string, string> = {
-  work: 'работа',
-  review: 'ревью',
-  deliver: 'доставка',
-};
-
-/** Сигнал сторожа по частям: правило с именем и числа со стадией — общие для обоих текстов. */
-export function groupSignalParts(notice: GroupSignalNotice): {
-  essence: string;
-  details: string;
-  project: string;
-} {
-  const title = GROUP_SIGNAL_TITLES[notice.rule];
-  const own = GROUP_SIGNAL_NUMBERS_BY_RULE[notice.rule];
-  const numbers = Object.entries(notice.numbers)
-    .map(([key, value]) => (own?.[key] ?? GROUP_SIGNAL_NUMBERS[key])?.(value) ?? `${key} ${value}`)
-    .join(', ');
-  const stage = notice.stage ? `стадия «${STAGE_TITLES[notice.stage] ?? notice.stage}»` : '';
-  return {
-    essence: `${notice.rule}${title ? ` ${title}` : ''}`,
-    details: [numbers, stage].filter(Boolean).join('; '),
-    project: notice.projectPath ? basename(notice.projectPath) : '',
-  };
-}
-
-export function composeGroupSignal(notice: GroupSignalNotice): string {
-  const project = notice.projectPath ? basename(notice.projectPath) : '';
-  const icon = notice.severity === 'alert' ? '⛔' : notice.severity === 'warn' ? '⚠️' : 'ℹ️';
-  const title = GROUP_SIGNAL_TITLES[notice.rule];
-  const own = GROUP_SIGNAL_NUMBERS_BY_RULE[notice.rule];
-  const numbers = Object.entries(notice.numbers)
-    .map(([key, value]) => (own?.[key] ?? GROUP_SIGNAL_NUMBERS[key])?.(value) ?? `${key} ${value}`)
-    .join(', ');
-  const stage = notice.stage ? `стадия «${STAGE_TITLES[notice.stage] ?? notice.stage}»` : '';
-  const details = [numbers, stage].filter(Boolean).join('; ');
-  return `${icon} ${notice.rule}${title ? ` ${title}` : ''}${details ? ` (${details})` : ''}${
-    project ? ` — ${project}` : ''
-  }`;
 }

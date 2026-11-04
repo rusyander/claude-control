@@ -8,7 +8,6 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { TextField } from '@shared/ui/text-field';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
 import { toast } from '@shared/lib/toast';
 import {
@@ -16,16 +15,15 @@ import {
   catalogRows,
   foreignInstalled,
   toGb,
-  useAddCustomModel,
   useBenchModel,
   useCancelLocalJob,
   useConnectLocal,
-  useImportModel,
   usePullModel,
   useRemoveModel,
   useSetModelChoice,
 } from '@entities/LocalModels';
 import { ModelRow } from '../ModelRow/ModelRow';
+import { CustomModelForm } from '../CustomModelForm/CustomModelForm';
 import { formatGb, quantTitle } from '../ModelSelects/optionText';
 import styles from './CatalogCard.module.scss';
 import type { CatalogCardProps, RemoveTarget } from './CatalogCard.types';
@@ -80,15 +78,12 @@ function removeText(target: RemoveTarget, t: TFunction, locale: string): string 
 export function CatalogCard({ info }: CatalogCardProps) {
   const { t, i18n } = useTranslation();
   const pull = usePullModel();
-  const importModel = useImportModel();
   const connect = useConnectLocal();
   const bench = useBenchModel();
   const remove = useRemoveModel();
   const cancel = useCancelLocalJob();
   const choose = useSetModelChoice();
-  const addCustom = useAddCustomModel();
   const [toRemove, setToRemove] = useState<RemoveTarget | undefined>(undefined);
-  const [repo, setRepo] = useState('');
   const rows = catalogRows(info);
   const measuredText = (bench: ModelBench): string => {
     const where = benchElsewhere(bench, info.device);
@@ -114,16 +109,6 @@ export function CatalogCard({ info }: CatalogCardProps) {
     connect.mutate(tag, {
       onSuccess: () => toast.success(t('localModels.connect.connected', { model: tag })),
     });
-  const submitCustom = (): void => {
-    const input = repo.trim();
-    if (input.length < 3) return;
-    addCustom.mutate(input, {
-      onSuccess: (model) => {
-        toast.success(t('localModels.catalog.custom.added', { title: model.title }));
-        setRepo('');
-      },
-    });
-  };
 
   return (
     <Card padding="md" role="region" aria-label={t('localModels.catalog.title')}>
@@ -156,7 +141,6 @@ export function CatalogCard({ info }: CatalogCardProps) {
                   context: row.choice.context,
                 })
               }
-              onImport={() => importModel.mutate(row.model.tag)}
               onConnect={() => runConnect(row.model.tag)}
               onBench={() => runBench(row.model.tag)}
               onRemove={() =>
@@ -190,43 +174,7 @@ export function CatalogCard({ info }: CatalogCardProps) {
           })}
         </Typography>
 
-        <form
-          className={styles.customForm}
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitCustom();
-          }}
-          aria-label={t('localModels.catalog.custom.title')}
-        >
-          <Typography variant="heading-sm" as="h3">
-            {t('localModels.catalog.custom.title')}
-          </Typography>
-          <Typography variant="caption" color="muted">
-            {t('localModels.catalog.custom.hint')}
-          </Typography>
-          <div className={styles.customRow}>
-            <div className={styles.customField}>
-              <TextField
-                label={t('localModels.catalog.custom.label')}
-                value={repo}
-                onChange={setRepo}
-                placeholder={t('localModels.catalog.custom.placeholder')}
-                isMono
-                disabled={addCustom.isPending}
-              />
-            </div>
-            <Button
-              type="submit"
-              size="sm"
-              variant="secondary"
-              leftIcon={<Icon name="plus" />}
-              isLoading={addCustom.isPending}
-              disabled={repo.trim().length < 3}
-            >
-              {t('localModels.catalog.custom.add')}
-            </Button>
-          </div>
-        </form>
+        <CustomModelForm />
 
         {foreign.length > 0 ? (
           <Stack gap="var(--spacing-xs)">

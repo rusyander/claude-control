@@ -1,153 +1,73 @@
 import { useTranslation } from 'react-i18next';
 import { isBuiltinGroupId, scopeOf } from '@agentdeck/contracts';
 import { Badge } from '@shared/ui/badge';
-import { Toggle } from '@shared/ui/toggle';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
-import { Typography } from '@shared/ui/typography';
-import { ownStepCount } from '@entities/StepPath';
-import {
-  useBuiltinGroups,
-  useGroupMembers,
-  useGroupPath,
-  useSetGroupEnabled,
-} from '@entities/Group';
-import { activeProvider, useProviders } from '@entities/Provider';
 import { TileFacts } from '../TileFacts/TileFacts';
-import { usePairSide } from '../model/usePairSide';
 import { TileFrame } from '../TileFrame/TileFrame';
 import type { GroupTileProps } from './GroupTile.types';
 import { scopeLabel } from '../lib/scopeLabel';
-import { tileSteps } from '../lib/tileSteps';
-import { projectOnlyLines } from '../model/projectOnlyLines';
-import { describedStepTitle } from '../model/describedStepTitle';
-import { previewSteps } from '../model/previewSteps';
-import { tileToggle } from '../model/tileToggle';
+import { tileStepTitles } from '../model/tileStepTitles';
 
 /**
- * Карточка группы в сетке: имя, «Когда», область, пара, первые шаги словами,
- * состав по видам, закреплённые числа, проекты, тумблер и предупреждение «в
- * проекте изменилось», кнопка «Копировать». Остальное — в окне группы по щелчку. У пары всё — той
- * стороны, что действует в проекте.
+ * Карточка прежней группы — только для чтения (этап 10, F1): имя, «Когда», область, первые шаги
+ * словами, состав по видам и единственное действие «В ядро» — перевод её «Пути» в сценарий ядра.
+ * Ни тумблера, ни копии, ни окна правки: прежний исполнитель групп снят, группы ведёт ядро.
  */
-export function GroupTile({ group, pair, onOpen, onCopy }: GroupTileProps) {
+export function GroupTile({ group, pair, onCore }: GroupTileProps) {
   const { t, i18n } = useTranslation();
-  const setGroupEnabled = useSetGroupEnabled();
-  const toggle = tileToggle(group, activeProvider(useProviders().data));
-  const side = usePairSide(group, pair);
-  const { shown } = side;
-  const path = useGroupPath(shown.id);
   const scope = scopeOf(group);
-  const when = shown.when ?? shown.scenario?.when ?? '';
-  const changed = group.originChanged ?? [];
-  const isScenario = shown.flow === 'scenario';
-  // Встроенная, изменённая человеком, больше не обновляется каталогом — это видно на карточке.
-  const isBuiltin = isBuiltinGroupId(group.id);
-  const builtin = useBuiltinGroups();
-  const isEditedBuiltin = isBuiltin && Boolean(builtin.data?.edited.includes(group.id));
-  // Названия шагов скиллов — из описаний состава (тот же запрос, что у окна группы).
-  const described = useGroupMembers(shown.id);
-  // Состав не прочитался — ждать слов нечего: оригинальные названия лучше пустой карточки.
-  const stepTitle = described.isError
-    ? undefined
-    : describedStepTitle(described.data, i18n.language);
-  const preview = path.data
-    ? previewSteps(path.data.entries, i18n.language, undefined, stepTitle)
-    : undefined;
-
-  const members = t('groups.membersCount', { count: shown.members.length });
-  // Участник без файла — видно на карточке: прежде о нём знал только «Состав».
-  // Файл в .claude привязанного проекта — не «нет файла», а «только в проекте».
-  const missingBriefs = (described.data?.members ?? []).filter((member) => member.missing);
-  const missing = missingBriefs.filter((member) => !member.foundIn).map((member) => member.id);
-  const onlyInProject = projectOnlyLines(missingBriefs, (project, names, count) =>
-    t('groupSources.membersOnlyInProject', { count, project, names }),
-  );
-  // Путь не прочитался — число шагов молча опускаем: сбой назовёт окно группы,
-  // а «читаю…» навсегда на карточке соврало бы.
-  let steps: string | undefined = t('groupSources.stepsCountLoading');
-  // Ноль шагов не повторяем в числах: тело карточки уже сказало «Своих шагов нет».
-  if (path.data) {
-    const count = ownStepCount(path.data.entries);
-    steps = count > 0 ? t('groupSources.stepsCount', { count }) : undefined;
-  } else if (path.isError) steps = undefined;
+  const when = group.when ?? group.scenario?.when ?? '';
+  const isScenario = group.flow === 'scenario';
+  const preview = tileStepTitles(group, i18n.language);
+  const stepCount = preview.titles.length + preview.more;
+  const members = t('groups.membersCount', { count: group.members.length });
+  const steps = stepCount > 0 ? t('groupSources.stepsCount', { count: stepCount }) : undefined;
 
   return (
     <TileFrame
       anchor={group.id}
       anchorAlias={pair?.id}
       name={group.name}
-      onOpen={onOpen}
       whenLabel={t('groupSources.when')}
       when={when}
       whenEmpty={t('groupSources.whenEmpty')}
       counts={steps ? `${steps} · ${members}` : members}
-      warnings={[
-        // Выбор стороны пары не прочитался — карточка показывает глобальную
-        // сторону наугад; молчать об этом значило бы выдать догадку за факт.
-        pair && side.isError ? t('groupSources.choiceLoadError') : '',
-        changed.length > 0 ? t('groupSources.originChangedCount', { count: changed.length }) : '',
-        missing.length > 0
-          ? t('groupSources.membersMissingCount', {
-              count: missing.length,
-              names: missing.join(', '),
-            })
-          : '',
-        ...onlyInProject,
-      ].filter(Boolean)}
       badges={
         <>
           <Badge tone={scope.kind === 'project' ? 'info' : 'accent'}>{scopeLabel(t, scope)}</Badge>
           {isScenario && <Badge tone="accent">{t('groupsPage.tile.scenarioBadge')}</Badge>}
-          {isBuiltin && <Badge tone="neutral">{t('groupsPage.tile.builtinBadge')}</Badge>}
+          {isBuiltinGroupId(group.id) && (
+            <Badge tone="neutral">{t('groupsPage.tile.builtinBadge')}</Badge>
+          )}
           {pair && <Badge tone="info">{t('groupSources.pairBadge')}</Badge>}
-          {toggle.shown && !toggle.checked && <Badge tone="neutral">{t('common.disabled')}</Badge>}
         </>
       }
       aside={
-        <>
+        // Переводить нечего — кнопки нет: пустой сценарий ядро всё равно не примет.
+        onCore && stepCount > 0 ? (
           <Button
             size="sm"
             variant="ghost"
-            iconOnly
-            icon={<Icon name="copy" size={16} />}
-            aria-label={t('groupsPage.copy.tileAria', { name: group.name })}
-            title={t('groupsPage.copy.tileAria', { name: group.name })}
-            onClick={onCopy}
-          />
-          {/* Чей тумблер — активного CLI (`tileToggle`): у CLI со слоем он
-              включает группу для его прогонов, у CLI без слоя его нет. */}
-          {toggle.shown && (
-            <Toggle
-              checked={toggle.checked}
-              onCheckedChange={(isEnabled) =>
-                setGroupEnabled.mutate({
-                  id: group.id,
-                  isEnabled,
-                  ...(toggle.provider ? { provider: toggle.provider } : {}),
-                })
-              }
-              disabled={setGroupEnabled.isPending}
-              aria-label={`${t('common.enabled')}: ${group.name}`}
-            />
-          )}
-        </>
+            leftIcon={<Icon name="play" size={16} />}
+            aria-label={t('groupsPage.core.tileImportAria', { name: group.name })}
+            title={t('groupsPage.core.tileImportAria', { name: group.name })}
+            onClick={() => onCore(group)}
+            data-group-core-import
+          >
+            {t('groupsPage.core.tileImport')}
+          </Button>
+        ) : undefined
       }
     >
       <TileFacts
-        steps={tileSteps(preview)}
-        stepsFailed={path.isError}
-        moreSteps={preview?.more}
+        steps={preview.titles}
+        moreSteps={preview.more}
         noStepsText={t(isScenario ? 'groupsPage.tile.noStepsScenario' : 'groupsPage.tile.noSteps')}
-        members={shown.members}
-        pinned={Object.keys(shown.knobs ?? {}).length}
-        projects={shown.projectPaths}
+        members={group.members}
+        pinned={Object.keys(group.knobs ?? {}).length}
+        projects={group.projectPaths}
       />
-      {isEditedBuiltin && (
-        <Typography variant="caption" color="subtle" as="p">
-          {t('groupsPage.tile.builtinEdited')}
-        </Typography>
-      )}
     </TileFrame>
   );
 }

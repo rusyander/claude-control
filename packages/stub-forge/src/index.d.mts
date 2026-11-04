@@ -133,13 +133,7 @@ export interface StubPipeline {
 }
 
 export type StubEventType =
-  | 'push'
-  | 'branch-delete'
-  | 'mr-open'
-  | 'mr-update'
-  | 'note'
-  | 'approval'
-  | 'merge';
+  'push' | 'branch-delete' | 'mr-open' | 'mr-update' | 'note' | 'approval' | 'merge';
 
 export interface StubEvent {
   id: number;

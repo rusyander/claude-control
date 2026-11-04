@@ -5,6 +5,8 @@ export const signalsEn: SignalTexts = {
   titles: {
     preflight: 'Launch preflight',
     'ask-reminder': 'Reminder of a question to the human',
+    'ask-refused': 'Question refused — the task is closed',
+    'mcp-human': "Human's MCP servers in the session",
     'estimate-refused': 'Estimate refused — the task will not run',
     'base-pin': 'Repository base pinned',
     'user-layer-report': 'User layer at launch',
@@ -23,6 +25,8 @@ export const signalsEn: SignalTexts = {
     'hook-loop': 'A hook keeps refusing',
     'keep-warm': 'Session kept warm',
     'session-refused': 'Session did not open',
+    'resume-refused': 'CLI conversation not continued — transcript not confirmed',
+    'chat-in-place': 'Chat runs in the project folder, no copy',
     'read-allow-unread': 'Read allow list not read',
     'read-scope-refused': 'Read scope entry not accepted',
     'permit-sources-unread': 'Grant source not read',

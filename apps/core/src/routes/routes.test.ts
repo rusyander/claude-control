@@ -209,10 +209,13 @@ describe('R:PR-04 own server pieces — slot queue, preset, router client', () =
   });
 
   it('R:PR-04 router client: /models shape parsed, failed load named with exit code, HTTP error and garbage named', async () => {
+    // load/unload сначала читают `/models` (имя секции пресета, `model-id.ts`): очередь ответов
+    // держит и это чтение — первое у load, третье (перед HTTP 500) у unload.
     const answers: Record<string, unknown[]> = {
       '/models': [
         { data: [{ id: 'm', status: { value: 'loading' } }] },
         { data: [{ id: 'm', status: { value: 'unloaded', failed: true, exit_code: 7 } }] },
+        { data: [{ id: 'm', status: { value: 'unloaded' } }] },
       ],
     };
     const fetchImpl = (async (url: string) => {
@@ -230,7 +233,7 @@ describe('R:PR-04 own server pieces — slot queue, preset, router client', () =
     await expect(client.models()).rejects.toThrow('router /models: no data array');
     answers['/models'] = [{ data: [{ status: {} }] }];
     await expect(client.models()).rejects.toThrow('row without id');
-    answers['/models'] = [{ data: [] }];
+    answers['/models'] = [{ data: [] }, { data: [] }];
     await expect(client.load('m', 1_000)).rejects.toThrow('router does not list m');
     answers['/models'] = Array.from({ length: 50 }, () => ({
       data: [{ id: 'm', status: { value: 'loading' } }],

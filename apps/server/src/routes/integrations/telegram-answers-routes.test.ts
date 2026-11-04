@@ -133,9 +133,7 @@ describe('Telegram и D-n на настоящем маршруте решени�
       collect: async () =>
         collectPendingAsks({
           inbox: { chats: [], deferred: inboxDeferredOf(ctx) } as unknown as ChatInbox,
-          foreign: [],
           defaultCli: 'Claude Code',
-          cliName: (id) => id,
         }),
       apply: (target, answer, clientId) =>
         applyAnswer(target, answer, { inject, clientId, runParams: () => undefined }),

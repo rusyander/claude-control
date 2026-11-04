@@ -95,13 +95,16 @@ describe('task lease beats', () => {
   }, 30_000);
 });
 
-describe('m1 lease staleness = silent 15 s by THIS lease AND dead', () => {
+// Держатель с другой машины: смерть его pid здесь не доказать — правило молчания (fallback).
+// Доказанно мёртвый держатель этой машины перехватывается сразу — `lease.proven-dead.test.ts`.
+describe('m1 lease staleness (holder of another host) = silent 15 s by THIS lease AND dead', () => {
   const T0 = 1_760_000_000_000;
   const dead = (now: number): LeaseDeps => ({ isAlive: async () => 'dead', now: () => now });
+  const elsewhere = (now: number): LeaseDeps => ({ ...dead(now), host: 'other-machine' });
 
   it('a dead holder that beat recently is kept; silent past STALE_MS it is taken over', async () => {
     const dir = tempDir('stale-');
-    const holder = await acquired(dir, identity({ pid: process.pid + 2 }), dead(T0));
+    const holder = await acquired(dir, identity({ pid: process.pid + 2 }), elsewhere(T0));
     expect(await acquireTaskLease(dir, identity(), dead(T0 + STALE_MS - 1_000))).toMatchObject({
       ok: false,
       reason: 'held',
@@ -116,7 +119,7 @@ describe('m1 lease staleness = silent 15 s by THIS lease AND dead', () => {
 
   it('a fresh beat of ANOTHER lease does not keep a silent holder alive', async () => {
     const dir = tempDir('stale-');
-    const holder = await acquired(dir, identity({ pid: process.pid + 3 }), dead(T0));
+    const holder = await acquired(dir, identity({ pid: process.pid + 3 }), elsewhere(T0));
     appendFileSync(
       join(dir, TASK_FILES.beats),
       `${JSON.stringify({ leaseId: newId(), at: T0 + STALE_MS })}\n`,

@@ -26,6 +26,21 @@ export const DEFAULT_PRESET: PresetId = 'feature';
 export const FORGE_ONLY_PRESET: PresetId = 'answer-reviewers';
 
 /**
+ * Чат начинается со страницы чата (ход = сообщение человека), а не с экрана запуска: оценки у него
+ * нет, и в списке сценариев запуска он был бы пустым вариантом.
+ */
+export const CHAT_PRESET: PresetId = 'chat';
+
+/** Лёгкая сессия «ask» создаётся только `POST /v1/ask`; оценка её отказывает — на экране запуска её нет. */
+export const ASK_PRESET: PresetId = 'ask';
+
+/**
+ * Ревью MR по ссылке (этап 10, F8) открывает только `POST /v1/review-link` — своя форма на этом
+ * экране; оценка его отказывает, поэтому в списке сценариев оценки его нет.
+ */
+export const REVIEW_LINK_PRESET: PresetId = 'review-link';
+
+/**
  * Политика после принятого деления: всегда `confirm`. Экран запуска и есть точка подтверждения —
  * при `auto` ядро запустило бы деление само, мимо подтверждения грантов на этом экране.
  */
@@ -60,10 +75,12 @@ const FIELD_OF_PATH: Record<string, DraftField> = {
 /**
  * Поля тела `POST /v1/estimate` из черновика. Пустые строки репозиториев отброшены, пустая база —
  * `null` (ядро берёт ветку по умолчанию); проверка — схемой контрактов, той же, что у ядра, чтобы
- * форма не отправляла то, что ядро вернёт 400.
+ * форма не отправляла то, что ядро вернёт 400. `language` — язык панели: на нём ядро пишет вопрос
+ * запуска (точка 10), иначе он стоял бы английским среди русских строк ленты.
  */
 export function fieldsOf(
   draft: LaunchDraft,
+  language?: string,
 ): { ok: true; fields: EstimateFields } | { ok: false; problems: DraftProblem[] } {
   const candidate = {
     title: draft.title.trim(),
@@ -74,6 +91,7 @@ export function fieldsOf(
     scenario: scenarioField(draft.scenario),
     launchPolicy: LAUNCH_POLICY,
     ciWait: draft.ciWait,
+    ...(language ? { lang: language.startsWith('en') ? ('en' as const) : ('ru' as const) } : {}),
   };
   const problems: DraftProblem[] = [];
   if (draft.scenario.kind === 'preset' && draft.scenario.id === FORGE_ONLY_PRESET)
@@ -137,6 +155,9 @@ export function scenarioOptions(listing: ScenarioListing | undefined): ScenarioO
   const presets = new Map<string, string>();
   for (const p of listing?.presets ?? []) if (!presets.has(p.id)) presets.set(p.id, p.title);
   for (const id of PRESET_IDS) if (!presets.has(id)) presets.set(id, id);
+  presets.delete(CHAT_PRESET);
+  presets.delete(ASK_PRESET);
+  presets.delete(REVIEW_LINK_PRESET);
   const out: ScenarioOption[] = [...presets].map(([id, title]) => ({
     value: `preset:${id}`,
     label: title,

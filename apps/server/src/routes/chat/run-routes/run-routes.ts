@@ -1,74 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ServerContext } from '../../../context.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { initiativePrompt, QUESTION_DENIED } from '../../../domains/chat/initiative/initiative.ts';
-import { autonomousPickMessage } from '@agentdeck/contracts/chat-group-settings';
-import { recommendedPicks } from '../../../domains/chat/auto-pick/auto-pick.ts';
-import {
-  chatKnobsLine,
-  linkedChildAppend,
-  runGroupChoice,
-} from '../../../domains/chat/group-run-lines/group-run-lines.ts';
-import { chatPathHint } from '../../../domains/chat/path-steps/path-steps.ts';
+import { initiativePrompt } from '../../../domains/chat/initiative/initiative.ts';
+import { linkedChildAppend } from '../../../domains/chat/group-run-lines/group-run-lines.ts';
 import { genTimeSink } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
 import type { ChatRunRegistry } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { ChatEvent } from '../../../domains/chat/chat-events.ts';
-import { RUN_UNKNOWN_DENIED } from '../../../domains/chat/run-ledger/run-ledger.ts';
-import {
-  conflictsWith,
-  exportsHeldContent,
-  isHiddenSync,
-  isSoleSync,
-  isUnnamedRef,
-  mainSyncDenied,
-  MAIN_SYNC_UNKNOWN,
-  movesHistory,
-  remoteConflicts,
-  resolvedSyncText,
-  syncCandidate,
-  syncsWithTarget,
-  syncTarget,
-  syncUnderway,
-} from '../../../domains/chat/main-sync/main-sync.ts';
-import { expandAliasText } from '../../../domains/chat/group-command/alias-text.ts';
-import { isProtectedBranch } from '../../../domains/chat/group-command/branch.ts';
-import {
-  PUBLISH_BEFORE_DELIVERY_DENIED,
-  publishesBeforeDelivery,
-  publishTextOf,
-  SEND_PACK_DENIED,
-  sendsPack,
-} from '../../../domains/chat/group-profile/delivery-publish.ts';
-import { GROUP_DELIVER_AHEAD_ENV } from '../../../domains/chat/group-profile/group-profile.ts';
+import { CORE_PERMIT_TOOL } from '../../../domains/chat/core-run/core-run.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
-import {
-  shouldAutoApprove,
-  isReadOnlyTool,
-} from '../../../domains/chat/auto-approve/auto-approve.ts';
-import {
-  BRANCH_GATE_STOPPED,
-  branchGateHandedDenial,
-  branchContinuePrompt,
-  branchMovedDenial,
-  isMainWorkingCopy,
-  isWritingCall,
-  mainCopyTargetOf,
-  outsideCopyDenial,
-  suggestBranchName,
-} from '../../../domains/chat/ChatBranchGate/ChatBranchGate.ts';
-import { existsSync } from 'node:fs';
-import {
-  addWorktree,
-  chatDeliveryFor,
-  GitError,
-  removeWorktree,
-} from '../../../domains/project-git/project-git.ts';
-import {
-  createAllowedMcpToolsReader,
-  createGuardedPatternsReader,
-} from '../../../domains/permissions/permissions.ts';
+import { chatDeliveryFor } from '../../../domains/project-git/project-git.ts';
 import { chatDirectory } from '../../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
 import { findTranscript } from '../../../domains/chat/ChatTranscriptFile/ChatTranscriptFile.ts';
 import {
@@ -91,10 +32,7 @@ import {
   readinessForCwd,
   repairCopy,
 } from '../../../domains/project-git/copy-readiness.ts';
-import {
-  cascadeCeilingFor,
-  expandAssignedModel,
-} from '../../../domains/model-cascade/model-cascade.ts';
+import { expandAssignedModel } from '../../../domains/model-cascade/model-cascade.ts';
 import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
 import { providerCliCommand } from '../../../providers/cli/cli.ts';
 import { getActiveProvider } from '../../../providers/registry.ts';
@@ -112,76 +50,13 @@ import {
 } from '../../../domains/chat/busy-send-queue.ts';
 import { SentOnce } from '../../../domains/chat/sent-once.ts';
 import { parseBody } from '../../../lib/request-body.ts';
-import { allowedPermissionRules } from '@agentdeck/contracts/permission-rules';
-import { cachedMainOf, guardHitFor } from '../../../domains/backend-guard/backend-guard.ts';
-import { mainCheckoutOf } from '../../../domains/project-tests/project-tests.ts';
-import {
-  GROUP_REASK_LINE,
-  GROUP_REASK_MAX,
-  noteGroupQuestion,
-  groupAutoApproveFor,
-  groupDecision,
-  groupDiscards,
-  groupGitAimRefusal,
-  groupKillRefusal,
-  groupPushRefusal,
-  needsMrState,
-  syncDanger,
-  withOwnTemp,
-  withProcessFacts,
-  withWorktree,
-  recordGroupAutoNotice,
-  type GroupAutoApprove,
-} from '../../../domains/chat/group-permissions.ts';
-import { gitDestroys, guardUncommitted } from '../../../domains/chat/group-tree-state.ts';
-import {
-  callTranscriptFile,
-  sessionScratchpad,
-  sessionTranscriptDir,
-  sessionTranscriptFile,
-  settledToolCallCwd,
-} from '../../../domains/chat/ChatTranscriptFile/tool-call-cwd.ts';
-import {
-  planAnswerMessage,
-  planAnswers,
-  recordGroupAnswerNotice,
-} from '../../../domains/chat/group-questions/group-questions.ts';
-import { readMergeRequestByUrl } from '../../../domains/integrations/forge.ts';
-import { forgeTokenForUrl } from '../../../domains/integrations/forge-pick.ts';
-import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import {
   autoApproveBodySchema,
-  branchDecisionBodySchema,
   chatSendBodySchema,
   permissionDecisionBodySchema,
-  permissionRequestBodySchema,
 } from '@agentdeck/contracts/request-bodies';
-import {
-  alreadyQueuedDenial,
-  groupMainCopyRefusal,
-  humanRefusedDenial,
-  selfApprovalRefusal,
-  twinDecidedDenial,
-} from '../../../domains/chat/deferred-asks/deferred-asks.ts';
-import { deferredAsksOf } from '../deferred-routes/deferred-store.ts';
 import { humanOnly } from '../human-only/human-only.ts';
 import { humanOnlyDepsFor } from '../human-only/human-only-deps.ts';
-import {
-  branchFactsOf,
-  deferCall,
-  deferReason,
-  deliveryRefusal,
-  groupCopyOf,
-  MAIN_COPY_REASON,
-  MAIN_COPY_TOOL,
-  mainCopyInput,
-  protectedWriteRefusal,
-  reachesPanelDecision,
-  scopeOfRun,
-  sourceOfRun,
-  type DeferReason,
-} from './deferred-bridge.ts';
-import { answerDeferredFromCard } from './deferred-card.ts';
 
 /** Отказ на новое сообщение, пока прошлый ответ ещё генерируется. */
 const RUN_BUSY_MESSAGE =
@@ -218,7 +93,7 @@ const refuse = (
  */
 /**
  * Отправка, когда активен чужой CLI. Этот маршрут — чат Claude: аргументы
- * собирает `ChatRunner` под `claude` (`--output-format stream-json
+ * собирает адаптер Claude в ядре под `claude` (`--output-format stream-json
  * --include-partial-messages --permission-prompt-tool …`), и раньше он брал
  * команду активного провайдера — телефон при активном Qwen запускал `qwen` с
  * флагами Claude. Тихо уйти в Claude тоже нельзя: человек выбрал другой CLI.
@@ -246,6 +121,21 @@ const refuseExpired = (reply: FastifyReply): FastifyReply =>
     { messageCode: 'permission-expired' },
   );
 
+/** Висящая карточка этого вызова — вопрос права задачи ядра (`CORE_PERMIT_TOOL`). */
+export const isCorePermitCard = (
+  pending: readonly { toolName: string; toolUseId: string }[],
+  toolUseId: string,
+): boolean => pending.some((p) => p.toolUseId === toolUseId && p.toolName === CORE_PERMIT_TOOL);
+
+const refuseCorePermit = (reply: FastifyReply): FastifyReply =>
+  refuse(
+    reply,
+    409,
+    'core_permit_browser_only',
+    'Вопрос права задачи ядра отвечается из окна чата: ответ уходит ядру командой браузера, этот маршрут его ядру не передаёт.',
+    { messageCode: 'core-permit-browser-only' },
+  );
+
 /**
  * Прогон агента: отправка сообщения, поток ответа, остановка и права.
  *
@@ -253,94 +143,6 @@ const refuseExpired = (reply: FastifyReply): FastifyReply =>
  * на другую вкладку не убивают агента, а к идущему прогону можно переподключиться
  * потоком, догнав пропущенное. Остановка — только по явной кнопке.
  */
-/**
- * Снят ли MR группы с черновика и есть ли у него конфликт — для перезаписи её
- * ветки (L7.12, журнал 19.10 02:17:02; решение владельца 23.10: только при
- * конфликте). Фордж читается только когда этот вопрос решает исход
- * (`needsMrState`): сеть на каждый запрос прав — лишняя. Ключа нет или фордж не
- * ответил — `mrInReview` не ставится («на ревью»). Конфликт — по форджу ИЛИ по
- * вершинам своей и целевой веток на сервере (`remoteConflicts`, сверка по хэшам):
- * фордж считает его лениво, а `origin/*` копии пишет сам агент (F-31).
- */
-export async function withMrState(
-  store: AppStore,
-  appData: string,
-  group: GroupAutoApprove,
-  toolName: string,
-  input: unknown,
-): Promise<GroupAutoApprove> {
-  if (!group.mr || !needsMrState(group, { toolName, input })) return group;
-  const token = forgeTokenForUrl(store, appData, group.mr);
-  const mr = token
-    ? await readMergeRequestByUrl(group.mr, token).catch((error: unknown) => {
-        console.warn('group permissions: MR state unreadable', error);
-        return undefined;
-      })
-    : undefined;
-  const target = mr?.targetBranch ?? group.base ?? 'main';
-  // Вершины веток — у сервера, не из `origin/*` копии, которые агент пишет сам (F-31).
-  const local =
-    group.worktree && group.ownBranch
-      ? await remoteConflicts(group.worktree, group.ownBranch, target)
-      : undefined;
-  const known = mr?.conflicts !== undefined || local !== undefined;
-  return {
-    ...group,
-    ...(mr ? { mrInReview: mr.state === 'open' && !mr.draft } : {}),
-    ...(known ? { mrConflicts: mr?.conflicts === true || local === true } : {}),
-  };
-}
-
-/** С какого времени ответ на запрос прав пишется в журнал сервера как долгий. */
-const SLOW_PERMISSION_MS = 10_000;
-
-/**
- * Ссылка — своя ветка группы на удалённом (`origin/<своя>`, `refs/remotes/<удалённый>/<своя>`),
- * а своя ветка — не основная. Своя — по git (`ownBranch`) или по записи разделения (`branch`).
- */
-function isOwnUpstream(ref: string, group: GroupAutoApprove): boolean {
-  const name = /^(?:refs\/remotes\/)?[^/\s]+\/(.+)$/.exec(ref)?.[1];
-  if (!name) return false;
-  return [group.ownBranch, group.branch].includes(name) && !isProtectedBranch(name, group.base);
-}
-
-/** Догон, чью цель не назвать: решает человек (`syncRefOf`). */
-export const UNNAMED_SYNC = Symbol('unnamed-sync');
-
-/**
- * Догон целевой ветки группой (`main-sync.ts`): ссылка, с которой сверять
- * конфликт, — названная целевой или «скрытая» (хэш коммита целевой,
- * `checkout -B своя <старт>`), что git признал догоном. Повторная проверка 24.10:
- * - `command` — текст с раскрытыми псевдонимами снимка (`expandAliasText`), как
- *   его исполнит оболочка: `grb origin/main` при `grb='git rebase'` — догон (a);
- * - догон, чью цель не назвать (`git rebase "$T"`, цель не нашлась), —
- *   `UNNAMED_SYNC`: сверить конфликт нечем, решает человек (c);
- * - инструмент PowerShell — тот же текст `git …`, та же сверка, что у Bash;
- * - выгрузка того, что HEAD уже содержит (`exportsHeldContent`), — не догон;
- *   хэш целевой в ней судится дальше, как у любой команды.
- */
-export async function syncRefOf(
-  group: GroupAutoApprove,
-  cwd: string,
-  toolName: string,
-  command: string,
-): Promise<string | typeof UNNAMED_SYNC | undefined> {
-  if (toolName !== 'Bash' && toolName !== 'PowerShell') return undefined;
-  if (syncsWithTarget(command)) {
-    const target = syncTarget(command);
-    if (target === undefined || isUnnamedRef(target)) return UNNAMED_SYNC;
-    // Своя ветка на удалённом — не целевая (g8 26.10, F3): бот CI дописал в неё коммит, и
-    // `git pull/rebase origin/<своя>` получал отказ «конфликтов с целевой нет».
-    if (isOwnUpstream(target, group)) return undefined;
-    if (!(await exportsHeldContent(cwd, command, target))) return target;
-  }
-  const candidate = syncCandidate(command);
-  if (!candidate) return undefined;
-  if (isUnnamedRef(candidate)) return UNNAMED_SYNC;
-  if (isOwnUpstream(candidate, group)) return undefined;
-  return (await isHiddenSync(cwd, candidate, group.base)) ? candidate : undefined;
-}
-
 export function registerChatRunRoutes(
   app: FastifyInstance,
   ctx: ServerContext,
@@ -351,17 +153,11 @@ export function registerChatRunRoutes(
   // эти маршруты, получают собственный.
   session: ChatSession,
   /**
-   * Модель лёгкого чата вопросов о ходе групп (5.1): есть — разговор этот чат.
-   * Его ходы идут без дописки панели, как первый ход из хаба, и на его модели.
-   */
-  statusOf?: (chatId: string) => { model: string; effort: string } | undefined,
-  /**
    * Разговор принадлежит группе на паузе (`pausedGroupOf`). Досылку без человека
    * (`automatic`) такой разговор не принимает: паузу снимает только человек.
    */
   heldOf?: (chatId: string) => boolean,
 ): void {
-  const guardMainOf = cachedMainOf(mainCheckoutOf);
   // Маршруты решений человека отвечают только человеку: процесс модели —
   // потомок любого прогона или CLI панели — получает 403 (`human-only.ts`).
   const humanDeps = humanOnlyDepsFor(registry);
@@ -378,25 +174,7 @@ export function registerChatRunRoutes(
   // Скорость ответа переживает конец хода: лента из транскрипта берёт время отсюда.
   registry.setGenTimeSink(genTimeSink(ctx.location.paths.appData));
 
-  /**
-   * Охраняемые паттерны: всё, что пользователь просил спрашивать или запрещать.
-   * Спрашивается на каждый вызов инструмента, поэтому читатель кэширует ответ до
-   * первой правки самих файлов настроек (см. `createGuardedPatternsReader`).
-   */
-  const guardedPatterns = createGuardedPatternsReader(() => ({
-    settings: ctx.location.paths.settings,
-    settingsLocal: ctx.location.paths.settingsLocal,
-    store: ctx.store,
-  }));
-  // MCP-инструменты, разрешённые по имени: брокер применяет их сам, когда сервер
-  // отдан ему правилом `ask` (см. `createAllowedMcpToolsReader`).
-  const allowedMcpTools = createAllowedMcpToolsReader(() => ({
-    settings: ctx.location.paths.settings,
-    settingsLocal: ctx.location.paths.settingsLocal,
-    store: ctx.store,
-  }));
-
-  // Адрес, по которому мини-MCP-сервер прав стучится за решением пользователя.
+  // Адрес панели для карточек прав задачи ядра (`core-run.ts watchPermits` берёт `runId`).
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
 
   // Очередь сообщений занятому разговору — на диске: перезапуск панели не
@@ -737,28 +515,12 @@ export function registerChatRunRoutes(
       // переезжает на второй, но вкладка ещё помнит первый.
       const assigned =
         ctx.store.getChatLink(chatId) ?? (sessionId ? ctx.store.getChatLink(sessionId) : undefined);
-      // Лёгкий чат вопросов о ходе групп: первый ход ушёл без дописки, и второй
-      // получал инициативу (разделить, довести до MR) — системный промпт менялся
-      // между ходами, а чат только для чтения звали делить и доставлять (ревью A1-F3).
-      const status = statusOf?.(chatId) ?? (sessionId ? statusOf?.(sessionId) : undefined);
 
-      // Потолок для подбора — модель этого разговора: оверрайд шапки, иначе
-      // настройка. Правило выключено в проекте → `undefined`, и про классы
-      // работы агенту не говорится ни слова.
-      const ceiling = cascadeCeilingFor(
-        { entries: ctx.store.getProjectCascadeEntries(), settings: ctx.store.getSettings() },
-        cwd,
-        { model, effort },
-      );
       // Доставка до MR — обычному чату проекта; ребёнок разделения получает её
       // заданием группы, а песочнице доставлять некуда.
       const delivery =
         workspace.isSandbox || assigned ? undefined : chatDeliveryFor(ctx.store, cwd);
-      const initiative = initiativePrompt(ctx.store.getSettings(), {
-        splitMuted: registry.isSplitMuted(chatId),
-        ...(ceiling ? { cascade: ceiling } : {}),
-        ...(delivery ? { delivery } : {}),
-      });
+      const initiative = initiativePrompt(ctx.store.getSettings(), delivery ? { delivery } : {});
 
       // Веер ручного параллельного запуска, отправленный ступенью НИЖЕ потолка
       // разговора. Плата за понижение тут одна — планка сдачи, и про это в
@@ -768,62 +530,30 @@ export function registerChatRunRoutes(
       // Чат группы разделения получает дописку своего звена, а не обычного
       // разговора (`childAppendPrompt`): ответ человека в него — тот же ход
       // группы, и делить его дальше не предлагается.
-      // Путь группы, выбранной в чате, — подсказкой: у обычного чата звеньев нет,
-      // и шаги ходами после стадии не идут (`chatPathHint`).
-      const pathHint = workspace.isSandbox
-        ? undefined
-        : chatPathHint(
-            ctx.store.getGroups(),
-            // Ребёнок веера на первом ходу видит выбор родителя (`pendingParent`).
-            runGroupChoice(
+      const appendSystemPrompt =
+        (assigned && !workspace.isSandbox
+          ? // Та же сборка, что у продолжения сессии панелью (`review-starter.ts`):
+            // разойдись они, ход менял бы системный промпт сессии (E6).
+            linkedChildAppend(
               ctx.store,
               ctx.location.paths.appData,
+              ctx.store.getSettings(),
               sessionId ? [chatId, sessionId] : [chatId],
               cwd,
               parentChatId && parentChatId !== chatId ? parentChatId : undefined,
-            ),
-          );
-      // «Числа» группы — только изменённые человеком; у звена разделения они
-      // едут в его дописке вместе с эскалацией работы (`childStageExtra`).
-      const knobsLine = workspace.isSandbox
-        ? undefined
-        : chatKnobsLine(
-            ctx.store,
-            ctx.location.paths.appData,
-            sessionId ? [chatId, sessionId] : [chatId],
-            cwd,
-            parentChatId && parentChatId !== chatId ? parentChatId : undefined,
-          );
-      const appendSystemPrompt = status
-        ? undefined
-        : (assigned && !workspace.isSandbox
-            ? // Та же сборка, что у продолжения сессии панелью (`review-starter.ts`):
-              // разойдись они, ход менял бы системный промпт сессии (E6).
-              linkedChildAppend(
-                ctx.store,
-                ctx.location.paths.appData,
-                ctx.store.getSettings(),
-                sessionId ? [chatId, sessionId] : [chatId],
-                cwd,
-                parentChatId && parentChatId !== chatId ? parentChatId : undefined,
-              )
-            : [
-                initiative ?? '',
-                lowered ? loweredWorkPrompt(undefined, { review: false }) : '',
-                pathHint ?? '',
-                knobsLine ?? '',
-              ]
-                .filter(Boolean)
-                .join(' ')) || undefined;
+            )
+          : [initiative ?? '', lowered ? loweredWorkPrompt(undefined, { review: false }) : '']
+              .filter(Boolean)
+              .join(' ')) || undefined;
 
       // Алиас CLI — это «рекомендованная модель уровня», не последняя в
       // семействе: `--model sonnet` уводил прогон на прошлое поколение при
-      // свежем в каталоге. Разворачиваем сами, ровно как разделение
-      // (`expandAssignedModel` в `split-launch.ts`), — и у понижённой ступени,
+      // свежем в каталоге. Разворачиваем сами (`expandAssignedModel` в
+      // `domains/model-cascade`), — и у понижённой ступени,
       // и у выбора человека в шапке: пункт «Sonnet» человек читает как «свежий
       // Sonnet» (живой прогон 29.09: выбран Sonnet, шёл Sonnet 5 при вышедшем
       // 5.5). Конкретное имя модели — его точный выбор, оно едет как есть.
-      const wantedModel = model || status?.model;
+      const wantedModel = model;
       const runModel = wantedModel
         ? expandAssignedModel(ctx.models.current(provider.modelVendors ?? []).models, wantedModel)
         : wantedModel;
@@ -832,7 +562,7 @@ export function registerChatRunRoutes(
       // `sessionId` через пару секунд, и перенос связи ищет запись по временному
       // ключу: не найдя, он молча ничего не делает, и чат уезжает в список
       // отдельным разговором вместе со своими вопросами (3 сентября так потерялись
-      // трое детей из четырёх, см. `SplitLink` в `domains/chat/ChatSplit/ChatSplit.ts`).
+      // трое детей из четырёх).
       //
       // Только для НОВОГО разговора: продолжение уже существующего родителя себе
       // не назначает — иначе обычная переписка в чате-ребёнке переписывала бы
@@ -848,8 +578,7 @@ export function registerChatRunRoutes(
       // Откуда прогон для контура (Т3, найдено ревью Т8). Связь заводится
       // разделением — значит разговор со связью принадлежит дереву групп, и
       // маршрут он обязан спрашивать потребителем «Группы разделения», как это
-      // уже делают сам запуск разделения (`split-launch.ts`) и продолжение в
-      // чистой сессии (`handoff-routes.ts`). Без этого одна переписка ходила бы
+      // делает продолжение в чистой сессии (`handoff-routes.ts`). Без этого одна переписка ходила бы
       // двумя маршрутами: реплики агента через контур, а ответ человека в том же
       // чате — мимо него, и наши слои снимались бы через раз. Связь, заведённую
       // строкой выше, считаем тоже: первое сообщение ребёнка — уже прогон дерева.
@@ -881,7 +610,7 @@ export function registerChatRunRoutes(
           // шлёт всегда, а телефон и API-клиенты — нет, и без этого их сообщения
           // молча возвращали бы разговор на дефолт из настроек.
           model: runModel || assigned?.model,
-          effort: effort || assigned?.effort || status?.effort,
+          effort: effort || assigned?.effort,
           // Инициативы панели (разделить задачи, закрыть этап чистой сессией) —
           // одной строкой к системному промпту. Тумблеры в настройках, потому что
           // уместны они не всякому: кто ведёт один короткий разговор, увидит в них
@@ -889,8 +618,8 @@ export function registerChatRunRoutes(
           ...(appendSystemPrompt ? { appendSystemPrompt } : {}),
           // Полный доступ снимает все проверки прав — по кнопке «Разрешить и
           // продолжить» у агента, вставшего из-за отсутствия разрешения.
-          // Чат дерева разделения с правом правок идёт в авторежиме, как и его
-          // запуск (`split-launch.ts`): иначе ответ человека в чате группы
+          // Чат дерева разделения с правом правок идёт в авторежиме, как шёл и его
+          // запуск: иначе ответ человека в чате группы
           // продолжал её в `acceptEdits`, и она вставала на карточке прав, которой
           // человек не видит (живой прогон 24.09.2026).
           permissionMode: fullAccess
@@ -900,7 +629,7 @@ export function registerChatRunRoutes(
               : permissionModeFor(workspace, allowEdits, cliAutoMode),
           // Интерактивные права: запрос на инструмент вне авторазрешённого уходит
           // человеку кнопкой в чате. Передаётся всегда, но при полном доступе
-          // (`bypassPermissions`) ChatRunner брокер не подключает — подтверждать
+          // (`bypassPermissions`) прогон брокер не подключает — подтверждать
           // нечего; вопрос агента с вариантами едет не через брокер, а следующим
           // сообщением (`QUESTION_PROMPT`, `domains/chat/initiative/initiative.ts`).
           permissionPrompt: { runId: chatId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
@@ -1082,540 +811,6 @@ export function registerChatRunRoutes(
   // Долгое решение прав — строкой в журнал сервера (журнал 26.10, #g8:30: вызов
   // группы шёл 131 с, команда — 0,07 с, а где стояла панель — не восстановить).
   // Карточка человеку тоже долгая — строка называет вызов, сверка — по D-n.
-  const slowPermission = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    if (reply.elapsedTime < SLOW_PERMISSION_MS) return;
-    const body = (request.body ?? {}) as { toolName?: unknown; toolUseId?: unknown };
-    console.warn(
-      `permission-request: ${String(body.toolName)} ${String(body.toolUseId)} answered in ` +
-        `${Math.round(reply.elapsedTime / 1000)} s`,
-    );
-  };
-  app.post<{ Body: unknown }>(
-    '/api/chat/permission-request',
-    { onResponse: slowPermission },
-    async (request, reply) => {
-      const body = parseBody(permissionRequestBodySchema, request.body, reply);
-      if (!body) return reply;
-      const { runId, toolName, input, toolUseId } = body;
-
-      // Вопрос человеку — не запрос прав: карточку с вопросом лента уже рисует
-      // по самому вызову, а ответ едет следующим сообщением. Показать здесь ещё
-      // и карточку прав значило бы повесить прогон до клика по кнопке, которая
-      // ничего не решает (см. `QUESTION_DENIED`).
-      if (toolName === 'AskUserQuestion') {
-        // Группа «по плану» (`group-questions.ts`): ответ на каждый вопрос сразу,
-        // отметка «ответ дан автоматически» — в хаб родителя. Тот же формат
-        // отказа, что у автовыбора: лента, реестр и сводка узнают его по метке.
-        const answers = registry.answersByPlan(runId) ? planAnswers(input) : null;
-        if (answers) {
-          const owner = registry.describe(runId) ?? registry.describeIdle(runId);
-          const group = groupAutoApproveFor(ctx.store, [runId, owner?.key]);
-          // Тот же вопрос снова и снова — петля (F-128): после потолка не отвечаем.
-          const asked = group
-            ? noteGroupQuestion(
-                group,
-                runId,
-                answers.map((answer) => answer.question),
-              )
-            : 0;
-          if (asked > GROUP_REASK_MAX) {
-            const message = `${planAnswerMessage(answers)}\n\n${GROUP_REASK_LINE}`;
-            return reply.send({ behavior: 'deny', message });
-          }
-          try {
-            if (group) recordGroupAnswerNotice(ctx.store, group, answers);
-          } catch {
-            // Отметка — для хаба: отказ диска не имеет права оставить вопрос без ответа.
-          }
-          return reply.send({ behavior: 'deny', message: planAnswerMessage(answers) });
-        }
-        // Автономный чат: тот же отказ с выбором, что пишет хук `autonomous-pick`
-        // там, где брокера нет, — лента узнаёт его по метке. Без рекомендации или с
-        // рекомендацией «для человека» — вопрос человеку (`recommendedPicks`). Группа,
-        // чьи развилки решает человек (`groupQuestions: 'human'`), — тоже ему.
-        const picks = registry.picksQuestions(runId) ? recommendedPicks(input) : null;
-        const message = picks ? autonomousPickMessage(picks) : QUESTION_DENIED;
-        return reply.send({ behavior: 'deny', message });
-      }
-
-      // Поздний подхват. Единственный обход журнала при старте панели мог этот
-      // прогон не поймать: pid приезжает в журнал асинхронно, а `tasklist` на
-      // занятой машине отвечает не всегда — и тогда живой агент получал отказ на
-      // КАЖДЫЙ вызов до конца жизни. Пробуем усыновить его по журналу здесь, теми
-      // же проверками; цена — одно чтение файла на неизвестный прогон. Тумблеры
-      // возвращаем из снимка ДО проверки автоподтверждения ниже: иначе подхват
-      // сразу поднял бы карточку там, где до перезапуска панель молчала.
-      if (!registry.isRunning(runId)) {
-        const adopted = registry.adoptFromLedger(runId);
-        if (adopted?.autoApprove) session.armAutoApprove(adopted.key, adopted.autoApprove);
-      }
-
-      // ВОРОТА ВЕТКИ — раньше автоподтверждения, и порядок тут решает всё: правка
-      // файла обратима, автоподтверждение пропустило бы её молча, и вопрос «где
-      // мы вообще пишем» не прозвучал бы никогда. Стоят они не про безопасность
-      // вызова, а про место: каталог у git один на всех, и первая правка делает
-      // чаты проекта зависимыми друг от друга (`ChatBranchGate.ts`).
-      const rules = allowedPermissionRules(ctx.store.getSettings().autoApproveRules);
-      // Хода нет, а процесс разговора жив — спросил фоновый субагент, переживший
-      // конец хода (живой прогон 14.10). Решается по параметрам разговора; карточка,
-      // если она нужна, заводит видимый прогон (`showCard` ниже).
-      const held = registry.describe(runId) ?? registry.describeIdle(runId);
-      // Карточке нужен ИДУЩИЙ прогон: буфер закончившегося не видит ни одна
-      // вкладка, и брокер держал бы вызов сутки при молчащем чате.
-      const showCard = (event: ChatEvent): boolean =>
-        (registry.isRunning(runId) || registry.hostBackgroundAsk(runId)) &&
-        registry.emitExternal(runId, event);
-      // Прогона нет в реестре — ни живого, ни усыновлённого из журнала: ни обходом
-      // при старте (`bootstrap/runtime/runtime.ts`), ни поздним подхватом выше. Значит его
-      // процесс мёртв или записи о нём нет вовсе. Отказ — раньше любого
-      // автоподтверждения: с включённым по умолчанию авторежимом остановленный
-      // прогон иначе получал бы молчаливое «разрешено». Текст честный и с
-      // действием: он уезжает агенту результатом вызова и в транскрипт, откуда его
-      // видит лента. «Разговор не найден» здесь стояло 09.09.2026 на 24 отказах за
-      // секунду.
-      if (!held) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
-
-      // ОТЛОЖЕННЫЕ ВОПРОСЫ D-n (решения владельца 23.10). Вызов, тянущийся к
-      // маршрутам решений или ключу панели, — попытка ответить за человека: отказ
-      // раньше всего, даже разрешения ниже (`deferred-bridge.ts`).
-      if (reachesPanelDecision(toolName, input)) {
-        return reply.send({ behavior: 'deny', message: selfApprovalRefusal() });
-      }
-      const asks = deferredAsksOf(ctx);
-      const runKeys = [
-        ...new Set([runId, held.key, held.sessionId].filter((key): key is string => Boolean(key))),
-      ];
-      const scope = scopeOfRun(ctx.store, runKeys);
-      const grouped = scope.kind === 'group';
-      // Разовое разрешение человека на ровно этот вызов — раньше ворот и правил:
-      // человек сказал «да» именно ему. Погашается здесь же, второй раз не пройдёт.
-      if (asks.consume(scope, toolName, input)) {
-        return reply.send({ behavior: 'allow', updatedInput: input });
-      }
-      // Черновик MR, пока ждёт D-n, и номер D-n в публикуемом тексте — отказ с ответом.
-      const delivery = deliveryRefusal(asks, scope, toolName, input);
-      if (delivery) return reply.send({ behavior: 'deny', message: delivery });
-      // Никто не смотрит: группа или автономный чат, у которого не открыт ни один
-      // поток клиента, — вызов, который решает человек, откладывается сразу.
-      // Автономность включена по умолчанию (26.09), поэтому одной её мало: открыта
-      // вкладка или телефон — человек может смотреть, и карточка первой (решение 1),
-      // D-n — по сроку `deferAfterMinutes`. Фоновый субагент одиночного чата после
-      // конца хода — так же: его карточка заводит видимый прогон (`showCard`).
-      // `hostBackgroundAsk` здесь не звать: он сам заводит прогон, и простое чтение
-      // запустило бы его.
-      // «Смотрит» — с окном срока: при перезапуске панели вкладка переподключается,
-      // а CLI шлёт запрос заново, и мгновенное «потока нет» отложило бы вызов при
-      // человеке у экрана (`isAttended`). Срок ноль — окно по умолчанию, 10 минут.
-      const deferAfterMs = Math.max(0, ctx.store.getSettings().deferAfterMinutes ?? 10) * 60_000;
-      const unattended =
-        grouped ||
-        (registry.isAutonomous(runId) &&
-          !registry.isAttended(runId, deferAfterMs > 0 ? deferAfterMs : 10 * 60_000));
-      const deferIt = (reason: DeferReason, kind: 'permission' | 'branchGate' = 'permission') =>
-        deferCall(asks, {
-          scope,
-          runKeys,
-          toolName: kind === 'branchGate' ? MAIN_COPY_TOOL : toolName,
-          input: kind === 'branchGate' ? mainCopyInput(held.options.cwd) : input,
-          toolUseId,
-          reason: reason.text,
-          reasonCode: reason.code,
-          ...(reason.params ? { reasonParams: reason.params } : {}),
-          kind,
-          cwd: held.options.cwd,
-          source: sourceOfRun(ctx.store, scope, held.options.cwd, held.options.name),
-        });
-      // Карточка одиночного чата, на которую не ответили за срок настройки, сама
-      // становится D-n (решение 1); ноль — ждать человека, как раньше.
-      // Близнец (RF-DL-02): тот же вызов дважды в одном ответе модели — две
-      // карточки. Решение одной закрывает D-n другой (`cardDecided`), а срок
-      // другой после решения первой даёт отказ без новой D-n: вызов один.
-      const callKey = (kind: 'permission' | 'branchGate') =>
-        kind === 'branchGate'
-          ? { tool: MAIN_COPY_TOOL, call: mainCopyInput(held.options.cwd) }
-          : { tool: toolName, call: input };
-      const cardAnswered = (
-        kind: 'permission' | 'branchGate',
-        decision: { behavior: string; expired?: boolean },
-      ) => {
-        // Только ответ человека: карточка, ставшая D-n по сроку, «отвечена» отказом
-        // самой панели, и закрыть он обязан не свою же запись.
-        if (decision.expired || session.deferredIdOf(runId, toolUseId)) return;
-        if (!session.wasPermissionAnswered(runId, toolUseId)) return;
-        if (decision.behavior !== 'allow' && decision.behavior !== 'deny') return;
-        const { tool, call } = callKey(kind);
-        asks.cardDecided(scope, tool, call, decision.behavior);
-      };
-      const deferLater = (reason: DeferReason, kind: 'permission' | 'branchGate') => {
-        const shownAt = Date.now();
-        return deferAfterMs > 0
-          ? {
-              afterMs: deferAfterMs,
-              reply: () => {
-                const { tool, call } = callKey(kind);
-                const twin = asks.twinDecided(scope, tool, call, shownAt);
-                if (twin) {
-                  return { reply: { behavior: 'deny' as const, message: twinDecidedDenial(twin) } };
-                }
-                const deferred = deferIt(reason, kind);
-                return {
-                  reply: { behavior: 'deny' as const, message: deferred.message },
-                  id: deferred.id,
-                };
-              },
-            }
-          : undefined;
-      };
-      const resolved = (decision: { behavior: 'allow' | 'deny'; expired?: boolean }) => {
-        const deferredId = session.deferredIdOf(runId, toolUseId);
-        registry.emitExternal(runId, {
-          kind: 'permissionResolved',
-          toolUseId,
-          behavior: decision.behavior,
-          ...(decision.expired ? { expired: true as const } : {}),
-          ...(deferredId ? { deferredId } : {}),
-        });
-      };
-      if (
-        !rules.has('editInMainCopy') &&
-        held &&
-        !session.isBranchGateSettled(runId) &&
-        isWritingCall(toolName, input) &&
-        isMainWorkingCopy(held.options.cwd)
-      ) {
-        // Человек уже ответил «пишите здесь» на D-n ворот — ворота сняты для чата.
-        if (asks.consume(scope, MAIN_COPY_TOOL, mainCopyInput(held.options.cwd))) {
-          session.settleBranchGate(runId);
-          return reply.send({ behavior: 'allow', updatedInput: input });
-        }
-        // Группа пишет в основную копию: ответ известен, если у неё своя копия;
-        // без копии место решает человек — D-n, работа идёт дальше.
-        if (grouped) {
-          const own = groupCopyOf(ctx.store, scope);
-          if (own && own.replace(/[\\/]+$/, '') !== held.options.cwd.replace(/[\\/]+$/, '')) {
-            return reply.send({ behavior: 'deny', message: groupMainCopyRefusal(own) });
-          }
-          return reply.send({
-            behavior: 'deny',
-            message: deferIt(MAIN_COPY_REASON, 'branchGate').message,
-          });
-        }
-        if (unattended) {
-          return reply.send({
-            behavior: 'deny',
-            message: deferIt(MAIN_COPY_REASON, 'branchGate').message,
-          });
-        }
-        // Ворота этого места уже стоят человеку: вторая карточка про то же ни к
-        // чему, и её разрешение исполнило бы правку дважды (D-L01, та же семья).
-        const gate = asks.retryOf(scope, MAIN_COPY_TOOL, mainCopyInput(held.options.cwd));
-        if (gate) {
-          return reply.send({
-            behavior: 'deny',
-            message:
-              gate.state === 'denied'
-                ? humanRefusedDenial(gate.id, gate.message)
-                : alreadyQueuedDenial(gate.id),
-          });
-        }
-        // Имя ветки предлагаем по заданию прогона, а не по названию чата: задание
-        // и есть то, ради чего ветку заводят, и в списке веток оно скажет больше.
-        const branch = suggestBranchName(held.options.prompt, held.key);
-        // Работа разговора отдана группам (Д15): карточка говорит кому, а копия,
-        // если её всё же заведут, встанет на ветку MR детей, а не на HEAD.
-        const handed = registry.branchGateContext(runId);
-        const shown = showCard({
-          kind: 'branchGate',
-          toolName,
-          input,
-          toolUseId,
-          cwd: held.options.cwd,
-          branch,
-          ...(handed?.children.length ? { children: handed.children } : {}),
-          ...(handed?.base ? { base: handed.base } : {}),
-        });
-        if (shown) {
-          const decision = await session.requestPermission(
-            { runId, toolName, input, toolUseId, kind: 'branchGate' },
-            deferLater(MAIN_COPY_REASON, 'branchGate'),
-          );
-          cardAnswered('branchGate', decision);
-          resolved(decision);
-          return reply.send(decision);
-        }
-      }
-      // Прогон в своей копии пишет в основную (D4): карточка «завести копию» тут
-      // ни к чему — копия уже есть, — поэтому отказ с адресом, куда писать.
-      const intoMain =
-        !rules.has('editInMainCopy') && held
-          ? mainCopyTargetOf(held.options.cwd, toolName, input)
-          : undefined;
-      if (held && intoMain) {
-        return reply.send({
-          behavior: 'deny',
-          message: outsideCopyDenial(held.options.cwd, intoMain),
-        });
-      }
-      // Звено до доставки не публикует (RF-BGCD-07): `deny` CLI — шаблон по тексту,
-      // и `bash -c 'git push'`, `Git push`, `git send-pack` доходили сюда, а разбор
-      // группы пуш своей ветки разрешает сам. Метку ставит профиль группы.
-      if (
-        held?.options.platformEnv?.[GROUP_DELIVER_AHEAD_ENV] === '1' &&
-        publishesBeforeDelivery(publishTextOf(toolName, input) ?? '')
-      ) {
-        return reply.send({ behavior: 'deny', message: PUBLISH_BEFORE_DELIVERY_DENIED });
-      }
-
-      // Автоподтверждение: обратимый запрос разрешаем молча, не показывая
-      // карточку. Человеку остаётся безвозвратное (удаление, затирание истории,
-      // снос данных и инфраструктуры, публикация в чужой реестр) и всё, что
-      // попадает под правила `ask`/`deny` пользователя, — граница целиком в
-      // `domains/chat/auto-approve/auto-approve.ts`, там же и причина её выбора.
-      //
-      // Чтение проходит и при выключенном тумблере: посмотреть файл нечего
-      // отменять, а карточка на каждый открытый файл останавливала прогон чаще
-      // всего остального вместе взятого.
-      // Защита бэкенда проекта узнала команду (снос таблицы, откат миграций,
-      // прод) — решает только человек, мимо автоподтверждения и строк группы.
-      // Хук проекта сказал CLI «спросить», но причина до брокера не доезжает:
-      // CLI передаёт инструменту прав только сам вызов. Без этой проверки
-      // включённый авторежим молча разрешал то, о чём хук просил спросить.
-      const guard = guardHitFor(held.options.cwd, toolName, input, guardMainOf);
-      const auto = session.autoApproveFor(runId);
-      // Группа разделения решает по строкам вкладки «Группы» (`group-permissions.ts`):
-      // её ведёт конвейер, а не браузер. Уступают строки только тумблеру, который
-      // человек ВКЛЮЧИЛ в чате группы сам; унаследованный от родителя или
-      // выключенный (ответ из хаба шлёт его выключенным) — не в счёт.
-      const humanOn = auto?.enabled === true && auto.inherited !== true;
-      const linked = humanOn ? undefined : groupAutoApproveFor(ctx.store, [runId, held?.key]);
-      // Своя ветка группы — у git её копии, не из текста команды (`withWorktree`).
-      const placed = linked && (await withWorktree(linked, held.options.cwd, { toolName, input }));
-      // Каталог оболочки CLI — из записи транскрипта с этим вызовом (N4): после
-      // `cd подпроект` прошлой командой относительные пути судились от корня копии.
-      // Запрос бывает раньше записи вызова — её ждут недолго (D-6, `settledToolCallCwd`).
-      const shellCwd =
-        placed && toolName === 'Bash'
-          ? await settledToolCallCwd(projectsDir(ctx), held.sessionId ?? held.key, toolUseId)
-          : undefined;
-      // Своя рабочая папка CLI этой сессии — уборка в ней своя (F-77).
-      const scratchpad =
-        placed && toolName === 'Bash'
-          ? sessionScratchpad(projectsDir(ctx), held.sessionId ?? held.key)
-          : undefined;
-      // Погашение номера или порта — сверка с процессами группы (N3): живое дерево,
-      // метка группы, текст запуска сироты в транскриптах копии (D-1).
-      const transcriptDir = placed
-        ? sessionTranscriptDir(projectsDir(ctx), held.sessionId ?? held.key)
-        : undefined;
-      // И номера, что разговор группы напечатал о своём запуске (D-8, `printed-pids.ts`).
-      const conversation = placed
-        ? sessionTranscriptFile(projectsDir(ctx), held.sessionId ?? held.key)
-        : undefined;
-      // Свои временные файлы прошлых вызовов — только у команды, удаляющей
-      // временный путь: файл с этим вызовом (разговор или субагент) читается тогда (D-10).
-      const owned =
-        placed &&
-        withOwnTemp(
-          {
-            ...placed,
-            ...(shellCwd ? { shellCwd } : {}),
-            ...(scratchpad ? { scratchpad } : {}),
-          },
-          { toolName, input },
-          toolUseId,
-          () => callTranscriptFile(projectsDir(ctx), held.sessionId ?? held.key, toolUseId),
-        );
-      const found =
-        owned &&
-        (await withProcessFacts(
-          owned,
-          { toolName, input },
-          registry.processRootsOf(runId),
-          undefined,
-          {
-            ...(transcriptDir ? { transcriptDir } : {}),
-            ...(conversation ? { conversation } : {}),
-          },
-        ));
-      const stated =
-        found && (await withMrState(ctx.store, ctx.location.paths.appData, found, toolName, input));
-      // Незакоммиченное перед затиранием или сменой ветки (решения владельца 23.10):
-      // затирание — после снимка в `refs/agentdeck/backup/…`, смена ветки на грязном
-      // дереве и неудавшийся снимок — отказ агенту с причиной, не карточка.
-      const kept =
-        stated && !guard
-          ? await guardUncommitted(
-              stated.worktree,
-              String((input as { command?: unknown } | null)?.command ?? ''),
-              groupDiscards(stated, { toolName, input }),
-            )
-          : {};
-      if ('deny' in kept) return reply.send({ behavior: 'deny', message: kept.deny });
-      const group = stated && kept.tree ? { ...stated, tree: kept.tree } : stated;
-      const groupLevel = group
-        ? groupDecision(group, {
-            toolName,
-            input,
-            guardedPatterns: guardedPatterns(),
-            allowedTools: allowedMcpTools(),
-          })
-        : 'human';
-      // Перезапись своей ветки, чей MR на ревью, без конфликта — отказ агенту с
-      // причиной, не карточка (решение владельца 23.10): решать человеку нечего.
-      const pushRefusal =
-        !guard && group ? groupPushRefusal(group, { toolName, input }) : undefined;
-      if (pushRefusal) return reply.send({ behavior: 'deny', message: pushRefusal });
-      // Погашение не своего или неназванного — отказ агенту с тем, как погасить
-      // своё, не карточка (D-1, 24.10, решение владельца): человеку решать нечего.
-      const killRefusal =
-        !guard && group ? groupKillRefusal(group, { toolName, input }) : undefined;
-      if (killRefusal) return reply.send({ behavior: 'deny', message: killRefusal });
-      // git в каталоге над копией (`cd ..; git -C ..`, D-4 25.10) — промах пути:
-      // отказ с тем, где пошёл бы git, а не карточка — человеку решать нечего.
-      const aimRefusal =
-        !guard && group ? groupGitAimRefusal(group, { toolName, input }) : undefined;
-      if (aimRefusal) return reply.send({ behavior: 'deny', message: aimRefusal });
-      // `git send-pack` — пуш мимо разбора цели: разбор группы счёл его обычной
-      // командой и пускал даже в main (RF-BGCD-07). Группе он не нужен — есть `git push`.
-      if (group && sendsPack(publishTextOf(toolName, input) ?? '')) {
-        return reply.send({ behavior: 'deny', message: SEND_PACK_DENIED });
-      }
-      // Догон main группой — только при конфликте с ним, без карточки
-      // (`main-sync.ts`): отставший MR без конфликта человек обновит сам.
-      // Текст — как его исполнит оболочка: псевдонимы снимка раскрыты (повторная проверка 24.10, a).
-      const written = String((input as { command?: unknown } | null)?.command ?? '');
-      // Цель через `$(git rev-parse …)` или переменную — сама ссылка (`resolvedSyncText`).
-      const syncCommand = resolvedSyncText(
-        expandAliasText(written, toolName === 'Bash' ? group?.aliases : undefined),
-      );
-      const syncFound =
-        !guard && group && held
-          ? await syncRefOf(group, held.options.cwd, toolName, syncCommand)
-          : undefined;
-      // Цель догона не назвать — сверить конфликт нечем: решает человек, не строки группы (c).
-      const syncUnnamed = syncFound === UNNAMED_SYNC;
-      const syncRef = syncFound === UNNAMED_SYNC ? undefined : syncFound;
-      // Догон уже идёт (его пропустила сверка, когда он начинался): сторона целевой
-      // для файла посреди него — разрешение конфликта, не новый догон (журнал 24.10,
-      // D33: `git show origin/main:a > a` посреди перебазирования — MAIN_SYNC_UNKNOWN).
-      // Перенос истории и посреди него сверяется заново.
-      const resolving =
-        Boolean(syncRef && held) &&
-        !movesHistory(syncCommand) &&
-        (await syncUnderway(held?.options.cwd ?? '', group?.base));
-      if (syncRef && held && !resolving) {
-        // По вершине сервера, не по `origin/*` копии (RF-BGCD-05); база группы — где искать хэш.
-        const conflict = await conflictsWith(held.options.cwd, syncRef, group?.base);
-        // Дерево целевой ради «чьё красное» — отказ называет `run --base` (F-09).
-        if (conflict === false) {
-          const message = mainSyncDenied(syncCommand, held.options.cwd);
-          return reply.send({ behavior: 'deny', message });
-        }
-        // Сверить не вышло — не «можно»: rebase без известного конфликта запрещён.
-        if (conflict === undefined) {
-          return reply.send({ behavior: 'deny', message: MAIN_SYNC_UNKNOWN });
-        }
-        // Конфликт группа чинит сразу и без карточки: разбор команды счёл бы
-        // `git merge origin/main` опасным слиянием и спросил человека.
-        // Догон, что разбор счёл опасным не из-за слияния (`-c core.editor=…`,
-        // `-x <команда>`, глобальные ключи с программой), коротким путём не идёт.
-        if (
-          conflict === true &&
-          group &&
-          isSoleSync(syncCommand) &&
-          // Разбор сам раскрывает псевдонимы — ему команда как написана.
-          !syncDanger(group, written, toolName)
-        ) {
-          recordGroupAutoNotice(ctx.store, group, { toolName, input });
-          return reply.send({ behavior: 'allow', updatedInput: input });
-        }
-      }
-      if (!guard && group && groupLevel !== 'human' && !syncUnnamed) {
-        // «С отметкой»: прошло без человека, но хаб родителя это покажет.
-        if (groupLevel === 'notify') recordGroupAutoNotice(ctx.store, group, { toolName, input });
-        return reply.send({ behavior: 'allow', updatedInput: input });
-      }
-      if (
-        !guard &&
-        !group &&
-        // Авторежим CLI шлёт сюда лишь задетое правилом `ask` (`CHAT_GIT_ASK`, L2):
-        // что не удаление и не правило человека — решают правила чата, как решил бы
-        // его классификатор, а не карточка при выключенном тумблере.
-        (auto?.enabled || held.options.permissionMode === 'auto' || isReadOnlyTool(toolName)) &&
-        // Удаление данных git и слияние — человеку и в одиночном чате (решение владельца 23.10).
-        !gitDestroys(toolName, input) &&
-        shouldAutoApprove({
-          toolName,
-          input,
-          guardedPatterns: guardedPatterns(),
-          allowedTools: allowedMcpTools(),
-          allowEdits: auto?.allowEdits ?? false,
-          // Правила читаются на КАЖДЫЙ запрос (`rules` выше): тумблер щёлкают
-          // ровно тогда, когда надоела карточка, и действовать он обязан со
-          // следующего же вызова, а не со следующего прогона.
-          allowedRules: rules,
-        })
-      ) {
-        return reply.send({ behavior: 'allow', updatedInput: input });
-      }
-
-      // Слияние, push в защищённую ветку и пуш с недоказуемой целью — известный
-      // ответ, а не вопрос человеку (решение 2). Проверка стоит ДО карточки: иначе
-      // карточка по сроку сама стала бы D-n, который заводить запрещено, и человек
-      // решал бы одной кнопкой то, что решает только владелец (D-S02).
-      const protectedWrite = protectedWriteRefusal(
-        toolName,
-        input,
-        await branchFactsOf(held.options.cwd, toolName, input, group?.base),
-      );
-      if (protectedWrite) return reply.send({ behavior: 'deny', message: protectedWrite });
-
-      // Тот же вызов уже стоит человеку (или человек его запретил): ответ — запись,
-      // а не вторая карточка. Без этого повтор в чате при человеке получал свежую
-      // карточку, вызов исполнялся, а D-n оставалась ждать — и разрешённая позже
-      // исполняла его второй раз (D-L01, живой прогон R4).
-      const already = asks.retryOf(scope, toolName, input);
-      if (already) {
-        return reply.send({
-          behavior: 'deny',
-          message:
-            already.state === 'denied'
-              ? humanRefusedDenial(already.id, already.message)
-              : alreadyQueuedDenial(already.id),
-        });
-      }
-
-      // Никто не смотрит — карточки нет: вызов становится D-n, и прогон идёт
-      // дальше без человека.
-      if (unattended) {
-        return reply.send({
-          behavior: 'deny',
-          message: deferIt(deferReason(guard, grouped)).message,
-        });
-      }
-
-      // Прогон мог уйти из реестра, пока шли проверки выше, — тот же отказ.
-      const shown = showCard({
-        kind: 'permission',
-        toolName,
-        input,
-        toolUseId,
-        ...(guard ? { guard } : {}),
-      });
-      if (!shown) return reply.send({ behavior: 'deny', message: RUN_UNKNOWN_DENIED });
-
-      const decision = await session.requestPermission(
-        { runId, toolName, input, toolUseId },
-        deferLater(deferReason(guard, false), 'permission'),
-      );
-      cardAnswered('permission', decision);
-      // Помечаем в потоке, что решение принято — карточка в чате обновится (или
-      // станет «отложено как D-n», если её решил срок).
-      resolved(decision);
-      return reply.send(decision);
-    },
-  );
-
   /** Решение пользователя по запросу прав (клик «Разрешить»/«Запретить»). */
   app.post<{ Params: { chatId: string }; Body: unknown }>(
     '/api/chat/:chatId/permission-decision',
@@ -1625,16 +820,9 @@ export function registerChatRunRoutes(
       const body = parseBody(permissionDecisionBodySchema, request.body, reply);
       if (!body) return reply;
       const { toolUseId, behavior, message } = body;
-      // Карточка, ставшая D-n по сроку: CLI вызова уже не ждёт, ответ — записи,
-      // разрешение — продолжением разговора с разовым правом (`deferred-card.ts`).
-      const deferred = await answerDeferredFromCard(
-        ctx,
-        (key, use) => session.deferredIdOf(key, use),
-        chatId,
-        toolUseId,
-        { behavior, ...(message ? { message } : {}) },
-      );
-      if (deferred) return { ok: true, deferred };
+      // Вопрос права задачи ядра отвечает браузер командой ядра: ответ этого сервера ядро
+      // отвергло бы (`answer` — human-strict, 06 §Authority). Отказ по имени, не тихое «принято».
+      if (isCorePermitCard(session.pendingPermissions(), toolUseId)) return refuseCorePermit(reply);
       const outcome = session.answerPermission(
         chatId,
         toolUseId,
@@ -1648,162 +836,6 @@ export function registerChatRunRoutes(
       // «Отложено» — тоже принято: панель только что поднялась, мост прав
       // повторит вопрос, и ответ уйдёт агенту с повтором.
       return { ok: outcome === 'ok' || outcome === 'held' };
-    },
-  );
-
-  /**
-   * Копии, заведённые воротами, чей переезд отказал на остановке прогона
-   * (`stop_unconfirmed`): ключ — чат и вызов. Повтор с тем же именем берёт ту
-   * же копию — вторую на одной ветке git не заведёт, и повтор упирался в 400
-   * (V-fix-D); другое имя, «писать здесь» или «отклонить» снимают её — иначе
-   * она оставалась бы сиротой, о которой знает только сообщение об отказе.
-   */
-  const gateCopies = new Map<string, { branch: string; path: string; output: string }>();
-  const gateCopyKey = (chatId: string, toolUseId: string): string => `${chatId}\u0000${toolUseId}`;
-  /** Снять копию ворот, которую разговор уже не займёт. Её никто не трогал. */
-  const dropGateCopy = async (key: string, projectDir: string | undefined): Promise<void> => {
-    const copy = gateCopies.get(key);
-    gateCopies.delete(key);
-    if (!copy || !projectDir || !existsSync(copy.path)) return;
-    try {
-      await removeWorktree(
-        projectDir,
-        copy.path,
-        false,
-        ctx.location.paths.mcpConfig,
-        ctx.store.getWorktreeMirror(projectDir),
-      );
-    } catch (error) {
-      // Не снялась (держит процесс, появились правки) — остаётся в «Копиях»,
-      // человек снимет её сам; ответ воротам от этого не зависит.
-      app.log.warn({ err: error, path: copy.path }, 'branch gate: unused copy not removed');
-    }
-  };
-
-  /**
-   * Ответ воротам ветки. Три исхода, и только один из них что-то заводит:
-   *
-   * `copy` — копия с веткой от текущего HEAD, и разговор ПЕРЕЕЗЖАЕТ в неё. Тот
-   * же чат, та же сессия, то же задание: прогон останавливается и поднимается
-   * заново с `--resume` в новом каталоге. Переносить транскрипт при этом не надо
-   * — `--resume` находит сессию независимо от каталога (проверено живьём
-   * 22.09.2026), а последний `cwd` транскрипта внутри git-копии того же
-   * репозитория `sessionHome` читает как переезд, так что дальше чат сам
-   * считает копию своим домом.
-   *
-   * `here` — писать в основной копии; больше в этом прогоне не спрашиваем.
-   *
-   * `stop` — отклонить саму правку.
-   */
-  app.post<{ Params: { chatId: string }; Body: unknown }>(
-    '/api/chat/:chatId/branch-decision',
-    { preHandler: humanOnly(humanDeps) },
-    async (request, reply) => {
-      const { chatId } = request.params;
-      const body = parseBody(branchDecisionBodySchema, request.body, reply);
-      if (!body) return reply;
-      const { toolUseId, choice, branch } = body;
-
-      // Ворота, которых CLI уже не ждёт: ни «писать здесь», ни копия ничего не
-      // дадут — вызов оборван, и сказать это надо словами, а не «принято».
-      if (session.isPermissionExpired(chatId, toolUseId)) return refuseExpired(reply);
-      const gateKey = gateCopyKey(chatId, toolUseId);
-      if (choice !== 'copy') await dropGateCopy(gateKey, registry.describe(chatId)?.options.cwd);
-      if (choice === 'here') {
-        session.settleBranchGate(chatId);
-        return { ok: session.decidePermission(chatId, toolUseId, { behavior: 'allow' }) };
-      }
-      // Решение сверяется с деревом В МОМЕНТ ответа, а не со снимком карточки:
-      // между ними могли пройти часы, и клиенту база копии не доверяется.
-      const handed = registry.branchGateContext(chatId);
-      if (choice === 'stop') {
-        const outcome = session.answerPermission(chatId, toolUseId, {
-          behavior: 'deny',
-          message: handed?.children.length
-            ? branchGateHandedDenial(handed.children)
-            : BRANCH_GATE_STOPPED,
-        });
-        if (outcome === 'expired') return refuseExpired(reply);
-        return { ok: outcome === 'ok' || outcome === 'held' };
-      }
-
-      // Снимок — ДО всего: остановка стирает прогон из реестра, а поднимать его
-      // заново надо теми же параметрами (та же причина, что у паузы дерева).
-      const held = registry.describe(chatId);
-      if (!held) {
-        return refuse(reply, 409, 'run_unknown', RUN_UNKNOWN_DENIED, {
-          messageCode: 'branch-run-gone',
-        });
-      }
-      const name = branch?.trim();
-      if (!name) {
-        return refuse(reply, 400, 'branch_required', 'Имя ветки не задано.', {
-          messageCode: 'branch-name-required',
-        });
-      }
-
-      const earlier = gateCopies.get(gateKey);
-      let created: { path: string; output: string };
-      if (earlier && earlier.branch === name && existsSync(earlier.path)) {
-        created = earlier;
-      } else {
-        try {
-          created = await addWorktree(
-            held.options.cwd,
-            name,
-            ctx.store.getWorktreeMirror(held.options.cwd),
-            handed?.base,
-            ctx.location.paths.mcpConfig,
-          );
-        } catch (error) {
-          // Отказ git — не повод снимать придержанный вызов: человек поправит имя
-          // и нажмёт снова, а агент всё это время честно ждёт у той же карточки.
-          const text = error instanceof GitError ? error.message : String(error);
-          return refuse(reply, 400, 'branch_failed', text);
-        }
-        // Новое имя заведено — прежняя копия этого вызова больше не нужна.
-        if (earlier) await dropGateCopy(gateKey, held.options.cwd);
-      }
-
-      // Порядок: сперва гасим прогон, потом отпускаем вызов. Наоборот агент
-      // получил бы отказ и успел бы сходить куда-нибудь ещё в основной копии —
-      // ровно то, ради чего ворота и стоят.
-      if (registry.stop(held.key) === 'unconfirmed') {
-        // Прежний процесс жив и не снят — номер нечем проверить (F-145). Отказ
-        // вызову и подъём в копии дали бы две записи в одну сессию рядом; копия
-        // остаётся заведённой, агент ждёт у той же карточки, человек знает;
-        // повтор с тем же именем её и займёт.
-        gateCopies.set(gateKey, { branch: name, ...created });
-        return refuse(
-          reply,
-          409,
-          'stop_unconfirmed',
-          `Копия ${created.path} заведена, но процесс агента не остановлен: панель не смогла проверить, что номер всё ещё его, и не тронула его. Разговор остался в основной копии, агент ждёт у той же карточки.`,
-          { messageCode: 'branch-stop-unconfirmed', params: { path: created.path } },
-        );
-      }
-      gateCopies.delete(gateKey);
-      session.decidePermission(chatId, toolUseId, {
-        behavior: 'deny',
-        message: branchMovedDenial(created.path, name),
-      });
-
-      const options = {
-        ...held.options,
-        cwd: created.path,
-        prompt: branchContinuePrompt(created.path, name),
-        ...(held.sessionId ? { sessionId: held.sessionId } : {}),
-      };
-      // Разветвление сессии здесь означало бы новый разговор — а переезжает тот
-      // же самый.
-      delete options.fork;
-      const started = registry.start(held.key, options, {
-        ...held.meta,
-        projectPath: created.path,
-        ...(held.sessionId ? { sessionId: held.sessionId } : {}),
-      });
-
-      return { ok: true, path: created.path, branch: name, started, output: created.output };
     },
   );
 }

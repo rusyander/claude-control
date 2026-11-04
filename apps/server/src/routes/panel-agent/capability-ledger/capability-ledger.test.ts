@@ -42,6 +42,13 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   // Решение 28.10 (новая строка, не переклассификация): команда ядру — пауза, одобрение,
   // перезапуск — полномочие человека; ядро вдобавок судит pid пира.
   'POST /api/core/commands': 'human:rights',
+  // Решение координатора этапа 10 (новые строки): перенос ключей телефона в ядро — доверие;
+  // перезапуск ядра и автозапуск при входе (задача ОС) — согласие человека.
+  'POST /api/core/devices/adopt': 'human:rights',
+  // Ревью MR по ссылке открывает задачу ядра, как команда (этап 10, F8).
+  'POST /api/core/review-link': 'human:rights',
+  'POST /api/core/supervisor/restart': 'human:consent',
+  'POST /api/core/supervisor/autostart': 'human:consent',
   // Решение владельца 30.09: перезапуск dev-сервера обрывает живые ходы.
   'POST /api/dev-restart': 'human:dev-restart',
   // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.
@@ -73,34 +80,17 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'PATCH /api/remote': 'human:remote',
   'POST /api/backups/secret-passphrase': 'human:secret',
   'POST /api/chat/:chatId/auto-approve': 'human:rights',
-  'POST /api/chat/:chatId/branch-decision': 'human:rights',
   // Возврат хода в остывшую сессию перезаписывает всё её окно в кэш — деньги человека (R5).
   'POST /api/chat/:chatId/keep-session': 'human:paid',
   'POST /api/chat/:chatId/permission-decision': 'human:rights',
   // Решение владельца 23.10: отложенный вопрос D-n решает только человек.
   'POST /api/chat/deferred/:id/decision': 'human:rights',
-  'POST /api/chat/split': 'human:split-apply',
-  'POST /api/chat/split/:parent/cancel': 'human:split-apply',
-  'POST /api/chat/split/:parent/cleanup': 'human:split-apply',
-  'POST /api/chat/split/:parent/review-decision': 'human:outward',
-  'POST /api/chat/split/:parent/review-push': 'human:outward',
-  'POST /api/chat/split/:parent/review-retry': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/file': 'human:outward',
-  // «Разобрать…» (владелец 24.10): публикация в Jira разом и чат «Решить здесь» — клик человека.
-  'GET /api/chat/split/:parent/tickets/target': 'human:outward',
-  'GET /api/chat/split/:parent/tickets/duplicates': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
-  // G4 (владелец 05.10): перевод задач групп в Jira — запись в чужой сервис по кнопке.
-  'GET /api/chat/split/:parent/tasks': 'human:outward',
-  'POST /api/chat/split/:parent/tasks/move': 'human:outward',
   // Запись в глобальный слой ~/.claude (В5) и действия локальных моделей — только человек.
   'POST /api/global-layer/:id/apply': 'human:code-write',
   'POST /api/kit/global/export': 'human:code-write',
   'POST /api/local-models/runtime/install': 'human:download',
   'POST /api/local-models/pull': 'human:download',
   'POST /api/local-models/qwen-code/install': 'human:download',
-  'POST /api/local-models/import': 'human:upload',
   'POST /api/local-models/server/start': 'human:consent',
   'POST /api/local-models/server/stop': 'human:consent',
   'POST /api/local-models/server/restart': 'human:consent',
@@ -180,10 +170,6 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'PUT /api/project-files/content': 'human:code-write',
   'PUT /api/prompt-gate': 'human:prompt-gate',
   'PUT /api/prompts/:id': 'human:prompts',
-  'POST /api/chat/split/:parent/start-now': 'human:split-apply',
-  'POST /api/chat/split/:parent/relaunch': 'human:split-apply',
-  'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
-  'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
   // «Перепроверить MR» снят отсюда решением владельца 26.10 (жмёт наблюдатель групп).
   'POST /api/project-tests/baseline': 'human:upload',
   // Бэкенд-разработка (владелец 12.10): доступ агента к базе, защита бэкенда,
@@ -215,16 +201,9 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
  * карте без строки здесь — красное «не оправдано», а не молчаливая выдача.
  */
 const CLOSED_SETS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
-  // actions-chat-control.ts: MODE_ROUTE
+  // actions-chat-control.ts: MODE_ROUTE (режим проверен `treeTarget`, отсюда `target.mode`)
   split_control: {
-    'MODE_ROUTE[input.mode]': [
-      'pause',
-      'resume-paused',
-      'continue-group',
-      'release',
-      'hold',
-      'resume',
-    ],
+    'MODE_ROUTE[target.mode]': ['pause', 'resume'],
   },
   // actions-tests-manual.ts: одно определение на два действия, `kind` — его параметр
   finish_manual_run: { kind: ['finish'] },
@@ -236,8 +215,6 @@ const HELPER_GRANTS: Readonly<Record<string, readonly string[]>> = {
   scriptUrl: ['GET /api/scripts/*', 'PUT /api/scripts/*', 'DELETE /api/scripts/*'],
   // actions-contour.ts: applyConsumers(id, inject) → POST `…/apply`, PUT `/api/platforms/${id}`
   applyConsumers: ['POST /api/platforms/:id/apply', 'PUT /api/platforms/:id'],
-  // actions-groups.ts: knobsOf(inject, id) → GET `/api/groups/${id}/knobs`
-  knobsOf: ['GET /api/groups/:id/knobs'],
   // actions-project-config.ts: rulesUrl/mcpUrl/permissionsUrl(project) → `/api/projects/${id}/…`
   rulesUrl: ['GET /api/projects/:id/rules', 'PUT /api/projects/:id/rules'],
   mcpUrl: [
@@ -253,8 +230,6 @@ const HELPER_GRANTS: Readonly<Record<string, readonly string[]>> = {
     'PUT /api/projects/:id/permissions/:permId',
     'DELETE /api/projects/:id/permissions/:permId',
   ],
-  // actions-project-config.ts: choiceUrl(project) → GET `/api/projects/group-choice?path=…`
-  choiceUrl: ['GET /api/projects/group-choice'],
   // actions-project-git.ts: mirrorUrl(project) → GET `/api/project-git/mirror-settings?path=…`
   mirrorUrl: ['GET /api/project-git/mirror-settings'],
   // actions-project-runner.ts: describeUrl(dir) → GET `/api/project-runner/describe?path=…`
@@ -279,14 +254,10 @@ const HELPER_GRANTS: Readonly<Record<string, readonly string[]>> = {
     'GET /api/project-tests/baselines',
     'GET /api/project-tests/e2e',
   ],
-  // actions-chat-control.ts: groupPlan(input, inject) → GET `/api/chat/${id}/group-settings`
-  groupPlan: ['GET /api/chat/:chatId/group-settings'],
-  // actions-chat-control.ts: splitPrompt(inject, chat) → GET `/api/chat/split/request?…`
-  splitPrompt: ['GET /api/chat/split/request'],
-  // actions-chat.ts: splitOf(inject, id) → readTree → GET `/api/chat/${id}/tree`
-  splitOf: ['GET /api/chat/:id/tree'],
-  // actions-chat-control.ts: splitTarget(input, inject) → readTree → GET `/api/chat/${id}/tree`
-  splitTarget: ['GET /api/chat/:id/tree'],
+  // actions-chat.ts: treePauseOf(inject, id) → readTree → GET `/api/chat/${id}/tree`
+  treePauseOf: ['GET /api/chat/:id/tree'],
+  // actions-chat-control.ts: treeTarget(input, inject) → readTree → GET `/api/chat/${id}/tree`
+  treeTarget: ['GET /api/chat/:id/tree'],
 };
 
 // ---- checks: pure functions over (routes, ledger, actions), so a planted defect can prove each ----
@@ -845,14 +816,14 @@ describe('capability ledger (G4) against the live app assembly', () => {
     expect(
       unjustified({ ...ROUTE_LEDGER, 'POST /api/sandbox/mcp-call': 'action:sandbox_ask' }, actions),
     ).toEqual(['POST /api/sandbox/mcp-call → sandbox_ask']);
-    // m4: шаблон `/api/chat/split/${…}/${MODE_ROUTE[…]}` не оправдывает статичного соседа
+    // m4: шаблон `/api/chat/${…}/tree/${MODE_ROUTE[…]}` не оправдывает статичного соседа
     // вне набора режимов (прежнее `HOLE → .*` оправдывало).
     expect(
       unjustified(
-        { ...ROUTE_LEDGER, 'POST /api/chat/split/:parent/start-now': 'action:split_control' },
+        { ...ROUTE_LEDGER, 'POST /api/chat/:id/tree/start-now': 'action:split_control' },
         actions,
       ),
-    ).toEqual(['POST /api/chat/split/:parent/start-now → split_control']);
+    ).toEqual(['POST /api/chat/:id/tree/start-now → split_control']);
     const overGranted = {
       ...ROUTE_LEDGER,
       'DELETE /api/projects/:id': 'action:delete_project,list_projects',
@@ -912,8 +883,11 @@ describe('capability ledger (G4) against the live app assembly', () => {
       humanDrift({ ...ROUTE_LEDGER, 'POST /api/brand-new': 'human:outward' }, PINNED_HUMAN),
     ).toEqual(['POST /api/brand-new: human:outward is not pinned']);
     expect(
-      humanDrift({ ...ROUTE_LEDGER, 'POST /api/chat/split': 'action:start_chat' }, PINNED_HUMAN),
-    ).toEqual(['POST /api/chat/split: human:split-apply → action:start_chat']);
+      humanDrift(
+        { ...ROUTE_LEDGER, 'POST /api/chat/deferred/:id/decision': 'action:start_chat' },
+        PINNED_HUMAN,
+      ),
+    ).toEqual(['POST /api/chat/deferred/:id/decision: human:rights → action:start_chat']);
   });
 
   it('resolveRouteKey picks the same route as the Fastify router (static > param > wildcard)', async () => {

@@ -47,6 +47,12 @@ export interface BootReconcile {
   atBoot(taskIds: readonly string[]): Promise<void>;
   /** Таймер повторной сверки; ответ — остановка, ждущая идущий проход. */
   start(everyMs: number): () => Promise<void>;
+  /**
+   * Человек ответил «повторить сверку» (точка 4): это действие — снова в наборе, таймер читает его
+   * факт в ближайший проход. Только названное: остальные начатые действия задачи могут быть
+   * действиями этого ядра, идущими прямо сейчас.
+   */
+  recheck(taskId: string, actionId: string): void;
   /** Что ещё не решено: задача → число действий и сессий. */
   pending(): Record<string, { actions: number; sessions: number }>;
 }
@@ -136,6 +142,15 @@ export function createBootReconcile(deps: BootReconcileDeps): BootReconcile {
         clearInterval(timer);
         await running;
       };
+    },
+    recheck(taskId, actionId) {
+      const task = deps.registry.live(taskId);
+      if (!task || !openActions(task).some((a) => a.actionId === actionId)) return;
+      const was = pending.get(taskId);
+      pending.set(taskId, {
+        actions: new Set([...(was?.actions ?? []), actionId]),
+        sessions: was?.sessions ?? new Set(),
+      });
     },
     pending() {
       return Object.fromEntries(

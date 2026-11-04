@@ -58,11 +58,8 @@ export interface SupervisorHook {
    * его целью нечем, и отыгрывается он даже на родном для цели событии. Без этого
    * калитка молча ничего не делала бы у `qwen` и `kimi` — единственных, у кого
    * `UserPromptSubmit` свой.
-   *
-   * `layer` — хук группы прогона (`domains/groups/codex-layer/codex-layer.ts`): слой в файлы
-   * цели не пишет, поэтому, как и `panel`, отыгрывается и на родном событии.
    */
-  readonly owner?: 'target' | 'panel' | 'layer';
+  readonly owner?: 'target' | 'panel';
 }
 
 /**
@@ -225,9 +222,7 @@ export async function runSupervisorEvent(
   // прикасается. Собственные записи панели (`owner: 'panel'`) в файлах цели не
   // лежат и продублированы быть не могут, поэтому идут в любом случае.
   const applicable = hooks.filter(
-    (hook) =>
-      hook.event === event &&
-      (owner === 'supervisor' || hook.owner === 'panel' || hook.owner === 'layer'),
+    (hook) => hook.event === event && (owner === 'supervisor' || hook.owner === 'panel'),
   );
   if (applicable.length === 0) {
     // Пустой результат здесь означает «надзирателю нечего отыгрывать»,

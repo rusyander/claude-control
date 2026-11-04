@@ -158,6 +158,22 @@ const top = (counts, n = 8) =>
     .map(([name, count]) => `${name}×${count}`)
     .join(' ');
 
+/**
+ * Ждать, пока разойдутся запросы API раздела (тишина 600 мс, потолок 8 с). Навигация и кнопки
+ * рисуются до ответа API, а поле может прийти с данными: «Любая модель» в «Локальных моделях»
+ * ждёт ответа об устройстве — без этой паузы раздел читался «полей нет» (03.11.2026).
+ */
+async function apiSettled(page, inflight) {
+  const deadline = Date.now() + 8_000;
+  let quietSince = inflight.size === 0 ? Date.now() : 0;
+  while (Date.now() < deadline) {
+    if (inflight.size > 0) quietSince = 0;
+    else if (!quietSince) quietSince = Date.now();
+    else if (Date.now() - quietSince >= 600) return;
+    await page.waitForTimeout(100);
+  }
+}
+
 /** Видимые поля текста в разделе, без отключённых и только-для-чтения. */
 async function fieldsOf(page) {
   const locator = page.locator(
@@ -218,11 +234,26 @@ try {
     await page.route('**/api/**', (route) =>
       route.request().method() === 'GET' ? route.fallback() : route.abort(),
     );
+    const inflight = new Set();
+    page.on('request', (request) => {
+      // Потоки событий не кончаются — их тишина не ждёт.
+      const stream =
+        request.resourceType() === 'eventsource' || /\/(events|stream)\b/.test(request.url());
+      if (request.url().includes('/api/') && !stream) inflight.add(request);
+    });
+    page.on('requestfinished', (request) => inflight.delete(request));
+    page.on('requestfailed', (request) => inflight.delete(request));
     try {
       await openPanelPage(page, BASE, entry);
       const hooked = await page.evaluate(() => Boolean(window.__renderTally));
       if (!hooked) throw new Error('крючок React не встал');
-      const fields = await fieldsOf(page);
+      let fields = await fieldsOf(page);
+      // Пауза только там, где полей ещё нет: ждать API в каждом из ~75 разделов — это выход за
+      // предел прогона в 10 минут (03.11.2026, прогон 043e2230).
+      if (fields.length === 0) {
+        await apiSettled(page, inflight);
+        fields = await fieldsOf(page);
+      }
       for (const field of fields) {
         const label = await labelOf(field);
         await field.click();

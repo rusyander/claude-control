@@ -21,6 +21,7 @@ import {
   type UnitView,
 } from './next.types.ts';
 import { publishStep, resolveConflict, tailStep, unitEndEvent } from './publish.ts';
+import { reviewLinkClosedByDecision, reviewLinkNext } from './review-link.ts';
 
 /**
  * Единственный судья класса `next` (P01, 02 §Conductor loop): свёртка журнала + сценарий + живые
@@ -113,6 +114,9 @@ function unitNext(
   if (stopped) return { kind: 'end-unit', unitId, event: 'close', reason: stopped };
   const conflict = resolveConflict(state, scenario, view, unit);
   if (conflict) return conflict;
+  // Ревью по ссылке (этап 10, F8): после ревью шаги выбирает ответ человека.
+  const byDecision = reviewLinkNext(state, scenario, view);
+  if (byDecision) return byDecision;
   const publishTail = afterPublish(scenario);
   for (const def of topoOrder(scenario)) {
     if (publishTail.has(def.id) && def.kind !== 'publish') {
@@ -228,7 +232,7 @@ function taskEnd(
     const failed = unitFailed(state, unitId);
     if (failed) return { kind: 'fail-task', reason: `unit ${unitId}: ${failed}` };
     // Сценарий с публикацией, а единица закрыта до «готово» (человек остановил круги) — не сдана.
-    if (publishes && unit.state === 'closed') {
+    if (publishes && unit.state === 'closed' && !reviewLinkClosedByDecision(state, unitId)) {
       return { kind: 'fail-task', reason: `unit ${unitId}: closed before ready to publish` };
     }
   }

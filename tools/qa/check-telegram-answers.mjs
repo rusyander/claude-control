@@ -1,22 +1,30 @@
 /**
- * Ответы из Telegram на одноразовой панели — весь путь: запрос прав агента →
- * сводка «Вопросы» → опрос бота → сообщение владельцу с кнопками → нажатие →
- * тот же маршрут решения, что у кнопки в панели → ответ дошёл до процесса CLI.
+ * Ответы из Telegram на одноразовой панели — весь путь: запрос прав сессии вне
+ * панели (терминал, VS Code) → хук пересылки панели → сводка «Вопросы» → опрос
+ * бота → сообщение владельцу с кнопками → нажатие → решение дошло до хука,
+ * то есть до CLI.
  *
- * Подменены только внешние края: модель (фальшивый `claude` на PATH сам зовёт
- * брокер прав панели по адресу из её `--mcp-config`, как это делает
- * `permission-prompt-server.mjs`) и сервер Telegram (заглушка по
- * `AGENTDECK_TELEGRAM_API`, с очередью `getUpdates`). Опрос, подпись кнопок,
- * проверка владельца, применение ответа — настоящие.
+ * С этапа 10 ход `/chat` — задача ядра, и вопрос права ядра Telegram только
+ * сообщает (ответ ядру — в панели или с телефона). Кнопки Telegram остались у
+ * запросов, которые решает панель; здесь — запрос сессии вне панели: его держит
+ * НАСТОЯЩИЙ хук `outside-relay-hook.mjs` (Claude Code запускает его так же — со
+ * строкой JSON во входе), транскрипт сессии лежит в доме стенда, как его пишет CLI.
+ * Подменены только внешние края: сам Claude Code (транскрипт + запуск хука) и
+ * сервер Telegram (заглушка по `AGENTDECK_TELEGRAM_API`, с очередью
+ * `getUpdates`). Пересылка, сводка, опрос, подпись кнопок, проверка владельца,
+ * применение ответа — настоящие.
  *
  * Ожидается:
- *   - два висящих запроса прав одного хода уходят ОДНИМ сообщением владельцу
+ *   - два висящих запроса прав одной сессии уходят ОДНИМ сообщением владельцу
  *     (`afterMinutes: 0`), у каждого «✅ Разрешить» / «⛔ Запретить»;
  *   - нажатие не владельца (чужой чат или чужой отправитель) молча отброшено:
  *     ни всплывающей строки, ни решения;
- *   - нажатие владельца решает запрос: CLI получил allow, сообщение
+ *   - нажатие владельца решает запрос: хук вывел CLI allow, сообщение
  *     переписано «✅ Разрешено»; повтор той же кнопки — «Уже отвечено», второго
- *     решения нет; «⛔ Запретить» второго — CLI получил deny, кнопки сняты;
+ *     решения нет; «⛔ Запретить» второго — хук вывел deny, кнопки сняты;
+ *   - вопрос ядра (ядро стенда поднимает задачу с открытым вопросом) приходит
+ *     в Telegram только уведомлением: «Ядро ждёт ответа», без кнопок, и
+ *     сообщения с кнопками про него нет;
  *   - вебхук у бота — статус `webhook`, `deleteWebhook` не звался ни разу;
  *   - 409 на опросе — статус `conflict`, опрос стоит (без повторов вплотную);
  *   - бот тот же, что у канала Telegram агента, — статус `same-bot` с
@@ -32,10 +40,11 @@
  *
  * Запуск: node tools/qa/check-telegram-answers.mjs
  */
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freePort, runOnStand, wait } from './throwaway-stand.mjs';
+import { freePort, REPO, runOnStand, wait } from './throwaway-stand.mjs';
 
 const OWNER = 424242;
 const STRANGER = 999001;
@@ -43,102 +52,84 @@ const TOKEN = '7000001:QA_answers_token_secret_ABCDEFGH';
 /** Бот карточки Telegram — его слушает окно подключения по /start. */
 const NOTIFY_TOKEN = '7000002:QA_notify_token_secret_ABCDEFGH';
 const CONNECTED = 555777;
-const CHAT = 'qa-tg-chat';
 const SESSION = '5e551000-0000-4000-8000-0000000000a7';
 const COMMANDS = ['rm -rf build', 'rm -rf dist'];
+/** Заголовок задачи ядра с открытым вопросом — по нему находится уведомление о ней. */
+const CORE_TITLE = 'Вопрос ядра посреди хода';
+/** Хук пересылки — тот самый файл, который панель ставит в настройки Claude Code. */
+const RELAY_HOOK = join(REPO, 'apps/server/src/domains/chat/outside-relay/outside-relay-hook.mjs');
+
+/** Транскрипт сессии вне панели, как его пишет CLI: два вызова Bash разом, результатов ещё нет. */
+function transcript(cwd, at) {
+  const base = { sessionId: SESSION, cwd, version: '2.1.295', entrypoint: 'cli' };
+  const records = [
+    {
+      ...base,
+      type: 'user',
+      uuid: 'u1',
+      timestamp: at,
+      message: { role: 'user', content: 'почисти сборку' },
+    },
+    {
+      ...base,
+      type: 'assistant',
+      uuid: 'a1',
+      timestamp: at,
+      message: {
+        role: 'assistant',
+        stop_reason: 'tool_use',
+        content: COMMANDS.map((command, i) => ({
+          type: 'tool_use',
+          id: `toolu_qa_tg_${i + 1}`,
+          name: 'Bash',
+          input: { command },
+        })),
+      },
+    },
+  ];
+  return records.map((record) => JSON.stringify(record)).join('\n') + '\n';
+}
+
+/** Запущенные хуки — снимаются в конце, даже если проверка упала посреди ожидания. */
+const hooks = [];
 
 /**
- * Фальшивый `claude`: ход с меткой QA_TG_ASK делает два вызова Bash разом и
- * спрашивает права у панели тем же запросом, что брокер; итог каждого решения —
- * строкой в `decisions.jsonl` рядом со скриптом.
+ * Запуск хука так, как его запускает Claude Code на `PermissionRequest`: строка JSON во вход,
+ * решение — JSON в выходе. Хук сам ждёт решения срезами `/wait`, поэтому живёт до нажатия.
  */
-const FAKE_CLAUDE = String.raw`
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const argv = process.argv.slice(2);
-const self = fileURLToPath(import.meta.url);
-const LOG = self.replace(/[^\\/]+$/, 'decisions.jsonl');
-const ALIVE = self.replace(/[^\\/]+$/, '.stand-alive');
-setInterval(() => { if (!existsSync(ALIVE)) process.exit(0); }, 250).unref();
-if (argv[0] === '--version' || argv[0] === '-v') {
-  process.stdout.write('2.1.0 (Claude Code)\n');
-  process.exit(0);
-}
-const after = (flag) => { const at = argv.indexOf(flag); return at >= 0 ? argv[at + 1] : undefined; };
-const session = after('--resume') ?? after('--session-id') ?? ${JSON.stringify(SESSION)};
-const out = (event) => process.stdout.write(JSON.stringify({ ...event, session_id: session }) + '\n');
-
-function broker() {
-  for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] !== '--mcp-config') continue;
-    const raw = argv[i + 1] ?? '';
-    let config;
-    try { config = JSON.parse(raw.trim().startsWith('{') ? raw : readFileSync(raw, 'utf8')); } catch { continue; }
-    for (const server of Object.values(config.mcpServers ?? {})) {
-      if (server?.env?.PERM_BASE_URL) return server.env;
-    }
-  }
-  return undefined;
-}
-
-async function ask(env, toolUseId, input) {
-  let runId = env.PERM_RUN_ID ?? '';
-  if (env.PERM_RUN_ID_FILE) { try { runId = readFileSync(env.PERM_RUN_ID_FILE, 'utf8').trim() || runId; } catch {} }
-  let token = '';
-  if (env.PERM_TOKEN_FILE) { try { token = readFileSync(env.PERM_TOKEN_FILE, 'utf8').trim(); } catch {} }
-  const response = await fetch(env.PERM_BASE_URL + '/api/chat/permission-request', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}) },
-    body: JSON.stringify({ runId, toolName: 'Bash', input, toolUseId }),
+function startHook({ apiUrl, tokenFile, transcriptPath, cwd, command }) {
+  const child = spawn(process.execPath, [RELAY_HOOK, '--url', apiUrl, '--token-file', tokenFile], {
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
-  const decision = await response.json().catch(() => ({}));
-  appendFileSync(LOG, JSON.stringify({ toolUseId, command: input.command, status: response.status, behavior: decision.behavior ?? 'none', message: String(decision.message ?? '').slice(0, 300), at: Date.now() }) + '\n');
-  return decision;
+  let out = '';
+  child.stdout.on('data', (chunk) => (out += chunk));
+  child.stdin.end(
+    JSON.stringify({
+      hook_event_name: 'PermissionRequest',
+      session_id: SESSION,
+      transcript_path: transcriptPath,
+      cwd,
+      tool_name: 'Bash',
+      tool_input: { command },
+    }),
+  );
+  const hook = {
+    command,
+    child,
+    exited: () => child.exitCode !== null,
+    output: () => out,
+    /** Что хук отдал CLI: allow / deny; пусто — решения не было. */
+    behavior: () => {
+      try {
+        return JSON.parse(out).hookSpecificOutput?.decision?.behavior;
+      } catch {
+        return undefined;
+      }
+    },
+  };
+  hooks.push(hook);
+  return hook;
 }
-
-async function turn(text) {
-  out({ type: 'system', subtype: 'init', cwd: process.cwd(), model: 'claude-opus-5', tools: [] });
-  if (text.includes('QA_TG_ASK')) {
-    const env = broker();
-    const calls = ${JSON.stringify(COMMANDS)}.map((command, i) => ({ id: 'toolu_qa_tg_' + (i + 1), input: { command } }));
-    out({ type: 'assistant', message: { id: 'msg_qa_tg_1', role: 'assistant', model: 'claude-opus-5', content: calls.map((c) => ({ type: 'tool_use', id: c.id, name: 'Bash', input: c.input })) } });
-    if (!env) appendFileSync(LOG, JSON.stringify({ error: 'no broker in --mcp-config', argv }) + '\n');
-    const decisions = env ? await Promise.all(calls.map((c) => ask(env, c.id, c.input))) : [];
-    out({ type: 'user', message: { role: 'user', content: calls.map((c, i) => ({ type: 'tool_result', tool_use_id: c.id, content: decisions[i]?.behavior === 'allow' ? 'ok' : 'denied', ...(decisions[i]?.behavior === 'allow' ? {} : { is_error: true }) })) } });
-  }
-  const reply = 'Done.';
-  out({ type: 'assistant', message: { id: 'msg_qa_tg_text', role: 'assistant', model: 'claude-opus-5', content: [{ type: 'text', text: reply }] } });
-  out({ type: 'result', subtype: 'success', is_error: false, result: reply, num_turns: 1 });
-}
-
-function textOf(line) {
-  try {
-    const event = JSON.parse(line);
-    if (event?.type !== 'user') return undefined;
-    const content = event.message?.content;
-    if (typeof content === 'string') return content;
-    return (Array.isArray(content) ? content : []).filter((p) => p.type === 'text').map((p) => p.text).join('');
-  } catch {
-    return undefined;
-  }
-}
-
-if (after('--input-format') === 'stream-json') {
-  let buffered = '';
-  for await (const chunk of process.stdin) {
-    buffered += chunk.toString('utf8');
-    let at;
-    while ((at = buffered.indexOf('\n')) >= 0) {
-      const text = textOf(buffered.slice(0, at));
-      buffered = buffered.slice(at + 1);
-      if (text !== undefined) await turn(text);
-    }
-  }
-} else {
-  await turn(after('-p') ?? after('--print') ?? argv.at(-1) ?? '');
-}
-`;
 
 // ---- заглушка Bot API ---------------------------------------------------------------------------
 const bot = {
@@ -289,17 +280,48 @@ try {
   await runOnStand(
     {
       label: 'tg-answers',
+      // Своё ядро стенда — источник вопроса ядра (задача с открытым вопросом поднимается при старте).
+      core: true,
       web: false,
-      fakeCli: { claude: FAKE_CLAUDE },
       env: {
+        AGENTDECK_CORE_SUPERVISE: '0',
         AGENTDECK_TELEGRAM_API: `http://127.0.0.1:${tgPort}`,
         // Две минуты тишины после старта панели (B7) стенду ждать незачем.
         AGENTDECK_TELEGRAM_SEND_GRACE_MS: '0',
       },
-      seed: ({ root }) => mkdirSync(join(root, 'qa-tg-app'), { recursive: true }),
+      seed: ({ root, cfg, coreHome }) => {
+        const project = join(root, 'qa-tg-app');
+        mkdirSync(project, { recursive: true });
+        // Транскрипт — там, где его ищет сводка: `<конфиг>/projects/<каталог проекта>/<сессия>.jsonl`.
+        const dir = join(cfg, 'projects', project.replace(/[^a-zA-Z0-9]/g, '-'));
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, `${SESSION}.jsonl`),
+          transcript(project, new Date(Date.now() - 30_000).toISOString()),
+          'utf8',
+        );
+        const out = spawnSync(
+          process.execPath,
+          [
+            '--experimental-strip-types',
+            '--no-warnings',
+            join(REPO, 'tools/qa/core-ask-seed.mjs'),
+            coreHome,
+            CORE_TITLE,
+          ],
+          { encoding: 'utf8' },
+        );
+        if (out.status !== 0) throw new Error(`core-ask-seed: ${out.stderr}`);
+      },
     },
     async (stand, check) => {
       const project = join(stand.root, 'qa-tg-app');
+      const transcriptPath = join(
+        stand.cfg,
+        'projects',
+        project.replace(/[^a-zA-Z0-9]/g, '-'),
+        `${SESSION}.jsonl`,
+      );
       const responses = [];
       const api = async (path, init) => {
         const reply = await stand.api(path, init);
@@ -307,50 +329,12 @@ try {
         return reply;
       };
       const view = async () => (await api('/integrations/telegram/answers')).body;
-      /**
-       * Запуск хода без чтения его потока: ход с отложенными запросами держит
-       * поток открытым дольше пятиминутного предела undici, и полное чтение
-       * обрывало фальшивый CLI раньше, чем приходили нажатия. Нужен только статус.
-       */
-      const startTurn = async (path, body) => {
-        const response = await fetch(`${stand.apiUrl}/api${path}`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        return { status: response.status, text: response.ok ? '' : await response.text() };
+      /** Решение по команде — то, что хук отдал CLI; хук ещё ждёт — решения нет. */
+      const outcome = (command) => {
+        const hook = hooks.find((one) => one.command === command);
+        return hook?.exited() ? { via: 'хук', behavior: hook.behavior() ?? 'нет' } : undefined;
       };
-      const decisions = () => {
-        try {
-          return readFileSync(join(stand.bin, 'decisions.jsonl'), 'utf8')
-            .split('\n')
-            .filter(Boolean)
-            .map((line) => JSON.parse(line));
-        } catch {
-          return [];
-        }
-      };
-      /**
-       * Решение по команде. Запрос прав одиночного чата панель может отложить
-       * сразу (D-n, `deferred-asks`): агенту уходит отказ-метка, а решение
-       * человека ложится на запись. Иначе запрос висит, и решение получает сам CLI.
-       */
-      const outcome = async (command) => {
-        const live = decisions().find(
-          (one) => one.command === command && !one.message?.startsWith('agentdeck(deferred '),
-        );
-        if (live) return { via: 'cli', behavior: live.behavior };
-        const list = (await api('/chat/deferred')).body?.items ?? [];
-        const item = list.find((one) => one.summary?.includes(command));
-        if (!item || item.state === 'waiting') return undefined;
-        const behavior =
-          item.state === 'denied'
-            ? 'deny'
-            : ['allowed', 'consumed'].includes(item.state)
-              ? 'allow'
-              : item.state;
-        return { via: `D-n ${item.id}`, behavior, item };
-      };
+      const toolUseOf = (command) => `toolu_qa_tg_${COMMANDS.indexOf(command) + 1}`;
 
       // ── настройка ────────────────────────────────────────────────────
       // Главный выключатель карточки Telegram: выключена — ответы не слушают.
@@ -380,19 +364,29 @@ try {
         'вызовы Bot API идут с сохранённым токеном',
         bot.calls.length > 0 && bot.calls.every((call) => call.tokenOk),
       );
+      const relay = await api('/outside/relay', { method: 'PATCH', body: { enabled: true } });
+      check(
+        'пересылка сессий вне панели включена, хуки стоят в настройках Claude Code стенда',
+        relay.status === 200 && relay.body?.enabled === true && relay.body?.installed === true,
+        relay.text.slice(0, 300),
+      );
 
       // ── вопрос → сообщение ───────────────────────────────────────────
-      const sent = await startTurn('/chat/send', {
-        chatId: CHAT,
-        prompt: 'QA_TG_ASK почисти сборку',
-        projectPath: project,
-      });
-      check('ход запущен', sent.status < 300, sent.text.slice(0, 300));
-      const message = await until(() => callsOf('sendMessage')[0], 30_000);
+      const tokenFile = join(stand.home, '.agentdeck', 'api-token');
+      for (const command of COMMANDS) {
+        startHook({ apiUrl: stand.apiUrl, tokenFile, transcriptPath, cwd: project, command });
+      }
+      const message = await until(
+        () => callsOf('sendMessage').find((call) => call.body.reply_markup),
+        30_000,
+      );
       check(
-        'сообщение ушло владельцу',
+        'сообщение с кнопками ушло владельцу',
         message?.body?.chat_id === String(OWNER),
-        JSON.stringify(message?.body ?? decisions()).slice(0, 600),
+        JSON.stringify({
+          sent: callsOf('sendMessage').map((call) => call.body),
+          hooks: hooks.map((one) => ({ exited: one.exited(), out: one.output() })),
+        }).slice(0, 900),
       );
       if (!message) return;
       const text = message.body.text ?? '';
@@ -436,7 +430,7 @@ try {
       check(
         `«1 · Разрешить» владельца решило запрос: ${first} → allow (${allowed?.via ?? 'нет решения'})`,
         allowed?.behavior === 'allow',
-        JSON.stringify({ allowed, decisions: decisions() }),
+        JSON.stringify({ allowed, hooks: hooks.map((one) => one.output()) }),
       );
       const editedAllowed = await until(() =>
         callsOf('editMessageText').find((call) => call.body.text?.includes('✅ Разрешено')),
@@ -458,14 +452,14 @@ try {
       const replayToast = await until(() =>
         toasts().find((one) => one.callback_query_id === replay),
       );
-      const afterReplay = await outcome(first);
+      // Решение пересылка отдаёт хуку один раз и забывает запрос: второму решению некуда лечь.
+      const afterReplay = await api(
+        `/outside/asks/${encodeURIComponent(toolUseOf(first))}/wait?ms=1000`,
+      );
       check(
         'повтор той же кнопки — «Уже отвечено», второго решения нет',
-        replayToast?.text === 'Уже отвечено' &&
-          (allowed?.via === 'cli'
-            ? decisions().filter((one) => one.command === first).length === 1
-            : afterReplay?.item?.decidedAt === allowed?.item?.decidedAt),
-        JSON.stringify({ replayToast, allowed, afterReplay }),
+        replayToast?.text === 'Уже отвечено' && afterReplay.body?.state === 'unknown',
+        JSON.stringify({ replayToast, allowed, afterReplay: afterReplay.body }),
       );
 
       press(deny2.callback_data, messageId);
@@ -473,7 +467,7 @@ try {
       check(
         `«2 · Запретить» владельца решило запрос: ${second} → deny (${denied?.via ?? 'нет решения'})`,
         denied?.behavior === 'deny',
-        JSON.stringify({ denied, decisions: decisions() }),
+        JSON.stringify({ denied, hooks: hooks.map((one) => one.output()) }),
       );
       const closed = await until(() =>
         callsOf('editMessageText').find(
@@ -483,12 +477,15 @@ try {
         ),
       );
       // Отвечено всё — сообщение свёрнуто: строка итога на ожидание, без разметки и кнопок.
+      // Вид строки — `compose.ts`: «✅ Разрешено 15:54 · git push · 📁 shop · Терминал · сессия».
       const lines = closed?.body.text.split('\n') ?? [];
+      const collapsed = (mark, command) =>
+        new RegExp(`^${mark} \\d\\d:\\d\\d · ${command} · 📁 qa-tg-app · .+$`);
       check(
         'закрытое сообщение свёрнуто: две строки итога, без подробностей и кнопок',
         lines.length === 2 &&
-          /^✅ Разрешено \d\d:\d\d · .+ \(.+\)$/.test(lines[0]) &&
-          /^⛔ Запрещено \d\d:\d\d · .+ \(.+\)$/.test(lines[1]) &&
+          collapsed('✅ Разрешено', first).test(lines[0]) &&
+          collapsed('⛔ Запрещено', second).test(lines[1]) &&
           !closed.body.text.includes('<'),
         JSON.stringify(callsOf('editMessageText').at(-1)?.body ?? {}),
       );
@@ -606,8 +603,13 @@ try {
       });
       const telegramAfter = (await api('/settings')).body?.integrations?.telegram;
       const answersAfter = await view();
+      // Уведомление о вопросе ядра приходит в этот же чат — приветствие ищется по тексту.
       const greeting = await until(() =>
-        callsOf('sendMessage').find((call) => call.body.chat_id === String(CONNECTED)),
+        callsOf('sendMessage').find(
+          (call) =>
+            call.body.chat_id === String(CONNECTED) &&
+            String(call.body.text ?? '').startsWith('✅ Подключено'),
+        ),
       );
       // Разобранный окном /start подтверждён: ни один бот не отвечает на него второй раз.
       await wait(2_000);
@@ -630,6 +632,33 @@ try {
           telegramAfter,
           answers: answersAfter?.settings,
         }),
+      );
+
+      // ── вопрос ядра — только уведомлением ────────────────────────────
+      // Задача ядра с открытым вопросом ждала с запуска: до подтверждения у карточки не было ни
+      // токена, ни события «вопрос». Ответ ядру Telegram не доказывает (human-strict), поэтому
+      // сообщение без кнопок, и опрос ответов своего сообщения с кнопками о нём не шлёт.
+      const coreNotice = await until(
+        () =>
+          callsOf('sendMessage').find((call) =>
+            String(call.body.text ?? '').includes('Ядро ждёт ответа'),
+          ),
+        30_000,
+      );
+      const coreButtons = callsOf('sendMessage').filter(
+        (call) => call.body.reply_markup && String(call.body.text ?? '').includes(CORE_TITLE),
+      );
+      check(
+        'вопрос ядра — уведомление «Ядро ждёт ответа» с заголовком задачи и ссылкой, без кнопок',
+        coreNotice?.body?.chat_id === String(CONNECTED) &&
+          String(coreNotice?.body?.text ?? '').includes(CORE_TITLE) &&
+          String(coreNotice?.body?.text ?? '').includes('/core?id=') &&
+          !coreNotice?.body?.reply_markup &&
+          coreButtons.length === 0,
+        JSON.stringify({
+          notice: coreNotice?.body,
+          withButtons: coreButtons.map((call) => call.body.text),
+        }).slice(0, 900),
       );
 
       // ── команды владельца ────────────────────────────────────────────
@@ -707,5 +736,7 @@ try {
     },
   );
 } finally {
+  // Хук без решения ждал бы до своего предела (50 мин) — снимаем всех, кто ещё жив.
+  for (const hook of hooks) if (!hook.exited()) hook.child.kill();
   tg.close();
 }

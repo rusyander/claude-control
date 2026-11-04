@@ -28,6 +28,8 @@ import { createConnection } from 'node:net';
 import { join } from 'node:path';
 import { hostname, tmpdir, userInfo } from 'node:os';
 import { chromium } from 'playwright';
+import { reapStandTree } from '../qa/throwaway-stand.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import {
   DEFAULT_MASKS,
   REPO_ROOT,
@@ -36,6 +38,7 @@ import {
   applyShotLanguage,
   openScenario,
   writeVariantIndex,
+  warmFront,
 } from './kit.mjs';
 import {
   EXTERNAL_URL,
@@ -237,13 +240,16 @@ try {
   started.push(
     spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', 'src/index.ts'], {
       cwd: join(REPO_ROOT, 'apps/server'),
-      env: {
-        ...base,
-        ...homeEnv,
-        PATH: [bin, ...system].join(IS_WIN ? ';' : ':'),
-        PORT: String(PANEL_PORT),
-        WEB_PORT: String(WEB_PORT),
-      },
+      env: await panelEnv(
+        {
+          ...base,
+          ...homeEnv,
+          PATH: [bin, ...system].join(IS_WIN ? ';' : ':'),
+          PORT: String(PANEL_PORT),
+          WEB_PORT: String(WEB_PORT),
+        },
+        { label: 'help-phone' },
+      ),
       stdio: 'ignore',
       shell: false,
     }),
@@ -289,6 +295,7 @@ try {
   await patchSettings(PANEL, { onboardingDone: true });
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   try {
     for (const theme of SHOT_THEMES) {
       for (const lang of SHOT_LANGS) {
@@ -309,6 +316,11 @@ try {
 } finally {
   for (const child of started) stopChild(child);
   await wait(600);
+  reapPanelCores();
+  // Ядро съёмки живёт в своём доме (`panel-core.mjs`) и снято строкой выше; здесь — остатки по
+  // записям под стендом, до сноса: живой хост держит каталог (проход 6, 03.11).
+  for (const id of reapStandTree(root).left)
+    console.log(`стенд съёмки: не снят процесс ядра (${id.role}) pid ${id.pid}: ${id.why}`);
   rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 }
 process.exit(exitCode);

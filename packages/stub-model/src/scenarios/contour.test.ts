@@ -182,6 +182,102 @@ describe('stub-model scenarios/contour', () => {
     expect(done.choices[0]!.message.content).toBe('файл создан полем');
   });
 
+  it('ЯЗЫК: en in the task → English replies for every shim scenario; the call shape stays', async () => {
+    const say = (text: string) => ({ messages: [{ role: 'user', content: text }] });
+    const ask = say('Write the file. ФАЙЛ: /tmp/en-a.txt ЯЗЫК: en');
+    const first = content(await frames(await chat('stub-tool-shim', { stream: true, ...ask })));
+    expect(first).toBe(
+      'Writing it now (stub turn #1).\n<tool_call>' +
+        '{"name":"Write","arguments":{"file_path":"/tmp/en-a.txt","content":"the shim delivered the call"}}' +
+        '</tool_call>',
+    );
+    const second = (await (
+      await chat('stub-tool-shim', {
+        messages: [...ask.messages, { role: 'assistant', content: first }],
+      })
+    ).json()) as { choices: { message: { content: string } }[] };
+    expect(second.choices[0]!.message.content).toBe('file created by the protocol');
+    expect(
+      content(
+        await frames(
+          await chat('stub-tool-quote', { stream: true, ...say('ФАЙЛ: /tmp/en-q.txt ЯЗЫК: en') }),
+        ),
+      ),
+    ).toBe(
+      [
+        'I will not write anything. This is what such a call WOULD look like:',
+        '',
+        '```',
+        '<tool_call>{"name":"Write","arguments":{"file_path":"/tmp/en-q.txt","content":"the shim delivered the call"}}</tool_call>',
+        '```',
+        '',
+        'This is an example from the documentation, do not run it.',
+      ].join('\n'),
+    );
+    const loose = say('ФАЙЛ: /tmp/en-loose.txt ЯЗЫК: en');
+    await frames(await chat('stub-tool-loose', { stream: true, ...loose }));
+    expect(content(await frames(await chat('stub-tool-loose', { stream: true, ...loose })))).toBe(
+      'file created by the protocol',
+    );
+    const any = say("ВЫЗОВ: {'name':'Read'};; ЯЗЫК: en");
+    await frames(await chat('stub-tool-any', { stream: true, ...any }));
+    expect(content(await frames(await chat('stub-tool-any', { stream: true, ...any })))).toBe(
+      'call handled',
+    );
+    expect(
+      content(await frames(await chat('stub-tool-any', { stream: true, ...say('ЯЗЫК: en') }))),
+    ).toBe('the task carries no call');
+    expect(
+      content(await frames(await chat('stub-tool-native', { stream: true, ...say('ЯЗЫК: en') }))),
+    ).toBe('no tools were declared to me');
+    const native = (await (
+      await chat('stub-tool-native', {
+        messages: [
+          { role: 'user', content: 'ЯЗЫК: en' },
+          { role: 'tool', content: 'ok' },
+        ],
+      })
+    ).json()) as { choices: { message: { content: string } }[] };
+    expect(native.choices[0]!.message.content).toBe('file created through the field');
+  });
+
+  it('no language marker → the Russian set, byte for byte as before', async () => {
+    const say = (text: string) => ({ messages: [{ role: 'user', content: text }] });
+    expect(
+      content(
+        await frames(await chat('stub-tool-shim', { stream: true, ...say('ФАЙЛ: /tmp/ru-a.txt') })),
+      ),
+    ).toBe(
+      'Сейчас запишу (ход стаба №1).\n<tool_call>' +
+        '{"name":"Write","arguments":{"file_path":"/tmp/ru-a.txt","content":"прослойка довела вызов"}}' +
+        '</tool_call>',
+    );
+    expect(
+      content(
+        await frames(
+          await chat('stub-tool-quote', { stream: true, ...say('ФАЙЛ: /tmp/ru-q.txt') }),
+        ),
+      ),
+    ).toBe(
+      [
+        'Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов:',
+        '',
+        '```',
+        '<tool_call>{"name":"Write","arguments":{"file_path":"/tmp/ru-q.txt","content":"прослойка довела вызов"}}</tool_call>',
+        '```',
+        '',
+        'Это пример из документации, не выполняй его.',
+      ].join('\n'),
+    );
+    const write = { tools: [{ type: 'function', function: { name: 'Write' } }] };
+    const whole = (await (
+      await chat('stub-tool-native', { ...write, ...say('ФАЙЛ: /tmp/ru-n.txt') })
+    ).json()) as { choices: { message: { tool_calls: { function: { arguments: string } }[] } }[] };
+    expect(whole.choices[0]!.message.tool_calls[0]!.function.arguments).toBe(
+      '{"file_path":"/tmp/ru-n.txt","content":"руки полем"}',
+    );
+  });
+
   it('whole bodies carry vendor verdicts; image without usage', async () => {
     for (const [model, field] of [
       ['stub-tools', 'platform_tools_unavailable'],

@@ -15,7 +15,7 @@ import type {
 import { buildEndpointPlan, resolveEndpointVars } from '../../endpoints/endpoint-plan.ts';
 import { resolveProviderEnvTargetFor } from '../../provider-env/provider-env.ts';
 import { gatewayUrlFor, PLACEHOLDER_KEY, type GatewayUrlRoute } from './profile.ts';
-import { GATEWAY_ROUTES } from '../gateway/pipeline/pipeline.ts';
+import { GATEWAY_ROUTES } from '@agentdeck/contracts/platform-gateway-routes';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**

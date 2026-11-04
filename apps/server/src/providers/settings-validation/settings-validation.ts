@@ -38,8 +38,6 @@ import {
 import { modelSources } from '@agentdeck/contracts/models';
 import { SPLIT_MAX_GROUPS } from '@agentdeck/contracts/task-split';
 import { SPLIT_HEAVY_RULE_MAX } from '@agentdeck/contracts/split-groups';
-import { GROUP_ECONOMY_LIMITS } from '@agentdeck/contracts/group-economy';
-import { groupWatchPatchSchema, groupWatchSnapshotSchema } from '@agentdeck/contracts/group-watch';
 import { isKnownProviderId } from '../registry.ts';
 
 /**
@@ -77,7 +75,9 @@ const modelPricingSchema = object({
 const endpointProfileSchema = object({
   id: string().min(1),
   name: string().min(1),
-  baseUrl: string().min(1),
+  // Пустой адрес — черновик «Добавить профиль» (см. contracts/endpoints): 400 на
+  // него означал, что кнопка не добавляет профиль вовсе.
+  baseUrl: string(),
   apiKind: zodEnum(['anthropic', 'google', 'openai-compat']),
   model: string(),
   writeToken: boolean(),
@@ -227,35 +227,6 @@ const platformGatewaySettingsSchema = object({
   enabled: boolean(),
   port: number().int().min(1024).max(65535),
   forceStream: boolean(),
-});
-
-/** Ноль («решает CLI») или число в границах рычага — опечатка не доходит до прогона. */
-function economyNumber(limits: { min: number; max: number }) {
-  return number()
-    .int()
-    .refine((value) => value === 0 || (value >= limits.min && value <= limits.max), {
-      message: `0 или от ${limits.min} до ${limits.max}`,
-    });
-}
-
-/**
- * Рычаги экономии групп: блок целиком, как у шлюза, — без ключа в схеме PATCH
- * отвечал бы 200 со старым значением, и тумблер на странице отскакивал бы назад.
- */
-const groupEconomyPatchSchema = object({
-  compactWindow: economyNumber(GROUP_ECONOMY_LIMITS.compactWindow),
-  bashOutputChars: economyNumber(GROUP_ECONOMY_LIMITS.bashOutputChars),
-  readOutputTokens: economyNumber(GROUP_ECONOMY_LIMITS.readOutputTokens),
-  cacheTtl: zodEnum(['', '5m', '1h']),
-  detachIde: boolean(),
-  sonnetDeliver: boolean(),
-  freshOnColdResume: boolean(),
-  workHabits: boolean(),
-  keepWarm: boolean(),
-  keepWarmPings: number()
-    .int()
-    .min(GROUP_ECONOMY_LIMITS.keepWarmPings.min)
-    .max(GROUP_ECONOMY_LIMITS.keepWarmPings.max),
 });
 
 /**
@@ -410,23 +381,13 @@ export const settingsPatchSchema = object({
   chatEffort: zodEnum(['', 'low', 'medium', 'high', 'xhigh', 'max']),
   // Инициативы чата (аудит «Настройки» 2026-09-03): без этих четырёх полей PATCH
   // отвечал 200 со СТАРЫМ значением, и тумблер на странице отскакивал назад.
-  taskSplitInitiative: boolean(),
   handoffInitiative: boolean(),
   handoffContextLimit: number().int().nonnegative(),
   handoffAutoDefault: boolean(),
   deliverToMr: boolean(),
-  // Правила прав: id правила → разрешено без вопроса. Схема нарочно широкая —
-  // состав правил меняется с кодом, а сервер, зная только старый набор, вырезал
-  // бы из патча новое правило и молча возвращал бы тумблер назад.
-  autoApproveRules: record(string(), boolean()),
   chatAutoMode: boolean(),
   chatLeanTools: boolean(),
-  deferAfterMinutes: number().int().min(0).max(1440),
   deferredTtlDays: number().int().min(1).max(90),
-  // Изменёнными ключами: маршрут сливает их с сохранённым блоком.
-  groupEconomy: groupEconomyPatchSchema.partial(),
-  // Пороги сторожа групп — тоже изменёнными ключами, слияние в маршруте.
-  groupWatch: groupWatchPatchSchema,
   modelPricing: record(string(), modelPricingSchema),
   encryptSecretBackups: boolean(),
   autoUpdateModels: boolean(),
@@ -458,11 +419,6 @@ export const settingsPatchSchema = object({
  */
 const importSettingsSchema = settingsPatchSchema.extend({
   remoteAccess: remoteAccessSettingsSchema.optional(),
-  // Снимок и state.json хранят только отличия от умолчаний (`groupEconomyChanges`);
-  // недостающие ключи дополняет `mergeState` умолчаниями текущего кода.
-  groupEconomy: groupEconomyPatchSchema.partial().optional(),
-  // Одно объявление с `importStateSchema` контрактов (F-67): битый порог отбрасывается поштучно.
-  groupWatch: groupWatchSnapshotSchema.optional(),
   /**
    * Активный контур. В PATCH его нет намеренно (он переключается транзакцией
    * активации), а в снимке обязан быть: без ключа zod вырезал его, тумблеры

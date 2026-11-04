@@ -2,6 +2,7 @@ import type { ServerResponse } from 'node:http';
 import type { DlpRule } from '@agentdeck/contracts';
 import { builtinRuleSet, maskRulesFor } from '@agentdeck/dlp/default-rules';
 import type { DlpApiKind } from '@agentdeck/dlp/api-shapes';
+import type { ContourBook } from './contour-book/contour-book.ts';
 import { hopText, type TextLanguage } from './gateway/texts.ts';
 import type { ThinkTailModels } from './gateway/think-models.ts';
 import type { KeySource, TagEntry } from './host.types.ts';
@@ -17,6 +18,8 @@ import type { HopTrace } from './trace.ts';
 export interface HopContext {
   tags: TagRegistry;
   spend: SpendBook;
+  /** Учёт контуров (след, расход по дням, отказ по бюджету) — то, что читают панель и ядро. */
+  contours: ContourBook;
   trace: HopTrace;
   keys: KeySource;
   /** Правила маски: свои правила панели или встроенный набор; битый файл — `broken`. */

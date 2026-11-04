@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { serverMessageText } from '@shared/config/i18n';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { TextField } from '@shared/ui/text-field';
@@ -96,7 +97,7 @@ export function StepAddress({ model }: WizardStepProps) {
         </Typography>
         {probe && (
           <Typography variant="caption" color="muted">
-            {probe.detail}
+            {serverMessageText(probe.detailCode, probe.detailParams, t) ?? probe.detail}
           </Typography>
         )}
       </Stack>

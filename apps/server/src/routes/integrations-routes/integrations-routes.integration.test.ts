@@ -197,44 +197,6 @@ describe('integrations-routes: поверхность', () => {
   });
 
   /**
-   * Комментарии задачи для `tests-cli delivery` (g8 F4 26.10): проверка в копии группы
-   * читает их здесь — ключ трекера только у панели. Неподключённый трекер — не отказ, а
-   * `not-connected`: панель такие задачи и не проверяет, CLI молчит так же.
-   */
-  it('комментарии задачи: тексты, «не подключён» и «не ответил» — разными ответами', async () => {
-    const ask = async () =>
-      app.inject({ method: 'GET', url: '/api/integrations/jira/issue/PRJ-1/comments' });
-    const off = await ask();
-    expect(off.statusCode).toBe(200);
-    expect(off.json()).toEqual({ comments: null, reason: 'not-connected' });
-
-    await connect();
-    vi.stubGlobal('fetch', () =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({
-            key: 'PRJ-1',
-            fields: {
-              summary: 'Падает',
-              comment: { comments: [{ body: 'Сделано в !810.' }, { body: 'Проверено.' }] },
-            },
-          }),
-          { status: 200 },
-        ),
-      ),
-    );
-    const read = await ask();
-    expect(read.statusCode).toBe(200);
-    expect(read.json()).toEqual({ comments: ['Сделано в !810.', 'Проверено.'] });
-    expect(read.body).not.toContain(SECRET);
-
-    vi.stubGlobal('fetch', () => Promise.resolve(new Response('down', { status: 503 })));
-    const down = await ask();
-    expect(down.statusCode).toBe(502);
-    expect(down.json()).toEqual({ comments: null, reason: 'unreachable' });
-  });
-
-  /**
    * Дефект 18.09.2026, найден живьём на Server/DC: `GET .../confluence/spaces`
    * отвечал 502 «токен отклонён» при рабочей Jira — у Confluence там свой
    * personal access token. Теперь Confluence — своя интеграция (владелец

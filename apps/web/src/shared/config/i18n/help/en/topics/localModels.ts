@@ -10,8 +10,7 @@ export const localModelsEn: typeof localModelsRu = {
       'This section puts a coding model on your machine and hands it to the panel’s agents. It ' +
       'reads the graphics card itself, shows which models will run on it and how fast, downloads ' +
       'the model server (llama.cpp) and the model, starts the server with the right context and sets up the ' +
-      'local-model contour — everything that used to be installed and configured by hand. Models ' +
-      'already downloaded in Ollama are taken over without downloading again. The ' +
+      'local-model contour — everything that used to be installed and configured by hand. The ' +
       'cloud comes back in one click.',
 
     guideTitle: 'What this document covers',
@@ -51,11 +50,15 @@ export const localModelsEn: typeof localModelsRu = {
     pathTextTitle: 'The same path in words',
     pathTextText:
       'A chat, group or test starts Claude Code as usual. The panel gives it the address of its ' +
-      'gateway; through the local-model contour the gateway passes the request to the model ' +
-      'server (llama-server) on 127.0.0.1:11435, which holds the model in video memory. The contour’s mode is ' +
+      'gateway; through the local-model contour the gateway passes the request to the stable ' +
+      'address 127.0.0.1:11435. Starting and stopping the model server (llama-server) go through ' +
+      'the core: the core holds the model in video memory, and the address stays the same when the ' +
+      'server restarts. A prompt longer than the window is refused with “prompt is too long”, and ' +
+      'Claude Code compacts the conversation on its own; an OpenAI client (Qwen Code) gets max_tokens ' +
+      'clamped to what the window still holds. The contour’s mode is ' +
       '“required”: if the server does not answer, the request does not silently go to the cloud — ' +
-      'it fails with a clear error. The panel’s own helpers — the panel agent, the form helper, ' +
-      'the assistant window, the watcher and group service calls — take the same contour: ' +
+      'it fails with a clear error. The panel’s own helpers — the panel agent, the form helper ' +
+      'and the assistant window — take the same contour: ' +
       'connecting makes it the “Panel assistant”, and “Back to the cloud” restores the previous ' +
       'choice. If the gateway did not start (port busy), the section shows a red check with the reason.',
 
@@ -110,7 +113,7 @@ export const localModelsEn: typeof localModelsRu = {
         'recommendation for this machine: the default window and the best quantization (up to Q6_K) that fits ' +
         'it entirely in the available memory; if nothing fits, the window steps down, never under 32K. It is ' +
         'computed from the memory size alone, never from the vendor. When another pair is selected, “Apply” sets the recommended one. A quantization below Q4 is ' +
-        'marked “low quality”. A file imported from Ollama shows the real quantization read from the GGUF header ' +
+        'marked “low quality”. A file imported from Ollama by an earlier panel version shows the real quantization read from the GGUF header ' +
         'and the note “imported from Ollama”; when it cannot be read, “unknown quantization”.',
       choiceOther: 'A quantization that is not on disk',
       choiceOtherText:
@@ -145,7 +148,7 @@ export const localModelsEn: typeof localModelsRu = {
         'Under the model row sits “On disk”: every downloaded quantization with its size and its own trash button; the ' +
         'button label says how much space comes back. The quantization currently loaded into the model server has no ' +
         'trash button — instead it reads “loaded into the server — stop the server to delete it”, and the whole-model ' +
-        'trash button in the row header is closed too. A file brought over from Ollama is marked “link to the Ollama ' +
+        'trash button in the row header is closed too. A file brought over from Ollama by an earlier panel version is marked “link to the Ollama ' +
         'file”: it is the same entry on disk as Ollama’s, so deleting it frees 0 GB and the model in Ollama stays whole.',
       filesConfirm: 'Deletion — after confirmation',
       filesConfirmText:
@@ -233,11 +236,10 @@ export const localModelsEn: typeof localModelsRu = {
       'slot is erased: a new chat does not inherit someone else’s prefix. Measured 15.10 on Qwen3.8 ' +
       '27B: going back to a 22-thousand-token conversation recomputed 41 tokens instead of 22 ' +
       'thousand, and the turn took 8 seconds instead of 20. A cache shorter than 8192 tokens is not ' +
-      'written: such a prompt is faster to read again. 45 seconds before the idle unload the cache ' +
-      'also goes to disk, so the first turn after sleep does not read the prompt from scratch. A ' +
+      'written: such a prompt is faster to read again. A ' +
       'file weighs about 100 KB per token. At most six files and 32 GB are kept, the oldest go ' +
-      'first; files taken from another model, window, cache or template are deleted. A sleeping ' +
-      'server is not woken for the erase. Cleanup runs after every write, at panel start and once an ' +
+      'first; files taken from another model, window, cache or template are deleted. ' +
+      'Cleanup runs after every write, at panel start and once an ' +
       'hour: files older than three days and files without a description (a write cut off midway) ' +
       'go. The cache of a chat that ended with an error stays until then — coming back to that chat, ' +
       'you do not wait for a re-read.',
@@ -255,9 +257,8 @@ export const localModelsEn: typeof localModelsRu = {
       'successful start resets the count. You can start the server by hand at any moment. A ' +
       'server stopped with the button is not restarted, neither by the timer nor by a run’s ' +
       'request. The timer only restarts a server that already answered in this panel run; a ' +
-      'run’s request that finds the server down starts it even after a computer reboot, from ' +
-      'the remembered launch, but no more than three failed starts in a row (see «Context is ' +
-      'server-wide»). While the server is down and a run is going, the model gets ' +
+      'run’s request that finds the server down starts it through the core, even after a computer ' +
+      'reboot (see «Context is server-wide»). While the server is down and a run is going, the model gets ' +
       '“server unavailable” and the client waits without limit (by design: a night must not ' +
       'cut the task): you see it on the server card, and the wait is ended with the stop ' +
       'button in the chat.',
@@ -290,11 +291,9 @@ export const localModelsEn: typeof localModelsRu = {
     longMemoryText:
       'The local-model kit tells the agent to create `.agent/PROGRESS.md` in the project, ' +
       'update it step by step and read it after the context is compacted; the compaction hints ' +
-      'are scaled to the local model window, not the cloud one. While the server watch follows a ' +
-      'request, the first-byte deadline is only a six-hour safety net: silence without progress ' +
-      'decides a cut, not a calculation from the measured speed. Without the watch, model reply ' +
-      'deadlines start at five minutes and grow with the context: a full prompt takes longer ' +
-      'than a minute. The run event buffer kept for reconnecting a screen is bounded (4000 ' +
+      'are scaled to the local model window, not the cloud one. The core computes the first-byte ' +
+      'deadline from the prompt length and the measured prompt speed, at least five minutes: a full ' +
+      'prompt takes longer than a minute. The run event buffer kept for reconnecting a screen is bounded (4000 ' +
       'events, 4 MB): the oldest go, and a screen that fell further behind sees a note about it.',
     mcpTitle: 'MCP servers of the local run',
     mcpCaption:
@@ -306,8 +305,7 @@ export const localModelsEn: typeof localModelsRu = {
       '15.10 on Qwen3.8 27B: the first request is 23 thousand tokens instead of 71 thousand; once ' +
       'the tool is loaded, later requests recompute 59–166 tokens out of 22 thousand. This holds for ' +
       'conversations started with tool search: resuming an older conversation, Claude Code repeats ' +
-      'its earlier tool set whole so the cache stays intact. The chat marks such a conversation with a ' +
-      'line naming the tokens of those descriptions — a new chat gets rid of them.',
+      'its earlier tool set whole so the cache stays intact — a new chat gets rid of those descriptions.',
     mcpWhy: 'Why the lean set has none by default',
     mcpWhyText:
       'Tool descriptions ride in every request and take model window. Measured on 14 Oct: one ' +
@@ -338,14 +336,16 @@ export const localModelsEn: typeof localModelsRu = {
     claudeCaption: 'A checkbox in the agents card, “For agents” tab. Off by default.',
     claudeOn: 'Turn on',
     claudeOnText:
-      'The panel writes into the env section of Claude settings.json the model server address, ' +
+      'The panel writes into the env section of Claude settings.json the core’s stable address ' +
+      '127.0.0.1:11435 (the core picks the server’s own port at every start, so that would go stale), ' +
       'the model for every role (subagents included) and the server context window. Claude Code ' +
       'itself — terminal, editor chat, panel chats — goes to the local model. The model choice in ' +
       'Claude Code (/model in the terminal, the list in the editor) shows one row with its name ' +
       'instead of Opus and Sonnet. New sessions pick it up at once; start an open session again. ' +
-      'The panel’s helpers (the panel agent, the form helper, the assistant window, the watcher, ' +
-      'group service calls) start Claude without your settings — the panel passes them the same ' +
-      'variables itself, so they answer with the local model too.',
+      'The panel’s helpers (the panel agent, the form helper, the assistant window) read none ' +
+      'of your settings and do not get these variables: the core ' +
+      'starts their session on its own route, and what leads them to the local model is the ' +
+      '“Panel assistant” assignment the connection makes (above), not this checkbox.',
     claudeOff: 'Turn off',
     claudeOffText:
       'Restores these variables exactly as they were before switching on; nothing else in the ' +
@@ -395,22 +395,6 @@ export const localModelsEn: typeof localModelsRu = {
       'a mismatch deletes the file and it is downloaded again. On Linux the CUDA libraries land beside llama-server: that is the only place ' +
       'the server looks for them, otherwise it would silently run on the CPU. A server that cannot start (no execute bit, a noexec volume) ' +
       'ends the launch with that error. Your own llama-server can be set with the LLAMA_SERVER_BINARY variable.',
-    importTitle: 'Models already downloaded in Ollama',
-    importLead:
-      'The weights layer in the Ollama store is a plain GGUF. The panel attaches it with a hard link and tries to open ' +
-      'it in llama.cpp without the graphics card; Ollama is neither started nor changed.',
-    importOk: 'It opened: the model is installed',
-    importOkText:
-      'The model appears in the installed list with the real quantization read from the file (for example Q4_K_M) and the mark “imported from Ollama”. The MTP layer (if the file has one) is found by the panel ' +
-      'itself and generation speeds up — on Qwen3.6 27B that is 82 tokens a second instead of 47.',
-    importFail: 'It did not open: download again',
-    importFailText:
-      'A format or architecture this build lacks cannot be opened by llama.cpp. The link is removed, the reason ' +
-      'is shown in the section and the model is offered for a fresh download from Hugging Face.',
-    importOwn: 'The panel’s own previous store',
-    importOwnText:
-      'Models the panel downloaded while Ollama was the server (the .local-models/models folder) are taken over ' +
-      'on the first start by themselves. The system Ollama store is not touched like that: its models are taken over with a button.',
 
     filesTitle: 'Where things live',
     filesCaption:
@@ -418,7 +402,7 @@ export const localModelsEn: typeof localModelsRu = {
     filesPanelTitle: 'The .local-models folder',
     fileRuntime: 'Model server (own copy)',
     fileModels:
-      'Models: GGUF files by repository; ollama-import/ holds the ones taken over from Ollama',
+      'Models: GGUF files by repository; ollama-import/ holds the ones taken over from Ollama earlier',
     fileDownloads: 'Partial downloads',
     fileTools: 'Qwen Code and its kit',
     fileLogs: 'Server log',
@@ -428,8 +412,9 @@ export const localModelsEn: typeof localModelsRu = {
       'Measurements, kit choice, quantization and context choice, run-layer measurements, added ' +
       'custom models',
     fileImport:
-      'A model file from Ollama (a store layer) is attached by a hard link — no second copy on disk. If the ' +
-      'folders are on different drives a link is impossible, and the file is copied.',
+      'Importing models from Ollama has been removed. Files imported by an earlier panel version stay in ' +
+      'ollama-import/ and work as before: they are hard links to the Ollama store layer, or copies when ' +
+      'the folders were on different drives.',
 
     limitsTitle: 'What a local model cannot do',
     limitWeakerTitle: 'It is weaker than the cloud',
@@ -460,25 +445,19 @@ export const localModelsEn: typeof localModelsRu = {
       'When a new panel version changes that template, a server started with the old one restarts by itself. ' +
       'Claude Code in such a run gets the server’s real window and compacts the history early; a ' +
       'request that no longer fits the window is refused by the gateway with «prompt is too long», ' +
-      'which Claude Code answers by compacting — the start of a request is never cut silently. The run ' +
-      'layer — system prompt and tool schemas — is measured by the gateway on every request with tools. ' +
-      'If, together with the reply reserve, it leaves no room for the conversation, every turn would get ' +
-      'that refusal: then the server line in the chat, the chat itself between turns and the server card ' +
-      'show the layer, window and limit and one action — raise the window to the nearest sufficient one, ' +
-      'and if the current quantization cannot carry that window on the card, pick one that can. The panel ' +
-      'never trims the set itself: that is the human’s decision on the contour card. The server ' +
-      'takes minutes over a long request, and that is not a hang: while a turn runs, a server line under ' +
-      'the chat messages shows the model, quantization, window and stage — loading, reading the prompt (how ' +
-      'many tokens of how many), answering, waiting for permission. Only silence without progress counts as a ' +
-      'stall: two minutes on the GPU, ten on the CPU; a server that answers the health check but stays silent ' +
-      'about its slot shows no progress. Then the request is cut with the reason and sent again, ' +
-      'and a server stuck mid-prompt is restarted; after 20 seconds of silence the line offers a restart ' +
-      'button. A refusal from the server itself (a 4xx/5xx code other than 503 “loading model”) shows on the line in red with its code and ' +
-      'text until the next request goes through. If the server is not running and the chat goes to the local model, the first request starts ' +
-      'it and waits for the load. If it does not come up, the next try comes no sooner than 30, then 60 ' +
-      'seconds later; after the third failure requests get a refusal with the cause from the server log ' +
-      'until the server is started or restarted by hand or the model choice changes. The previous server ' +
-      'run keeps its log next to it, in llama.prev.log.',
+      'which Claude Code answers by compacting — the start of a request is never cut silently. If the ' +
+      'system prompt and tool schemas, together with the reply reserve, leave no room for the ' +
+      'conversation, every turn gets that refusal: raise the window or pick the lean set on the ' +
+      'contour card — the panel never trims the set itself. The server takes minutes over a long ' +
+      'request, and that is not a hang: while a turn runs, a server line under the chat messages shows ' +
+      'the model, quantization, window and waiting for permission. The line does not show turn stages ' +
+      '(loading, reading the prompt, answering): the core carries chat requests to the model, and the ' +
+      'stages come back once the core has a hop activity feed. A refusal from the server itself (a ' +
+      '4xx/5xx code other than 503 “loading model”) shows on the line in red with its code and text ' +
+      'and a “Restart the server” button until the next request goes through: the panel reads the ' +
+      'refusal from the core request journal. If the server is not running and ' +
+      'the chat goes to the local model, the first request starts it through the core and waits for ' +
+      'the load; if it does not come up, the request gets a refusal with the cause.',
     limitEstimateTitle: 'An estimate is not a measurement',
     limitEstimateText:
       'The catalog speed is computed from the card’s bandwidth. The real number depends on the ' +

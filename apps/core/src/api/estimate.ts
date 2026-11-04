@@ -1,4 +1,4 @@
-import { parseEstimateBody } from '@agentdeck/contracts/core/estimate';
+import { ESTIMATE_BODY_LIMIT, parseEstimateBody } from '@agentdeck/contracts/core/estimate';
 import { estimateTask, replayEstimate } from '../conductor/estimate/index.ts';
 import { decideAuthority } from '../policy/authority/authority.ts';
 import { proofOfBody } from './body-proof.ts';
@@ -15,7 +15,8 @@ import type { FastifyInstance } from 'fastify';
  */
 
 export function registerEstimate(app: FastifyInstance, ctx: RouteContext): void {
-  app.post('/v1/estimate', async (request, reply) => {
+  // Свой предел: первое слово чата несёт вложения (`attachments`), общий предел API их не вмещает.
+  app.post('/v1/estimate', { bodyLimit: ESTIMATE_BODY_LIMIT }, async (request, reply) => {
     const token = ctx.tokenOf(request);
     if (token === 'none') {
       return reply.code(401).send(apiError('token-required', 'Нужен токен ядра'));

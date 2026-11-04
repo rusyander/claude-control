@@ -10,12 +10,8 @@ import {
   parseCodexToml,
   upsertCodexRootScalar,
 } from '../../lib/codex-toml/codex-toml.ts';
-import {
-  APPROVAL_POLICIES,
-  DEFAULT_APPROVAL,
-  DEFAULT_SANDBOX,
-  SANDBOX_MODES,
-} from './constants.ts';
+import { CODEX_APPROVAL_POLICIES, CODEX_SANDBOX_MODES } from '@agentdeck/contracts/permissions';
+import { DEFAULT_APPROVAL, DEFAULT_SANDBOX } from './constants.ts';
 import { backupNameOf } from './target.ts';
 import type { CodexPermissionsValues, ProviderPermissionsTarget } from './types.ts';
 
@@ -26,22 +22,6 @@ import type { CodexPermissionsValues, ProviderPermissionsTarget } from './types.
  * одноимённые ключи ВНУТРИ таблиц (`[profiles.x]` и т.п.) НЕ тронуты; таблицы,
  * комментарии, прочие корневые ключи — БАЙТ-В-БАЙТ.
  */
-
-export function parseCodexDraft(rec: Record<string, unknown>): CodexPermissionDraft | undefined {
-  const approvalPolicy = rec.approvalPolicy;
-  const sandboxMode = rec.sandboxMode;
-  if (
-    typeof approvalPolicy !== 'string' ||
-    !APPROVAL_POLICIES.includes(approvalPolicy as CodexApprovalPolicy)
-  )
-    return undefined;
-  if (typeof sandboxMode !== 'string' || !SANDBOX_MODES.includes(sandboxMode as CodexSandboxMode))
-    return undefined;
-  return {
-    approvalPolicy: approvalPolicy as CodexApprovalPolicy,
-    sandboxMode: sandboxMode as CodexSandboxMode,
-  };
-}
 
 /**
  * Прочитать текущие значения обоих ключей КОРНЯ. Отсутствует ключ → дефолт Codex
@@ -65,9 +45,9 @@ export function readCodexPermissions(text: string): CodexPermissionsValues {
 
   const approvalPresent =
     typeof rawApproval === 'string' &&
-    APPROVAL_POLICIES.includes(rawApproval as CodexApprovalPolicy);
+    CODEX_APPROVAL_POLICIES.includes(rawApproval as CodexApprovalPolicy);
   const sandboxPresent =
-    typeof rawSandbox === 'string' && SANDBOX_MODES.includes(rawSandbox as CodexSandboxMode);
+    typeof rawSandbox === 'string' && CODEX_SANDBOX_MODES.includes(rawSandbox as CodexSandboxMode);
 
   return {
     kind: 'codex',

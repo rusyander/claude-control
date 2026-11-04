@@ -1,3 +1,4 @@
+import { HOOK_JSON_FLAG } from '../adapters/hook-words.ts';
 import { bridgeEnv } from './bridges.ts';
 import { coreCheck, coreSince, newestCore } from './core-discovery.ts';
 import { createCoreClient, type CoreClient } from './core-client.ts';
@@ -32,6 +33,26 @@ export interface HookIo {
   stderr: (line: string) => void;
   /** Клиент ядра (подмена в тестах); по умолчанию — тот же, что у мостов MCP. */
   client?: (opts: { url: string; token: string; procs?: string; waitMs: number }) => CoreClient;
+  /**
+   * Отказ JSON-ом в stdout при коде 0 (`run.ts hook --json`): CLI, теряющие код 2, — Codex на
+   * Windows отчитывает его «exited with code 1» и вызов ИСПОЛНЯЕТ (проба 02.11, codex-cli
+   * 0.155.1). JSON `hookSpecificOutput.permissionDecision: "deny"` он держит как запрет.
+   */
+  json?: { stdout: (text: string) => void };
+}
+
+/** Слово режима JSON после `hook` в команде хука — общее с переходниками, что его пишут. */
+export { HOOK_JSON_FLAG };
+
+/** Отказ в форме PreToolUse JSON (Claude-совместимой; её читают Codex и прочие). */
+export function hookDenyJson(reason: string): string {
+  return JSON.stringify({
+    hookSpecificOutput: {
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: reason,
+    },
+  });
 }
 
 export interface HookCall {
@@ -103,7 +124,9 @@ function defaultClient(opts: {
 export async function runCoreHook(io: HookIo): Promise<number> {
   const deny = (reason: string): number => {
     io.stderr(`agentdeck: ${reason}\n`);
-    return 2;
+    if (!io.json) return 2;
+    io.json.stdout(hookDenyJson(`agentdeck: ${reason}`));
+    return 0;
   };
   const env = bridgeEnv(io.env);
   if ('missing' in env) return deny(`core hook without session env (${env.missing.join(', ')})`);
@@ -128,13 +151,27 @@ export async function runCoreHook(io: HookIo): Promise<number> {
   return deny('core answered the hook without a decision; denied');
 }
 
-/** Процесс хука: stdin целиком, затем решение. */
-export async function runHookProcess(): Promise<number> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return runCoreHook({
-    env: process.env,
-    stdin: Buffer.concat(chunks).toString('utf8'),
-    stderr: (line) => void process.stderr.write(line),
-  });
+/**
+ * Процесс хука: stdin целиком, затем решение. В режиме JSON и сбой самого хука — отказ JSON-ом:
+ * ненулевой код без JSON такой CLI исполняет (fail-open), а хук обязан быть fail-closed (P41).
+ */
+export async function runHookProcess(args: readonly string[] = []): Promise<number> {
+  const json = args.includes(HOOK_JSON_FLAG)
+    ? { stdout: (text: string) => void process.stdout.write(text) }
+    : undefined;
+  try {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+    return await runCoreHook({
+      env: process.env,
+      stdin: Buffer.concat(chunks).toString('utf8'),
+      stderr: (line) => void process.stderr.write(line),
+      ...(json ? { json } : {}),
+    });
+  } catch (error) {
+    if (!json) throw error;
+    const why = error instanceof Error ? error.message : String(error);
+    json.stdout(hookDenyJson(`agentdeck: core hook failed (${why}); denied`));
+    return 0;
+  }
 }

@@ -3,6 +3,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { TruncatedText } from '@shared/ui/truncated-text';
+import { applyTargetTitle } from '@entities/Platform';
 import { formatAgo } from '../lib/formatAgo';
 import styles from './ApplyJournal.module.scss';
 import type { ApplyJournalProps } from './ApplyJournal.types';
@@ -46,7 +47,7 @@ export function ApplyJournal({ targets, onRollback, isPending }: ApplyJournalPro
             <Stack gap="var(--spacing-3xs)" minWidth="12rem" flex={1}>
               <Typography variant="body-sm" as="span">
                 {target.appliedAt ? formatAgo(target.appliedAt, i18n.language, t) : '—'} ·{' '}
-                {t('platform.journalEntry', { title: target.title })}
+                {t('platform.journalEntry', { title: applyTargetTitle(target, t) })}
               </Typography>
               {target.filePath && (
                 <TruncatedText text={target.filePath} variant="caption" color="subtle" />

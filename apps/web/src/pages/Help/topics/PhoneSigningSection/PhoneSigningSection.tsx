@@ -23,6 +23,7 @@ export function PhoneSigningSection({ tr }: SectionProps) {
         <GuideStep title={tr('signingRevoke')} text={tr('signingRevokeText')}>
           <HelpShot topic="phone" scenario="signing" frame="02-panel-revoke-last" side="panel" />
         </GuideStep>
+        <GuideStep title={tr('signingCore')} text={tr('signingCoreText')} />
       </GuideSteps>
       <FieldTable
         nameHeader={tr('signingColumn')}

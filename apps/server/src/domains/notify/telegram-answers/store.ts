@@ -95,12 +95,22 @@ export class AnswersStore {
     return fresh;
   }
 
+  /**
+   * Часы, по которым считается срок хранения. Сервис ставит свои (`deps.now`): метки `sentAt`
+   * пишутся по его часам, и по чужим запись, только что положенная, могла уйти как недельная.
+   */
+  private clock: () => number = Date.now;
+
+  useClock(clock: () => number): void {
+    this.clock = clock;
+  }
+
   save(): void {
     this.prune();
     if (this.file) writeJsonFile(this.file, this.data);
   }
 
-  private prune(now = Date.now()): void {
+  private prune(now = this.clock()): void {
     const old = (iso: string | undefined): boolean => !iso || now - Date.parse(iso) > KEEP_MS;
     this.data.messages = this.data.messages
       .filter((message) => !(message.closedAt && old(message.closedAt)) && !old(message.sentAt))
@@ -152,7 +162,7 @@ export class AnswersStore {
     return this.data.messages.find((message) => message.sid === sid);
   }
 
-  add(message: SentMessage, now = Date.now()): void {
+  add(message: SentMessage, now = this.clock()): void {
     this.data.messages.push(message);
     const at = new Date(now).toISOString();
     for (const item of message.items) this.data.sent[item.key] = at;

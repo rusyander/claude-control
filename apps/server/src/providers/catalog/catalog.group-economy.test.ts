@@ -4,13 +4,11 @@ import {
   groupEconomySupportSchema,
   leverWorks,
 } from '@agentdeck/contracts/group-economy-support';
-import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
-import { economyRunEnv } from '../../domains/provider-chat/economy-run/economy-run.ts';
 import { listProviders } from '../registry.ts';
 
 /**
  * @covers catalog/{gemini,goose,continue,kimi,opencode,aider,cursor}.ts
- * @scenario семь CLI пакета D объявляют каждый из девяти рычагов; недействующий
+ * @scenario семь CLI пакета D объявляют каждый из шести рычагов; недействующий
  *   — с причиной; канал есть ровно у тех, у кого родной рычаг доходит до прогона
  *   (Goose, Continue), у Gemini его нет — файл настроек на прогон CLI отвергает.
  */
@@ -36,7 +34,7 @@ describe('catalog group economy (package D)', () => {
 
   it('goose: working levers name their condition (review D F1, F2)', () => {
     const support = byId('goose')!.groupEconomy!.support;
-    // Порог сжатия — только когда окно модели известно (`economy-run/goose.ts`).
+    // Порог сжатия — только когда окно модели известно (`gooseEconomy` в `apps/core/src/adapters/economy-carry.ts`).
     expect(support.compactWindow).toEqual({
       support: 'native',
       note: 'economy-note-window-known-only',
@@ -50,11 +48,13 @@ describe('catalog group economy (package D)', () => {
     }
   });
 
-  it('kimi: one premise for the cache levers; aider: no TTL key, habits meaningless', () => {
+  it('kimi: implicit cache, config-only limits; aider: no TTL key, habits meaningless', () => {
     const kimi = byId('kimi')!.groupEconomy!.support;
-    // Провайдер Kimi выбран в config.toml человека — обоим рычагам кэша одна причина.
-    expect(kimi.freshOnColdResume?.note).toBe('economy-note-provider-unknown');
-    expect(kimi.keepWarm?.note).toBe('economy-note-provider-unknown');
+    expect(kimi.cacheTtl).toEqual({ support: 'impossible', note: 'economy-note-cache-implicit' });
+    expect(kimi.compactWindow).toEqual({
+      support: 'disproportionate',
+      note: 'economy-note-config-only',
+    });
     const aider = byId('aider')!.groupEconomy!.support;
     expect(aider.cacheTtl).toEqual({ support: 'impossible', note: 'economy-note-no-key' });
     expect(aider.workHabits).toEqual({ support: 'meaningless', note: 'economy-note-no-tool-loop' });
@@ -90,13 +90,7 @@ describe('catalog group economy (package D)', () => {
       note: 'economy-note-admin-settings',
     });
     expect(support.bashOutputChars).toEqual(support.compactWindow);
-    expect(
-      economyRunEnv('gemini', {
-        env: {},
-        appData: '/data',
-        economy: GROUP_ECONOMY_DEFAULTS,
-        compactWindow: 160_000,
-      }),
-    ).toBeUndefined();
+    // Канал рычагов на прогон теперь у ядра (`economy-carry.ts`); здесь — что каталог его не объявляет.
+    expect(byId('gemini')!.groupEconomy!.channel).toBeUndefined();
   });
 });

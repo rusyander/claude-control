@@ -225,16 +225,6 @@ export function LocalModelsTopic() {
         </Callout>
       </HelpSection>
 
-      <HelpSection title={tr('importTitle')} caption={tr('importLead')}>
-        <OptionCards
-          items={[
-            { title: tr('importOk'), text: tr('importOkText') },
-            { title: tr('importFail'), text: tr('importFailText') },
-            { title: tr('importOwn'), text: tr('importOwnText') },
-          ]}
-        />
-      </HelpSection>
-
       <HelpSection title={tr('filesTitle')} caption={tr('filesCaption')}>
         <Stack gap="var(--spacing-xs)">
           <StorageCard

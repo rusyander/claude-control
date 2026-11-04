@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ownerRequestBlock } from '@agentdeck/contracts/quality-floor';
+import {
+  OWNER_REQUEST_END,
+  OWNER_REQUEST_HEADER,
+  ownerCoverageLine,
+} from '@agentdeck/contracts/quality-floor';
 import { OWNER_BRIEF, ownerBlockOf, writeOwnerBrief } from './owner-brief.ts';
 
 /**
@@ -22,8 +26,17 @@ function copy(): string {
 }
 
 const OWNER = 'Доска PROJ: возьми фронтовые задачи, глубокое ревью, MR без мержа.';
+// Блок слов владельца в том виде, в каком его писало старое разделение панели
+// (уехало в ядро, этап 10): старые задания читаются как прежде.
+const ownerBlock = (words: string): string =>
+  [
+    OWNER_REQUEST_HEADER,
+    `[owner message 1 of 1]\n\n${words}`,
+    OWNER_REQUEST_END,
+    ownerCoverageLine(),
+  ].join('\n\n');
 const task = (words = OWNER): string =>
-  `${ownerRequestBlock([words])}\n\nДобавка разделяющего агента.\n\nЗадачи группы:\n- PROJ-1`;
+  `${ownerBlock(words)}\n\nДобавка разделяющего агента.\n\nЗадачи группы:\n- PROJ-1`;
 
 describe('файл слов владельца в копии', () => {
   it('держит дословную просьбу, формат строк owner-N и без добавки разделяющего агента', () => {

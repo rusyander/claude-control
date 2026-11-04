@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { chatDeliveryPrompt } from '@agentdeck/contracts/task-split';
-import { DELIVERY_AFTER_SPLIT, initiativePrompt } from './initiative.ts';
+import { initiativePrompt } from './initiative.ts';
 
 /**
  * Инициативы уезжают к агенту одним аргументом командной строки, поэтому
@@ -15,8 +15,8 @@ describe('строка инициатив для прогона', () => {
    * человека и решает развилку сам — то есть выключенные тумблеры молча меняли
    * бы его поведение там, где выбор принадлежит человеку.
    */
-  it('оба тумблера выключены — остаётся правило про вопрос человеку', () => {
-    const bare = initiativePrompt({ taskSplitInitiative: false, handoffInitiative: false }) ?? '';
+  it('тумблер выключен — остаётся правило про вопрос человеку', () => {
+    const bare = initiativePrompt({ handoffInitiative: false }) ?? '';
 
     expect(bare).toContain('AskUserQuestion');
     expect(bare).toContain('Answer questions?');
@@ -35,30 +35,28 @@ describe('строка инициатив для прогона', () => {
    * нет вовсе, и рассказ про чужую ошибку только сбивал бы.
    */
   it('чужому CLI без включённых инициатив дописывать нечего', () => {
-    expect(
-      initiativePrompt({ taskSplitInitiative: false, handoffInitiative: false }, { foreign: true }),
-    ).toBeUndefined();
-    expect(
-      initiativePrompt({ taskSplitInitiative: true, handoffInitiative: false }, { foreign: true }),
-    ).not.toContain('AskUserQuestion');
+    expect(initiativePrompt({ handoffInitiative: false }, { foreign: true })).toBeUndefined();
+    expect(initiativePrompt({ handoffInitiative: true }, { foreign: true })).not.toContain(
+      'AskUserQuestion',
+    );
   });
 
-  it('включённые складываются в одну строку без переводов строки', () => {
-    const both = initiativePrompt({ taskSplitInitiative: true, handoffInitiative: true });
-    expect(both).toBeDefined();
-    expect(both).not.toMatch(/[\r\n]/);
-    expect(both).toContain('agentdeck:split');
-    expect(both).toContain('agentdeck:handoff');
-  });
-
-  it('каждый тумблер отвечает только за свою инициативу', () => {
-    const split = initiativePrompt({ taskSplitInitiative: true, handoffInitiative: false });
-    expect(split).toContain('agentdeck:split');
-    expect(split).not.toContain('agentdeck:handoff');
-
-    const handoff = initiativePrompt({ taskSplitInitiative: false, handoffInitiative: true });
+  /**
+   * Предложение разделения снято (этап 10, G14): у карточки разделения нет кнопок.
+   * Склейка его не просит ни при каком тумблере, источник его не называет.
+   */
+  it('продолжение — одной строкой; разделения в склейке нет', () => {
+    const handoff = initiativePrompt({ handoffInitiative: true });
+    expect(handoff).toBeDefined();
+    expect(handoff).not.toMatch(/[\r\n]/);
     expect(handoff).toContain('agentdeck:handoff');
-    expect(handoff).not.toContain('agentdeck:split');
+    expect(handoff).toContain('continue the work in a clean session');
+    expect(handoff).toContain('it is triggered by a service block');
+    for (const prompt of [handoff, initiativePrompt({ handoffInitiative: false })]) {
+      expect(prompt).not.toContain('agentdeck:split');
+      expect(prompt).not.toContain('spread a list of tasks');
+      expect(prompt).not.toContain('propose a split');
+    }
   });
 
   /**
@@ -68,61 +66,16 @@ describe('строка инициатив для прогона', () => {
    * обязано быть в любой склейке.
    */
   it('склейка начинается с источника — иначе агент читает её как подсадную', () => {
-    for (const settings of [
-      { taskSplitInitiative: true, handoffInitiative: false },
-      { taskSplitInitiative: false, handoffInitiative: true },
-      { taskSplitInitiative: true, handoffInitiative: true },
-    ]) {
+    for (const settings of [{ handoffInitiative: false }, { handoffInitiative: true }]) {
       const prompt = initiativePrompt(settings) ?? '';
       expect(prompt.startsWith('This run was started from the AgentDeck panel')).toBe(true);
     }
   });
 
   it('инициатива продолжения требует уборки рабочих файлов до предложения', () => {
-    const handoff = initiativePrompt({ taskSplitInitiative: false, handoffInitiative: true }) ?? '';
+    const handoff = initiativePrompt({ handoffInitiative: true }) ?? '';
     expect(handoff).toContain('ARCHIVE.md');
     expect(handoff).toContain('TASKS.md');
-  });
-  /**
-   * Инициатива дописывается к КАЖДОМУ прогону, поэтому без глушителя агент
-   * предлагает делить снова и снова — живые прогоны спрашивали об этом даже на
-   * «убери лишние импорты в трёх файлах». Отказались или уже разделили —
-   * инструкция уезжать перестаёт, а продолжение в чистой сессии остаётся: это
-   * другой тумблер и другое решение.
-   */
-  it('разговор с погашенным разделением получает только продолжение', () => {
-    const both = { taskSplitInitiative: true, handoffInitiative: true };
-    const muted = initiativePrompt(both, { splitMuted: true }) ?? '';
-
-    expect(muted).not.toContain('agentdeck:split');
-    expect(muted).toContain('agentdeck:handoff');
-    expect(muted.startsWith('This run was started from the AgentDeck panel')).toBe(true);
-    // Источник называет только предложенное (TQ-10): разделения здесь нет.
-    expect(muted).not.toContain('spread a list of tasks');
-    expect(muted).toContain('continue the work in a clean session');
-    expect(muted).toContain('it is triggered by a service block');
-    const full = initiativePrompt(both) ?? '';
-    expect(full).toContain('spread a list of tasks');
-    expect(full).toContain('both are triggered by a service block');
-  });
-
-  it('единственная инициатива погашена — у чужого CLI строки нет вовсе', () => {
-    expect(
-      initiativePrompt(
-        { taskSplitInitiative: true, handoffInitiative: false },
-        { splitMuted: true, foreign: true },
-      ),
-    ).toBeUndefined();
-  });
-
-  /**
-   * Планка «что считать отдельной задачей» — не украшение: именно её занижение
-   * превращало инициативу в назойливость.
-   */
-  it('в инструкции названа планка задачи и запрет спрашивать дважды', () => {
-    const split = initiativePrompt({ taskSplitInitiative: true, handoffInitiative: false }) ?? '';
-    expect(split).toContain('ONE task');
-    expect(split).toContain('at most once per conversation');
   });
 
   /**
@@ -131,7 +84,7 @@ describe('строка инициатив для прогона', () => {
    * MR на «объясни, как это работает» был бы вредом.
    */
   it('доставка: приезжает по запросу, одной строкой, с планкой и запретами', () => {
-    const settings = { taskSplitInitiative: false, handoffInitiative: false };
+    const settings = { handoffInitiative: false };
     expect(initiativePrompt(settings)).not.toContain('delivery up to an MR');
 
     const delivery = chatDeliveryPrompt({ skill: 'acme-ticket-delivery' });
@@ -152,29 +105,5 @@ describe('строка инициатив для прогона', () => {
     expect(foreign).not.toContain('AskUserQuestion');
     expect(foreign).toContain('`ticket-delivery-2`');
     expect(initiativePrompt(settings, { foreign: true, delivery: foreign })).toContain(foreign);
-  });
-
-  /**
-   * Живой прогон 24.09.2026: родитель получил и «предложи разделение», и
-   * «доставь до MR» без старшинства — и мог доставить пять тикетов сам.
-   * Доставка остаётся (разделение включено из коробки, чат с одной задачей
-   * без неё не дошёл бы до MR), но уступает разделению явно.
-   */
-  it('доставка рядом с разделением уступает ему; без разделения — как была', () => {
-    const delivery = chatDeliveryPrompt({ skill: 'acme-ticket-delivery' });
-    const split = { taskSplitInitiative: true, handoffInitiative: false };
-
-    const both = initiativePrompt(split, { delivery }) ?? '';
-    expect(both).toContain(`${DELIVERY_AFTER_SPLIT} ${delivery}`);
-    expect(both).toContain('if you propose a split, deliver nothing');
-    expect(both).toContain('enabled delivery up to an MR on this project');
-    expect(both).not.toMatch(/[\r\n]/);
-
-    // Разделение уже предлагали — старшинство не нужно, строка доставки чистая.
-    const muted = initiativePrompt(split, { delivery, splitMuted: true }) ?? '';
-    expect(muted).toContain(delivery);
-    expect(muted).not.toContain(DELIVERY_AFTER_SPLIT);
-    const off = { taskSplitInitiative: false, handoffInitiative: false };
-    expect(initiativePrompt(off, { delivery })).not.toContain(DELIVERY_AFTER_SPLIT);
   });
 });

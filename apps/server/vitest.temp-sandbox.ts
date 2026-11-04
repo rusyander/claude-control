@@ -15,8 +15,18 @@ import { join } from 'node:path';
 // неё проект без своего `git init`, оказавшийся внутри чужого репозитория,
 // становился его частью: 07.10 прогон завёл в настоящем репозитории 128 копий
 // с ветками — песочница тогда лежала внутри него.
-const VARS = ['TEMP', 'TMP', 'TMPDIR', 'GIT_CEILING_DIRECTORIES'] as const;
+// AGENTDECK_CORE_HOME: дом ядра — пустой каталог прогона, а не настоящий `~/.agentdeck/core`.
+// Без неё тест, запустивший чат через рантайм, находил живое ядро этой машины и заводил в нём
+// задачи: 02–03.11 в списке задач ядра на странице групп легли 28 задач «BGASK <temp>», часть —
+// живыми. Тест, которому нужно ядро, ставит свой дом сам (proxy-host, steps-core-route).
+const VARS = ['TEMP', 'TMP', 'TMPDIR', 'GIT_CEILING_DIRECTORIES', 'AGENTDECK_CORE_HOME'] as const;
 const saved = new Map<string, string | undefined>();
+
+function valueFor(name: (typeof VARS)[number], dir: string): string {
+  if (name === 'GIT_CEILING_DIRECTORIES') return realpathSync.native(dir);
+  if (name === 'AGENTDECK_CORE_HOME') return join(dir, 'core-home');
+  return dir;
+}
 let sandbox: string | undefined;
 
 export function setup(): void {
@@ -24,13 +34,14 @@ export function setup(): void {
   // от сканера CLI (свои процессы панели он пропускает), «agent» ломал сверки
   // путей, а лишние 30 знаков в каждом пути выводили инструкции набора за предел
   // и запрос — в 414.
-  sandbox = mkdtempSync(join(tmpdir(), 'vt-'));
+  const dir = mkdtempSync(join(tmpdir(), 'vt-'));
+  sandbox = dir;
   for (const name of VARS) {
     saved.set(name, process.env[name]);
     // Потолок — сам каталог прогона: репозиторий, заведённый тестом внутри него,
     // находится, а всё, что выше, — нет. Путём «как на диске»: короткое имя
     // Windows (`RUSYAN~1`) git с потолком не сопоставляет.
-    process.env[name] = name === 'GIT_CEILING_DIRECTORIES' ? realpathSync.native(sandbox) : sandbox;
+    process.env[name] = valueFor(name, dir);
   }
 }
 

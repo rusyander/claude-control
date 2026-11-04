@@ -1,4 +1,5 @@
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -12,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
 import { cleanLiveParent } from './src/platform/__fixtures__/clean-base.ts';
+import { reapCoreProcessesUnder } from './src/platform/__fixtures__/reap-home.ts';
 
 /**
  * Свой temp и свой дом ядра на прогон набора. Интеграционный тест ядра никогда не пишет в
@@ -34,6 +36,11 @@ let sandbox: string | undefined;
 let liveSandbox: string | undefined;
 
 const OWNER_FILE = 'owner.pid';
+/**
+ * Метка «каталог завёл прогон, который снимает за собой процессы ядра» (проход 6, 03.11). Хосты под
+ * каталогом БЕЗ метки (прогоны до этой правки) уборка не снимает: их остатки — решение человека.
+ */
+const REAP_MARK = 'reap-owned';
 // Каталог без файла владельца (до этой правки) снимается, только когда точно не идёт прогон.
 const LEGACY_AGE_MS = 6 * 60 * 60 * 1000;
 
@@ -51,18 +58,30 @@ const alive = (pid: number): boolean => {
  * Общая база живых стендов (`%ProgramData%\agentdeck-live`) переживает прогоны: убитый прогон
  * (таймаут, прерванный агент) не доходит до `teardown`, а на Windows занятый CLI-файл роняет
  * `rmSync`. Без уборки там копились десятки `vl-*` (31.10: ~70 каталогов, в одном 1720 файлов).
- * Снимается только `vl-*`, чей владелец мёртв; каталог живого прогона не трогается.
+ * Снимается только `vl-*`, чей владелец мёртв; каталог живого прогона не трогается. Тем же
+ * правилом — `vc-*` во временной папке (`prefix`, `legacy: false`): каталог без файла владельца там
+ * может оказаться чужим, и снимается только размеченный прогоном.
+ * Размеченный `REAP_MARK` каталог перед сносом отдаёт процессы ядра, записанные под ним (`reap`).
  */
-export function sweepStaleLive(parent: string, now = Date.now()): string[] {
+export async function sweepStaleLive(
+  parent: string,
+  now = Date.now(),
+  {
+    prefix = 'vl-',
+    legacy = true,
+    reap = reapCoreProcessesUnder,
+  }: { prefix?: string; legacy?: boolean; reap?: (dir: string) => Promise<unknown> } = {},
+): Promise<string[]> {
   const removed: string[] = [];
   for (const name of readdirSync(parent)) {
-    if (!name.startsWith('vl-')) continue;
+    if (!name.startsWith(prefix)) continue;
     const dir = join(parent, name);
     let stale: boolean;
     try {
       const pid = Number(readFileSync(join(dir, OWNER_FILE), 'utf8').trim());
       stale = !Number.isInteger(pid) || pid <= 0 || !alive(pid);
     } catch {
+      if (!legacy) continue;
       try {
         stale = now - statSync(dir).mtimeMs > LEGACY_AGE_MS;
       } catch {
@@ -70,26 +89,54 @@ export function sweepStaleLive(parent: string, now = Date.now()): string[] {
       }
     }
     if (!stale) continue;
+    // Убитый прогон до `teardown` не дошёл: его отвязанные хосты держат каталог — снять до сноса.
+    const marked = existsSync(join(dir, REAP_MARK));
+    if (marked) await reap(dir).catch(() => undefined);
     try {
       rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
       removed.push(name);
     } catch {
-      // Занят ещё живым потомком — снимет следующий прогон.
+      // Занят ещё живым потомком — снимет следующий прогон; размеченному возвращаются метки.
+      if (marked) reclaim(dir);
     }
   }
   return removed;
 }
 
-export function setup(): void {
+/** Каталог прогона: владелец (номер процесса набора) и метка снятия. */
+function claim(dir: string): void {
+  writeFileSync(join(dir, OWNER_FILE), String(process.pid));
+  writeFileSync(join(dir, REAP_MARK), '');
+}
+
+/**
+ * Снос, упавший на занятом файле, успевает удалить `owner.pid` и метку раньше, чем упасть: без них
+ * следующий прогон каталог уже не снимал, и хост под ним жил (`vc-qsdUjV`, 03.11). Метки
+ * возвращаются; владелец — этот процесс, к следующему прогону он мёртв.
+ */
+function reclaim(dir: string): void {
+  try {
+    if (existsSync(dir)) claim(dir);
+  } catch {
+    // Каталог ушёл или недоступен — следующему прогону снимать нечего или нельзя.
+  }
+}
+
+export async function setup(): Promise<void> {
+  // Прежние `vc-*` убитых прогонов — тем же правилом, что `vl-*` (только размеченные снимаются).
+  await sweepStaleLive(tmpdir(), Date.now(), { prefix: 'vc-', legacy: false }).catch(
+    () => undefined,
+  );
   sandbox = mkdtempSync(join(tmpdir(), 'vc-'));
+  claim(sandbox);
   const real = realpathSync.native(sandbox);
   const coreHome = join(real, 'core-home');
   mkdirSync(coreHome);
   const liveParent = cleanLiveParent();
   // Нет чистой базы — переменная пуста, и живой стенд откажет сам (`liveBase`), не уйдя в профиль.
-  if (liveParent !== undefined) sweepStaleLive(liveParent);
+  if (liveParent !== undefined) await sweepStaleLive(liveParent);
   liveSandbox = liveParent === undefined ? undefined : mkdtempSync(join(liveParent, 'vl-'));
-  if (liveSandbox !== undefined) writeFileSync(join(liveSandbox, OWNER_FILE), String(process.pid));
+  if (liveSandbox !== undefined) claim(liveSandbox);
   const liveReal = liveSandbox === undefined ? undefined : realpathSync.native(liveSandbox);
   for (const name of VARS) {
     saved.set(name, process.env[name]);
@@ -103,17 +150,22 @@ export function setup(): void {
   }
 }
 
-export function teardown(): void {
+export async function teardown(): Promise<void> {
   for (const name of VARS) {
     const value = saved.get(name);
     if (value === undefined) delete process.env[name];
     else process.env[name] = value;
   }
+  // Хосты сессий и звеньев отвязаны (переживают ядро по замыслу) — сносить каталог можно только
+  // после них: живой хост держал каталог, и прогон оставлял его вместе с процессом (02–03.11).
+  for (const dir of [sandbox, liveSandbox])
+    if (dir) await reapCoreProcessesUnder(dir).catch(() => undefined);
   for (const dir of [sandbox, liveSandbox])
     if (dir)
       try {
         rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
       } catch {
-        // Занятый файл не роняет прогон: `vl-*` с мёртвым владельцем снимет следующий `setup`.
+        // Занятый файл не роняет прогон: каталог с мёртвым владельцем снимет следующий `setup`.
+        reclaim(dir);
       }
 }

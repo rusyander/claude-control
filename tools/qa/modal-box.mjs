@@ -131,7 +131,7 @@ export async function plant(dialog, kind) {
  *
  * GET отдаётся следующему обработчику (`fallback`), чтобы подмены раздела и
  * обход онбординга продолжали работать. `stubbed` — адреса, чью запись
- * отвечает подмена раздела (`group-stubs.mjs` STUBBED): она уходит подмене,
+ * отвечает подмена раздела (`legacy-groups-stub.mjs` STUBBED): она уходит подмене,
  * а не обрывается, иначе шаг, ждущий ответа подмены, не наступил бы.
  */
 export function requestGuard({ stubbed } = {}) {

@@ -4,11 +4,11 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getProvider } from '../../providers/registry.ts';
 import { BOM_CHAR } from '../../lib/text-form/text-form.ts';
+import { isCliOnlyGeminiApprovalMode } from '@agentdeck/contracts/permissions';
 import {
   readProviderPermissions,
   saveProviderPermissions,
   parseProviderPermissionsDraft,
-  isCliOnlyGeminiApprovalMode,
   geminiOtherKeysProjection,
   UnrecognizedFormatError,
   type ProviderPermissionsTarget,

@@ -9,7 +9,11 @@ import type {
   RouteResource,
 } from '@agentdeck/contracts/core/routes';
 import { bindLoopback } from '../../platform/ports.ts';
-import { createLivenessProbe, type ProcessIdentity } from '../../platform/process-identity.ts';
+import {
+  createLivenessProbe,
+  type Liveness,
+  type ProcessIdentity,
+} from '../../platform/process-identity.ts';
 import { createStubRoute, parseStubServerRef } from './stub.ts';
 
 const FAKE_CORE = fileURLToPath(new URL('./__fixtures__/fake-core.ts', import.meta.url));
@@ -21,13 +25,15 @@ const see = (ref: string): void => {
   const parsed = parseStubServerRef(ref);
   if (!('unreadable' in parsed)) seen.push(parsed.identity);
 };
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * Жизнь сервера по личности (pid + старт), не по номеру: под нагрузкой полного прогона Windows
+ * отдаёт освободившийся pid новому процессу за миллисекунды, и `kill(pid, 0)` видел бы чужой
+ * живой процесс (g13 p10: «release verified stopped», а `alive(pid)` — true). Снимок свежий.
+ */
+const life = async (pid: number): Promise<Liveness> => {
+  const identity = seen.findLast((one) => one.pid === pid);
+  if (!identity) throw new Error(`pid ${pid} was never seen in a resource ref`);
+  return createLivenessProbe().isAlive(identity, { fresh: true });
 };
 
 afterAll(async () => {
@@ -116,7 +122,7 @@ describe('R:PR-09 stub route — the model server is its own process', () => {
     expect(again).toEqual(endpoint);
     expect(await chat(again)).toContain('survived the core');
     const pid = serverPid(lease);
-    expect(alive(pid)).toBe(true);
+    expect(await life(pid)).toBe('alive');
 
     const r = recorder();
     const outcome = await restarted.release(lease, r.record);
@@ -126,7 +132,7 @@ describe('R:PR-09 stub route — the model server is its own process', () => {
         /^verified:server stopped \(\d+ process(es)?\), port \d+ free after close$/,
       ),
     ]);
-    expect(alive(pid)).toBe(false);
+    expect(await life(pid)).toBe('dead');
     expect(await portFree(endpoint)).toBe(true);
     await expect(restarted.endpoint(lease, recorder().record)).rejects.toThrow(/released/);
   }, 60_000);
@@ -145,8 +151,8 @@ describe('R:PR-09 stub route — the model server is its own process', () => {
     const done = await route.shutdown(r.record);
     expect(done.leaks).toEqual([]);
     expect(done.verified).toHaveLength(2);
-    expect(alive(orphanPid)).toBe(false);
-    expect(alive(ownPid)).toBe(false);
+    expect(await life(orphanPid)).toBe('dead');
+    expect(await life(ownPid)).toBe('dead');
     expect(await portFree(ownEndpoint)).toBe(true);
     expect(await route.release(own, r.record)).toEqual({ verified: [], leaks: [] });
   }, 60_000);
@@ -181,7 +187,7 @@ describe('R:PR-09 stub route — the model server is its own process', () => {
       expect(await chat(await route.endpoint(lease, r.record))).toContain('through wmi');
       const outcome = await route.release(lease, r.record);
       expect(outcome.leaks).toEqual([]);
-      expect(alive(pid)).toBe(false);
+      expect(await life(pid)).toBe('dead');
     },
     60_000,
   );

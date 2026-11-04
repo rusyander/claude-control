@@ -6,12 +6,13 @@ import { pathToFileURL } from 'node:url';
 import { createLocalModels, loadCatalog } from './service.ts';
 import { localPaths, readState, updateState, type LocalPaths } from './paths.ts';
 import {
+  holdServer,
   IDLE_SLEEP_SECONDS,
   readRecord,
-  startServer,
   START_TIMEOUT_MS,
   type ServerShape,
 } from './server.ts';
+import { fakeCoreHold, refuse } from './__fixtures__/fake-core-hold.ts';
 import { modelFilePath } from './hf.ts';
 import { loadRelease } from './runtime.ts';
 import type { FetchLike } from './download.ts';
@@ -45,6 +46,8 @@ let root: string;
 let up: boolean;
 let spawned: { args: string[]; env: NodeJS.ProcessEnv }[];
 let killed: number[];
+/** Что держит «ядро» к началу проверки: сервер прежней панели (запись в beforeEach) или ничего. */
+let coreHeld: number | undefined;
 
 /** Сеть до llama-server: жив, пока `up`; до остальных хостов — не доходит. */
 const fakeServerNet: FetchLike = async (input) => {
@@ -77,15 +80,19 @@ function service(fetchImpl: FetchLike = fakeServerNet, extra: { cuda?: boolean }
           : 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, args: string[], options: { env: NodeJS.ProcessEnv }) => {
-      spawned.push({ args, env: options.env });
-      up = true;
-      return { pid: 4242, once: () => undefined, on: () => undefined, unref: () => undefined };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      killed.push(pid);
-      up = false;
-    },
+    // Ядро держит модель, поднятую до перезапуска панели (запись в beforeEach).
+    hold: fakeCoreHold({
+      ...(coreHeld ? { initial: { pid: coreHeld, model: TAG } } : {}),
+      hold: ({ flags, env }) => {
+        spawned.push({ args: flags, env });
+        up = true;
+        return 4242;
+      },
+      release: (pid) => {
+        killed.push(pid);
+        up = false;
+      },
+    }),
   });
 }
 
@@ -113,6 +120,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'cc-local-kv-'));
   spawned = [];
   killed = [];
+  coreHeld = 999_999_999;
   const paths = localPaths(root, ENV());
   const runtimeDir = join(paths.runtime, 'llama-b11583');
   // Окно 65536 — выбор человека (как у владельца): умолчание каталога выросло до 131072 (L6),
@@ -162,6 +170,7 @@ describe('перезапуск сервера при смене кеша кон�
     // Чистая машина: сервера нет, окно не выбиралось — подбор решает всё сам (L6).
     const paths = localPaths(root, ENV());
     rmSync(paths.pidFile, { force: true });
+    coreHeld = undefined;
     up = false;
     // Квантование — Q4_K_M, на котором сняты замеры 07.10: с умолчанием каталога (IQ4_XS, ревью
     // L6) окну 131072 хватает и q8_0, и подбор кеш не выбирал бы — проверять было бы нечего.
@@ -213,29 +222,26 @@ describe('перезапуск сервера при смене кеша кон�
 });
 
 describe('сервер, не ответивший вовремя', () => {
-  it('снимается, а не остаётся сиротой на порту без записи', async () => {
-    // Живой случай 07.10: поиск видеокарт занял 51 с, панель ждала 30, удалила
-    // запись и бросила процесс — следующий запуск упёрся в «порт занят».
+  it('удержание снимается, а не держит карту без записи', async () => {
+    // Живой случай 07.10: поиск видеокарт занял 51 с, панель ждала 30, удалила запись и бросила
+    // процесс — следующий запуск упёрся в «порт занят». Теперь процесс держит ядро: молчащий
+    // постоянный адрес снимает удержание.
     const paths = localPaths(root, ENV());
     rmSync(paths.pidFile, { force: true });
     up = false;
     const stopped: number[] = [];
-    const silent = (() => ({
-      pid: 5151,
-      once: () => undefined,
-      on: () => undefined,
-      unref: () => undefined,
-    })) as unknown as Parameters<typeof startServer>[0]['spawnImpl'];
+    const hold = fakeCoreHold({ hold: () => 5151, release: (pid) => void stopped.push(pid) });
     await expect(
-      startServer({
+      holdServer({
         paths,
         binary: BINARY,
         port: PORT,
         shape: seededShape(paths, 'q8_0'),
+        sizeBytes: 1,
+        needBytes: 0,
+        hold,
         fetchImpl: fakeServerNet,
-        spawnImpl: silent,
         timeoutMs: 400,
-        kill: (pid) => stopped.push(pid),
       }),
     ).rejects.toMatchObject({ messageCode: 'local-timeout' });
     expect(stopped).toEqual([5151]);
@@ -243,29 +249,33 @@ describe('сервер, не ответивший вовремя', () => {
     expect(START_TIMEOUT_MS).toBeGreaterThanOrEqual(60_000);
   });
 
-  it('вышел сразу — код выхода и журнал в ошибке, снимать нечего', async () => {
+  it('ядро отказало — причина ядра в ошибке, записи нет, снимать нечего', async () => {
     const paths = localPaths(root, ENV());
     rmSync(paths.pidFile, { force: true });
     up = false;
     const stopped: number[] = [];
-    const dead = (() => ({
-      pid: 5252,
-      once: (_event: string, handler: (code: number) => void) => handler(3),
-      on: () => undefined,
-      unref: () => undefined,
-    })) as unknown as Parameters<typeof startServer>[0]['spawnImpl'];
+    const hold = fakeCoreHold({
+      hold: () => {
+        throw refuse('local_server_exited', 'llama-server exited with code 3');
+      },
+      release: (pid) => void stopped.push(pid),
+    });
     await expect(
-      startServer({
+      holdServer({
         paths,
         binary: BINARY,
         port: PORT,
         shape: seededShape(paths, 'q8_0'),
+        sizeBytes: 1,
+        needBytes: 0,
+        hold,
         fetchImpl: fakeServerNet,
-        spawnImpl: dead,
         timeoutMs: 2000,
-        kill: (pid) => stopped.push(pid),
       }),
-    ).rejects.toMatchObject({ messageCode: 'local-exited' });
+    ).rejects.toMatchObject({
+      messageCode: 'local-hold-refused',
+      params: { code: 'local_server_exited' },
+    });
     expect(stopped).toEqual([]);
     expect(readRecord(paths)).toBeUndefined();
   });

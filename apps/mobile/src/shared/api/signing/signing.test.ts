@@ -132,7 +132,6 @@ describe('a phone-made signature against the real server verifier', () => {
   it('every signed route class verifies with its own params', () => {
     const rows: { path: string; body: unknown }[] = [
       { path: '/chat/c-1/permission-decision', body: { behavior: 'allow', requestId: 'r' } },
-      { path: '/chat/c-1/branch-decision', body: { choice: 'new-branch' } },
       { path: '/chat/c-1/auto-approve', body: { enabled: true } },
       { path: '/outside/asks/a-1/answer', body: { behavior: 'allow' } },
       { path: '/provider-chat/chats/x/permissions/q', body: { decision: 'allow' } },
@@ -183,7 +182,6 @@ describe('signingTarget: what the phone signs', () => {
       body: { behavior: 'deny', answers: { q: 'a' } },
       signed: true,
     },
-    { method: 'POST', path: '/chat/c/branch-decision', body: { choice: 'stop' }, signed: false },
     { method: 'POST', path: '/chat/c/auto-approve', body: { enabled: false }, signed: false },
     { method: 'POST', path: '/chat/c/auto-approve', body: { enabled: true }, signed: true },
     { method: 'POST', path: '/chat/send', body: { text: 'hi' }, signed: false },

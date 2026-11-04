@@ -3,7 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, realpathSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import type { Project, ProjectLocalConfig } from '@agentdeck/contracts';
+import type { LocalLayerStatus, Project, ProjectLocalConfig } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { registerProjectRoutes } from './project-routes.ts';
@@ -52,7 +52,13 @@ describe('project-routes: GET .claude проекта («Из проекта»)',
     const ctx = {
       store,
       backupDir: join(appDataRoot, 'backups'),
-      location: { paths: { root: appDataRoot, settings: join(appDataRoot, 'settings.json') } },
+      location: {
+        paths: {
+          root: appDataRoot,
+          settings: join(appDataRoot, 'settings.json'),
+          mcpConfig: join(appDataRoot, '.claude.json'),
+        },
+      },
     } as unknown as ServerContext;
 
     app = Fastify();
@@ -165,6 +171,25 @@ describe('project-routes: GET .claude проекта («Из проекта»)',
     ).json<ProjectLocalConfig>();
     expect(config.hooks.map((hook) => hook.command)).toEqual(['echo own', 'echo local']);
     expect(config.hooks.every((hook) => hook.isEnabled && hook.groupIds.length === 0)).toBe(true);
+  });
+
+  // s10 G14 p7: карточка узнаёт о недоверенной папке до хода — ответ ручки несёт доверие,
+  // прочитанное заново на каждый запрос (ответ «да» в терминале виден без перезапуска панели).
+  it('local-layer: folderTrust read per request from the CLI config, on GET and on PUT of the mode', async () => {
+    const id = await addProject();
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${id}/local-layer`,
+      payload: { mode: 'on' },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json<LocalLayerStatus>()).toMatchObject({ mode: 'on', folderTrust: 'untrusted' });
+    writeFileSync(
+      join(appDataRoot, '.claude.json'),
+      JSON.stringify({ projects: { [projectDir]: { hasTrustDialogAccepted: true } } }),
+    );
+    const got = await app.inject({ method: 'GET', url: `/api/projects/${id}/local-layer` });
+    expect(got.json<LocalLayerStatus>()).toMatchObject({ mode: 'on', folderTrust: 'trusted' });
   });
 
   it('путь нормализуется: `..` внутри пути ведёт к тому же .claude', async () => {

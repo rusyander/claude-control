@@ -22,7 +22,7 @@
  */
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { REPO_ROOT } from './kit.mjs';
+import { REPO_ROOT, shotLanguage, shotTheme } from './kit.mjs';
 import { dropLinkedStand, makeLinkedStand } from './linked-stand.mjs';
 
 /** Корень одноразового стенда: сосед репозитория, а не его подкаталог. */
@@ -76,15 +76,16 @@ export function dropStand() {
 }
 
 /**
- * Состояние панели. Мастер первого запуска закрыт, тема задана явно: кадры не
- * должны зависеть от темы машины, на которой идёт съёмка.
+ * Состояние панели. Мастер первого запуска закрыт, тема и язык — варианта съёмки
+ * (`GUIDE_THEME`, `GUIDE_LANG`): кадры не должны зависеть от темы машины, а правку
+ * настроек из процесса съёмки ворота «решает только человек» могут отклонить.
  */
 export function writeState(patch = {}) {
   writeFileSync(
     STATE,
     json({
       projects: [],
-      settings: { onboardingDone: true, theme: 'light', language: 'ru' },
+      settings: { onboardingDone: true, theme: shotTheme(), language: shotLanguage() },
       ...patch,
     }),
     'utf8',

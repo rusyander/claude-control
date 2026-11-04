@@ -170,62 +170,6 @@ export function createLimitShareReader(appDataDir: string): () => Map<string, Li
   };
 }
 
-/**
- * Замер окна из журнала: когда, доля, сброс (секунды эпохи). `week` — недельное окно,
- * без отметки — пятичасовое.
- */
-export interface WindowPoint {
-  t: number;
-  utilization: number;
-  resetsAt: number;
-  week?: true;
-}
-
-/**
- * Записи журнала с памятью по mtime и размеру файла: сторож групп спрашивает каждую
- * минуту (прогноз и уровни окна R9, тяжёлый прогон R42), а файл меняется реже.
- */
-export function createLimitRunsReader(appDataDir: string): () => readonly LimitRunRecord[] {
-  let cached: { mtimeMs: number; size: number; runs: LimitRunRecord[] } | undefined;
-  return () => {
-    const path = limitJournalPath(appDataDir);
-    if (!existsSync(path)) return [];
-    const { mtimeMs, size } = statSync(path);
-    if (cached?.mtimeMs === mtimeMs && cached.size === size) return cached.runs;
-    const runs = readLimitRuns(appDataDir);
-    cached = { mtimeMs, size, runs };
-    return runs;
-  };
-}
-
-/**
- * Замеры обоих окон всех прогонов аккаунта (R9 сторожа групп): окно одно на подписку,
- * и замеры обычного чата рядом с группой — те же.
- */
-export function windowPointsOf(runs: readonly LimitRunRecord[]): WindowPoint[] {
-  const points: WindowPoint[] = [];
-  for (const run of runs) {
-    for (const sample of run.samples) {
-      if (!Number.isFinite(sample.at)) continue;
-      const { fiveHour, sevenDay } = sample;
-      if (fiveHour)
-        points.push({
-          t: sample.at,
-          utilization: fiveHour.utilization,
-          resetsAt: fiveHour.resetsAt,
-        });
-      if (sevenDay)
-        points.push({
-          t: sample.at,
-          utilization: sevenDay.utilization,
-          resetsAt: sevenDay.resetsAt,
-          week: true,
-        });
-    }
-  }
-  return points;
-}
-
 function isRecord(value: unknown): value is LimitRunRecord {
   if (typeof value !== 'object' || value === null) return false;
   const record = value as Partial<LimitRunRecord>;

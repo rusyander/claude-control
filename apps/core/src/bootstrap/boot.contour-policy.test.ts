@@ -25,7 +25,11 @@ const KEY = ['sk-', 'contour', '-policy-0123456789'].join('');
 const OWN = 'api-key:endpoint:own';
 const GATE = 'gateway:c1';
 
-function panelData(mode: 'required' | 'best-effort' | null, withKey: boolean): string {
+function panelData(
+  mode: 'required' | 'best-effort' | null,
+  withKey: boolean,
+  defaultModel = '',
+): string {
   const dir = tempDir('contour-policy-panel-');
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -44,6 +48,7 @@ function panelData(mode: 'required' | 'best-effort' | null, withKey: boolean): s
             driver: 'litellm',
             baseUrl: 'http://127.0.0.1:9',
             mode: mode ?? 'required',
+            defaultModel,
           },
         ],
       },
@@ -136,6 +141,91 @@ describe('boot: the panel active contour is the level-1 policy of set-route and 
     const tier = tierOf(core, task);
     expect(tier.ok).toBe(false);
     expect(tier.reasons[0]).toContain('contour c1 is required and its gateway is down');
+  });
+
+  it('a mode switch on a RUNNING core reaches the next set-route and tier judge without a restart (s10 G7)', async () => {
+    const dir = panelData('best-effort', true);
+    const core = await boot(dir);
+    const task = await taskOn(core);
+    expect(tierOf(core, task)).toMatchObject({ ok: true, route: { kind: 'api-key', id: OWN } });
+    // Человек переключил режим карточки на «обязательно» — панель переписала state.json.
+    const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) as {
+      settings: { platforms: Array<{ mode: string }> };
+    };
+    state.settings.platforms[0]!.mode = 'required';
+    writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
+    const tier = tierOf(core, task);
+    expect(tier.ok && tier.route).toEqual({ kind: 'gateway', id: GATE });
+    const past = await setRoute(core, task.taskId, [OWN]);
+    expect(past.status).toBe(422);
+    expect(past.body).toContain(`contour c1 is required, only ${GATE} is allowed`);
+    // И обратно: «по возможности» снова не трогает набор.
+    state.settings.platforms[0]!.mode = 'best-effort';
+    writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
+    expect(tierOf(core, task)).toMatchObject({ ok: true, route: { kind: 'api-key', id: OWN } });
+    expect((await setRoute(core, task.taskId, [OWN])).status).toBe(200);
+  });
+
+  it('a contour created on a RUNNING core is a live route after POST /v1/contours/apply, not a down gateway (s10 G7)', async () => {
+    const dir = panelData(null, true);
+    const core = await boot(dir);
+    const task = await taskOn(core);
+    // Человек завёл второй контур, ключ и сделал его обязательным — панель переписала state.json.
+    const state = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')) as {
+      settings: { activePlatformId?: string; platforms: Array<Record<string, unknown>> };
+    };
+    state.settings.platforms.push({
+      id: 'c2',
+      title: 'Новый контур',
+      driver: 'litellm',
+      baseUrl: 'http://127.0.0.1:9',
+      mode: 'required',
+    });
+    state.settings.activePlatformId = 'c2';
+    writeFileSync(join(dir, 'state.json'), JSON.stringify(state));
+    setStoredKey(dir, 'platform:c2', KEY);
+    const NEW = 'gateway:c2';
+    // До применения маршрута в реестре нет: шлюз `down`, отказ (не облако вендора).
+    const before = await setRoute(core, task.taskId, [NEW]);
+    expect(before.status).toBe(422);
+    expect(before.body).toContain('gateway:c2 is not in the route registry');
+    const downTier = tierOf(core, task);
+    expect(downTier.ok).toBe(false);
+    expect(downTier.reasons[0]).toContain('contour c2 is required and its gateway is down');
+    const token = readFileSync(core.layout.token, 'utf8').trim();
+    const applied = await fetch(`${core.url}/v1/contours/apply`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(applied.status).toBe(200);
+    expect(core.routes.get(NEW)?.kind).toBe('gateway');
+    const tier = tierOf(core, task);
+    expect(tier.ok && tier.route).toEqual({ kind: 'gateway', id: NEW });
+    expect((await setRoute(core, task.taskId, [NEW])).status).toBe(200);
+    const log = readFileSync(join(core.layout.logs, 'core.jsonl'), 'utf8');
+    expect(log).toContain('routes.refreshed');
+    expect(log).toContain(NEW);
+  });
+
+  it('required with no model named: the tier fills the contour default model; a named ceiling stays (s10 G7)', async () => {
+    const core = await boot(panelData('required', true, 'contour-default-1'));
+    const bare = await core.registry.create({
+      ...CREATED,
+      modelCeiling: null,
+      allowedRoutes: [triple(OWN)] as never,
+    });
+    const filled = tierOf(core, bare);
+    expect(filled.ok && filled.route).toEqual({ kind: 'gateway', id: GATE });
+    expect(filled.ok && filled.model).toBe('contour-default-1');
+    expect(filled.ok && filled.sources.model).toBe('contour');
+    expect(filled.reasons.join('\n')).toContain(
+      'model contour-default-1 is the default of the required contour',
+    );
+    // Потолок задачи назван — модель контура его не заменяет.
+    const named = tierOf(core, await taskOn(core));
+    expect(named.ok && named.model).toBe('stub-model');
+    expect(named.ok && named.sources.model).toBe('ceiling');
   });
 
   it('best-effort or no active contour: the task set is untouched — set-route takes the api-key route, the tier picks it', async () => {

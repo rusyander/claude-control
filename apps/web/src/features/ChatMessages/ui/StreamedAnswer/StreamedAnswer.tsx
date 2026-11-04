@@ -26,7 +26,7 @@ import styles from './StreamedAnswer.module.scss';
  * обрубком. Карточки рисуем сразу, но погашенными — решать и собирать файлы можно,
  * когда агент договорит, и это ровно то, что видно.
  */
-export function StreamedAnswer({ stream, splitCeiling, costUnit, effort }: StreamedAnswerProps) {
+export function StreamedAnswer({ stream, costUnit, effort }: StreamedAnswerProps) {
   const { t } = useTranslation();
 
   // Разборы идут цепочкой по одному и тому же тексту — языки блоков разные, и
@@ -64,7 +64,7 @@ export function StreamedAnswer({ stream, splitCeiling, costUnit, effort }: Strea
           />
         )}
         {split.proposals.map((proposal, index) => (
-          <TaskSplitCard key={index} proposal={proposal} ceiling={splitCeiling} disabled />
+          <TaskSplitCard key={index} proposal={proposal} />
         ))}
         {split.rejected > 0 && (
           <div className={styles.splitRejected} role="status">

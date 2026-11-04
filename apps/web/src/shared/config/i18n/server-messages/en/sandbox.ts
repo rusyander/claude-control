@@ -11,6 +11,8 @@ export const sandboxEn: Record<SandboxMessageCode, string> = {
   'sandbox-ask-incomplete': 'A sandbox and the question text are required',
   'sandbox-reaped-idle':
     'The sandbox was removed for idling: a copy of account access must not lie in it for hours. Open it again — it will be assembled again.',
+  'sandbox-core-refused': 'The core did not run the sandbox conversation: {{reason}}',
+  'sandbox-repo-failed': 'The sandbox work folder was not prepared for the core: {{reason}}',
   'sandbox-nothing-to-run': 'Nothing to run: command not found',
   'sandbox-ps1-needs-pwsh':
     '.ps1 scripts run through PowerShell — outside Windows pwsh (PowerShell Core) is required. Install it or rewrite the hook as .sh or .mjs.',

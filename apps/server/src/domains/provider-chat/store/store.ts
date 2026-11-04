@@ -14,7 +14,6 @@ import type {
   ProviderChatMessage,
   ProviderChatSummary,
 } from '@agentdeck/contracts';
-import type { ProviderChatLiveSession } from '../live-session/live-session.ts';
 
 /**
  * Переписка чужого провайдера на диске: один файл JSONL на разговор, рядом с
@@ -73,11 +72,6 @@ export interface ProviderChatCascade {
    * `review`, и по этому полю она отличается от ревью работы.
    */
   fixFindings?: string[];
-  /**
-   * «Ревью после работы» выключено в проекте (R3(d), 26.10): снято при запуске, как у
-   * связи Claude (`ChatLink.reviewAfterWork`). Нет поля — ревью после работы есть.
-   */
-  reviewAfterWork?: false;
 }
 
 /** Запись файла: шапка разговора либо одна реплика. */
@@ -446,48 +440,13 @@ export function setChatCascade(
 }
 
 /**
- * Отметка о сессии CLI разговора (E2b) — соседним файлом `<id>.live.json`, а не
- * полем шапки: она меняется КАЖДЫМ ходом, а шапка переписывается вместе со всей
- * перепиской. Список разговоров читает только `.jsonl`, так что файл ему не мешает.
+ * Отметка о сессии CLI разговора (E2b), соседний файл `<id>.live.json`, — её писал прежний
+ * исполнитель чужого CLI. Ходов здесь больше нет, но старые отметки лежат на диске: удаление
+ * разговора убирает и её.
  */
 function liveSessionFile(appDataDir: string, providerId: string, chatId: string) {
   const file = chatFile(appDataDir, providerId, chatId);
   return file ? file.replace(/\.jsonl$/, '.live.json') : undefined;
-}
-
-export function readChatLiveSession(
-  appDataDir: string,
-  providerId: string,
-  chatId: string,
-): ProviderChatLiveSession | undefined {
-  const file = liveSessionFile(appDataDir, providerId, chatId);
-  if (!file || !existsSync(file)) return undefined;
-  try {
-    const mark = JSON.parse(readFileSync(file, 'utf8')) as ProviderChatLiveSession;
-    // Битая отметка — как её отсутствие: ход откроет новую сессию.
-    return typeof mark?.kind === 'string' && typeof mark.id === 'string' ? mark : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Записать отметку; `undefined` — стереть. Разговора нет — ничего не пишется. */
-export function writeChatLiveSession(
-  appDataDir: string,
-  providerId: string,
-  chatId: string,
-  mark: ProviderChatLiveSession | undefined,
-): void {
-  const file = liveSessionFile(appDataDir, providerId, chatId);
-  const chat = chatFile(appDataDir, providerId, chatId);
-  if (!file || !chat || !existsSync(chat)) return;
-  if (!mark) {
-    rmSync(file, { force: true });
-    return;
-  }
-  const temp = `${file}.tmp`;
-  writeFileSync(temp, JSON.stringify(mark), 'utf8');
-  renameSync(temp, file);
 }
 
 /** Удалить разговор вместе с файлом и отметкой о сессии CLI. */

@@ -2,8 +2,9 @@
  * Сценарии раздела «Агент панели»: `panelAgent/first` и `panelAgent/guards`.
  *
  * Каждый шаг — настоящая реплика в настоящем окне: съёмка печатает её в поле,
- * панель запускает фальшивую модель, та зовёт действия панели через переходник,
- * и карточка приходит тем же кадром `/api/events`, что и у живого агента.
+ * панель задаёт вопрос ядру, ядро запускает настоящий `claude` с моделью-заглушкой
+ * (`panel-agent-model.mjs`), та зовёт действия панели через мост, и карточка
+ * приходит тем же кадром `/api/events`, что и у живого агента.
  * Решение по карточке — клик (или Enter) в окне, как у человека.
  *
  * Состояние, которое по сюжету меняет «кто-то другой» (файл правил, сломанные
@@ -26,6 +27,20 @@ import { join } from 'node:path';
 const WINDOW = '[data-panel-agent-window]';
 const lang = () => (process.env.GUIDE_LANG === 'en' ? 'en' : 'ru');
 const t = (ru, en) => (lang() === 'en' ? en : ru);
+
+/**
+ * Страница съёмки: знакомство с маскотом уже было. Его приветствие показывается один раз
+ * на 11 с и в кадр попадало через раз (01 русский — с ним, английский — без).
+ */
+async function shotPage(browser) {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  await page.addInitScript(() => {
+    const key = 'agentdeck.mascot';
+    const saved = JSON.parse(window.localStorage.getItem(key) ?? '{}');
+    window.localStorage.setItem(key, JSON.stringify({ ...saved, greeted: true }));
+  });
+  return page;
+}
 
 async function openSection(page, web, path, pause = 2500) {
   await page.goto(`${web}${path}`, { waitUntil: 'domcontentloaded' });
@@ -98,7 +113,7 @@ async function patchSettings(panel, patch) {
 const windowShot = (scenario, page, id) => scenario.shot(page, id, { clip: WINDOW, padding: 0 });
 
 export async function shootFirst(browser, web, scenario, { stand }) {
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const page = await shotPage(browser);
   try {
     // ── 01. Кнопка агента в боковом меню, на любой странице ─────────────────
     await openSection(page, web, '/');
@@ -164,37 +179,13 @@ export async function shootFirst(browser, web, scenario, { stand }) {
     // ── 10. История разговоров ──────────────────────────────────────────────
     await view(page, 'История', 'History');
     await windowShot(scenario, page, '10-history');
-
-    // ── 11. Сценарий одной карточкой: шаги по порядку, группа выключена ─────
-    await view(page, 'Разговор', 'Conversation');
-    await newConversation(page);
-    await send(
-      page,
-      t(
-        'Собери сценарий «Выпуск»: собрать, прогнать проверки, описать изменения',
-        'Build a scenario «Release»: build, run the checks, describe the changes',
-      ),
-      { card: true },
-    );
-    await windowShot(scenario, page, '11-scenario-card');
-
-    // ── 12. После «Выполнить» сценарий в «Группах», выключенный ─────────────
-    await page.locator('[data-agent-decision="approve"]').click();
-    await turnOver(page);
-    await page.waitForURL(/\/groups/, { timeout: 15_000 }).catch(() => undefined);
-    await page
-      .getByText(t('Выпуск', 'Release'), { exact: true })
-      .first()
-      .waitFor({ timeout: 15_000 });
-    await page.waitForTimeout(1500);
-    await scenario.shot(page, '12-scenario-created');
   } finally {
     await page.close();
   }
 }
 
 export async function shootGuards(browser, web, scenario, { panel, configDir }) {
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const page = await shotPage(browser);
   const appData = join(configDir, 'agentdeck');
   try {
     await openSection(page, web, '/platform');
@@ -271,17 +262,6 @@ export async function shootGuards(browser, web, scenario, { panel, configDir }) 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(800);
 
-    // ── 07. Активен CLI без агента — ход не запускается ─────────────────────
-    // Continue: у него нет запуска, где у агента только переходник. Codex здесь
-    // уже не годится — агент на нём работает, и кадр снял бы настоящий ход.
-    await newConversation(page);
-    await patchSettings(panel, { provider: 'continue' });
-    await openSection(page, web, '/settings');
-    await openAgent(page);
-    await send(page, t('Что ты умеешь?', 'What can you do?'));
-    await windowShot(scenario, page, '07-other-cli');
-    await patchSettings(panel, { provider: 'claude' });
-
     // ── 08. Правила маскирования сломаны — без маски сообщение не уходит ────
     writeFileSync(join(appData, 'dlp-rules.json'), '{ не json', 'utf8');
     await openSection(page, web, '/');
@@ -291,11 +271,10 @@ export async function shootGuards(browser, web, scenario, { panel, configDir }) 
     await windowShot(scenario, page, '08-dlp-broken');
     rmSync(join(appData, 'dlp-rules.json'), { force: true });
 
-    // ── 09–12. Прочие отказы до запуска: ответ маршрута подменён (см. шапку) ─
+    // ── 12. Отказ до запуска: ответ маршрута подменён (см. шапку). Прежние 07, 09–11 (CLI без
+    // агента, CLI не найден, свой эндпоинт, контур недоступен) сняты на этапе 10: CLI, маршрут и
+    // контур судит ядро, а свой эндпоинт работает через него.
     const refusals = [
-      ['09-cli-not-found', 'cli_not_found', 'Claude Code не найден в PATH процесса панели.'],
-      ['10-endpoint-unsupported', 'endpoint_unsupported', 'Ассистенту выбран свой эндпоинт.'],
-      ['11-contour-unreachable', 'contour_unreachable', 'Шлюз контура не поднят.'],
       ['12-busy', 'busy', 'В этом разговоре агент ещё отвечает — дождитесь конца хода.'],
     ];
     for (const [frame, error, message] of refusals) {

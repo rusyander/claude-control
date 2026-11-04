@@ -27,11 +27,10 @@ afterAll(() => {
   rmSync(copy, { recursive: true, force: true });
 });
 
-const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
 const ENV = {
   ...process.env,
   AGENTDECK_KIT_VARIANT: '',
-  AGENTDECK_HEAVY_QUEUE_DIR: '',
   AGENTDECK_KIT_STATE: STATE,
   ...CHILD,
 };

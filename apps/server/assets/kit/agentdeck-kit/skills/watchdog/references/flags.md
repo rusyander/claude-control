@@ -76,7 +76,7 @@ exist prints `<kind> missing: <resolved path>` — a typo shows at setup, never 
 | LOG | new lines in a `log:` unit (`lo` beyond the first few) | the feed or proof progressed |
 
 Waste: REPEAT, RERUN, REREAD, SLEEP, SLOW, BGLONG, BIG, CTX+ and a repeated error carry a waste class — a
-plugin arms that unit's pause at its next safe point from it (agentdeck-watchdog does); STALL and BURN carry
+plugin may arm that unit's pause at its next safe point from it; STALL and BURN carry
 it as a burn, which pauses NOW.
 
 ## Rows owed, keepalive

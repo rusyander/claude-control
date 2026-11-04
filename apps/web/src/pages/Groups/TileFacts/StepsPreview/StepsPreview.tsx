@@ -3,22 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Typography } from '@shared/ui/typography';
 import styles from './StepsPreview.module.scss';
 
-export function StepsPreview({ steps, failed, more, emptyText }: StepsPreviewProps) {
+export function StepsPreview({ steps, more, emptyText }: StepsPreviewProps) {
   const { t } = useTranslation();
-  if (failed) {
-    return (
-      <Typography variant="caption" color="subtle" as="p" className={styles.line}>
-        {t('groupsPage.tile.stepsFailed')}
-      </Typography>
-    );
-  }
-  if (!steps) {
-    return (
-      <Typography variant="caption" color="subtle" as="p" className={styles.line}>
-        {t('groupsPage.tile.stepsReading')}
-      </Typography>
-    );
-  }
   if (steps.length === 0) {
     return (
       <Typography variant="caption" color="subtle" as="p" className={styles.line}>

@@ -98,7 +98,7 @@
       "light-en": {
         "file": "05-running.en.png",
         "width": 1116,
-        "height": 693
+        "height": 567
       },
       "dark-ru": {
         "file": "05-running.dark.png",
@@ -142,7 +142,7 @@
       "light-en": {
         "file": "07-counters.en.png",
         "width": 1116,
-        "height": 693
+        "height": 567
       },
       "dark-ru": {
         "file": "07-counters.dark.png",

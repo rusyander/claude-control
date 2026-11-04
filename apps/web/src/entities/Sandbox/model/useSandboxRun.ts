@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { apiClient } from '@shared/api/client';
+import { apiClient, messageFromPayload } from '@shared/api/client';
 import { createRunAbort, type RunAbort } from './sandboxAbort';
 import { sandboxErrorText } from './sandboxError';
 import { parseSandboxFrame } from './sandboxFrame';
 
 /**
  * Разговор внутри песочницы. Устроен так же, как чат, но обращается к своему
- * маршруту: там Claude Code запускается с временной конфигурацией и видит
- * только проверяемые настройки.
+ * маршруту: каждый вопрос — одноходовая задача ядра, Claude Code в ней идёт с
+ * временной конфигурацией песочницы и видит только проверяемые настройки.
  */
 
 export interface SandboxRunState {
@@ -30,8 +30,8 @@ export function useSandboxRun() {
   const aborter = abortRef.current;
 
   // Уход со страницы (переключение вкладки, закрытие окна) обязан прервать
-  // прогон: пока соединение открыто, сервер не видит `close` и не убивает
-  // временный Claude — тот доработал бы прогон до конца уже никому не нужным.
+  // прогон: пока соединение открыто, сервер не видит `close` и не отменяет
+  // задачу ядра — временный Claude доработал бы ход до конца никому не нужным.
   useEffect(() => () => aborter.abort(), [aborter]);
 
   const run = useCallback(
@@ -88,7 +88,10 @@ export function useSandboxRun() {
               if (event.kind === 'tool') {
                 return { ...current, tools: [...current.tools, event.name ?? ''] };
               }
-              if (event.kind === 'error') return { ...current, error: event.message };
+              // Отказ ядра идёт кодом (`sandbox-core-refused` + причина): текст — на языке
+              // интерфейса, русская строка сервера — запасная.
+              if (event.kind === 'error')
+                return { ...current, error: messageFromPayload(event) ?? event.message };
               if (event.kind === 'done') return { ...current, costUsd: event.costUsd };
               if (event.kind === 'session') return { ...current, sessionId: event.sessionId };
               return current;

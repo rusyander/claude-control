@@ -55,22 +55,12 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/fs/roots': 'action:browse_folders',
   'POST /api/projects/open-in-editor': 'action:open_project_in_editor',
   // chat/cascade-routes.ts
-  'GET /api/chat/cascade': 'action:read_model_cascade',
   'GET /api/chat/lowered-runs': 'action:list_lowered_runs',
   // «Что получил агент» (U8): кнопка карточки группы; агенту панели пока не нужна.
   'GET /api/chat/:chatId/received': 'gap:P3',
-  'PUT /api/chat/cascade': 'action:set_model_cascade,set_review_after_work',
   // chat/cli-routes.ts
   'GET /api/chat/cli': 'action:cli_version',
   'POST /api/chat/cli/update': 'action:update_cli',
-  // chat/group-settings-routes.ts
-  'GET /api/chat/:chatId/group-settings': 'action:set_chat_group',
-  'GET /api/chat/escalations': 'action:list_waiting',
-  'GET /api/chat/watch-signals': 'gap:P3',
-  // Охват сторожа групп — строка карточки настроек.
-  'GET /api/group-watch/coverage': 'gap:P3',
-  'POST /api/chat/:chatId/escalations/read': 'internal:ui-state',
-  'PUT /api/chat/:chatId/group-settings': 'action:set_chat_group',
   // chat/handoff-routes.ts
   'GET /api/chat/handoff/request': 'action:request_chat_handoff',
   'GET /api/chat/handoff/state': 'action:read_chat_modes',
@@ -89,54 +79,13 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chat/active': 'action:list_active_runs',
   'GET /api/chat/spend': 'action:read_chat_spend',
   'POST /api/chat/:chatId/auto-approve': 'human:rights',
-  'POST /api/chat/:chatId/branch-decision': 'human:rights',
   'POST /api/chat/:chatId/permission-decision': 'human:rights',
   'POST /api/chat/:chatId/stop': 'action:stop_chat_run',
   // Возврат хода в остывшую сессию перезаписывает всё её окно в кэш — решение
   // о деньгах человека, агенту панели закрыт (R5).
   'POST /api/chat/:chatId/keep-session': 'human:paid',
-  'POST /api/chat/permission-request': 'internal:callback',
   'POST /api/chat/send':
-    'action:start_chat,send_chat_message,request_split,restart_chat_session,request_chat_handoff',
-  // chat/split-control-routes.ts
-  'POST /api/chat/split/:parent/accept': 'action:split_accept_group',
-  'POST /api/chat/split/:parent/auto-notices/dismiss': 'internal:ui-state',
-  'POST /api/chat/split/:parent/cancel': 'human:split-apply',
-  'POST /api/chat/split/:parent/pause': 'action:split_control',
-  'POST /api/chat/split/:parent/resume-paused': 'action:split_control',
-  'POST /api/chat/split/:parent/start-now': 'human:split-apply',
-  'POST /api/chat/split/:parent/restart-group': 'human:split-apply',
-  'POST /api/chat/split/:parent/drop-group': 'human:split-apply',
-  // Решение владельца 25.10: «Продолжить» сдавшуюся группу агент жмёт сам, как
-  // паузу и продолжение с паузы, — группы доходят до MR без человека.
-  'POST /api/chat/split/:parent/continue-group': 'action:split_control',
-  // Решение владельца 26.10: «Перепроверить MR» доставленной группы жмёт и
-  // наблюдатель групп, как паузу и продолжение, — не решение человека. Действия
-  // агента панели для неё ещё нет.
-  'POST /api/chat/split/:parent/recheck': 'gap:P3',
-  // chat/split-routes.ts
-  'GET /api/chat/split/:parent/overlap': 'action:read_split_overlap',
-  'GET /api/chat/split/request': 'action:request_split',
-  'POST /api/chat/split': 'human:split-apply',
-  'POST /api/chat/split/:parent/cleanup': 'human:split-apply',
-  'POST /api/chat/split/:parent/hold': 'action:split_control',
-  'POST /api/chat/split/:parent/relaunch': 'human:split-apply',
-  'POST /api/chat/split/:parent/release': 'action:split_control',
-  'POST /api/chat/split/:parent/resume': 'action:split_resume_interrupted',
-  'POST /api/chat/split/:parent/review-decision': 'human:outward',
-  'POST /api/chat/split/:parent/review-push': 'human:outward',
-  'POST /api/chat/split/:parent/review-retry': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/file': 'human:outward',
-  // chat/split-ticket-batch-routes.ts: «Разобрать…» — публикация в Jira разом и «Решить здесь»
-  'GET /api/chat/split/:parent/tickets/target': 'human:outward',
-  'GET /api/chat/split/:parent/tickets/duplicates': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/publish': 'human:outward',
-  'POST /api/chat/split/:parent/tickets/take': 'human:split-apply',
-  'GET /api/chat/split/:parent/tasks': 'human:outward',
-  'POST /api/chat/split/:parent/tasks/move': 'human:outward',
-  // chat/split-status-routes.ts: вопрос человека о ходе групп из хаба — лёгкий чат-помощник
-  // по сводке, как `/api/assist`; агенту панели не нужен — сводку он читает сам.
-  'POST /api/chat/split/:parent/status-ask': 'internal:assistant',
+    'action:start_chat,send_chat_message,restart_chat_session,request_chat_handoff',
   // global-layer-routes.ts (В5): чтение и сверка — пробел агента; запись в слой ~/.claude — человек.
   'GET /api/global-layer': 'gap:P3',
   'POST /api/global-layer/:id/compare': 'gap:P3',
@@ -158,7 +107,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/local-models/runtime/install': 'human:download',
   'POST /api/local-models/pull': 'human:download',
   'POST /api/local-models/qwen-code/install': 'human:download',
-  'POST /api/local-models/import': 'human:upload',
   'POST /api/local-models/server/start': 'human:consent',
   'POST /api/local-models/server/stop': 'human:consent',
   'POST /api/local-models/server/restart': 'human:consent',
@@ -182,7 +130,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/kit/global/import': 'gap:P3',
   // Единственная запись набора в ~/.claude — настоящая конфигурация человека.
   'POST /api/kit/global/export': 'human:code-write',
-  'POST /api/chat/split/decline': 'action:split_decline',
   // chat/transcript-routes.ts
   // Выгрузка разговора файлом — кнопка человека «Экспортировать» (D2, U5c).
   'GET /api/chat/:chatId/export': 'human:download',
@@ -191,7 +138,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chat/:chatId/agents/:agentId': 'gap:P3',
   'GET /api/chat/:chatId/extensions': 'gap:P3',
   'GET /api/chat/:chatId/agents/:agentId/extensions': 'gap:P3',
-  'POST /api/chat/:chatId/agents/:agentId/stop': 'gap:P3',
   'GET /api/chat/:chatId/agent-history': 'gap:P3',
   'GET /api/chat/:chatId/main-agent': 'gap:P3',
   'GET /api/chat/search': 'action:search_chats',
@@ -294,43 +240,9 @@ export const ROUTE_LEDGER: RouteLedger = {
   // format-check-routes.ts
   'GET /api/format-check': 'action:format_check',
   'POST /api/format-check/refresh': 'action:format_check',
-  // group-delivery-routes.ts — что из группы дойдёт до прогона чужого CLI (D6)
-  'GET /api/groups/:id/delivery': 'foreign-cli',
-  // group-duplicate-routes.ts
-  'POST /api/groups/:id/duplicate': 'action:copy_group',
-  // group-knobs-routes.ts
-  'GET /api/groups/:id/knobs': 'action:read_group',
-  'PUT /api/groups/:id/knobs': 'action:set_group_knobs,draft_group',
-  // group-path-routes.ts
-  'GET /api/groups/:id/members': 'action:read_group',
-  'GET /api/groups/:id/path': 'action:read_group',
-  'GET /api/groups/resource-catalog': 'action:list_resource_catalog',
-  'GET /api/resources/summary': 'action:summarize_resource',
-  'POST /api/groups/:id/path/draft': 'action:draft_group_step',
-  'POST /api/groups/:id/path/promote': 'action:promote_group_step',
-  'PUT /api/groups/:id/path/steps':
-    'action:add_group_step,move_group_step,draft_group,draft_scenario',
-  // group-routes.ts
-  'DELETE /api/groups/:id': 'action:delete_group',
+  // legacy-groups-routes.ts — прежние группы только на чтение (этап 10)
   'GET /api/groups': 'action:list_groups',
-  'GET /api/groups/builtin': 'internal:ui-state',
-  'POST /api/groups/builtin/restore': 'gap:P3',
-  'GET /api/groups/:id/delete-effect': 'internal:preview',
-  'POST /api/groups': 'action:save_group,draft_group,draft_scenario',
-  'POST /api/groups/:id/enabled': 'action:toggle_group',
-  'POST /api/groups/activate': 'action:activate_groups_for_path',
-  'PUT /api/groups/:id': 'action:save_group',
-  // group-sources-routes.ts
-  'GET /api/groups/:id/override': 'action:read_group_override',
-  'GET /api/groups/discovery': 'action:list_discovered_groups',
-  'GET /api/projects/group-choice': 'action:read_project_group_choice',
-  'POST /api/groups/:id/advice/apply': 'action:apply_group_advice',
-  'POST /api/groups/:id/copy-to-global': 'action:copy_group_to_global',
-  'POST /api/groups/:id/merge-origin': 'action:merge_group_origin',
-  'POST /api/groups/discovery/:key/import': 'action:import_discovered_group',
-  'POST /api/groups/discovery/run': 'action:run_group_discovery',
-  'PUT /api/groups/:id/override': 'action:set_group_override',
-  'PUT /api/projects/group-choice': 'action:set_project_group_choice',
+  'GET /api/groups/legacy-runs': 'internal:ui-state',
   // history-routes.ts
   'GET /api/history': 'action:list_history',
   'GET /api/history/diff': 'action:history_diff',
@@ -363,12 +275,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/integrations/tms/pull': 'human:outward',
   'POST /api/integrations/tms/push': 'human:outward',
   'POST /api/integrations/webhook/test': 'human:outward',
-  // integrations/forge-mr-routes.ts — живое MR для `tests-cli delivery` в копии группы.
-  'GET /api/integrations/forge/mr-review': 'internal:callback',
   // integrations/jira-routes.ts
   'GET /api/integrations/jira/issue/:key': 'action:jira_issue',
-  // Комментарии задачи для `tests-cli delivery` в копии группы, не возможность интерфейса.
-  'GET /api/integrations/jira/issue/:key/comments': 'internal:callback',
   'GET /api/integrations/jira/issue/:key/transitions': 'action:jira_transitions',
   'GET /api/integrations/jira/projects': 'action:jira_projects',
   'GET /api/integrations/jira/search': 'action:jira_search',
@@ -847,9 +755,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   'PUT /api/scripts/*': 'action:save_script',
   // search-routes.ts
   'GET /api/search': 'action:search_panel',
-  // split-defaults-routes.ts
-  'GET /api/split-defaults': 'action:read_split_defaults',
-  'PUT /api/split-defaults': 'action:save_split_defaults',
   // sieve-routes.ts
   'GET /api/sieves': 'action:read_sieves',
   'DELETE /api/sieves/learned/:id': 'action:delete_learned_sieve',
@@ -857,15 +762,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   // dev-restart-routes.ts
   'GET /api/dev-restart': 'internal:ui-state',
   'POST /api/dev-restart': 'human:dev-restart',
-  // verify-ledger-routes.ts — плитка журнала проверок: действия на чтение у агента пока нет.
-  'GET /api/verify-ledger': 'gap:P3',
-  // watcher-routes.ts
-  'GET /api/watcher': 'action:watcher_status',
-  'POST /api/watcher': 'action:set_watcher',
-  'POST /api/watcher/events': 'internal:ui-state',
-  // Баг словами человека и отчёт страницей (09.10.2026): действий агента под них нет.
-  'POST /api/watcher/reports': 'gap:P3',
-  'GET /api/watcher/report': 'gap:P3',
   // core-proxy-routes.ts — прокладка к ядру (07 фаза 2). Число страницы берёт само окно;
   // задачи ядра агенту пока не показаны; команда ядру — только рукой человека (решение
   // координатора 28.10: новая строка `human:` сужает доступ, D2 не задет).
@@ -873,4 +769,39 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/core/tasks': 'gap:P3',
   'GET /api/core/tasks/:id': 'gap:P3',
   'POST /api/core/commands': 'human:rights',
+  // Состояние ядра для окна (значок звеньев) и поток ленты задачи — служебные.
+  'GET /api/core/health': 'internal:ui-state',
+  'GET /api/core/tasks/:id/events': 'internal:stream',
+  'GET /api/core/tasks/:id/sessions/:sid/stream': 'internal:stream',
+  // Чтения и правки ядра, которые окно умеет, а агент пока нет (этап 9).
+  'GET /api/core/tasks/:id/report': 'gap:P3',
+  'GET /api/core/routes': 'gap:P3',
+  'GET /api/core/profiles/:repoKey': 'gap:P3',
+  'GET /api/core/records/:id': 'gap:P3',
+  'GET /api/core/scenarios': 'gap:P3',
+  'GET /api/core/scenarios/:ref': 'gap:P3',
+  'POST /api/core/scenarios': 'gap:P3',
+  'GET /api/core/config': 'gap:P3',
+  'POST /api/core/config': 'gap:P3',
+  // Серверы MCP человека по CLI для экрана выбора (этап 10, зона A) — чтение окна.
+  'GET /api/core/mcp-offers': 'gap:P3',
+  // Оценка перед запуском — карточка, ничего не пишет.
+  'POST /api/core/estimate': 'internal:preview',
+  // Сверка доставки копии судьёй публикации ядра для `tests-cli delivery` — только чтение,
+  // не возможность интерфейса (этап 10, G16).
+  'GET /api/core/delivery': 'internal:callback',
+  // Та же оценка чата, но со слоем панели, собранным сервером (этап 10, G13).
+  'POST /api/chat/core-start': 'internal:preview',
+  // Перенос ключей устройств в ядро — доверие к телефону, полномочие человека (решение
+  // координатора этапа 10: новая строка `human:` сужает доступ, D2 не задет).
+  'POST /api/core/devices/adopt': 'human:rights',
+  // Ревью MR по ссылке открывает задачу ядра, как команда, — полномочие человека (этап 10, F8).
+  'POST /api/core/review-link': 'human:rights',
+  // «Путь» группы → сценарий: только перевод, ничего не пишет (этап 10, F1).
+  'POST /api/core/scenarios/from-path': 'internal:preview',
+  // Надзор ядра (этап 10): состояние — для окна; перезапуск и автозапуск при входе в систему
+  // (ставит задачу ОС) — согласие человека, как у перезапуска своего сервера моделей.
+  'GET /api/core/supervisor': 'internal:ui-state',
+  'POST /api/core/supervisor/restart': 'human:consent',
+  'POST /api/core/supervisor/autostart': 'human:consent',
 };

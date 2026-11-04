@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { outsideCopyDenial } from '../../ChatBranchGate/ChatBranchGate.ts';
-import { MAIN_SYNC_DENIED, MAIN_SYNC_UNKNOWN } from '../../main-sync/main-sync.ts';
 import {
   alreadyQueuedDenial,
   deferralDenial,
@@ -11,8 +9,7 @@ import {
   mrMentionRefusal,
   selfApprovalRefusal,
 } from '../../deferred-asks/deferred-asks.ts';
-import { guardLabel, OUTSIDE_COPY_PREFIX, toolOutcome } from './tool-outcome.ts';
-import { createTranscriptReader } from './transcript-events.ts';
+import { guardLabel, toolOutcome } from './tool-outcome.ts';
 
 /**
  * Итог вызова (R15, R18): одна функция на транскрипт и поток. Тексты — формы,
@@ -94,17 +91,6 @@ describe('toolOutcome', () => {
     expect(head(`Exit code 1\n${'y'.repeat(300)}`)?.length).toBe(120);
   });
 
-  it('отказы брокера панели — по началу текста, даже без рода CLI (C14)', () => {
-    expect(toolOutcome({ is_error: true, content: MAIN_SYNC_DENIED }).denied).toBe('main-sync');
-    expect(toolOutcome({ is_error: true, content: MAIN_SYNC_UNKNOWN }).denied).toBe('main-sync');
-    // Начало сверено с настоящим текстом отказа: его правка без правки начала покраснит тест.
-    const outside = outsideCopyDenial('/work/app-copy', '/work/app');
-    expect(outside.startsWith(OUTSIDE_COPY_PREFIX)).toBe(true);
-    expect(
-      toolOutcome({ is_error: true, content: outside }, { denialKind: 'permission-rule' }),
-    ).toEqual({ denied: 'outside-copy' });
-  });
-
   it('D-n и отказ панели с известным ответом — свой род, даже поверх рода CLI', () => {
     // Настоящие тексты отказа: правка их начала без правки метки покраснит тест.
     const deferred = [
@@ -168,52 +154,5 @@ describe('toolOutcome', () => {
     expect(
       toolOutcome({ is_error: true, content: 'Command timed out after 0s' }),
     ).not.toHaveProperty('timedOutMs');
-  });
-});
-
-describe('читатель транскрипта: итог вызова', () => {
-  const t = '2026-10-18T22:08:26.500Z';
-  it('`toolUseResult.timedOutAfterMs` и `toolDenialKind` строки — к единственному результату', () => {
-    const read = createTranscriptReader();
-    expect(
-      read({
-        type: 'user',
-        timestamp: t,
-        message: { content: [{ type: 'tool_result', tool_use_id: 'a', content: 'moved' }] },
-        toolUseResult: { timedOutAfterMs: 600_000 },
-      }),
-    ).toEqual([{ kind: 'toolResult', t: Date.parse(t), id: 'a', chars: 5, timedOutMs: 600_000 }]);
-    expect(
-      read({
-        type: 'user',
-        timestamp: t,
-        message: {
-          content: [{ type: 'tool_result', tool_use_id: 'b', content: 'no', is_error: true }],
-        },
-        toolDenialKind: 'permission-rule',
-      }),
-    ).toEqual([
-      { kind: 'toolResult', t: Date.parse(t), id: 'b', chars: 2, denied: 'permission-rule' },
-    ]);
-  });
-
-  it('при нескольких результатах поля строки не делятся: ни одному', () => {
-    const read = createTranscriptReader();
-    const events = read({
-      type: 'user',
-      timestamp: t,
-      message: {
-        content: [
-          { type: 'tool_result', tool_use_id: 'a', content: 'one' },
-          { type: 'tool_result', tool_use_id: 'b', content: 'two' },
-        ],
-      },
-      toolUseResult: { timedOutAfterMs: 600_000 },
-    });
-    expect(events).toHaveLength(2);
-    expect(events.map((event) => event.kind === 'toolResult' && event.timedOutMs)).toEqual([
-      undefined,
-      undefined,
-    ]);
   });
 });

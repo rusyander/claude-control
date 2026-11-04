@@ -10,7 +10,6 @@ import {
   pickMergeRequestBranch,
   resolveMergeRequestBranch,
 } from './project-git.ts';
-import { makeSplitGit, splitTasks } from '../chat/ChatSplit/ChatSplit.ts';
 
 /**
  * Ветка MR без форджа (Д2, инцидент 23.09.2026). Разбор — на строках, сама
@@ -176,39 +175,5 @@ describe.skipIf(!GIT_AVAILABLE)('ветка MR на настоящем git', () 
 
     expect(copy.detached).toBe(false);
     expect(run(copy.path, ['rev-parse', 'HEAD'])).toBe(mrSha);
-  });
-
-  it('разделение: работа в MR без форджа встаёт на ветку MR, а не на ветку из блока от main', async () => {
-    const links: string[] = [];
-    const cwds: string[] = [];
-
-    const result = await splitTasks({
-      projectPath: project,
-      // Так агент родителя пишет блок: ветку группы придумал сам, ветку MR не знает.
-      proposal: {
-        groups: [
-          {
-            title: 'Конфликты MR 7',
-            branch: 'fix-mr-conflicts',
-            tasks: ['разрешить конфликты'],
-            review: { url: MR_URL, work: true },
-          },
-        ],
-      },
-      startRuns: true,
-      git: makeSplitGit(),
-      now: () => 1000,
-      start: ({ cwd }) => {
-        cwds.push(cwd);
-        return true;
-      },
-      link: (chat) => void links.push(chat.branch),
-    });
-
-    expect(result.failures).toEqual([]);
-    expect(result.chats[0]?.branch).toBe('feature/mr');
-    expect(links).toEqual(['feature/mr']);
-    expect(run(cwds[0] ?? project, ['rev-parse', 'HEAD'])).toBe(mrSha);
-    expect(run(project, ['branch', '--list', 'fix-mr-conflicts*'])).toBe('');
   });
 });

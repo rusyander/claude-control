@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CATALOG_PROVIDERS } from '../../../providers/catalog/catalog.ts';
 import type { ConfigProvider } from '../../../providers/types/types.ts';
-import {
-  allToolGates,
-  ToolGateRegistry,
-  toolGateOf,
-  type GatewayToolCall,
-  type ToolGate,
-} from './tool-gate.ts';
+import { allToolGates, toolGateOf, type GatewayToolCall, type ToolGate } from './tool-gate.ts';
 
 /**
  * Ворота — шов между двумя доменами, и на шве живёт молчаливый класс дефектов:
@@ -80,49 +74,6 @@ describe('ворота вызова', () => {
     await gate.decide(call('src/a.ts'));
 
     expect(seen).toEqual(['wire:block', 'wire:allow']);
-  });
-});
-
-describe('реестр открытых прогонов', () => {
-  const stub = { decide: async () => ({ allow: true }) };
-
-  it('метки без прогона ворот НЕ имеют', () => {
-    const registry = new ToolGateRegistry();
-
-    // `undefined`, а не «пустые ворота»: прослойка спрашивает включённость провода
-    // до первого кадра, и пустые ворота заставили бы её ждать решения, которого
-    // никто не примет.
-    expect(registry.gateOf('run-1')).toBeUndefined();
-    expect(registry.size).toBe(0);
-  });
-
-  it('прогон получает свои ворота и отдаёт их обратно по метке', () => {
-    const registry = new ToolGateRegistry();
-    registry.open('run-1', stub);
-
-    expect(registry.gateOf('run-1')).toBe(stub);
-    expect(registry.gateOf('run-2')).toBeUndefined();
-    expect(registry.size).toBe(1);
-  });
-
-  it('конец прогона ворота закрывает', () => {
-    // Оставленная запись — это ворота, исполняющие скрипты для прогона, которого
-    // уже нет.
-    const registry = new ToolGateRegistry();
-    registry.open('run-1', stub);
-    registry.close('run-1');
-
-    expect(registry.gateOf('run-1')).toBeUndefined();
-    expect(registry.size).toBe(0);
-  });
-
-  it('пустая метка ворот не открывает', () => {
-    // Иначе один запрос без метки открыл бы ворота всем таким же.
-    const registry = new ToolGateRegistry();
-    registry.open('', stub);
-
-    expect(registry.size).toBe(0);
-    expect(registry.gateOf('')).toBeUndefined();
   });
 });
 

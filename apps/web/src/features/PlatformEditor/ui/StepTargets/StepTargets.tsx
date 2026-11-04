@@ -62,6 +62,13 @@ export function StepTargets({ model }: WizardStepProps) {
         <Typography variant="caption" color="muted">
           {t('contourConfig.access.consumersHint')}
         </Typography>
+        {/* Обязательный контур ведёт задачи ядра через себя и со снятой галочкой: сказать это
+            рядом с галочками, иначе снятая читается как «этот раздел мимо контура». */}
+        {model.draft.mode === 'required' && (
+          <Typography variant="caption" color="muted" data-contour-required-all>
+            {t('contourConfig.access.requiredAll')}
+          </Typography>
+        )}
 
         {model.plan.isLoading && <SkeletonList rows={3} withActions={false} />}
 

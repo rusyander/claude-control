@@ -1,37 +1,23 @@
-import type { spawn as nodeSpawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { spawnCliProcess } from '../../lib/cli-spawn/cli-spawn.ts';
-import { killChildTree } from '../../lib/process-tree/process-tree.ts';
-import { defaultCliCommand } from '../../providers/cli/cli.ts';
 import type { ServerMessageCode, ServerMessageParams } from '@agentdeck/contracts/server-messages';
-import { coded } from '../../lib/server-text/server-text.ts';
 import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
-import {
-  readStreamJsonResult,
-  STREAM_JSON_INPUT_ARGS,
-  streamJsonUserLine,
-  type AgentImage,
-} from '../../lib/agent-images/agent-images.ts';
-import { lightWindowLayers } from '../platform/layers/layers.ts';
+import type { AgentImage } from '../../lib/agent-images/agent-images.ts';
+import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { maskAssistText, maskFormFields, restoreFormSecrets } from '../assistant-secrets.ts';
+import { askOneShot } from '../core-ask/one-shot.ts';
+import type { AskCarry, CoreAskPort } from '../core-ask/core-ask.types.ts';
 
 /**
- * Помощник по заполнению форм. Работает через сам Claude Code в неинтерактивном
- * режиме (`claude -p`), поэтому использует уже настроенную подписку: никаких
- * отдельных ключей заводить не нужно.
+ * Помощник по заполнению форм. Ход — вопрос ядра «ask» активным CLI (этап 10, F2b): ядро
+ * запускает его своей дорогой (маршрут, контур, DLP, журнал), подписка CLI та же.
  *
  * Модель просят вернуть строгий JSON с полями формы и коротким пояснением —
  * так ответ можно применить к форме, а не пересказывать пользователю текстом.
  *
  * ЛЁГКОЕ ОКНО (решение владельца D4, 28.09). Помощнику не нужно ничего, кроме
- * задания: всё, что он знает о форме, — в тексте. Поэтому запуск без
- * инструментов, без сохранения сессии и без наших слоёв (правила, хуки, скиллы,
- * MCP человека) — теми же флагами, что у агента панели (`lightWindowLayers`), в
- * пустом временном каталоге. Разговор продолжается историей В ЗАПРОСЕ, а не
- * `--resume`: прежний запуск копил транскрипт на каждый вопрос к форме (130
- * файлов в `projects/…apps-server/` к 28.09) вместе с полями формы.
+ * задания: всё, что он знает о форме, — в тексте. Поэтому вопрос без
+ * инструментов и без слоёв человека (правила, хуки, скиллы, MCP) во временном
+ * каталоге ядра. Разговор продолжается историей В ЗАПРОСЕ, а не продолжением
+ * сессии CLI: прежний запуск копил транскрипт на каждый вопрос к форме.
  */
 
 /** Реплика прежнего разговора в окне помощника — её держит клиент. */
@@ -157,165 +143,17 @@ function extractJson(text: string): { reply: string; fields: Record<string, unkn
 const ASSIST_TIMEOUT_MS = 180_000;
 
 /**
- * Хвост лёгкого окна — общий для помощника формы, помощника структуры и
- * служебных вызовов модели через раннер (группы, окно ассистента): без
- * сохранения сессии, без наших слоёв, без инструментов. `--tools ""` —
- * последним: пустое значение вариадического флага съело бы следующий голый
- * аргумент (как у агента панели), поэтому хвост всегда в конце argv.
- */
-export function lightWindowArgs(): string[] {
-  return ['--no-session-persistence', ...lightWindowLayers().args, '--tools', ''];
-}
-
-/**
- * Рабочий каталог лёгкого окна — пустая временная папка: CLI ищет `CLAUDE.md`
- * вверх от него, и каталог сервера принёс бы правила репозитория. `cleanup`
- * не бросает: пустая папка без секретов — не повод ронять ответ.
- */
-export function lightWindowDir(): { dir: string; cleanup: () => void } {
-  const dir = mkdtempSync(join(tmpdir(), 'cc-assistant-'));
-  return {
-    dir,
-    cleanup: () => {
-      try {
-        rmSync(dir, { recursive: true, force: true });
-      } catch {
-        // Не удалилась (держит антивирус) — останется во временной папке ОС.
-      }
-    },
-  };
-}
-
-/** Аргументы помощника формы: JSON-конверт (или поток с картинками) + лёгкое окно. */
-export function oneShotArgs(streaming: boolean): string[] {
-  return [
-    '-p',
-    ...(streaming ? STREAM_JSON_INPUT_ARGS : ['--output-format', 'json']),
-    ...lightWindowArgs(),
-  ];
-}
-
-/**
- * Запускает CLI и отдаёт промпт через стандартный ввод. Аргументом его
- * передавать нельзя: многострочный текст с кавычками рвётся оболочкой,
- * и до модели доходит обрывок. Ответ — конверт `--output-format json` в обоих
- * режимах. Общий для помощника формы и помощника структуры ресурса: вторая
- * копия уже разошлась с этой (не ловила EPIPE на stdin).
- *
- * Запуск — `spawnCliProcess` (настоящий `.exe` без оболочки, иначе квотирование
- * `shellArgs`): прежний `spawn(…, { shell: true })` на Windows склеивал argv
- * пробелами, и пустое значение `--tools ""` исчезло бы, а флаг съел бы
- * следующий. Рабочий каталог — пустая временная папка: CLI ищет `CLAUDE.md`
- * вверх от него, и каталог сервера принёс бы правила репозитория.
- */
-export function runClaudeOneShot(
-  prompt: string,
-  command: string,
-  images: readonly AgentImage[] = [],
-  timeoutMs: number = ASSIST_TIMEOUT_MS,
-  spawnImpl?: typeof nodeSpawn,
-  /** Добавка к окружению сервера — переключатель «Claude Code на локальной модели». */
-  env: Record<string, string> = {},
-): Promise<string> {
-  // С картинками — потоковый ввод (картинка едет блоком `image`), и итог
-  // приходит событием `result` потокового вывода, а не одним JSON.
-  const streaming = images.length > 0;
-  const { dir, cleanup } = lightWindowDir();
-
-  const spawned = spawnCliProcess(command, oneShotArgs(streaming), {
-    cwd: dir,
-    ...(spawnImpl ? { spawnImpl } : {}),
-    ...(Object.keys(env).length > 0 ? { env } : {}),
-  });
-  if (spawned.error) {
-    cleanup();
-    return Promise.reject(spawned.error);
-  }
-  const child = spawned.child;
-
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => {
-      // Дерево, а не сам процесс: под `cmd.exe` обычный kill оставил бы CLI жить.
-      killChildTree(child);
-      cleanup();
-      reject(coded(new Error('Помощник не ответил за отведённое время'), 'assistant-timeout'));
-    }, timeoutMs);
-
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      cleanup();
-      reject(error);
-    });
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      cleanup();
-      if (code === 0) resolve(streaming ? envelopeOf(stdout) : stdout);
-      else
-        reject(
-          new Error(failureText(stderr, stdout, streaming) || `CLI завершился с кодом ${code}`),
-        );
-    });
-
-    // Обработчик ОБЯЗАТЕЛЕН: CLI закрывается сразу (сломан, не залогинен), а
-    // промпт со схемой и всей формой обычно длиннее буфера канала, и
-    // недописанный поток отдаёт EPIPE (на Windows EOF) отдельным `error`.
-    // Необработанное событие потока роняет весь сервер — здесь же это лишь
-    // «ввод не долетел»: исход прогона решают код выхода и stderr ниже.
-    child.stdin.on('error', () => undefined);
-    child.stdin.write(streaming ? streamJsonUserLine(prompt, images) : prompt);
-    child.stdin.end();
-  });
-}
-
-/**
- * Причина сбоя для человека. Claude Code кладёт её не в stderr, а в `result`
- * своего ответа: без входа stderr пуст, а в stdout — «Not logged in · Please
- * run /login». Голое «код 1» не говорит человеку, что делать.
- */
-function failureText(stderr: string, stdout: string, streaming: boolean): string {
-  if (stderr.trim()) return stderr.trim().slice(0, 500);
-  if (streaming) return (readStreamJsonResult(stdout)?.text ?? '').trim().slice(0, 500);
-  const last = stdout.trim().split('\n').pop() ?? '';
-  try {
-    const envelope = JSON.parse(last) as { result?: unknown };
-    return typeof envelope.result === 'string' ? envelope.result.trim().slice(0, 500) : '';
-  } catch {
-    return last.trim().slice(0, 500);
-  }
-}
-
-/** Итог потокового вывода в форме конверта `--output-format json`. */
-function envelopeOf(stdout: string): string {
-  const result = readStreamJsonResult(stdout);
-  return JSON.stringify({
-    result: result?.text ?? '',
-    is_error: result?.isError ?? true,
-  });
-}
-
-/**
  * Ответ модели окну помощника: текст либо отказ/сбой — с кодом, если причину
- * назвала панель (маршрут провайдера, `assistant-route.ts`).
+ * назвала панель или ядро (`core-ask/one-shot.ts`).
  */
 export type HelperOutcome =
   | { ok: true; text: string }
   | { ok: false; error: string; messageCode?: ServerMessageCode; params?: ServerMessageParams };
 
 /**
- * Кто отвечает окну: промпт (уже под маской) и картинки → текст модели. Решает
- * маршрут активного провайдера (`assistant-route.ts → helperAsk`); здесь только
- * то, что окно делает с ответом. Функцией, а не маршрутом: модуль маршрута сам
- * зовёт этот файл, и обратный импорт замкнул бы круг.
+ * Кто отвечает окну: промпт (уже под маской) и картинки → текст модели. Отвечает
+ * вопрос ядра (`coreHelperAsk`); здесь только то, что окно делает с ответом.
+ * Функцией — проверки подают свою, без ядра.
  */
 export type HelperAsk = (
   prompt: string,
@@ -323,36 +161,43 @@ export type HelperAsk = (
   timeoutMs: number,
 ) => Promise<HelperOutcome>;
 
-/** Прежний путь окна — процесс `claude` по подписке, ответ из конверта JSON. */
-export function claudeAsk(
-  command: string,
-  spawnImpl?: typeof nodeSpawn,
-  env: Record<string, string> = {},
+/**
+ * Окно помощника через ядро (этап 10, F2b): вопрос «ask» без инструментов маршрутом активного
+ * CLI и профиля «Ассистент панели» (`core-ask/one-shot.ts`). Своего процесса `claude -p` у
+ * окна больше нет: ядро запускает CLI во временном каталоге задачи, без слоёв человека.
+ */
+export function coreHelperAsk(
+  port: CoreAskPort,
+  store: AppStore,
+  appDataDir: string,
+  /** Набор панели чужому CLI (`helperCarryOf`, G13) — как прежнее окно, Claude без набора. */
+  carry?: AskCarry,
 ): HelperAsk {
   return async (prompt, images, timeoutMs) => {
-    const stdout = await runClaudeOneShot(prompt, command, images, timeoutMs, spawnImpl, env);
-    const envelope = JSON.parse(stdout) as { result?: string };
-    return { ok: true, text: envelope.result ?? '' };
+    const result = await askOneShot(port, store, appDataDir, {
+      title: 'panel helper',
+      messages: [{ role: 'user', content: prompt, images }],
+      timeoutMs,
+      ...(carry ? { carry } : {}),
+    });
+    if (result.ok) return { ok: true, text: result.reply };
+    return {
+      ok: false,
+      error: result.error,
+      ...(result.messageCode ? { messageCode: result.messageCode } : {}),
+      ...(result.params ? { params: result.params } : {}),
+    };
   };
-}
-
-/** Строка — команда `claude` (прежняя подпись), функция — маршрут провайдера. */
-export function helperAskOf(ask: string | HelperAsk): HelperAsk {
-  return typeof ask === 'string' ? claudeAsk(ask) : ask;
 }
 
 export async function askAssistant(
   request: AssistRequest,
-  ask: string | HelperAsk = defaultCliCommand(),
+  ask: HelperAsk,
 ): Promise<AssistResponse> {
   try {
     const fields = request.fields ?? {};
     const masked = maskFormFields(fields);
-    const answer = await helperAskOf(ask)(
-      buildPrompt(request, masked),
-      request.images ?? [],
-      ASSIST_TIMEOUT_MS,
-    );
+    const answer = await ask(buildPrompt(request, masked), request.images ?? [], ASSIST_TIMEOUT_MS);
     if (!answer.ok) {
       // Отказ маршрута (контур, провайдер без запуска) — с кодом: клиент назовёт
       // причину на своём языке, а не общим «помощник не ответил».

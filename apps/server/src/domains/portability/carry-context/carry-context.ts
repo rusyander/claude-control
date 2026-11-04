@@ -18,7 +18,7 @@ import {
   type HashFile,
   type StatFile,
 } from '../../chat/ChatHandoff/ChatHandoff.ts';
-import { continuationTitle } from '../../provider-chat/handoff/handoff.ts';
+import { continuationTitle } from '../../provider-chat/continuation-title.ts';
 
 /**
  * Незакрытая работа переезжает вместе со средой (П6.1).
@@ -85,6 +85,13 @@ export interface CarryPlanDeps {
   readonly now?: () => number;
 }
 
+/**
+ * Исход заведения разговора у нового CLI. Обещание — у чужого CLI: его разговор — задача ядра,
+ * и отказ ядра известен только после ответа на оценку и запуск (этап 10, F2c).
+ */
+export type CarryOpened =
+  { ok: true; key: string; chatId: string } | { ok: false; failure: CarryTargetFailure };
+
 /** Что переносу нужно, чтобы его ВЫПОЛНИТЬ. */
 export interface CarryDeps extends CarryPlanDeps {
   /** Имя нового CLI для человека — уезжает в заметку исходного разговора. */
@@ -99,7 +106,7 @@ export interface CarryDeps extends CarryPlanDeps {
     title: string;
     cwd: string;
     prompt: string;
-  }) => { ok: true; key: string; chatId: string } | { ok: false; failure: CarryTargetFailure };
+  }) => CarryOpened | Promise<CarryOpened>;
   /**
    * Заметка в ленту разговора по его ключу. `false` — сказать было некуда: у
    * Claude лента это транскрипт самого CLI, и панель говорит только в живой
@@ -157,7 +164,7 @@ export function planCarry(
  * нажатием проходит время, за которое цепочка могла дорасти до потолка, а опора
  * — исчезнуть. План — снимок для глаз, решение принимается здесь.
  */
-export function carryChat(source: CarrySourceChat, deps: CarryDeps): CarryOutcome {
+export async function carryChat(source: CarrySourceChat, deps: CarryDeps): Promise<CarryOutcome> {
   const aliases = [source.key];
   if (!source.cwd)
     return { key: source.key, carried: false, reason: 'no_project', noticedSource: false };
@@ -174,7 +181,7 @@ export function carryChat(source: CarrySourceChat, deps: CarryDeps): CarryOutcom
   const depth = deps.chains.depth(aliases) + 1;
   const title = continuationTitle(source.title, depth);
 
-  const opened = deps.open({ title, cwd: source.cwd, prompt });
+  const opened = await deps.open({ title, cwd: source.cwd, prompt });
   // Отказ цели НАЗЫВАЕТСЯ. Прежде три разные беды — прогон не пошёл, хранилище
   // не завело разговор, задание в заведённый разговор не ушло — приезжали одним
   // «не перенесено» без причины, и человеку нечем было отличить неполадку CLI
@@ -216,11 +223,11 @@ export function carryChat(source: CarrySourceChat, deps: CarryDeps): CarryOutcom
 }
 
 /** Перенести выбранные разговоры. Порядок ответа — порядок запроса. */
-export function carryChats(
+export async function carryChats(
   sources: readonly CarrySourceChat[],
   keys: readonly string[],
   deps: CarryDeps,
-): CarryOutcome[] {
+): Promise<CarryOutcome[]> {
   const byKey = new Map(sources.map((source) => [source.key, source]));
   const outcomes: CarryOutcome[] = [];
   for (const key of keys) {
@@ -231,7 +238,8 @@ export function carryChats(
       outcomes.push({ key, carried: false, noticedSource: false });
       continue;
     }
-    outcomes.push(carryChat(source, deps));
+    // По одному, не разом: у нового CLI перенос тратит его лимиты, и порядок ответа — порядок запроса.
+    outcomes.push(await carryChat(source, deps));
   }
   return outcomes;
 }

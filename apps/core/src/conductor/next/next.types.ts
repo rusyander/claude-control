@@ -73,6 +73,10 @@ export type NextAction =
   | { kind: 'answered'; stepId: string; askId: string }
   /** Шаг `ask-human` закрыт ответом человека (точка 8). */
   | { kind: 'close-human-step'; stepId: string; askId: string }
+  /** Шаг `chat` закрыт командой человека `end-chat` (`cmdId` — основание в `step.ended`). */
+  | { kind: 'close-chat'; stepId: string; cmdId: string }
+  /** Шаг вопроса «ask» закрыт ядром на конце первого хода (этап 10, F2). */
+  | { kind: 'close-ask'; stepId: string }
   | {
       kind: 'raise';
       point: ConductorPoint;
@@ -181,9 +185,21 @@ export const END_REASON = {
   claimed: 'claimed',
   noRoute: 'no-route',
   briefOverBudget: 'brief-over-budget',
+  /** Чат закрыт человеком (`end-chat`, этап 10). */
+  endChat: 'end-chat',
+  /**
+   * Сеанс чата кончился без `end-chat` (CLI упал, хост умер): шаг останавливается, продолжение
+   * разговора — дело возобновления (зона F2), а не молчаливый новый сеанс.
+   */
+  chatSessionEnded: 'chat-session-ended',
+  /** Вопрос «ask» отвечен: конец первого хода закрывает шаг (этап 10, F2). */
+  askAnswered: 'ask-answered',
 } as const;
 
-/** Варианты ответа на точки дирижёра — текст видит человек, сверка идёт по нему же. */
+/**
+ * Русские подписи вариантов на точки дирижёра. Английские и сверка ответа по ключу — `answers.ts`;
+ * эти строки не меняются: ими записаны ответы в журналах задач, поднятых до перевода.
+ */
 export const ROUND_CAP_ANSWERS = {
   more: 'Ещё один круг',
   stop: 'Остановить единицу',

@@ -3,7 +3,14 @@ import type { AddressInfo, Socket } from 'node:net';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createCaFetch, createCaStreamFetch, readCaCert } from './ca-fetch.ts';
-import { noProxyBypasses, redactProxyValue, resolveProxy, tunnelAgent } from './proxy.ts';
+import {
+  isLocalhostName,
+  loopbackLookup,
+  noProxyBypasses,
+  redactProxyValue,
+  resolveProxy,
+  tunnelAgent,
+} from './proxy.ts';
 
 /**
  * Сеть к внешним адресам (10:128): прокси компании и свой корень доверия — против настоящих
@@ -21,6 +28,20 @@ function codeOf(error: unknown): string | undefined {
 
 describe('platform/net', () => {
   describe('proxy choice', () => {
+    it('names under .localhost are loopback names; the lookup answers 127.0.0.1 in both forms', () => {
+      expect(isLocalhostName('api.localhost')).toBe(true);
+      expect(isLocalhostName('API.LOCALHOST.')).toBe(true);
+      expect(isLocalhostName('localhost.corp.test')).toBe(false);
+      expect(isLocalhostName('notlocalhost')).toBe(false);
+      const answers: unknown[][] = [];
+      loopbackLookup('api.localhost', { all: true }, (...args: unknown[]) => answers.push(args));
+      loopbackLookup('api.localhost', {}, (...args: unknown[]) => answers.push(args));
+      expect(answers).toEqual([
+        [null, [{ address: '127.0.0.1', family: 4 }]],
+        [null, '127.0.0.1', 4],
+      ]);
+    });
+
     it('no proxy → direct; lower-case wins; empty value means no proxy', () => {
       expect(resolveProxy(url('https://gw.corp.test'), {}).kind).toBe('direct');
       const both = resolveProxy(url('https://gw.corp.test'), {
@@ -196,9 +217,18 @@ describe('platform/net', () => {
       expect((await stream(`${targetBase}/redirect-away`)).status).toBe(302);
     });
 
-    it('without CA and proxy the built-in fetch is returned', () => {
-      expect(createCaFetch('', {})).toBe(globalThis.fetch);
-      expect(createCaFetch('', { https_proxy: 'http://p:3128' })).not.toBe(globalThis.fetch);
+    it('a name under .localhost reaches this machine with and without CA/proxy (RFC 6761)', async () => {
+      // Резолвер Windows не знает `api.localhost` локального стенда — проба видела «адрес
+      // недоступен»; имя должно доехать до петли и без своего корня/прокси, и с ними.
+      const port = new URL(targetBase).port;
+      for (const fetchImpl of [
+        createCaFetch('', {}),
+        createCaStreamFetch('', {}),
+        createCaFetch(PEM, { https_proxy: 'http://127.0.0.1:1' }),
+      ]) {
+        const response = await fetchImpl(`http://stand-check.localhost:${port}/v1/models`);
+        expect(await response.json()).toEqual({ via: 'target' });
+      }
     });
   });
 

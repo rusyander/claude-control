@@ -40,6 +40,31 @@ export async function commitOf(
   }
 }
 
+/**
+ * Общий предок двух ревизий (база диффа ревью MR по ссылке, этап 10 F8); нет общего — `absent`,
+ * git не ответил — `unknown`.
+ */
+export async function mergeBaseOf(
+  repo: string,
+  a: string,
+  b: string,
+  options: CopyGitOptions = {},
+): Promise<Fact<string>> {
+  try {
+    const out = await git(repo, ['merge-base', a, b], {
+      ...options,
+      timeoutMs: T.short,
+      acceptNonZero: true,
+    });
+    const sha = out.stdout.trim();
+    if (out.code === 0 && /^[0-9a-f]{40,64}$/.test(sha)) return { value: sha };
+    // 1 — общего предка нет; прочие коды (128 — ревизия не разобрана) — не ответ, а сбой.
+    return out.code === 1 ? { absent: true } : { unknown: `git merge-base exit ${out.code}` };
+  } catch (error) {
+    return { unknown: reasonOf(error) };
+  }
+}
+
 /** Ветка, выложенная в каталоге (`absent` — отцепленный HEAD). */
 export async function currentBranch(
   dir: string,

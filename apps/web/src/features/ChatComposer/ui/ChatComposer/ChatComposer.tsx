@@ -31,7 +31,6 @@ export function ChatComposer({
   onStop,
   onRejectFiles,
   isRunning,
-  onSplitTasks,
   onHandoff,
   modes,
 }: ChatComposerProps) {
@@ -369,20 +368,6 @@ export function ChatComposer({
                 void attach(picked);
               }}
             />
-            {/* Разделить задачи можно и задним числом: агент предлагает это сам
-                только на трёх и более независимых задачах, а спросить вправе
-                кто угодно и когда угодно. */}
-            {onSplitTasks && (
-              <Button
-                variant="ghost"
-                iconOnly
-                icon={<Icon name="branch" size={24} />}
-                aria-label={t('chat.split.ask')}
-                title={t('chat.split.ask')}
-                onClick={onSplitTasks}
-                disabled={isRunning || isDrawing}
-              />
-            )}
             {/* «Закрыть этап» — та же просьба, что агент иногда высказывает сам,
                 только высказанная человеком. Дальше решает он же: панель покажет
                 карточку и без его согласия контекст не сотрёт. */}

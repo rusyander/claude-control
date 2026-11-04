@@ -10,6 +10,4 @@ export interface SplitSettingsProps {
 export interface DeliveryControlProps {
   /** Каталог проекта этого чата. */
   path: string;
-  /** Чат группы: подпись кнопки — решение плана для неё, настройка — проектная. */
-  groupDeliver?: boolean;
 }

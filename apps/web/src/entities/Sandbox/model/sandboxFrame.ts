@@ -4,6 +4,9 @@ export interface SandboxEvent {
   text?: string;
   name?: string;
   message?: string;
+  /** Код текста ошибки (`server-messages`) и его параметры — перевод на стороне клиента. */
+  messageCode?: string;
+  params?: Record<string, unknown>;
   sessionId?: string;
   costUsd?: number;
 }

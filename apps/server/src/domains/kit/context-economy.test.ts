@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -7,10 +7,9 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { builtinKitDir } from './service.ts';
 
 /**
- * Экономия окна звена группы — через диспетчер `run.mjs`, как его зовёт hooks.json:
- * подталкивание к пакетному чтению до вызова (Read/Grep/Glob в счёт, отказ после
- * проигнорированных строк), потолок чтения целых файлов и полного `git diff` оболочкой,
- * карточка правила ≥ 4k в следующих этапах той же копии. Сессия человека — как была.
+ * Экономия окна в шаге задачи ядра (AGENTDECK_STEP_KIND, не `chat`) — через диспетчер `run.mjs`, как его
+ * зовёт hooks.json: карточка правила ≥ 4k в следующих шагах той же копии и запрет до чтения правила.
+ * Строка [batch] после серии Bash-чтений — одна для человека и шага. Сессия человека — как была.
  */
 
 // AGENTDECK_KIT_UNDER_TEST — копия набора для прогона «красный до» против старого кода; без неё — встроенный.
@@ -20,8 +19,8 @@ const dir = mkdtempSync(join(tmpdir(), 'kit-context-economy-'));
 const STATE = join(dir, 'state');
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
-const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
-const HUMAN = { AGENTDECK_SPLIT_CHILD: '', AGENTDECK_USER_MEMORY_OFF: '' };
+const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
+const HUMAN = { AGENTDECK_STEP_KIND: '' };
 
 type HookOut = {
   hookSpecificOutput?: {
@@ -38,7 +37,7 @@ function hook(event: string, payload: object, env: Record<string, string>): Hook
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: STATE,
       ...env,
     },
@@ -72,68 +71,18 @@ const turn = (uses: Use[], bodies: string[] = []) => {
     },
   ];
 };
-const loneReads = (k: number, prefix: string) =>
-  Array.from({ length: k }, (_, i) =>
-    turn([use('Read', { file_path: `C:/repo/src/${prefix}${i}.ts` })], [`body of ${prefix}${i}`]),
-  ).flat();
 function transcript(records: object[]): string {
   const path = join(dir, `t${++n}.jsonl`);
   writeFileSync(path, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'utf8');
   return path;
 }
-const read = (session: string, tp: string, file = 'C:/repo/src/other.ts') => ({
-  hook_event_name: 'PreToolUse',
-  session_id: session,
-  transcript_path: tp,
-  cwd: dir,
-  tool_name: 'Read',
-  tool_input: { file_path: file },
-});
 const ctx = (o: HookOut) => o.hookSpecificOutput?.additionalContext ?? '';
 const denied = (o: HookOut) => o.hookSpecificOutput?.permissionDecision === 'deny';
 
-describe('batch-nudge: серия одиночных чтений в звене группы — до вызова', () => {
-  const r3 = loneReads(3, 'a');
-  const r9 = [...r3, ...loneReads(6, 'b')];
-  const r10 = [...r9, ...loneReads(1, 'c')];
-
-  it('три одиночных Read подряд — строка [batch]; сразу следом — тишина; у человека pre молчит', () => {
-    const tp = transcript(r3);
-    expect(ctx(hook('pre', read('kbatch000001', tp), CHILD))).toMatch(/\[batch\]/);
-    expect(ctx(hook('pre', read('kbatch000001', tp), CHILD))).not.toMatch(/\[batch\]/);
-    expect(ctx(hook('pre', read('kbatchhuman1', tp), HUMAN))).not.toMatch(/\[batch\]/);
-  });
-
-  it('после двух проигнорированных строк независимое одиночное чтение — отказ, один раз', () => {
-    const s = 'kbatchesc001';
-    expect(ctx(hook('pre', read(s, transcript(r3)), CHILD))).toMatch(/\[batch\]/);
-    expect(ctx(hook('pre', read(s, transcript(r9)), CHILD))).toMatch(/\[batch\]/);
-    const tp = transcript(r10);
-    const refusal = hook('pre', read(s, tp, 'C:/repo/src/independent.ts'), CHILD);
-    expect(denied(refusal)).toBe(true);
-    expect(refusal.hookSpecificOutput?.permissionDecisionReason).toMatch(/batch-nudge/);
-    expect(denied(hook('pre', read(s, tp, 'C:/repo/src/independent.ts'), CHILD))).toBe(false);
-  });
-
-  it('чтение файла, названного предыдущим результатом, не отказывается', () => {
-    const s = 'kbatchdep001';
-    hook('pre', read(s, transcript(r3)), CHILD);
-    hook('pre', read(s, transcript(r9)), CHILD);
-    const dep = [...r9, ...turn([use('Grep', { pattern: 'x' })], ['C:/repo/src/found.ts:12: x'])];
-    expect(denied(hook('pre', read(s, transcript(dep), 'C:/repo/src/found.ts'), CHILD))).toBe(
-      false,
-    );
-  });
-
-  it('строка [batch] и правило по тому же вызову приходят вместе', () => {
-    const out = ctx(
-      hook('pre', read('kbatchrule01', transcript(r3), 'C:/repo/src/App.tsx'), CHILD),
-    );
-    expect(out).toMatch(/\[batch\]/);
-    expect(out).toMatch(/^# /m);
-  });
-
-  it('post-any: в звене серию Bash-чтений ведёт pre (тишина), у человека строка как была', () => {
+describe('batch-nudge: серия Bash-чтений — строка после вызова', () => {
+  // Подталкивание до вызова и потолок чтения оболочкой были ветками звена группы — сняты вместе с
+  // группами разделения. Строка post-any одна для сессии человека и шага задачи ядра.
+  it('post-any: три Bash-чтения подряд — строка [batch] и у человека, и в шаге задачи', () => {
     const bash = Array.from({ length: 3 }, (_, i) =>
       turn([use('Bash', { command: `cat f${i}.txt` })]),
     ).flat();
@@ -146,243 +95,31 @@ describe('batch-nudge: серия одиночных чтений в звене 
       tool_input: { command: 'cat f2.txt' },
       tool_response: { stdout: 'x' },
     });
-    expect(ctx(hook('post-any', payload('kpostchild01'), CHILD))).not.toMatch(/\[batch\]/);
     expect(ctx(hook('post-any', payload('kposthuman01'), HUMAN))).toMatch(/\[batch\]/);
-  });
-});
-
-describe('bash-read-cap: целые файлы и полный diff оболочкой в звене группы', () => {
-  const cap = join(dir, 'cap');
-  mkdirSync(cap, { recursive: true });
-  const body = Array.from(
-    { length: 250 },
-    (_, i) => `export const v${i} = '${'x'.repeat(60)}';\n`,
-  ).join('');
-  writeFileSync(join(cap, 'a.ts'), body);
-  writeFileSync(join(cap, 'b.ts'), body);
-  const empty = transcript([]);
-  const bash = (command: string, env: Record<string, string>, cwd = cap) =>
-    hook(
-      'pre',
-      {
-        hook_event_name: 'PreToolUse',
-        session_id: `kcap${++n}`.padEnd(12, '0'),
-        transcript_path: empty,
-        cwd,
-        tool_name: 'Bash',
-        tool_input: { command },
-      },
-      env,
-    );
-  const capped = (o: HookOut) =>
-    denied(o) && /bash-read-cap/.test(o.hookSpecificOutput?.permissionDecisionReason ?? '');
-
-  it('`&>/dev/null` уводит и stdout — чтение не считается печатью (аудит g1 26.10)', () => {
-    expect(capped(bash('cat a.ts b.ts && echo ok', CHILD))).toBe(true);
-    expect(capped(bash('cat a.ts b.ts &>/dev/null && echo ok', CHILD))).toBe(false);
-    expect(capped(bash('cat a.ts b.ts &>> quiet.log && echo ok', CHILD))).toBe(false);
-    expect(capped(bash('cat a.ts b.ts 2>&1 && echo ok', CHILD))).toBe(true);
+    expect(ctx(hook('post-any', payload('kpoststep001'), CHILD))).toMatch(/\[batch\]/);
   });
 
-  it('печать только в /dev/null с отброшенным кодом выхода — отказ (g1 F9); проверка кодом и запись — нет', () => {
-    const noop = (o: HookOut) =>
-      capped(o) &&
-      /prints only to \/dev\/null/.test(o.hookSpecificOutput?.permissionDecisionReason ?? '');
-    // Обе живые команды аудита (21:17:02 и 21:18:52).
-    expect(noop(bash('sed -n 26,28p a.ts >/dev/null; wc -l a.ts', CHILD))).toBe(true);
-    expect(
-      noop(bash('echo "- Panel task-point quotes: one line" >> /dev/null; grep -c "" a.ts', CHILD)),
-    ).toBe(true);
-    expect(noop(bash('ls a.ts &>/dev/null; ls', CHILD))).toBe(true);
-    expect(noop(bash('sed -n 26,28p a.ts >/dev/null; wc -l a.ts', HUMAN))).toBe(false);
-    for (const command of [
-      'grep -q v1 a.ts >/dev/null && echo yes',
-      'grep -q v1 a.ts >/dev/null || echo no',
-      'sed -n 1,2p a.ts >/dev/null',
-      'echo x > out.txt; ls',
-      "sed -i 's/a/b/' a.ts >/dev/null; ls",
-      'cat a.ts | grep v1 >/dev/null; ls',
-      'npm test >/dev/null; echo done',
-      'echo "$(touch x)" >/dev/null; ls',
-      'echo hi >&2 >/dev/null; ls',
-    ]) {
-      expect(noop(bash(command, CHILD)), command).toBe(false);
+  it('pre больше не шлёт [batch] и не отказывает одиночному чтению оболочкой', () => {
+    const reads = Array.from({ length: 10 }, (_, i) =>
+      turn([use('Read', { file_path: `C:/repo/src/a${i}.ts` })], [`body ${i}`]),
+    ).flat();
+    const tp = transcript(reads);
+    for (const env of [HUMAN, CHILD]) {
+      const out = hook(
+        'pre',
+        {
+          hook_event_name: 'PreToolUse',
+          session_id: 'kprenobatch1',
+          transcript_path: tp,
+          cwd: dir,
+          tool_name: 'Read',
+          tool_input: { file_path: 'C:/repo/src/other.ts' },
+        },
+        env,
+      );
+      expect(ctx(out)).not.toMatch(/\[batch\]/);
+      expect(out.hookSpecificOutput?.permissionDecision).not.toBe('deny');
     }
-  });
-
-  it('`cat a b` и цикл `for … cat` выше потолка — отказ; у человека — нет', () => {
-    expect(capped(bash('cat a.ts b.ts', CHILD))).toBe(true);
-    expect(capped(bash('for f in a.ts b.ts; do cat "$f"; done', CHILD))).toBe(true);
-    expect(capped(bash('cat a.ts b.ts', HUMAN))).toBe(false);
-  });
-
-  it('путь через переменную той же команды считается (`P=…; cat -n $P/a`, группа #5 25.10)', () => {
-    expect(capped(bash('P=.; cat -n $P/a.ts $P/b.ts', CHILD))).toBe(true);
-    expect(capped(bash('F=a.ts; cat $F b.ts', CHILD))).toBe(true);
-    expect(capped(bash('P=.; for f in $P/a.ts $P/b.ts; do cat "$f"; done', CHILD))).toBe(true);
-    expect(capped(bash('cat $UNSET/a.ts $UNSET/b.ts', CHILD))).toBe(false);
-  });
-
-  // 26.10 (rbac-ui, ревью): `for f in …; do head -c 1500 $f; done` по четырём файлам прогонов отказан как 59k целиком.
-  it('тело цикла судится по каждому файлу как обычная команда', () => {
-    expect(
-      capped(bash('for f in a.ts b.ts; do echo "== $f"; head -c 1500 $f; echo; done', CHILD)),
-    ).toBe(false);
-    expect(capped(bash(`for f in a.ts b.ts; do sed -n '1,200p' "$f"; done`, CHILD))).toBe(true);
-  });
-
-  // 26.10 (rbac-ui, ревью): циклы, где $f не берёт ни один читатель, отказаны как 59k / 54k целиком.
-  it('цикл без читателя переменной файлов не печатает; `(cat $f)` в подоболочке — печатает', () => {
-    expect(
-      capped(
-        bash(
-          'for f in a.ts b.ts; do echo "== $f"; grep -o value1 $f | sort -u; grep -o value2 $f | head -3; done',
-          CHILD,
-        ),
-      ),
-    ).toBe(false);
-    expect(
-      capped(
-        bash(
-          'for f in a.ts b.ts; do git cat-file -p HEAD:$f > $f; echo "$f -> $(tail -1 a.ts)"; done',
-          CHILD,
-        ),
-      ),
-    ).toBe(false);
-    expect(capped(bash('for f in a.ts b.ts; do (cat $f); done', CHILD))).toBe(true);
-  });
-
-  // 26.10 (rbac-ui): `cat big.tsx | head -150` прошёл как «вывод идёт дальше» — а последний
-  // `head`/`tail`/`sed -n` печатает в окно; счёт — по строкам, которые он пропустит.
-  it('`cat big | head -N` считается по N строкам; `| head -20` и `| grep` проходят', () => {
-    const big = Array.from(
-      { length: 3000 },
-      (_, i) => `export const value${i} = ${'x'.repeat(60)};\n`,
-    ).join('');
-    writeFileSync(join(cap, 'big.ts'), big);
-    writeFileSync(join(cap, 'small.ts'), 'export const s = 1;\n');
-    expect(capped(bash('cat big.ts | head -2000', CHILD))).toBe(true);
-    expect(capped(bash('cat big.ts | tail -n 2000', CHILD))).toBe(true);
-    expect(capped(bash("cat big.ts | sed -n '1,2000p'", CHILD))).toBe(true);
-    expect(capped(bash('R=.; cat $R/small.ts; cat $R/big.ts | head -400', CHILD))).toBe(true);
-    expect(capped(bash('cat big.ts | head -20', CHILD))).toBe(false);
-    expect(capped(bash('cat big.ts | head', CHILD))).toBe(false);
-    expect(capped(bash('cat big.ts | grep x', CHILD))).toBe(false);
-    expect(capped(bash('cat big.ts | grep x | head -2000', CHILD))).toBe(false);
-    expect(capped(bash('cat big.ts | head -2000 > part.txt', CHILD))).toBe(false);
-    expect(capped(bash('cat big.ts | head -2000', HUMAN))).toBe(false);
-  });
-
-  // 26.10 (rbac-ui, #g9:192): `sed -n 1,80p .agent/PROGRESS.md 2>/dev/null || sed -n 1,80p
-  // ../.agent/PROGRESS.md` — в отказе «.agent/PROGRESS.md 8k, .agent/PROGRESS.md 0k, dev/null 0k»:
-  // цель перенаправления читалась файлом, `../` терялся в подписи, ветки `||` складывались.
-  it('`a || b` судится по большей ветке; цель перенаправления — не файл; подписи различают пути', () => {
-    const wt = join(cap, 'wt');
-    mkdirSync(join(wt, '.agent'), { recursive: true });
-    mkdirSync(join(cap, '.agent'), { recursive: true });
-    const progress = Array.from({ length: 80 }, (_, i) => `- step ${i} ${'y'.repeat(60)}\n`).join(
-      '',
-    );
-    writeFileSync(join(wt, '.agent', 'PROGRESS.md'), progress);
-    writeFileSync(join(cap, '.agent', 'PROGRESS.md'), progress);
-    const reason = (o: HookOut) => o.hookSpecificOutput?.permissionDecisionReason ?? '';
-    // Живая форма: каждая ветка ~5.8k — ниже порога 8k; сумма двух веток была 11.6k → ложный отказ.
-    expect(
-      capped(
-        bash(
-          'sed -n 1,80p .agent/PROGRESS.md 2>/dev/null || sed -n 1,80p ../.agent/PROGRESS.md',
-          CHILD,
-          wt,
-        ),
-      ),
-    ).toBe(false);
-    // Оба файла печатаются — отказ; в подписи оба пути как в команде, без `dev/null` и `err.log`.
-    const both = reason(
-      bash('cat .agent/PROGRESS.md ../.agent/PROGRESS.md 2>/dev/null 2> err.log', CHILD, wt),
-    );
-    expect(both).toMatch(/bash-read-cap/);
-    expect(both).toContain('(.agent/PROGRESS.md 6k, ../.agent/PROGRESS.md 6k)');
-    expect(both).not.toMatch(/dev\/null|err\.log/);
-    // Большая ветка выше потолка 24k только в сумме: судится одна, ~21k, а не ~42k.
-    const alt = reason(bash('cat a.ts || cat b.ts', CHILD));
-    expect(alt).toMatch(/prints ~21k chars/);
-    // `a && b || c`: печатаются a и b — сумма этой ветки; `;` по-прежнему складывает.
-    expect(reason(bash('cat a.ts && cat b.ts || cat small.ts', CHILD))).toMatch(/prints ~42k/);
-    expect(reason(bash('cat a.ts; cat b.ts', CHILD))).toMatch(/prints ~42k/);
-    // `a && b || c` = max(a+b, c), не a + max(b, c); после `;` — новый счёт веток.
-    expect(reason(bash('cat a.ts && cat small.ts || cat b.ts', CHILD))).toMatch(/prints ~21k/);
-    expect(reason(bash('cat small.ts || cat a.ts; cat b.ts', CHILD))).toMatch(/prints ~42k/);
-    // `cat <file` печатает файл — считается.
-    expect(capped(bash('cat <a.ts', CHILD))).toBe(true);
-  });
-
-  // 26.10 (g8, #g8:156): `head -c 3000 .agent/run/tickets.md; echo; cat t.md | head -60` — отказ
-  // «~30k chars of whole files (tickets.md 28k …)»: `-c N` читался как N строк, то есть весь файл.
-  it('`head -c N` / `tail -c N` считаются по N байтам, `-n N` — по строкам', () => {
-    const lines = Array.from({ length: 400 }, (_, i) => `- ticket ${i} ${'t'.repeat(64)}\n`).join(
-      '',
-    );
-    writeFileSync(join(cap, 'tickets.md'), lines);
-    expect(capped(bash('head -c 3000 tickets.md; echo; cat a.ts | head -60', CHILD))).toBe(false);
-    expect(capped(bash('head -c3000 tickets.md', CHILD))).toBe(false);
-    expect(capped(bash('tail -c 3000 tickets.md', CHILD))).toBe(false);
-    expect(capped(bash('head -c 3000 tickets.md | head -5', CHILD))).toBe(false);
-    expect(capped(bash('head -c 20000 tickets.md', CHILD))).toBe(true);
-    expect(capped(bash('head -n 3000 tickets.md', CHILD))).toBe(true);
-    expect(capped(bash('head -c 20000 tickets.md | head -400', CHILD))).toBe(true);
-  });
-
-  // 26.10 (g9, #g9:218–220): срезы 6.2k–7.6k символов кириллицы (8.7–10.4 KB) CLI сохранял в файл —
-  // он считает байты, а потолок считал символы и пропускал; `sed … | cut -c1-260` шёл как «вывод дальше».
-  it('размер считается в байтах UTF-8; `| cut -cA-B` режет ширину строк', () => {
-    const ru = Array.from({ length: 100 }, (_, i) => `// строка ${i} ${'ж'.repeat(40)}\n`).join('');
-    writeFileSync(join(cap, 'ru.ts'), ru);
-    expect(capped(bash("sed -n '1,100p' ru.ts", CHILD))).toBe(true);
-    expect(capped(bash("sed -n '1,40p' ru.ts", CHILD))).toBe(false);
-    expect(capped(bash('cat ru.ts | head -100', CHILD))).toBe(true);
-    expect(capped(bash('cat a.ts b.ts | head -c 3000', CHILD))).toBe(false);
-    const wide = Array.from({ length: 60 }, (_, i) => `${i} ${'w'.repeat(1000)}\n`).join('');
-    writeFileSync(join(cap, 'wide.txt'), wide);
-    expect(capped(bash('sed -n 1,60p wide.txt | cut -c1-260', CHILD))).toBe(true);
-    expect(capped(bash('sed -n 1,60p wide.txt | cut -c 1-80', CHILD))).toBe(false);
-    expect(capped(bash('sed -n 1,60p wide.txt | cut -c-80 | head -20', CHILD))).toBe(false);
-    expect(capped(bash('sed -n 1,60p wide.txt | cut -d, -f1', CHILD))).toBe(false);
-  });
-
-  it('диапазоны, конвейер и вывод в файл проходят', () => {
-    expect(capped(bash("sed -n '1,40p' a.ts", CHILD))).toBe(false);
-    expect(capped(bash('cat a.ts b.ts | grep v1', CHILD))).toBe(false);
-    expect(capped(bash('cat a.ts b.ts > both.txt', CHILD))).toBe(false);
-  });
-
-  it('прогон проверки по тем же большим файлам (vitest, tsc, eslint) не режется', () => {
-    for (const run of [
-      'npx vitest run a.ts b.ts',
-      'pnpm exec vitest run a.ts b.ts 2>&1 | tail -400',
-      'npx tsc --noEmit a.ts b.ts',
-      'npx eslint a.ts b.ts',
-      'node --test a.ts b.ts; echo done',
-    ])
-      expect(capped(bash(run, CHILD)), run).toBe(false);
-  });
-
-  it('полный `git diff` на 1800 строк — отказ; `--stat` и один путь проходят', () => {
-    const repo = join(dir, 'repo');
-    mkdirSync(repo, { recursive: true });
-    const git = (...a: string[]) =>
-      execFileSync('git', ['-C', repo, ...a], { stdio: ['ignore', 'pipe', 'ignore'] });
-    git('init', '-q');
-    git('config', 'user.email', 't@example.com');
-    git('config', 'user.name', 't');
-    writeFileSync(join(repo, 'big.ts'), Array.from({ length: 900 }, (_, i) => `a${i}\n`).join(''));
-    writeFileSync(join(repo, 'one.ts'), 'x\n');
-    git('add', '.');
-    git('commit', '-qm', 'base');
-    writeFileSync(join(repo, 'big.ts'), Array.from({ length: 900 }, (_, i) => `b${i}\n`).join(''));
-    writeFileSync(join(repo, 'one.ts'), 'y\n');
-    expect(capped(bash('git diff', CHILD, repo))).toBe(true);
-    expect(capped(bash('git diff --stat', CHILD, repo))).toBe(false);
-    expect(capped(bash('git diff -- one.ts', CHILD, repo))).toBe(false);
   });
 });
 
@@ -427,10 +164,10 @@ describe('rule-injector: правило ≥ 4k в следующем этапе 
         CHILD,
       ),
     );
-    expect(later).toMatch(/earlier stage of this copy/);
+    expect(later).toMatch(/earlier step in this copy/);
     expect(later.length).toBeLessThanOrEqual(1000);
     expect(later).toMatch(/offset=\d+ limit=\d+/);
-    expect(ask('kcopyother01', 'pytest tests/ -q', other, CHILD)).not.toMatch(/card \(split group/);
+    expect(ask('kcopyother01', 'pytest tests/ -q', other, CHILD)).not.toMatch(/card \(task step/);
   });
 
   it('правило короче 4k — целиком в каждом этапе; сессия человека — целиком', () => {
@@ -438,7 +175,7 @@ describe('rule-injector: правило ≥ 4k в следующем этапе 
     const b = ask('kcopysmall02', 'docker run --rm hello-world', copy, CHILD);
     expect(a.length).toBeGreaterThan(1000);
     expect(b).toBe(a);
-    expect(ask('kcopyhuman01', 'pytest tests/ -q', copy, HUMAN)).not.toMatch(/card \(split group/);
+    expect(ask('kcopyhuman01', 'pytest tests/ -q', copy, HUMAN)).not.toMatch(/card \(task step/);
   });
 });
 
@@ -486,13 +223,13 @@ describe('rule-injector: карточка не пропускает свой в�
     /^rule-card: .*full text .*attached to this deny/s.test(reason(o)) &&
     ctx(o).includes(full) &&
     !/\[truncated/.test(ctx(o)) &&
-    !/card \(split group/.test(ctx(o));
+    !/card \(task step/.test(ctx(o));
   // Правило о способе проверки: файл целиком в контексте, вызов НЕ отказан.
   const rides = (o: HookOut, full = FULL) =>
     !denied(o) &&
     ctx(o).includes(full) &&
     !/\[truncated/.test(ctx(o)) &&
-    !/card \(split group/.test(ctx(o));
+    !/card \(task step/.test(ctx(o));
   const testFile = join(copy, 'src', 'a.test.ts');
   const lookup = (s: string) =>
     call(s, empty, { tool_name: 'Read', tool_input: { file_path: testFile } });
@@ -516,7 +253,7 @@ describe('rule-injector: карточка не пропускает свой в�
   it('карточку взвёл Read тест-файла → правка несёт файл и проходит; повтор — без второй копии', () => {
     const armed = hook('pre', lookup('kgatelookup1'), CHILD);
     expect(denied(armed)).toBe(false);
-    expect(ctx(armed)).toMatch(/card \(split group/);
+    expect(ctx(armed)).toMatch(/card \(task step/);
     expect(rides(hook('pre', editTest('kgatelookup1'), CHILD))).toBe(true);
     const again = hook('pre', editTest('kgatelookup1'), CHILD);
     expect(denied(again)).toBe(false);
@@ -587,7 +324,7 @@ describe('rule-injector: карточка не пропускает свой в�
     expect(ctx(mcp('kgatereview0', 'mr_discussions'))).toContain(REVIEW_FULL);
     const disc = mcp('kgatereview1', 'mr_discussions');
     expect(denied(disc)).toBe(false);
-    expect(ctx(disc)).toMatch(/# Review depth.*card \(split group/);
+    expect(ctx(disc)).toMatch(/# Review depth.*card \(task step/);
     expect(denied(mcp('kgatereview1', 'get_merge_request_diffs'))).toBe(false);
     expect(denied(mcp('kgatereview1', 'create_merge_request_discussion_note'))).toBe(false);
     const thread = mcp('kgatereview1', 'create_merge_request_thread');
@@ -791,7 +528,7 @@ describe('rule-injector: карточка не пропускает свой в�
   it('сессия человека в той же копии — без карточки и без отказа', () => {
     const human = hook('pre', call('kgatehuman01', empty), HUMAN);
     expect(denied(human)).toBe(false);
-    expect(ctx(human)).not.toMatch(/card \(split group/);
+    expect(ctx(human)).not.toMatch(/card \(task step/);
   });
 
   it('карточка после сжатия: чтение до границы не в счёт, после — снимает отказ', () => {
@@ -809,7 +546,6 @@ describe('rule-injector: карточка не пропускает свой в�
       env: {
         ...process.env,
         AGENTDECK_KIT_VARIANT: '',
-        AGENTDECK_HEAVY_QUEUE_DIR: '',
         AGENTDECK_KIT_STATE: STATE,
         ...CHILD,
       },
@@ -852,7 +588,7 @@ describe('rule-injector: карточка не пропускает свой в�
       CHILD,
     );
     expect(denied(after)).toBe(false);
-    expect(ctx(after)).toMatch(/card \(split group/);
+    expect(ctx(after)).toMatch(/card \(task step/);
   });
 });
 

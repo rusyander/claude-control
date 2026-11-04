@@ -24,6 +24,14 @@ export {
   HALF_MADE_ANSWER_REASON,
   openAnswerTask,
 } from './answer-task.ts';
+export { openReviewTask, reviewRequestOf, type ReviewTaskInput } from './review-task.ts';
 export { basePinDetail, parseBasePin } from './base-pin.ts';
 export type * from './estimate.types.ts';
 export type * from './answer-task.types.ts';
+export {
+  chatOpeningOf,
+  inPlaceRootOf,
+  isChatScenario,
+  isScratchTask,
+  CHAT_PRESET,
+} from './placement.ts';

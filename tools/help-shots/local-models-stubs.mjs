@@ -83,8 +83,6 @@ const base = () => ({
   },
   catalog: CATALOG,
   installed: [],
-  importable: [],
-  importFailed: [],
   jobs: [],
   connect: { configured: false, active: false, model: '' },
   qwenCode: { binary: '', version: '', source: 'none' },

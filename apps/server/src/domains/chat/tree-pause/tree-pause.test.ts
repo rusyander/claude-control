@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildTreeResumePrompt } from '@agentdeck/contracts/chat-handoff';
 import type { ChatLink, TreePauseRecord } from '../../../lib/app-store/app-store.types.ts';
 import type { RunMeta, RunSnapshot } from '../ChatRunRegistry/ChatRunRegistry.ts';
-import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { TreeRunOptions as RunOptions } from './tree-pause.ts';
 import type { AutoApproveState } from '../ChatSession/ChatSession.ts';
 import {
   collectTree,
@@ -291,7 +291,6 @@ describe('пауза дерева: добор процессов копий (F-1
       links: () => links,
       runs,
       store: memoryStore(),
-      idle: { snapshot: () => undefined, close: () => 'absent' },
       afterPause: (keys) => swept.push([...keys]),
     });
     tree.pause('root');

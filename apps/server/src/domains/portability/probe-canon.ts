@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AgentEnvironment, EnvScope } from '@agentdeck/contracts/portable-env';
 import { agentEnvironment, envItemId, envSource, needsFacts, needsNone } from './canon.ts';
+import { codedIntent } from './intent-codes.ts';
 
 /**
  * ПРОБНАЯ СРЕДА приёмочной пробы (П2.4): шесть записей канона, по одной на слой,
@@ -273,7 +274,10 @@ export function probeEnvironment(params: {
         kind: 'hook',
         id: envItemId('hook', PROBE_NAME),
         source: from(scripts.hookPath),
-        intent: 'Проба: хук обязан остановить условленный запрещённый вызов.',
+        ...codedIntent(
+          'Проба: хук обязан остановить условленный запрещённый вызов.',
+          'portability-intent-probe-hook',
+        ),
         trigger: { on: 'tool', event: 'pre_tool', match: 'Bash' },
         blocking: 'blocks',
         needs: needsFacts(['tool_name', 'tool_input'], 'declared'),
@@ -290,10 +294,16 @@ export function probeEnvironment(params: {
         kind: 'skill',
         id: envItemId('skill', PROBE_NAME),
         source: from(join(scripts.skillDir, 'SKILL.md')),
-        intent: 'Проба: скилл обязан доехать до модели условленным словом.',
+        ...codedIntent(
+          'Проба: скилл обязан доехать до модели условленным словом.',
+          'portability-intent-probe-skill',
+        ),
         trigger: { on: 'model' },
         blocking: 'inapplicable',
-        needs: needsNone('скилл выбирает модель по описанию; фактов рантайма ему не нужно'),
+        needs: needsNone(
+          'скилл выбирает модель по описанию; фактов рантайма ему не нужно',
+          'portability-needs-skill',
+        ),
         sideEffects: [],
         name: PROBE_NAME,
         description: `Проба переноса среды: условленное слово ${PROBE_MARKS.skill}.`,
@@ -310,10 +320,16 @@ export function probeEnvironment(params: {
         kind: 'command',
         id: envItemId('command', PROBE_COMMAND_NAME),
         source: from(null),
-        intent: 'Проба: команда обязана развернуться в условленный текст.',
+        ...codedIntent(
+          'Проба: команда обязана развернуться в условленный текст.',
+          'portability-intent-probe-command',
+        ),
         trigger: { on: 'user' },
         blocking: 'inapplicable',
-        needs: needsNone('команда разворачивается в готовый текст и аргументов не берёт'),
+        needs: needsNone(
+          'команда разворачивается в готовый текст и аргументов не берёт',
+          'portability-needs-command',
+        ),
         sideEffects: [],
         name: PROBE_COMMAND_NAME,
         namespace: null,
@@ -325,7 +341,10 @@ export function probeEnvironment(params: {
         kind: 'permission',
         id: envItemId('permission', `deny-${PROBE_MARKS.deniedFile}`),
         source: from(null),
-        intent: 'Проба: право обязано отказать в чтении условленного файла.',
+        ...codedIntent(
+          'Проба: право обязано отказать в чтении условленного файла.',
+          'portability-intent-probe-permission',
+        ),
         trigger: { on: 'tool', event: 'pre_tool', match: 'Read' },
         blocking: 'blocks',
         needs: needsFacts(['tool_name', 'tool_input'], 'declared'),
@@ -340,10 +359,16 @@ export function probeEnvironment(params: {
         kind: 'mcpServer',
         id: envItemId('mcpServer', PROBE_NAME),
         source: from(null),
-        intent: 'Проба: инструмент MCP обязан оказаться в списке у модели.',
+        ...codedIntent(
+          'Проба: инструмент MCP обязан оказаться в списке у модели.',
+          'portability-intent-probe-mcp',
+        ),
         trigger: { on: 'model' },
         blocking: 'inapplicable',
-        needs: needsNone('сервер отвечает на запрос модели и фактов разговора не требует'),
+        needs: needsNone(
+          'сервер отвечает на запрос модели и фактов разговора не требует',
+          'portability-needs-probe-server',
+        ),
         sideEffects: ['runs_process'],
         name: PROBE_NAME,
         transport: 'stdio',
@@ -358,10 +383,16 @@ export function probeEnvironment(params: {
         kind: 'envVar',
         id: envItemId('envVar', PROBE_ENV_NAME),
         source: from(null),
-        intent: 'Проба: переменная окружения обязана доехать до процесса инструмента.',
+        ...codedIntent(
+          'Проба: переменная окружения обязана доехать до процесса инструмента.',
+          'portability-intent-probe-env',
+        ),
         trigger: { on: 'always' },
         blocking: 'inapplicable',
-        needs: needsNone('переменная окружения действует постоянно и фактов разговора не требует'),
+        needs: needsNone(
+          'переменная окружения действует постоянно и фактов разговора не требует',
+          'portability-needs-env',
+        ),
         sideEffects: [],
         name: PROBE_ENV_NAME,
         value: PROBE_MARKS.env,

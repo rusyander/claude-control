@@ -5,44 +5,44 @@
       "light-ru": {
         "file": "01-selector.png",
         "width": 1116,
-        "height": 926
+        "height": 996
       },
       "light-en": {
         "file": "01-selector.en.png",
         "width": 1116,
-        "height": 926
+        "height": 996
       },
       "dark-ru": {
         "file": "01-selector.dark.png",
         "width": 1116,
-        "height": 926
+        "height": 996
       },
       "dark-en": {
         "file": "01-selector.dark.en.png",
         "width": 1116,
-        "height": 926
+        "height": 996
       }
     },
     "switch/02-chosen": {
       "light-ru": {
         "file": "02-chosen.png",
         "width": 1116,
-        "height": 1144
+        "height": 1115
       },
       "light-en": {
         "file": "02-chosen.en.png",
         "width": 1116,
-        "height": 1144
+        "height": 1095
       },
       "dark-ru": {
         "file": "02-chosen.dark.png",
         "width": 1116,
-        "height": 1144
+        "height": 1115
       },
       "dark-en": {
         "file": "02-chosen.dark.en.png",
         "width": 1116,
-        "height": 1144
+        "height": 1095
       }
     },
     "switch/03-check": {
@@ -71,44 +71,44 @@
       "light-ru": {
         "file": "04-check-result.png",
         "width": 1116,
-        "height": 772
+        "height": 820
       },
       "light-en": {
         "file": "04-check-result.en.png",
         "width": 1116,
-        "height": 789
+        "height": 818
       },
       "dark-ru": {
         "file": "04-check-result.dark.png",
         "width": 1116,
-        "height": 772
+        "height": 820
       },
       "dark-en": {
         "file": "04-check-result.dark.en.png",
         "width": 1116,
-        "height": 789
+        "height": 818
       }
     },
     "switch/05-keys": {
       "light-ru": {
         "file": "05-keys.png",
         "width": 1116,
-        "height": 1465
+        "height": 1274
       },
       "light-en": {
         "file": "05-keys.en.png",
         "width": 1116,
-        "height": 1465
+        "height": 1274
       },
       "dark-ru": {
         "file": "05-keys.dark.png",
         "width": 1116,
-        "height": 1465
+        "height": 1274
       },
       "dark-en": {
         "file": "05-keys.dark.en.png",
         "width": 1116,
-        "height": 1465
+        "height": 1274
       }
     },
     "switch/06-format": {

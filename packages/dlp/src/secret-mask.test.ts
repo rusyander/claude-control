@@ -302,8 +302,19 @@ describe('имена со словами и случайным хвостом', 
     expect(hidden).toEqual([]);
   });
 
+  // Слово с цифрой (`t3`, `v2`) — тоже слово имени: папка `cc-t3-codex-project-XXXXXX`
+  // уходила меткой ключа, и журнал ядра терял путь задачи (C3d, 02.11).
+  it('300 имён mkdtemp со словом-с-цифрой — ни одно не спрятано', () => {
+    const hidden = Array.from({ length: 300 }, () => {
+      const text = `C:\\Temp\\cc-t3-codex-project-${suffix()}`;
+      return maskSecretsInText(text) === text ? undefined : text;
+    }).filter(Boolean);
+    expect(hidden).toEqual([]);
+  });
+
   it.each([
     ['слово и длинный случайный кусок', j('prod-', 'q8ZrLk2Wm9Xa7Tb4Nc1PdVe6')],
+    ['слово с цифрой и длинный кусок', j('v2-', 'q8ZrLk2Wm9Xa7Tb4Nc1PdVe6')],
     ['префикс с подчёркиваниями', j('rk_live_', 'Hf3Jg0Rs5Yu2Kp9Lm4Zx7Cv1')],
     // Хвост короче 24 и ключ из половин: прежнее правило судило только самый
     // длинный кусок и пропускало их (ревью сит, 28.09).
@@ -389,7 +400,7 @@ describe('keepRouteIds: the core registry route id is a name, not a pair', () =>
 });
 
 describe('repoKey: the core repo key is a name, not a secret pair', () => {
-  const REPO = 'claude-control-1a2b3c4d';
+  const REPO = 'agentdeck-1a2b3c4d';
   const VENDOR = ['sk-ant-api03-', 'Zx9Qw8Er7Ty6Ui5Op4As3Df2'].join('');
   const OPAQUE = ['aB3xY9kLmN0p', 'QrS7tUvW2zCd'].join('');
 
@@ -422,5 +433,50 @@ describe('repoKey: the core repo key is a name, not a secret pair', () => {
     expect(out).toContain(`"repoKey":"${REPO}"`);
     expect(out).not.toContain(OPAQUE);
     expect(out).toContain(`"password":"${SECRET_MASK}"`);
+  });
+});
+
+describe('key: an environment variable NAME is a name, not a secret pair', () => {
+  it('UPPER_SNAKE words under the exact name `key` stay in every pair form', () => {
+    for (const text of [
+      '{"key": "QA_DB_PASSWORD", "value": ""}',
+      '{"key":"PATH"}',
+      '{"key":"NODE_OPTIONS_V2"}',
+      'key: "ANTHROPIC_API_KEY"',
+      'key=GITHUB_TOKEN',
+    ]) {
+      expect(maskSecretsInText(text)).toBe(text);
+    }
+  });
+
+  it('a value that is not a variable name, or another field, is still masked', () => {
+    expect(maskSecretsInText('{"key":"hunter2"}')).toBe(`{"key":"${SECRET_MASK}"}`);
+    expect(maskSecretsInText('{"key":"AKIAIOSFODNN7EXAMPLE"}')).not.toContain('AKIAIOSFODNN7');
+    expect(maskSecretsInText('{"key":"X7K9Q2M4P8R3T6V1W5Y0"}')).not.toContain('X7K9Q2M4');
+    expect(maskSecretsInText('{"key":"ABCDEFGHIJKLMNOPQRSTUVWX"}')).not.toContain('ABCDEFGH');
+    expect(maskSecretsInText('{"apiKey":"QA_DB_PASSWORD"}')).toBe(`{"apiKey":"${SECRET_MASK}"}`);
+    expect(maskSecretsInText('key=hunter2')).toBe(`key=${SECRET_MASK}`);
+  });
+});
+
+describe('метка маски — уже маска, а не секрет', () => {
+  // Кадр помощи «ключ из чата доходит меткой» (англ.): «Here is the key: [КЛЮЧ_1]» —
+  // детектор принимал метку за значение пары «key:», панель перемаскировала её в
+  // [КЛЮЧ_2], журнал ядра — в «••••••», и модель метки не видела.
+  it.each([
+    'Here is the key: [КЛЮЧ_1]',
+    'token=[КЛЮЧ_3]',
+    'password: [ТОКЕН_2.3]',
+    'Authorization: Bearer [КЛЮЧ_1]',
+    '"apiKey": "[КЛЮЧ_4]"',
+    'secret: [КЛЮЧ]',
+  ])('%s — остаётся как есть', (text) => {
+    expect(maskSecretsInText(text)).toBe(text);
+  });
+
+  it('значение в скобках, не похожее на метку, по-прежнему секрет', () => {
+    expect(maskSecretsInText(`password: [${j('Hunter2', '!x9')}]`)).not.toContain('Hunter2');
+    const key = j('s', 'k-demo-', '7f3a91c2d8e04b65a1');
+    expect(maskSecretsInText(`Here is the key: ${key}`)).toBe(`Here is the key: ${SECRET_MASK}`);
   });
 });

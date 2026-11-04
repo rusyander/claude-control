@@ -65,7 +65,7 @@ export const panelAgentEn: typeof panelAgentRu = {
       'connected in «Integrations». The agent names which of the two a step belongs to.',
     linksGroupWord: 'The word «group»',
     linksGroupWordText:
-      'Either a settings bundle, a working order or a scenario in «Groups», or a case group in ' +
+      'Either a former group in «Groups» (the agent only shows those), or a case group in ' +
       '«Tests». When the request does not make clear which, the agent asks.',
     linksRulesWord: 'The word «rule»',
     linksRulesWordText:
@@ -105,21 +105,22 @@ export const panelAgentEn: typeof panelAgentRu = {
       'The model only asks. The panel executes, and a changing action waits for your click',
     pathTextTitle: 'The same path in words',
     pathTextText:
-      'The message passes the data mask, then the panel starts the active CLI — ' +
-      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code — with no ' +
-      'built-in tools and none of your personal CLI settings (hooks, skills, own MCP servers, ' +
-      'AGENTS.md; Codex without your config.toml, Gemini CLI, OpenCode, Goose and Kimi Code with ' +
-      'their own one-turn directory that receives only the model and the login): all ' +
-      'it has is the bridge to the panel’s actions, and the turn itself never lands in the ' +
-      'CLI’s session history — the panel keeps the conversation. With Gemini CLI, OpenCode, ' +
-      'Goose and Kimi Code the turn also checks every call: should the model ask for a tool ' +
-      'beyond the bridge, the turn stops. The model picks an action. A ' +
+      'The message passes the data mask, then the panel asks the core: the core starts the CLI ' +
+      'by its own route (model, contour, data protection, journal) with no built-in tools and ' +
+      'none of your personal CLI settings, in a scratch folder removed after the turn. All the ' +
+      'CLI has is the bridge to the panel’s actions with a one-turn token: the token opens only ' +
+      'the agent’s actions on behalf of this conversation and is revoked however the turn ends; ' +
+      'the panel remembers the actions’ results for the next turn. Should the model ask for a tool ' +
+      'beyond the bridge, the turn stops. The turn never lands in the CLI’s session history — ' +
+      'the panel keeps the conversation. A CLI the core does not support is refused with a ' +
+      'reason; a core that is not running, or a task that ended without opening a session, ends ' +
+      'the turn with the core’s own words (the reason it wrote into the task step). The model ' +
+      'picks an action. A ' +
       'read runs at once; a change or a dangerous action is shown as a card with a preview and ' +
       'waits up to 10 minutes. After «Run» the panel checks the target has not changed, runs the ' +
       'action through the section’s route, opens the page with the result and writes a line to ' +
       'the action trail. The page opens on the tab where the named item is visible: a DLP rule ' +
-      'on the rules tab, a rule or a script on “All”, a group on the tab of its scope, a half of ' +
-      'a pair on the pair’s shared card; where the page has filters (Permissions, for ' +
+      'on the rules tab, a rule or a script on “All”; where the page has filters (Permissions, for ' +
       'example), they are cleared and the row is highlighted. Asking to show the same thing again clears the filters again, even when the ' +
       'address has not changed. Along with the message the model gets the outcomes of this ' +
       'conversation’s earlier actions — id, name, refusal — so «open that chat» needs no ' +
@@ -197,32 +198,11 @@ export const panelAgentEn: typeof panelAgentRu = {
       'danger.',
     secGroups: 'Groups',
     secGroupsText:
-      'List — read: the agent sees the group’s variables too, secret ones masked, a disabled ' +
-      'group’s included. So it can add a variable without wiping the others: a mask is written ' +
-      'back as the value already on disk. Write and enable/disable a group — change. Delete — danger; ' +
-      'the delete card names the variables that leave settings.json and the members, switched off by ' +
-      'this group alone, that come back on. Explaining one group is a read too: what each member ' +
-      'does (a line from its own file), the «Path» in order and the skill knobs — «Auto» or ' +
-      'pinned. Changes, each through a card: a draft of a new group from your description ' +
-      '(members, «When», own path steps and knobs in one card; the group is created switched ' +
-      'off), an own path step — add or reorder, knobs — pin or return to «Auto». A scenario — ' +
-      'a group whose ordered steps ARE the whole work, with no pipeline stages — is drafted in ' +
-      'ONE card too: each step is either an existing skill (it joins as a member) or its own ' +
-      'text with a title, a prompt and an optional «Done when»; the card lists the steps in ' +
-      'order. A taken name or an unknown skill is refused before the card; the scenario is ' +
-      'created switched off, and the «Groups» page opens on it. Groups by scope: sets found in ' +
-      'projects and the catalog of ready resources — read; importing a found set (a project ' +
-      'group, switched off), a new search, copying a project group to global with the model’s ' +
-      'advice, applying chosen advice to the copy, merging the copy with a changed original, ' +
-      'overriding a global group in a project and switching on the groups bound to a folder — ' +
-      'change through a card; whatever calls the model spends your quota, and the card says so. ' +
-      'A «Path» step can be drafted by the step assistant — a card with your words, since it ' +
-      'calls the model; the group does not change, the assistant’s conversation is kept as with ' +
-      'the button — and an own step turned into a separate skill, rule, hook or script — a card ' +
-      'too, with the resource text. Overrides, activating groups by folder and the catalog work ' +
-      'only for panel projects and their git copies: any other folder is refused before a card. ' +
-      'A short description of a skill, hook or rule is a change: without a cached one the ' +
-      'panel makes one cheap model call.',
+      'Groups are the former way of running work; tasks now run in the core. The agent only ' +
+      'shows groups: the list is a read, the group’s variables are visible, secret ones masked, ' +
+      'a disabled group’s included. The agent cannot create, edit, delete or run a group — ' +
+      'nothing does that any more. Only you can move a former group into the core, with the ' +
+      '«To core» button on the Groups page.',
     secPlugins: 'Plugins',
     secPluginsText:
       'Installed and available — read. Enable/disable and update — change. Install, ' +
@@ -246,13 +226,9 @@ export const panelAgentEn: typeof panelAgentRu = {
     secSettings: 'Settings and provider',
     secSettingsText:
       'Read settings — read. Change allowed keys — change. Switch the active CLI — danger: ' +
-      'the whole panel, chat and the agent itself change. The shared group rules, the watcher, ' +
-      'the model catalog page by page, the CLI format check, the account and the CLI version ' +
-      'the agent reads. Changing the group rule numbers and switching the watcher on or off — ' +
-      'change: the watcher spends quota in the background; afterwards the Watcher page opens. ' +
-      'Group permissions and group ' +
-      'questions are changed only by you. Updating the CLI — danger; the result names the ' +
-      'version after the update. ' +
+      'the whole panel, chat and the agent itself change. The model catalog page by page, the ' +
+      'CLI format check, the account and the CLI version the agent reads. Updating the CLI — ' +
+      'danger; the result names the version after the update. ' +
       'Model prices, code editors, where Claude Code’s account access comes from (the key ' +
       'itself is never returned), browsing this machine’s folders, providers and their check ' +
       'results are reads. Checking the provider is a change: writing is checked on a ' +
@@ -310,10 +286,12 @@ export const panelAgentEn: typeof panelAgentRu = {
     secContourText:
       'Contour list, status, address probe — read. Save a draft — change, without the key. ' +
       'Enable a contour — dangerous: after it CLI requests go to the company contour. The ' +
-      'gateway state and the contour spend with the «budget exhausted» mark — read. Starting ' +
-      'the gateway, clearing the «budget exhausted» mark and connecting or disconnecting the ' +
-      'contour MCP — change. Restarting the gateway, removing a contour’s application, ' +
-      'switching it off and deleting it together with its key — danger: the card names where ' +
+      'gateway state and the contour spend with the «budget exhausted» mark — read. Switching ' +
+      'the gateway on (the setting plus a check that the core’s gateway listens) and re-checking ' +
+      'it (the core is asked afresh, requests in flight are not cut) — change: the core holds ' +
+      'the gateway, the panel binds no port. Clearing the «budget ' +
+      'exhausted» mark and connecting or disconnecting the contour MCP — change. Removing a ' +
+      'contour’s application, switching it off and deleting it together with its key — danger: the card names where ' +
       'the contour is applied and what comes back. The agent never sees the contour key in ' +
       'any answer.',
     secTests: 'Testing',
@@ -326,7 +304,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'accepting or rejecting a draft, stopping a run — change: the card shows the case before ' +
       'and after, an edit touches only the named fields. A new case from the agent is marked as ' +
       'the agent’s, like an accepted draft; an edited one keeps its author. Starting a run, a generation or a ' +
-      'charter exploration, deleting a case or a whole group — danger. After a start the library ' +
+      'charter exploration, deleting a case or a whole group — danger. The core runs it with the ' +
+      'active CLI — Claude Code, Qwen Code or Codex; the card names the CLI and, with another ' +
+      'active CLI, says up front that the run will be refused. After a start the library ' +
       'opens: progress, log and «Stop» live there. The agent also reads the «Report» tab ' +
       '(run comparison, change impact, flaky, quarantine, risk, release), plans, the manual run, ' +
       'baselines and the e2e folder. Creating, editing or building a test plan by a rule (the ' +
@@ -346,10 +326,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'the project’s own folder is never removed. The baseline snapshot is uploaded by you.',
     secProjectConfig: 'Project settings',
     secProjectConfigText:
-      'The project instructions file, its MCP servers (secrets masked), permissions and which ' +
-      'side of a group pair is active in the project — read. Turning a project MCP server on or ' +
-      'off, adding or editing a permission, switching the group — change: the card shows the ' +
-      'entry before and after. Adding or editing a project MCP server — danger: the CLI runs its ' +
+      'The project instructions file, its MCP servers (secrets masked) and permissions — read. ' +
+      'Turning a project MCP server on or off, adding or editing a permission — change: the card ' +
+      'shows the entry before and after. Adding or editing a project MCP server — danger: the CLI runs its ' +
       'command later by itself, with no card, so the card names it in full. Replacing the ' +
       'project instructions file, deleting an MCP server or a permission — danger, with the file ' +
       'diff. The agent never sends secret values: you fill an empty one on the project card. If ' +
@@ -358,11 +337,11 @@ export const panelAgentEn: typeof panelAgentRu = {
       'masks) is a read: it belongs to the project’s git, the agent does not edit it.',
     secProjectGit: 'Project git and copies',
     secProjectGitText:
-      'Copy and split settings — read. Switching or creating a branch, committing all changes, ' +
+      'Copy and group settings — read. Switching or creating a branch, committing all changes, ' +
       'pulling commits, creating, removing, reinstalling or refreshing a working copy, changing ' +
       'the copy patterns and install command — danger: the card names the branch, the commit ' +
       'files and the command. Delivering groups to a merge request and how many groups run at ' +
-      'once — change. Pushing a commit to the server and deciding split group permissions and ' +
+      'once — change. Pushing a commit to the server and deciding group permissions and ' +
       'branches are not the agent’s: it prepares everything and asks you to press the button. ' +
       'The full install log of a working copy is a read, keys in it masked.',
     secProjectRunner: 'Project dev server and code',
@@ -411,29 +390,15 @@ export const panelAgentEn: typeof panelAgentRu = {
       'otherwise the agent refuses before the card.',
     secChats: 'Chats',
     secChatsText:
-      'Reading a chat (latest messages, the agent’s plan, the agent’s question, a split proposal ' +
-      'and the split plan of its tree), searching the messages of all chats, gathering what ' +
-      'in the chats waits for you and listing the folders that have chats — read; secrets in ' +
-      'texts are masked. Writing a message into a ' +
-      'chat and asking its agent to propose a task split — danger: the card shows the chat, the ' +
-      'model and effort the turn goes out with, and whether the agent is busy — then the message ' +
-      'waits for its turn to end. Splitting by the proposal is yours: the «Split into N chats» ' +
-      'button under the agent’s answer. «Work here», the chat’s group and autonomy, stopping the ' +
-      'agent in a chat, pausing and resuming a split group or the whole tree, releasing a group ' +
-      'and answering a triage question — change. Resuming a group paused while still queued puts it back ' +
-      'in the queue rather than starting it. «Continue» on a group that stopped unfinished (a failure, ' +
-      'delivery retries used up, a turn without a review verdict) is a change too: the agent hands it ' +
-      'what is left in its own copy and conversation. Cancelling the plan, removing a group, cleaning up copies, ' +
-      'permission and branch-gate decisions, auto-approve and starting past the parallel-group ' +
-      'limit stay yours. ' +
-      'Chat modes (stage auto-continue, the session chain, the permission mode and file ' +
-      'edits), the chat’s model picking and review after work, chat spend this session, lowered runs and branch ' +
-      'overlaps of split groups are reads; overlaps are recomputed as when the hub opens the ' +
-      'check: the result is saved and a new overlap is named once in the parent chat. “Close stage” is ' +
-      'dangerous: the request goes to the chat’s agent in the same session. Turning on picking ' +
-      'the model per task, switching «Review after work» on or off for a project, accepting a delivered group, “Mark done” on a stopped or stuck one (its ' +
-      'waiters start; the agent never marks a running group) and “Resume” of interrupted groups are ' +
-      'changes; “Start now” and relaunching groups stay with you.',
+      'Reading a chat (latest messages, the agent’s plan, the agent’s question), searching the ' +
+      'messages of all chats, gathering what in the chats waits for you and listing the folders ' +
+      'that have chats — read; secrets in texts are masked. Writing a message into a chat — ' +
+      'danger: the card shows the chat, the model and effort the turn goes out with, and whether ' +
+      'the agent is busy — then the message waits for its turn to end. Stopping the agent in a ' +
+      'chat and pausing or resuming the chat’s whole tree — change. Chat modes (stage ' +
+      'auto-continue, the session chain, the permission mode and file edits), chat spend this ' +
+      'session and lowered runs are reads. “Close stage” is dangerous: the request goes to the ' +
+      'chat’s agent in the same session.',
     secAnalyticsPortability: 'Analytics and transfer',
     secAnalyticsPortabilityText:
       'Running Claude processes and where a session runs (a panel chat, a CLI in a terminal or ' +
@@ -460,9 +425,7 @@ export const panelAgentEn: typeof panelAgentRu = {
       '«Run». On a line of its own, «Besides the file» names the consequences the diff does not ' +
       'show: a panel mark being removed, an OAuth login being deleted, marks moving on a rename, ' +
       'a group that holds the switch off anyway. The panel writes those lines itself, so they ' +
-      'are translated along with the interface instead of staying Russian in an English window. ' +
-      'Group and scenario step titles are stored in both languages: in the description, the ' +
-      'fields and the diff the card shows them in the window language, and so does the phone.',
+      'are translated along with the interface instead of staying Russian in an English window.',
     cardDanger: 'Dangerous',
     cardDangerText:
       'Heading «Dangerous action — check carefully». Focus is on «Reject»: Enter pressed out of ' +
@@ -484,12 +447,10 @@ export const panelAgentEn: typeof panelAgentRu = {
       'changed. The agent re-reads and shows a fresh card.',
     cardTimeout: 'Waits until…',
     cardTimeoutText:
-      'The card waits 10 minutes for a click, under Goose 4: Goose waits on an action call for ' +
-      'no more than 5 minutes, so the card closes earlier and the «timed out» answer still ' +
-      'reaches the model. The end time is written on the card. No decision — the outcome is ' +
-      '«timed out», nothing was run. If the CLI itself gives up waiting, the card is withdrawn ' +
-      'too, with nothing run: a later decision would land nowhere — the model has already ' +
-      'been told it failed.',
+      'The card waits 10 minutes for a click. The end time is written on the card. No decision ' +
+      '— the outcome is «timed out», nothing was run. If the CLI itself gives up waiting, the ' +
+      'card is withdrawn too, with nothing run: a later decision would land nowhere — the model ' +
+      'has already been told it failed.',
     cardOnlyWindow: 'Who decides',
     cardOnlyWindowText:
       'Only a human decides — with a click in the panel window or a button in the phone app ' +
@@ -507,22 +468,21 @@ export const panelAgentEn: typeof panelAgentRu = {
     routeWhat: 'What the agent does',
     routeDefault: 'Default provider',
     routeDefaultText:
-      'The request goes to the vendor cloud with the active CLI’s own login: ' +
-      'Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose or Kimi Code. With the ' +
-      '“Claude Code on this model” checkbox on in “Local models”, the agent’s Claude Code answers ' +
-      'with the local model, bypassing the cloud.',
+      'The core runs the turn by its own route for the active CLI: the vendor cloud with the ' +
+      'CLI’s own login, or a contour when the core requires one for every session. The core’s ' +
+      'route picks the model.',
     routeContour: 'Contour',
     routeContourText:
-      'Claude Code only: with any other CLI a turn through the contour does not start (a ' +
-      'refusal naming the CLI). Claude Code is pointed at the panel’s local gateway, which inserts the contour key. The ' +
-      'agent process gets a placeholder instead of the key. Gateway down or no key — refusal: ' +
-      'no silent fallback to the vendor cloud. The agent’s address carries the Panel assistant ' +
-      'section: close that section on the contour and the gateway refuses the agent’s very next ' +
-      'request, a conversation already under way included.',
+      'The turn takes the core’s route through the contour gateway; the core holds the contour ' +
+      'key, the CLI process never gets it. A route the core does not accept (gateway down, no ' +
+      'key, this CLI cannot go through a contour) — a refusal with the reason: no silent ' +
+      'fallback to the vendor cloud. The agent’s address carries the Panel assistant section: ' +
+      'close that section on the contour and the gateway refuses the agent’s very next request, ' +
+      'a conversation already under way included.',
     routeEndpoint: 'Own endpoint',
     routeEndpointText:
-      'Refused: the endpoint token would have to be handed to the CLI process. Switch the ' +
-      'assistant back to the default provider or to a contour.',
+      'The turn goes to your address by the core’s route: the core holds the key, the CLI ' +
+      'process never gets it; the model comes from the profile when the profile names one.',
 
     notTitle: 'What the panel agent is NOT',
     notCaption: 'Neighbours it gets confused with',
@@ -583,9 +543,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     limitHooks: 'Settings only you change',
     limitHooksText:
       'The config directory, revealing secrets, backups before writing and their encryption, ' +
-      'rule auto-approval, the auto permission mode in every chat, the prompt gate, model prices, the gateway port, remote access, ' +
-      'group economy, the group-watch thresholds, the D-n timings (minutes before a card ' +
-      'moves to «Awaiting decision» and days an item waits) and answers from Telegram are ' +
+      'the auto permission mode in every chat, the prompt gate, model prices, the gateway port, remote access, ' +
+      'the task step economy, the old D-n term (days an item waits) and answers from Telegram are ' +
       'not changed by the agent — it asks you to do it in «Settings». The agent writes hooks, ' +
       'but read the hook command in full on the card: Claude Code will run it.',
     limitStartChat: 'Starting a chat',
@@ -630,9 +589,7 @@ export const panelAgentEn: typeof panelAgentRu = {
       'closed while a reply runs, or a mode without attachments is chosen), an image is ' +
       'attached neither by drop nor by paste: the window says “The image cannot be attached ' +
       'right now…” and names the file, and the browser does not open the dropped file — the ' +
-      'typed text stays. The agent on Gemini CLI, Goose or Kimi Code takes no images: a single ' +
-      'run of these CLIs has no path for an image to the model, and a turn with one is refused ' +
-      'before the start, in words.',
+      'typed text stays.',
     limitWindow: 'Window',
     limitWindowText:
       'The window sits on the right, 440 pixels wide by default; the page shrinks beside it and ' +
@@ -653,37 +610,24 @@ export const panelAgentEn: typeof panelAgentRu = {
       'worktrees. Work with code happens in chat.',
     refusalsTitle: 'Refusals and why',
     refusalsCaption:
-      'All but the last happen before the start: the window shows «The agent did not answer» ' +
-      'with the reason, nothing is written',
+      'All but the last stop the turn before it acts: the window shows the reason, nothing is ' +
+      'written',
     refusalsColumn: 'Refusal',
     refusalsMeaningColumn: 'Reason and what to do',
-    refusalProvider: 'CLI without the agent',
-    refusalProviderText:
-      'The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code; other CLIs ' +
-      '(Continue, Cursor, Aider) have no run where the agent holds only the panel actions. The refusal names the CLI — switch the active one in Providers.',
-    refusalCli: 'CLI not found',
-    refusalCliText:
-      'It is not in the PATH of the panel process. Install the CLI and restart the panel; an API ' +
-      'key will not help — without the CLI the agent has no actions.',
-    refusalEndpoint: 'Own endpoint selected',
-    refusalEndpointText:
-      'The endpoint key would have to be handed to the agent process. Switch the assistant back ' +
-      'to the default provider or to a contour.',
-    refusalContour: 'Contour unreachable',
-    refusalContourText:
-      'The panel gateway is down or the contour key is not saved. Start the gateway or save the ' +
-      'key on the contour card. Through a contour the agent goes with Claude Code only: with ' +
-      'another active CLI the turn does not start, and the refusal names that CLI.',
+    refusalCore: 'The core refused',
+    refusalCoreText:
+      'The core judges the turn before the start: the CLI is not installed or not logged in, ' +
+      'the CLI cannot run without its built-in tools, the route through a contour or to your ' +
+      'own address is not accepted. The refusal names the reason — fix what it names (install ' +
+      'the CLI, log in, start the gateway, save the contour key) or switch the active CLI in ' +
+      'Providers. An API key instead of the CLI will not help: without the CLI the agent has no ' +
+      'actions.',
     refusalMask: 'Masking rules broken',
     refusalMaskText:
       'The Data protection rules file cannot be read. No message goes out without the mask — fix ' +
       'the rules in that section.',
     refusalBusy: 'The agent is still answering',
     refusalBusyText: 'A turn is running in this conversation. Wait for it or press «Stop».',
-    refusalLong: 'A long message on Kimi Code',
-    refusalLongText:
-      'Kimi Code takes the message only on its command line, and that has a ceiling — 24,000 ' +
-      'characters. Longer, and the turn does not start; shorten the message or split it.',
     refusalTimeout: 'Timed out',
     refusalTimeoutText:
       'The card was not decided within 10 minutes — the action did not run. Ask the agent again.',
@@ -698,8 +642,8 @@ export const panelAgentEn: typeof panelAgentRu = {
     guide: {
       firstTitle: 'Path 1. I want the panel to do this from my words',
       firstCaption:
-        'From the button on the page to a completed action, a rejected deletion, the trail, ' +
-        'history and a scenario in one card',
+        'From the button on the page to a completed action, a rejected deletion, the trail and ' +
+        'history',
       firstLauncher: 'A button on every page',
       firstLauncherText: 'In the side menu, above the sections — «Panel agent».',
       firstEmpty: 'The window next to the page',
@@ -755,19 +699,6 @@ export const panelAgentEn: typeof panelAgentRu = {
         'unsent text so you can send it again. A conversation deleted in another tab is not brought ' +
         'back by a window that still has it open: the message is not sent, the feed is cleared, and ' +
         'the next message starts a new conversation.',
-      firstScenario: 'A scenario — in one card',
-      firstScenarioText:
-        'Describe the steps in words: «Build a scenario “Release”: build, run the checks, describe ' +
-        'the changes». The agent does not assemble the group piece by piece; it brings one «Draft ' +
-        'a scenario» card: the steps in order on their own line, below them the record that will ' +
-        'land in state.json, with «flow»: «scenario» and «isEnabled»: false. A step is its own ' +
-        'text (title, prompt, «Done when») or an existing skill; the skill then joins as a member. ' +
-        'A taken name or a skill that does not exist is refused before the card.',
-      firstScenarioCreated: 'The scenario in «Groups», switched off',
-      firstScenarioCreatedText:
-        'After «Run» the panel opens «Groups» on the new scenario: the «scenario» and «Disabled» ' +
-        'marks, the «When» line and the first steps. The toggle enables it — you, or the agent ' +
-        'as a separate action; the steps are edited on the group’s path page.',
 
       guardsTitle: 'Path 2. The agent refused or «did not do something»',
       guardsCaption:
@@ -793,21 +724,9 @@ export const panelAgentEn: typeof panelAgentRu = {
         'After saving, the panel opens the form of that server: the empty secret field is on top with the cursor already in it. ' +
         'The value is written on “Save”; the agent never sees it. The agent window says “The key field is open” ' +
         'only when the field was actually found.',
-      guardsOtherCli: 'A CLI without the agent is active',
-      guardsOtherCliText:
-        'The turn does not start: the agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code.',
       guardsDlp: 'Masking rules broken',
       guardsDlpText:
         'Without the mask no message goes to the agent — the window names where to fix it.',
-      guardsCli: 'CLI not found',
-      guardsCliText:
-        'The active provider’s CLI is not on the panel process PATH — the turn does not start. Install it and restart the panel.',
-      guardsEndpoint: 'The assistant uses its own endpoint',
-      guardsEndpointText:
-        'The endpoint key would have to be handed to the agent process, so the turn does not start. Switch the assistant back to the default provider or to a contour.',
-      guardsContourDown: 'Contour unreachable',
-      guardsContourDownText:
-        'The assistant goes through a contour, but the gateway is down or there is no key — the panel never silently falls back to the vendor cloud.',
       guardsBusy: 'The agent is still answering',
       guardsBusyText:
         'A turn is already running in this conversation (for example, from another tab). Wait for it to end and send again.',
@@ -830,10 +749,6 @@ export const panelAgentEn: typeof panelAgentRu = {
       '09-journal':
         'Action trail: outcome and «decided by a human» for changes, «no question» for reads',
       '10-history': 'History: a conversation with its message count, ready to open',
-      '11-scenario-card':
-        'The card «Create scenario “Release” (switched off)»: three steps in order and a record with flow «scenario»',
-      '12-scenario-created':
-        'The Groups page: scenario «Release» marked «scenario» and «Disabled», its first three steps',
     },
     guards: {
       '01-contour-card': 'A contour draft card: the key is typed by you after saving',
@@ -843,16 +758,8 @@ export const panelAgentEn: typeof panelAgentRu = {
       '05-mcp-card': 'MCP server gitlab: in the .claude.json diff GITLAB_TOKEN is empty',
       '06-mcp-secret':
         'Form of the gitlab server: the empty GITLAB_TOKEN secret field on top, cursor in it — the human types the value',
-      '07-other-cli':
-        'Continue is active: «The panel agent does not work with Continue… The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code»',
       '08-dlp-broken':
         '«The data masking rules are broken: without the mask no message goes to the agent»',
-      '09-cli-not-found':
-        '«The active provider’s CLI is not in PATH: the agent has nothing to run with»',
-      '10-endpoint-unsupported':
-        '«The assistant uses its own endpoint: its key would have to be handed to the agent process»',
-      '11-contour-unreachable':
-        '«The assistant goes through a contour, but the gateway is down or there is no key»',
       '12-busy': '«The agent is still answering in this conversation — wait for the turn to end»',
     },
   },

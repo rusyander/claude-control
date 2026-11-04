@@ -38,7 +38,7 @@ export function DeferredSection({ items, now }: { items: readonly InboxDeferred[
               .join(' · ')}
           </Mono>
           <Mono style={styles.summary} numberOfLines={4}>
-            {item.kind === 'branchGate' ? t.home.branchGate : `${item.toolName}: ${item.summary}`}
+            {`${item.toolName}: ${item.summary}`}
           </Mono>
           {item.detail ? (
             // Что впишется в файл: у Write и Edit в сводке только путь, и человек

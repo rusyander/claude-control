@@ -87,5 +87,7 @@ export const contourConfigEn: typeof contourConfigRu = {
       'A run gets the gateway address in the variables of ITS OWN process: “chat through the contour, tests with my own key” is a choice, not a wish. An unticked switch closes the section in the gateway at once — for runs already going, too.',
     filesStay:
       'CLI files stay applied, but the gateway no longer lets terminal requests through. To restore the files themselves, press “Undo the apply” on the contour card.',
+    requiredAll:
+      '“Required” mode: Claude chat, the tests agent and foreign CLI chats — core tasks — always go through the contour, even with the box unticked. For them the boxes decide only in “best effort” mode.',
   },
 };

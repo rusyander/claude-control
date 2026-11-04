@@ -40,6 +40,7 @@ export const SESSION_STEP_KINDS = [
   'answer-reviewers',
   'report',
   'custom',
+  'chat',
 ] as const;
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
 
@@ -72,7 +73,13 @@ const CHECK_KINDS: ReadonlySet<string> = new Set([
   'review',
   'answer-reviewers',
   'custom',
+  'chat',
 ]);
+/**
+ * Чат кончает человек (`end-chat`), а не модель: `step_done` ему не дан — заявление модели
+ * закрыло бы разговор посреди беседы (этап 10).
+ */
+const NO_STEP_DONE_KINDS: ReadonlySet<string> = new Set(['chat']);
 /**
  * `unit_diff` — дифф одного файла единицы для тех, кто судит уже сделанную правку: ревью и ответ
  * ревьюерам. Пакет ревью сверх предела называет файлы списком, тело берётся этим инструментом.
@@ -92,7 +99,8 @@ export function toolPlanFor(stepKind: string): StepToolPlan | null {
   const modelTools = MODEL_TOOL_NAMES.filter(
     (t) =>
       (t !== 'check' || CHECK_KINDS.has(stepKind)) &&
-      (t !== 'unit_diff' || UNIT_DIFF_KINDS.has(stepKind)),
+      (t !== 'unit_diff' || UNIT_DIFF_KINDS.has(stepKind)) &&
+      (t !== 'step_done' || !NO_STEP_DONE_KINDS.has(stepKind)),
   );
   return { builtins: READ_ONLY_KINDS.has(stepKind) ? 'read-only' : 'all', modelTools };
 }
@@ -406,4 +414,23 @@ export function inputSchemaOf(name: ModelToolName): Record<string, unknown> {
   const schema = z.toJSONSchema(MODEL_TOOL_SCHEMAS[name], { unrepresentable: 'any' });
   const { $schema: _drop, ...rest } = schema as Record<string, unknown>;
   return rest;
+}
+
+export interface SessionToolDef {
+  name: ModelToolName;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/**
+ * Список `tools/list` сервера `agentdeck` для вида шага — один на ядро и мост: ядро отдаёт его
+ * на `GET /v1/session/tools`, мост — сам, когда ядро не ответило вовремя (ядро перезапускается
+ * на старте сессии, а CLI ждёт список MCP меньше, чем длится перезапуск).
+ */
+export function sessionToolsFor(stepKind: string): SessionToolDef[] {
+  return (toolPlanFor(stepKind)?.modelTools ?? []).map((name) => ({
+    name,
+    description: MODEL_TOOL_DESCRIPTIONS[name],
+    inputSchema: inputSchemaOf(name),
+  }));
 }

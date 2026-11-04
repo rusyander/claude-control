@@ -69,6 +69,7 @@ async function read(a: OpenAction, readers = forgeActionReaders()) {
     'mr-create': 'mr.by-source-branch',
     'mr-update': 'mr.by-source-branch',
     'thread-reply': 'thread.reply-by-hash',
+    'mr-comment': 'thread.reply-by-hash',
     'tracker-write': 'tracker.write-by-hash',
   } as const;
   const kind = a.kind as keyof typeof classes;
@@ -216,6 +217,37 @@ describe.each(['gitlab', 'github'] as const)('forge readers on %s (stub forge)',
     await port('publisher').resolve(iid, threadId);
     expect(await read(action(key('done', true), startedAt), readers)).toHaveProperty('value');
   });
+
+  it('mr-comment: own top-level note with the hash → value; reviewer note or another body → absent', async () => {
+    const { url, port, readers } = await setup();
+    const created = await port('reviewer').createMr({
+      sourceBranch: 'feat',
+      targetBranch: 'main',
+      title: 't',
+      body: 'b',
+      draft: false,
+    });
+    if (!('value' in created)) throw new Error('create failed');
+    const iid = created.value.iid;
+    const body = '**Замечания ревью (1)**\n\n1. a.ts:1 — x';
+    const key = (b: string): ForgeActionKey => ({
+      kind: 'mr-comment',
+      url,
+      iid,
+      bodyHash: noteHash(b),
+    });
+    const startedAt = Date.now();
+    expect(await read(action(key(body), startedAt), readers)).toEqual({ absent: true });
+    await port('reviewer').comment(iid, body);
+    expect(await read(action(key(body), startedAt), readers)).toEqual({ absent: true });
+    const note = await port('publisher').comment(iid, body);
+    if (!('value' in note)) throw new Error(`comment failed: ${JSON.stringify(note)}`);
+    expect(note.value.bodyHash).toBe(noteHash(body));
+    expect(await read(action(key(body), startedAt), readers)).toEqual({
+      value: `!${iid} note ${note.value.id}`,
+    });
+    expect(await read(action(key('other'), startedAt), readers)).toEqual({ absent: true });
+  });
 });
 
 describe('tracker-write and unreadable keys', () => {
@@ -233,7 +265,14 @@ describe('tracker-write and unreadable keys', () => {
 
   it('a target/hint not in the codec shape is unknown, never absent', async () => {
     // Прежняя форма цели (до кодека) — `origin/feature` и пустая подсказка.
-    for (const kind of ['push', 'ref-delete', 'mr-create', 'mr-update', 'thread-reply'] as const) {
+    for (const kind of [
+      'push',
+      'ref-delete',
+      'mr-create',
+      'mr-update',
+      'thread-reply',
+      'mr-comment',
+    ] as const) {
       const a: OpenAction = {
         actionId: newId(),
         kind,

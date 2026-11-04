@@ -2,11 +2,9 @@ import { existsSync, statSync } from 'node:fs';
 import { relative, resolve, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ProjectTestE2eSync } from '@agentdeck/contracts';
-import { TESTS_PROJECT_ENV } from '@agentdeck/contracts/chat-group-settings';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
-import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { e2eFolderView, e2eLinkedRoot } from '../../domains/project-tests/e2e-folder/e2e-folder.ts';
-import { e2eChatLine, e2eChatProjectRoot } from '../../domains/project-tests/e2e-chat.ts';
+import { e2eChatLine } from '../../domains/project-tests/e2e-chat.ts';
 import { syncE2eIfChanged } from '../../domains/project-tests/e2e-sync/e2e-sync.ts';
 import { readEnvironments } from '../../domains/project-tests/library/library.ts';
 import { readAutomation } from '../../domains/project-tests/automation/automation.ts';
@@ -15,12 +13,7 @@ import {
   syncSuitesOnce,
   testsHookScript,
 } from '../../domains/project-tests/project-tests.ts';
-import {
-  writeQwenLimits,
-  writeQwenSystemNote,
-} from '../../domains/provider-chat/system-note/system-note.ts';
 import { panelHomeDir } from '../../lib/brand.mjs';
-import { getProvider } from '../../providers/registry.ts';
 
 /**
  * Агент чата узнаёт о тестах проекта на КАЖДОМ старте: отправка человека, дети
@@ -33,19 +26,15 @@ import { getProvider } from '../../providers/registry.ts';
  * проекте без папки получал бы `e2e/` и строку в `.git/info/exclude` молча.
  * Без папки строка только подсказывает, куда класть тесты.
  *
- * Чужие CLI получают ту же строку тем же решателем (`ProviderChatService`), а
- * конец хода любого из них сверяет папку, если агент её трогал. Копия ветки,
+ * Ход через ядро (чат Claude и чужого CLI, этап 10) своей строки о тестах у ядра не получает:
+ * панель кладёт её в перенос сеанса (`session.append`, G6), и ядро дописывает её после своего
+ * брифа; конец хода чата сверяет папку, если агент её трогал. Копия ветки,
  * где папка лежит ссылкой на оригинал, говорит и сверяет от имени ОРИГИНАЛА:
  * тест лёг в его папку, и кейс должен появиться у него.
  */
 export interface TestsChatWiringDeps {
   appData: string;
-  chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'> &
-    Partial<Pick<ChatRunRegistry, 'setWorkspaceEnv'>>;
-  providerChats?: Pick<
-    ProviderChatService,
-    'setWorkspaceNote' | 'setSystemNote' | 'setLocalLimits'
-  >;
+  chatRuns: Pick<ChatRunRegistry, 'setWorkspaceNote'>;
   /** Прогон раздела «Тесты» пишет в файлы групп — сверка поверх него потеряла бы правку. */
   isBusy?: (path: string) => boolean;
   now?: () => string;
@@ -126,36 +115,15 @@ function projectOf(cwd: string): string | undefined {
   return e2eLinkedRoot(cwd) ?? cwd;
 }
 
-/**
- * Строка для каталога прогона; `undefined` — каталог не проект (песочница панели).
- * `projectFromEnv` — группа Claude (X1): строка без путей, проект едет в
- * окружении (`testsChatEnv`), и системный промпт у копий одной группы общий.
- */
-export function testsChatNote(
-  deps: TestsChatWiringDeps,
-  at: string,
-  group = false,
-  projectFromEnv = false,
-): string | undefined {
-  const input = testsChatInput(deps, at, group);
-  return input
-    ? e2eChatLine({ ...input, ...(projectFromEnv ? { projectFromEnv } : {}) })
-    : undefined;
-}
-
-/** Окружение группы Claude к строке без путей: проект, который назвала бы строка. */
-export function testsChatEnv(
-  deps: TestsChatWiringDeps,
-  at: string,
-): Record<string, string> | undefined {
-  const input = testsChatInput(deps, at, true);
-  return input ? { [TESTS_PROJECT_ENV]: e2eChatProjectRoot(input) } : undefined;
+/** Строка для каталога прогона; `undefined` — каталог не проект (песочница панели). */
+export function testsChatNote(deps: TestsChatWiringDeps, at: string): string | undefined {
+  const input = testsChatInput(deps, at);
+  return input ? e2eChatLine(input) : undefined;
 }
 
 function testsChatInput(
   deps: TestsChatWiringDeps,
   at: string,
-  group: boolean,
 ): Parameters<typeof e2eChatLine>[0] | undefined {
   const cwd = projectOf(at);
   if (!cwd) return undefined;
@@ -179,7 +147,6 @@ function testsChatInput(
     cliPath: testsCliPath(),
     hasStandUrl,
     automation,
-    ...(group ? { group } : {}),
   };
 }
 
@@ -207,29 +174,6 @@ export function testsChatFinished(
 export function wireTestsChatNote(deps: TestsChatWiringDeps): {
   finished: (cwd: string | undefined, startedAt: number) => ProjectTestE2eSync | undefined;
 } {
-  // Группа Claude — строкой без путей и проектом в окружении (X1): путь копии в
-  // системном промпте не давал копиям одной группы делить кэш начала запроса.
-  deps.chatRuns.setWorkspaceNote((cwd, run?: { group: boolean }) =>
-    testsChatNote(deps, cwd, run?.group, run?.group),
-  );
-  deps.chatRuns.setWorkspaceEnv?.((cwd) => testsChatEnv(deps, cwd));
-  // Группа чужого CLI — той же строкой, что группа Claude (ревью A2-F10): обычная
-  // зовёт спросить человека, а группа идёт без человека и встала бы на вопросе.
-  deps.providerChats?.setWorkspaceNote((cwd, run) => testsChatNote(deps, cwd, run?.group));
-  // Тот же файл системных настроек, что везёт группы Qwen, везёт и строку — в
-  // системный промпт, а не в слова человека. Незнакомый id реестр откатывает на
-  // Claude, у которого слоя нет, — строка остаётся в реплике.
-  deps.providerChats?.setSystemNote((providerId, note, env) =>
-    getProvider(providerId).groupLayer === 'qwen-system-settings'
-      ? writeQwenSystemNote({ appData: deps.appData, note, env })
-      : undefined,
-  );
-  // Окно и сроки локальной модели — тем же файлом настроек Qwen (L4b): иначе он считает окно
-  // по имени модели и сжимает историю от чужого числа.
-  deps.providerChats?.setLocalLimits((providerId, limits, env) =>
-    getProvider(providerId).groupLayer === 'qwen-system-settings'
-      ? writeQwenLimits({ appData: deps.appData, limits, env })
-      : undefined,
-  );
+  deps.chatRuns.setWorkspaceNote((cwd) => testsChatNote(deps, cwd));
   return { finished: (cwd, startedAt) => testsChatFinished(deps, cwd, startedAt) };
 }

@@ -1,31 +1,34 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
-import { PlatformGateway } from '../gateway/listener/listener.ts';
+import {
+  listeningGateway,
+  memoryContours,
+  type MemoryContours,
+} from '../contours/__fixtures__/memory-contours.ts';
 import { activatePlatform, type ContourActivationDeps } from './activation.ts';
 import { findPlatform, writePlatform, writeToken } from '../store/store.ts';
 import { shimFromProbe } from '../smoke-tools.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
- * Проба инструментов (развилка 3) — через НАСТОЯЩИЙ шлюз: перевод поля `tools`
- * в диалект контура живёт там, и только этот путь отвечает, дойдёт ли вызов.
+ * Проба инструментов (развилка 3) — настоящим `fetch` по сокету на петле в шлюз контуров. Шлюз
+ * держит ядро (этап 10, C3d), здесь он — внешняя граница: сервер на 127.0.0.1, отвечающий потоком
+ * Anthropic так, как шлюз человека отвечает клиенту `/<контур>/v1/messages`; порт панель берёт у
+ * учёта контуров ядра (`memoryContours`).
  *
- * Ниже — шапка соседнего теста пробного запроса, её смысл тот же.
- *
- * Пробный запрос активации — через НАСТОЯЩИЙ шлюз: настоящий сокет на петле,
- * настоящий конвейер, подставлен только контур наверху.
- *
- * Ради этого транспорты и разведены (`probeFetch` / `smokeFetch`): заглушка,
- * подставленная обоим, доказывала бы работу заглушки. Здесь же запрос выходит
- * из домена в сеть, возвращается в свой же слушатель, проходит перевод диалекта
- * и подстановку ключа — то есть ровно тот путь, которым пойдёт CLI, и ни одним
- * звеном короче.
+ * Чего здесь нет и где оно доказано: перевод поля `tools` в диалект контура —
+ * `apps/core/src/hop-host/gateway/dialect/dialect.test.ts`, кадры вызова обратно —
+ * `gateway/frames/frames.toolevents.test.ts`; подстановка ключа —
+ * `apps/core/src/hop-host/user-gateway.parity.integration.test.ts`; слушатель и его порт —
+ * `apps/core/src/hop-host/user-gateway.integration.test.ts`.
  */
 
 const SECRET = 'contour-key-corporate-4f21';
@@ -66,58 +69,73 @@ const modelsOk: PlatformFetch = () =>
 let root: string;
 let appData: string;
 let store: AppStore;
-let gateway: PlatformGateway;
-/** Куда и с чем шлюз сходил наверх: адрес, заголовки, тело. */
-let calls: { url: string; headers: Record<string, string>; body: string }[] = [];
+let contours: MemoryContours;
+let gateway: Server;
+/** Что шлюз получил от панели: путь и тело. */
+let calls: { path: string; body: string }[] = [];
+/** Ответы шлюза по порядку запросов (последний — всем дальше): статус и кадры потока Anthropic. */
+let answers: { status: number; frames: string[] }[];
 
-/** Контур-заглушка НАД шлюзом: N-му запросу отвечает N-м набором кадров потоком (последний — всем дальше). */
-function sequence(answers: string[][], status = 200): PlatformFetch {
-  return (url, init) => {
-    const frames = answers[Math.min(calls.length, answers.length - 1)] ?? [];
-    calls.push({
-      url,
-      headers: (init?.headers ?? {}) as Record<string, string>,
-      body: typeof init?.body === 'string' ? init.body : '',
-    });
-    if (status >= 400) {
-      return Promise.resolve(
-        new Response(frames.join(''), {
-          status,
-          headers: { 'content-type': 'application/json' },
-        }),
-      );
-    }
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const encoder = new TextEncoder();
-        for (const frame of frames) controller.enqueue(encoder.encode(`data: ${frame}\n\n`));
-        controller.close();
-      },
-    });
-    return Promise.resolve(
-      new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
-    );
-  };
-}
+/** Кадры потока Anthropic, как их отдаёт шлюз человека клиенту `/v1/messages`. */
+const text = (chunk: string): string =>
+  JSON.stringify({
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'text_delta', text: chunk },
+  });
+const stop = (reason: string): string =>
+  JSON.stringify({ type: 'message_delta', delta: { stop_reason: reason } });
+const CALL = JSON.stringify({
+  type: 'content_block_start',
+  index: 0,
+  content_block: { type: 'tool_use', id: 't1', name: 'report_status', input: {} },
+});
+const ARGS = JSON.stringify({
+  type: 'content_block_delta',
+  index: 0,
+  delta: { type: 'input_json_delta', partial_json: '{"status":"ready"}' },
+});
 
-const DELTA = '{"id":"c1","model":"gpt-x","choices":[{"index":0,"delta":{"content":"готов"}}]}';
-const DONE = '{"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}';
+const OK = { status: 200, frames: [text('готов'), stop('end_turn')] };
+const CALLED = { status: 200, frames: [CALL, ARGS, stop('tool_use')] };
+const said = (chunk: string) => ({ status: 200, frames: [text(chunk), stop('end_turn')] });
 
-beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'cc-activation-gw-'));
+beforeEach(async () => {
+  root = mkdtempSync(join(tmpdir(), 'cc-activation-tools-'));
   appData = join(root, 'agentdeck');
   mkdirSync(appData, { recursive: true });
   mkdirSync(join(root, 'claude'), { recursive: true });
   calls = [];
+  answers = [OK];
 
   store = new AppStore(appData);
   writePlatform(store, PLATFORM);
   writeToken(appData, PLATFORM.id, SECRET);
-  gateway = new PlatformGateway();
+
+  gateway = createServer((request, response) => {
+    let raw = '';
+    request.on('data', (chunk: Buffer) => (raw += chunk.toString()));
+    request.on('end', () => {
+      const answer = answers[Math.min(calls.length, answers.length - 1)] ?? OK;
+      calls.push({ path: request.url ?? '', body: raw });
+      if (answer.status >= 400) {
+        response.writeHead(answer.status, { 'content-type': 'application/json' });
+        return response.end(answer.frames.join(''));
+      }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      for (const frame of answer.frames) response.write(`data: ${frame}\n\n`);
+      response.end();
+    });
+  });
+  await new Promise<void>((resolve) => gateway.listen(0, '127.0.0.1', resolve));
+  contours = memoryContours();
+  // Шлюз человека у ядра слушает — на порту подставного шлюза.
+  contours.setUserGateway(listeningGateway((gateway.address() as AddressInfo).port));
 });
 
 afterEach(async () => {
-  await gateway.stop();
+  gateway.closeAllConnections();
+  await new Promise<void>((resolve) => gateway.close(() => resolve()));
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -127,50 +145,28 @@ const deps = (): ContourActivationDeps => ({
   backupDir: join(root, 'backups'),
   appDataDir: appData,
   probeFetch: modelsOk,
-  // Порт — у ЖИВОГО слушателя, ровно как его берёт маршрут: порт 0 при старте
-  // означает «какой достанется», и спросить его можно только у него самого.
-  gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
-  // `smokeFetch` не задан НАМЕРЕННО: пробный запрос идёт настоящим `fetch` в
-  // настоящий слушатель на 127.0.0.1.
+  // Порт — тот, что держит шлюз человека у ядра сейчас, ровно как его берёт маршрут.
+  gatewayPort: () => contours.userGatewayPort(),
+  // `smokeFetch` не задан НАМЕРЕННО: пробный запрос идёт настоящим `fetch` по сокету.
 });
 
-const CALL =
-  '{"id":"c2","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"t1","type":"function","function":{"name":"report_status","arguments":"{\\"status\\":\\"ready\\"}"}}]}}]}';
-const CALL_DONE = '{"id":"c2","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}';
-const text = (content: string): string =>
-  JSON.stringify({ id: 'c2', choices: [{ index: 0, delta: { content } }] });
-
-async function startWith(fetchImpl: PlatformFetch): Promise<void> {
-  await gateway.start({ store, appDataDir: appData, port: 0, fetchImpl, spendFlushMs: 0 });
-}
-
 describe('проба инструментов при активации', () => {
-  it('модель вызвала инструмент полем — зелёная строка, поле дошло до контура', async () => {
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [CALL, CALL_DONE],
-      ]),
-    );
+  it('модель вызвала инструмент полем — зелёная строка, поле ушло в шлюз', async () => {
+    answers = [OK, CALLED];
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.ok).toBe(true);
     expect(result.smoke.tools).toEqual({ ok: true });
     expect(calls).toHaveLength(2);
-    expect(JSON.parse(calls[1]?.body ?? '{}').tools?.[0]?.function?.name).toBe('report_status');
+    expect(calls[1]?.path).toBe(`/${PLATFORM.id}/v1/messages`);
+    expect(JSON.parse(calls[1]?.body ?? '{}').tools?.[0]?.name).toBe('report_status');
+    expect(calls[1]?.body).not.toContain(SECRET);
     expect(store.getState().platformSmoke?.[PLATFORM.id]?.tools).toEqual({ ok: true });
-    // Тот же вызов виден чату чужого CLI: журнал шлюза считает вызовы полем.
-    expect(gateway.toolCallsSince(0)).toBe(1);
   });
 
   it('вызов текстом — причина названа, ничего не исполнено', async () => {
     const asText = '```json\n{"name":"report_status","arguments":{"status":"ready"}}\n```';
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [text(asText), DONE],
-      ]),
-    );
+    answers = [OK, said(asText)];
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.ok).toBe(true);
@@ -178,19 +174,13 @@ describe('проба инструментов при активации', () => 
   });
 
   it('ответ без вызова — «не вызвала»', async () => {
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [text('Готово.'), DONE],
-      ]),
-    );
+    answers = [OK, said('Готово.')];
     const result = await activatePlatform(deps(), PLATFORM.id);
     expect(result.smoke.tools).toMatchObject({ ok: false, reason: 'no-call' });
   });
 
-  it('прослойка включена — не спрашиваем: один запрос наверх', async () => {
+  it('прослойка включена — не спрашиваем: один запрос в шлюз', async () => {
     writePlatform(store, { ...PLATFORM, toolShim: true });
-    await startWith(sequence([[DELTA, DONE]]));
     const result = await activatePlatform(deps(), PLATFORM.id);
     expect(result.smoke.tools).toBeUndefined();
     expect(calls).toHaveLength(1);
@@ -198,7 +188,6 @@ describe('проба инструментов при активации', () => 
 
   it('тип контура выбрасывает поле — «dropped» без похода в сеть', async () => {
     writePlatform(store, { ...PLATFORM, driver: 'enterprise-platform' });
-    await startWith(sequence([[DELTA, DONE]]));
     const result = await activatePlatform(deps(), PLATFORM.id);
     expect(result.smoke.tools).toMatchObject({ ok: false, reason: 'dropped' });
     expect(calls).toHaveLength(1);
@@ -214,12 +203,7 @@ describe('прослойка по итогу пробы', () => {
   const saved = (): Platform => findPlatform(store, PLATFORM.id) as Platform;
 
   it('модель не вызвала инструмент — панель включает прослойку сама и отмечает, что это она', async () => {
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [text('Готово.'), DONE],
-      ]),
-    );
+    answers = [OK, said('Готово.')];
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(saved().toolShim).toBe(true);
@@ -227,12 +211,7 @@ describe('прослойка по итогу пробы', () => {
   });
 
   it('вызов пришёл полем — тумблер остаётся человеческим, отметки нет', async () => {
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [CALL, CALL_DONE],
-      ]),
-    );
+    answers = [OK, CALLED];
     await activatePlatform(deps(), PLATFORM.id);
 
     expect(saved().toolShim).toBe(false);
@@ -245,12 +224,7 @@ describe('прослойка по итогу пробы', () => {
       toolShim: false,
       toolShimFromProbe: '2026-09-19T10:00:00.000Z',
     });
-    await startWith(
-      sequence([
-        [DELTA, DONE],
-        [text('Готово.'), DONE],
-      ]),
-    );
+    answers = [OK, said('Готово.')];
     await activatePlatform(deps(), PLATFORM.id);
 
     expect(saved().toolShim).toBe(false);
@@ -258,36 +232,8 @@ describe('прослойка по итогу пробы', () => {
   });
 
   it('запрос с инструментом отклонён — это сказано про запрос, а не про модель: тумблер не трогаем', async () => {
-    // Первый запрос — живой ответ потоком, второй (с инструментом) — отказ
-    // шлюза. Одной `sequence` так не сделать: статус в ней общий на прогон.
-    let asked = 0;
-    await startWith((url, init) => {
-      calls.push({
-        url,
-        headers: (init?.headers ?? {}) as Record<string, string>,
-        body: typeof init?.body === 'string' ? init.body : '',
-      });
-      asked += 1;
-      if (asked > 1) {
-        return Promise.resolve(
-          new Response(JSON.stringify({ error: { message: 'upstream busy' } }), {
-            status: 503,
-            headers: { 'content-type': 'application/json' },
-          }),
-        );
-      }
-      const stream = new ReadableStream<Uint8Array>({
-        start(controller) {
-          const encoder = new TextEncoder();
-          for (const frame of [DELTA, DONE])
-            controller.enqueue(encoder.encode(`data: ${frame}\n\n`));
-          controller.close();
-        },
-      });
-      return Promise.resolve(
-        new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
-      );
-    });
+    // Первый запрос — живой ответ потоком, второй (с инструментом) — отказ шлюза.
+    answers = [OK, { status: 503, frames: ['{"error":{"message":"upstream busy"}}'] }];
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.tools).toMatchObject({ ok: false, reason: 'refused' });

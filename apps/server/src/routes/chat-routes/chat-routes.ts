@@ -51,25 +51,24 @@ export function registerChatRoutes(
   session: ChatSession,
   /** Ждёт ли разговор дерева человека — метка «ждёт вас» в списке чатов. */
   awaitsYou?: (chatId: string) => boolean,
-  /** Модель, назначенная лёгкому чату вопросов о ходе групп (5.1). */
-  assignedOf?: (chatId: string) => { model: string; effort: string } | undefined,
   /** Разговор группы на паузе — досылку без человека не принимает. */
   heldOf?: (chatId: string) => boolean,
   /** Ход сессии вне панели кончился — «Закончил» в Telegram после долгой работы. */
   outsideTurnEnded?: (sessionId: string) => void,
+  /** Журнал сжатий контура из звена ядра (C3b) — подпись «контур сжал историю» в ленте. */
+  summarizedIds?: () => Promise<Set<string>>,
 ): void {
   registerChatTranscriptRoutes(
     app,
     ctx,
     (chatId) => registry.isProcessAlive(chatId),
     awaitsYou,
-    assignedOf,
-    (chatId) => registry.canStopSubagents(chatId),
+    summarizedIds,
   );
-  // Ход субагента и его остановка — узел дерева агентов (`subagent-routes.ts`).
+  // Ход субагента — узел дерева агентов (`subagent-routes.ts`).
   registerSubagentRoutes(app, ctx, registry);
   registerChatBrowseRoutes(app, ctx);
-  registerChatRunRoutes(app, ctx, registry, session, assignedOf, heldOf);
+  registerChatRunRoutes(app, ctx, registry, session, heldOf);
   registerChatArtifactRoutes(app, ctx);
   registerChatCliRoutes(app, undefined, () => ctx.store);
   // Вопросы сессий из терминала и VS Code: сводка помечает те, что ждут

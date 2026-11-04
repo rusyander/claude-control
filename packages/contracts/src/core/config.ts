@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { commandIssues, commandProofSchema, type CommandIssue } from './commands.ts';
-import { uuidv7 } from './ids.ts';
+import { registryId, uuidv7 } from './ids.ts';
 import { GRANT_OPS } from './journal-data.ts';
+import { SESSION_STEP_KINDS } from './model-tools.ts';
 
 /**
  * Настройка ядра `<дом ядра>/config.json` (00:58): один строгий документ, один читатель
@@ -22,6 +23,8 @@ export const CONFIG_SECTIONS = [
   'humanPoints', // новый: список пункта 5 (06:22)
   'trustedRepos', // новый: отметка доверия панели (03:44), пути исходных репозиториев
   'cliPaths', // этап 9 (F9): явный путь к CLI переходника, выигрывает у поиска
+  'mcpPicks', // s10 p7 (P73): какие серверы MCP человека отданы виду шага
+  'economy', // s10 p8: рычаги экономии шагов задачи (порт рычагов групп панели)
 ] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
@@ -51,9 +54,24 @@ const ownRouteSchema = z.looseObject({
   }),
   models: z.array(ownModelSchema).min(1),
 });
+/**
+ * Сервер моделей человека (этап 10, маршрут `local:user:<id>`): только HTTP — ядро пробует его,
+ * читает модели и шлёт вызовы, но никогда не запускает, не останавливает и не снимает процесс.
+ * Ключ — ИМЯ переменной окружения; значение в настройку не попадает.
+ */
+export const userRouteSchema = z.strictObject({
+  id: registryId,
+  baseUrl: z.url(),
+  dialect: z.enum(['openai-chat', 'anthropic-messages']),
+  keyVar: z.string().min(1).optional(),
+  /** Нет — список читается с `/v1/models` сервера. */
+  models: z.array(z.string().min(1)).optional(),
+});
+export type UserRoute = z.infer<typeof userRouteSchema>;
 export const routesSectionSchema = z.looseObject({
   stub: z.array(stubRouteSchema).optional(),
   localOwn: ownRouteSchema.optional(),
+  localUser: z.array(userRouteSchema).optional(),
 });
 
 // ── readAllow: путь репозитория → список чтения вне копии (F-87) ───────────────────────────
@@ -117,6 +135,47 @@ export const cliPathsSchema = z.record(
   z.string().max(1024).regex(ABSOLUTE_PATH, 'absolute path'),
 );
 
+// ── mcpPicks: вид шага → серверы MCP человека (P73, s10 p7) ───────────────────────────────
+/**
+ * Выбор человека: какие свои серверы MCP он дал виду шага. По умолчанию — ни одного (строгий
+ * список). Сервер берётся из предложений CLI сеанса (`mcpSource` переходника: конфиг MCP самого
+ * CLI в его порядке пользователь/проект); выбранный, но не предложенный — выпадает с причиной.
+ */
+export const mcpPicksSchema = z.partialRecord(
+  z.enum(SESSION_STEP_KINDS),
+  z.array(z.string().min(1).max(128)).max(50),
+);
+
+// ── economy: рычаги экономии шагов задачи (s10 p8, порт рычагов групп панели) ──────────────
+/**
+ * Границы — те же, что у панели (CLI отверг бы меньшее молча). Нет раздела или поля — умолчание
+ * панели (`CORE_ECONOMY_DEFAULTS`, решение s10 p9); `0` / `false` — рычаг выключен явно, решает
+ * CLI. Чат панели (chat@1) рычагов не получает, как разговор панели прежде.
+ */
+const leverOrOff = (min: number, max: number) =>
+  z.union([z.literal(0), z.number().int().min(min).max(max)]).optional();
+
+export const economySectionSchema = z.strictObject({
+  compactWindow: leverOrOff(100_000, 1_000_000),
+  bashOutputChars: leverOrOff(4_000, 128_000),
+  readOutputTokens: leverOrOff(2_000, 100_000),
+  cacheTtl: z.enum(['5m', '1h']).optional(),
+  detachIde: z.boolean().optional(),
+  workHabits: z.boolean().optional(),
+});
+
+/**
+ * Умолчания рычагов — умолчания групп панели (`GROUP_ECONOMY_DEFAULTS`: вывод оболочки 8000 знаков,
+ * чтение 10 000 токенов, IDE отключена, строка привычек); окно сжатия и срок кэша по умолчанию не
+ * трогаются. Поле раздела перекрывает своё умолчание.
+ */
+export const CORE_ECONOMY_DEFAULTS = {
+  bashOutputChars: 8_000,
+  readOutputTokens: 10_000,
+  detachIde: true,
+  workHabits: true,
+} as const satisfies z.infer<typeof economySectionSchema>;
+
 /** Схема каждого раздела — таблица исчерпывающая: новый раздел не соберётся без своей схемы. */
 export const CONFIG_SECTION_SCHEMAS = {
   routes: routesSectionSchema,
@@ -127,6 +186,8 @@ export const CONFIG_SECTION_SCHEMAS = {
   humanPoints: humanPointsSchema,
   trustedRepos: trustedReposSchema,
   cliPaths: cliPathsSchema,
+  mcpPicks: mcpPicksSchema,
+  economy: economySectionSchema,
 } as const satisfies Record<ConfigSection, z.ZodType>;
 
 export const coreConfigSchema = z.strictObject({
@@ -140,6 +201,8 @@ export const coreConfigSchema = z.strictObject({
   humanPoints: humanPointsSchema.optional(),
   trustedRepos: trustedReposSchema.optional(),
   cliPaths: cliPathsSchema.optional(),
+  mcpPicks: mcpPicksSchema.optional(),
+  economy: economySectionSchema.optional(),
 });
 export type CoreConfig = z.infer<typeof coreConfigSchema>;
 

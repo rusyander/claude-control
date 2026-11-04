@@ -1,18 +1,25 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readDeliveryFacts } from './delivery-facts/delivery-facts.ts';
 import { bootstrapPlanFor, WorktreeBootstraps } from './bootstrap.ts';
 import { PREP_TREE_HOOKS, settlePrepTree, snapshotPrepTree } from './lockfiles.ts';
+import { parseDirtyPaths } from './read.ts';
+
+/** Грязные пути копии так, как их видит git: отслеживаемые правки и новые файлы. */
+function dirtyPaths(dir: string): string[] {
+  const out = execFileSync('git', ['status', '--porcelain=v1', '-z', '-uall'], {
+    cwd: dir,
+    encoding: 'utf8',
+  });
+  return parseDirtyPaths(out).sort();
+}
 
 /**
  * Разбор остановок 23.10, D5: подготовка копии (`go mod download`) переписала
  * go.mod двух каталогов вне задачи группы, и доставка требовала закоммитить
- * чужую правку. На настоящем git: откат манифестов и запись того, что
- * подготовка всё же оставила, — доставка такие пути работой группы не считает.
+ * чужую правку. На настоящем git: откат манифестов, дерево после подготовки чистое.
  */
 
 function dropTemp(target: string): void {
@@ -51,51 +58,13 @@ describe('подготовка копии не оставляет правок �
     expect([...reverted].sort()).toEqual(['cp-ca/go.mod', 'cp-ca/go.sum', 'go.mod', 'go.sum']);
     expect(readFileSync(join(dir, 'cp-ca', 'go.mod'), 'utf8')).toBe('module ca\n\ngo 1.22\n');
     expect(existsSync(join(dir, 'go.sum'))).toBe(false);
-    const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect(facts.dirty).toEqual([]);
-  });
-
-  it('что подготовка оставила — не «не закоммичено» у группы, пока агент не тронул файл', async () => {
-    // Своя команда подготовки человека перегенерировала отслеживаемый файл.
-    writeFileSync(join(dir, 'gen', 'schema.ts'), 'export const v = 2;\n');
-    await settlePrepTree(dir);
-
-    const before = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect(before.dirty).toEqual([]);
-
-    // Агент правит тот же файл и ещё один — оба снова его работа.
-    writeFileSync(join(dir, 'gen', 'schema.ts'), 'export const v = 3;\n');
-    writeFileSync(join(dir, 'cp-ca', 'go.mod'), 'module ca\n\ngo 1.24\n');
-    const after = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect([...after.dirty].sort()).toEqual(['cp-ca/go.mod', 'gen/schema.ts']);
-  });
-
-  // F-100: запись в каталоге git копии мог подложить агент и спрятать свою работу.
-  it('запись — не в копии: подложенная в каталог git ничего не прячет', async () => {
-    writeFileSync(join(dir, 'gen', 'schema.ts'), 'export const v = 2;\n');
-    await settlePrepTree(dir);
-    expect(existsSync(join(dir, '.git', 'agentdeck-prep-left.json'))).toBe(false);
-    const status = execFileSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' });
-    expect(status.trim()).toBe('M gen/schema.ts');
-
-    // Агент правит файл и кладёт запись прежнего вида с хешем своей правки.
-    writeFileSync(join(dir, 'cp-ca', 'go.mod'), 'module ca\n\ngo 1.24\n');
-    const hash = createHash('sha256')
-      .update(readFileSync(join(dir, 'cp-ca', 'go.mod')))
-      .digest('hex');
-    writeFileSync(
-      join(dir, '.git', 'agentdeck-prep-left.json'),
-      JSON.stringify([{ path: 'cp-ca/go.mod', hash }]),
-    );
-    const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect(facts.dirty).toEqual(['cp-ca/go.mod']);
+    expect(dirtyPaths(dir)).toEqual([]);
   });
 });
 
 /**
  * F-64: повторная установка в копии посреди работы откатывала go.mod/lock-файл
- * агента и записывала его правки как «оставила подготовка» — доставка их не
- * видела. Снимок до установки (`snapshotPrepTree`) отделяет правку агента.
+ * агента. Снимок до установки (`snapshotPrepTree`) отделяет правку агента.
  */
 describe('повторная установка посреди работы не трогает правки агента', () => {
   let dir: string;
@@ -112,7 +81,7 @@ describe('повторная установка посреди работы не
   });
   afterEach(() => dropTemp(dir));
 
-  it('грязное до установки остаётся и видно доставке; переписанное установкой — откатывается', async () => {
+  it('грязное до установки остаётся; переписанное установкой — откатывается', async () => {
     // Работа агента: новая зависимость в go.mod и package-lock, правка кода.
     writeFileSync(join(dir, 'go.mod'), 'module root\n\ngo 1.22\n\nrequire x v1\n');
     writeFileSync(join(dir, 'package-lock.json'), '{"v":1,"dep":"x"}\n');
@@ -131,8 +100,7 @@ describe('повторная установка посреди работы не
     expect(readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8')).toBe('lockfileVersion: 9\n');
     expect(readFileSync(join(dir, 'package-lock.json'), 'utf8')).toBe('{"v":1,"dep":"x"}\n');
     expect(readFileSync(join(dir, 'go.mod'), 'utf8')).toContain('require x v1');
-    const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect([...facts.dirty].sort()).toEqual(['app.ts', 'go.mod', 'package-lock.json']);
+    expect(dirtyPaths(dir)).toEqual(['app.ts', 'go.mod', 'package-lock.json']);
   });
 
   it('снимок до установки не вышел — конец установки ничего не откатывает', async () => {
@@ -171,8 +139,7 @@ describe('повторная установка посреди работы не
       expect(state.status).toBe('ok');
       expect(readFileSync(join(dir, 'package-lock.json'), 'utf8')).toBe('{"v":1,"dep":"x"}\n');
       expect(readFileSync(join(dir, 'pnpm-lock.yaml'), 'utf8')).toBe('lockfileVersion: 9\n');
-      const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-      expect(facts.dirty).toEqual(['package-lock.json']);
+      expect(dirtyPaths(dir)).toEqual(['package-lock.json']);
     } finally {
       dropTemp(scripts);
       dropTemp(logs);
@@ -240,7 +207,5 @@ describe.runIf(HAS_GO)('настоящий go mod download при подгото
     expect(state.reverted).toContain('cp-ca/go.mod');
     expect(readFileSync(join(dir, 'cp-ca', 'go.mod'), 'utf8')).toBe(CA_MOD);
     expect(run('status', '--porcelain')).toBe('');
-    const facts = await readDeliveryFacts({ cwd: dir, branch: 'feature/users' });
-    expect(facts.dirty).toEqual([]);
   }, 120_000);
 });

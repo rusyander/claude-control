@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import type { AgentEnvironment } from '@agentdeck/contracts/portable-env';
 import { agentEnvironmentSchema } from '@agentdeck/contracts/portable-env-schema';
 import {
   countOnlyThroughPanel,
@@ -388,22 +389,29 @@ describe('portability-routes: паспорт среды', () => {
       }
     });
 
-    it('испорченный settings.json — названный отказ на ОБОИХ маршрутах, а не 500', async () => {
-      // Ровно та поломка, которую человек делает руками: лишняя запятая. До
-      // починки `readJsonFile` бросал из импортёра, и панель отвечала
-      // пятисоткой с текстом разборщика — а тот ЦИТИРУЕТ начало файла, рядом с
-      // которым в `settings.json` живут ключи API.
+    it('испорченный settings.json — паспорт на ОБОИХ маршрутах, разделы файла названы непрочитанными', async () => {
+      // Ровно та поломка, которую человек делает руками: лишняя запятая. Сначала
+      // она давала пятисотку с текстом разборщика, потом — отказ всему паспорту:
+      // CLAUDE.md и скиллы, лежащие в других файлах, пропадали вместе с файлом
+      // настроек. Теперь разделы ЭТОГО файла названы пропуском с причиной, а
+      // остальные на месте.
       writeFileSync(join(home, 'settings.json'), '{ "env": { "EDITOR": "code", } }');
 
-      for (const res of [await passport(), await fidelity('?target=codex')]) {
-        expect(res.statusCode).toBe(400);
-        expect(res.json<{ messageCode: string }>().messageCode).toBe(
-          'portability-source-not-readable',
-        );
-        // Наружу идёт код, а не цитата файла: иначе отказ сам выносил бы то,
-        // что паспорт бережно не показывает.
-        expect(res.body).not.toContain('EDITOR');
+      const passportRes = await passport();
+      expect(passportRes.statusCode).toBe(200);
+      const env = passportRes.json<AgentEnvironment>();
+      expect(env.items.map((item) => item.kind)).toContain('instructions');
+      for (const kind of ['hook', 'permission', 'envVar']) {
+        const skip = env.skipped.find((entry) => entry.kind === kind);
+        expect(skip?.reason, kind).toBe('not_readable');
+        expect(skip?.detailCode, kind).toBe('portability-skip-section-unreadable');
       }
+
+      const fidelityRes = await fidelity('?target=codex');
+      expect(fidelityRes.statusCode).toBe(200);
+      // Наружу идёт код и путь, а не цитата файла: иначе паспорт сам выносил бы
+      // то, что бережно не показывает (рядом в settings.json живут ключи API).
+      for (const res of [passportRes, fidelityRes]) expect(res.body).not.toContain('EDITOR');
     });
 
     it('значение секрета не встречается нигде в отчёте', async () => {

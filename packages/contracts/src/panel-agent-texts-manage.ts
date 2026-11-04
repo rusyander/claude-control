@@ -9,23 +9,11 @@
  */
 export const PANEL_MANAGE_TEXT_PARAMS = {
   // Настройки: правила групп разделения, наблюдатель, модели, форматы, CLI.
-  'journal-read-split-defaults': [],
-  'journal-save-split-defaults': [],
-  'summary-save-split-defaults': [],
-  'label-split-human-only': [],
-  'value-split-human-only': [],
   // Сита перед MR: выученные по тредам MR и счёт блокеров (28.09).
   'journal-read-sieves': [],
   'journal-delete-learned-sieve': [],
   'summary-delete-learned-sieve': ['class'],
   'label-sieve-sources': [],
-  'journal-watcher-status': [],
-  'journal-set-watcher': [],
-  'summary-watcher-on': [],
-  'summary-watcher-off': [],
-  'label-watcher-cost': [],
-  'value-watcher-cost': [],
-  'value-watcher-off': [],
   'journal-list-models': [],
   'journal-format-check': [],
   'journal-read-account': [],

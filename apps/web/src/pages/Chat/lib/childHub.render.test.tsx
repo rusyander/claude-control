@@ -2,21 +2,20 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ChatSummary } from '@agentdeck/contracts';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import type { ActiveRunView } from '@shared/lib/agent-runs';
 import { i18n } from '@shared/config/i18n';
 import { ChildStages } from '@features/ChatMessages';
 import { collectChildStages } from './childStages';
-import { treeForChat } from './treeForChat';
 
 /**
- * Хаб родителя целиком: настоящая сводка (`collectChildStages` со склейкой
- * конвейера) рисуется настоящей карточкой `ChildStages`. Подменены только часы.
+ * Хаб родителя целиком: настоящая сводка (`collectChildStages`) рисуется
+ * настоящей карточкой `ChildStages`. Подменены только часы.
  *
- * Живой прогон 24.09.2026 (L13, L23, L37, L20): разбор молчал минутами без
- * времени; строка остановленного разбора писала «в работе 21м», и человек
- * читал это как «работает»; сводки «сколько готово, сколько ждёт меня» не было;
- * чаты групп, отброшенных перезапуском, становились строками групп.
+ * Живой прогон 24.09.2026 (L23, L37, L20): строка остановленного звена писала
+ * «в работе 21м», и человек читал это как «работает»; сводки «сколько идёт,
+ * сколько ждёт меня» не было; чаты групп, отброшенных перезапуском, становились
+ * строками групп. Вид конвейера разделения (план, разбор, очередь групп без
+ * чата) снят вместе с конвейером (этап 10, G14): строки — только чаты детей.
  */
 
 function chat(over: Partial<ChatSummary> & { id: string }): ChatSummary {
@@ -35,25 +34,12 @@ function chat(over: Partial<ChatSummary> & { id: string }): ChatSummary {
 
 const running = (id: string): ActiveRunView => ({ id, status: 'running' }) as ActiveRunView;
 
-type Group = SplitPlanView['groups'][number];
-const group = (index: number, over: Partial<Group>): Group => ({
-  index,
-  title: `Группа ${index}`,
-  branch: `fix/g${index}`,
-  after: [],
-  status: 'pending',
-  ...over,
-});
-
-function render(chats: ChatSummary[], runs: ActiveRunView[], split?: SplitPlanView): string {
-  const groups = collectChildStages(chats, 'parent', runs, split);
-  // Дерево — как его отдаёт сервер хабу: вид конвейера едет в нём (`split`).
-  const tree = split ? { root: 'parent', running: 0, nodes: [], split } : undefined;
-  // Кнопки строк (уборка копии, пауза группы) ведут запрос сами — как в панели,
-  // под клиентом запросов.
+function render(chats: ChatSummary[], runs: ActiveRunView[]): string {
+  const groups = collectChildStages(chats, 'parent', runs);
+  // Кнопки строк ведут запрос сами — как в панели, под клиентом запросов.
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
-      <ChildStages groups={groups} onOpen={() => {}} {...(tree ? { tree } : {})} sectionsOpen />
+      <ChildStages groups={groups} onOpen={() => {}} sectionsOpen />
     </QueryClientProvider>,
   );
 }
@@ -84,67 +70,20 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('хаб разделения — разбор', () => {
+describe('хаб — остановленное звено', () => {
   it('L23: время остановленного звена подписано как длительность, а не как «в работе»', () => {
     vi.useFakeTimers({ now: Date.parse('2026-09-24T12:00:00.000Z') });
-    const html = render([triageChat], [], {
-      parentChatId: 'parent',
-      triageChatId: 'triage',
-      triage: { at: '2026-09-24T10:22:00.000Z', received: false, repairs: [], conflicts: [] },
-      order: [],
-      groups: [],
-    });
+    const html = render([triageChat], []);
 
     // Колонка «Время работы» (живой прогон 29.09): подпись над значением.
     expect(textOf(html)).toMatch(/Время работы\|*21м 57с/);
     expect(textOf(html)).not.toContain('в работе 21м');
   });
-
-  it('L13: идущий разбор показывает, сколько он уже идёт, — по часам, а не по последней записи', () => {
-    const split: SplitPlanView = {
-      parentChatId: 'parent',
-      triageChatId: 'triage',
-      order: [],
-      groups: [],
-    };
-    vi.useFakeTimers({ now: Date.parse('2026-09-24T10:04:12.000Z') });
-    const chip = section(
-      render([triageChat], [running('triage')], split),
-      'data-hub-triage="running"',
-    );
-    expect(textOf(chip)).toContain('идёт разбор · 4м 12с');
-
-    vi.setSystemTime(Date.parse('2026-09-24T10:04:42.000Z'));
-    const later = section(
-      render([triageChat], [running('triage')], split),
-      'data-hub-triage="running"',
-    );
-    expect(textOf(later)).toContain('идёт разбор · 4м 42с');
-  });
-
-  // Итога разбора нет, а прогон стоит (пауза, остановка, перезапуск): «идёт
-  // разбор» здесь было неправдой — фишка говорит «разбор не идёт» и без времени.
-  it('L13: разбор, чей прогон не идёт, не пишет «идёт» вовсе', () => {
-    vi.useFakeTimers({ now: Date.parse('2026-09-24T12:00:00.000Z') });
-    const split: SplitPlanView = {
-      parentChatId: 'parent',
-      triageChatId: 'triage',
-      order: [],
-      groups: [],
-    };
-    const html = render([triageChat], [], split);
-    const chip = section(html, 'data-hub-triage="stopped"');
-
-    expect(html).not.toContain('data-hub-triage="running"');
-    expect(textOf(chip)).toContain('разбор не идёт');
-    expect(textOf(chip)).not.toContain('·');
-  });
 });
 
-describe('хаб разделения — сводка (L37)', () => {
+describe('хаб — сводка (L37)', () => {
   const chats = [
     triageChat,
-    chat({ id: 'done', branch: 'fix/g0', stage: 'fix', groupTitle: 'Группа 0' }),
     chat({
       id: 'busy',
       branch: 'fix/g1',
@@ -152,105 +91,67 @@ describe('хаб разделения — сводка (L37)', () => {
       groupTitle: 'Группа 1',
       createdAt: '2026-09-24T10:30:00.000Z',
     }),
+    chat({
+      id: 'asking',
+      branch: 'fix/g2',
+      stage: 'work',
+      groupTitle: 'Группа 2',
+      awaitingReply: true,
+    }),
     chat({ id: 'stuck', branch: 'fix/g5', stage: 'review', groupTitle: 'Группа 5' }),
   ];
-  const split: SplitPlanView = {
-    parentChatId: 'parent',
-    triageChatId: 'triage',
-    triage: { at: '2026-09-24T10:22:00.000Z', received: true, repairs: [], conflicts: [] },
-    order: [0, 1, 2, 3, 4, 5],
-    groups: [
-      group(0, { status: 'done', chatId: 'done' }),
-      group(1, { status: 'started', chatId: 'busy' }),
-      group(2, { status: 'held', hold: 'Какой браузер?' }),
-      group(3, { status: 'pending' }),
-      group(4, { status: 'failed', error: 'нет копии' }),
-      group(5, { status: 'awaiting', waitingFor: 'delivery', chatId: 'stuck' }),
-    ],
-  };
 
-  it('счётчики по состояниям, «ждёт вас» и время с начала разделения', () => {
+  it('счётчики по состояниям, «ждёт вас» и время с начала', () => {
     vi.useFakeTimers({ now: Date.parse('2026-09-24T11:05:00.000Z') });
-    const html = render(chats, [running('busy')], split);
+    const html = render(chats, [running('busy')]);
     const summary = textOf(section(html, 'data-hub-summary'));
 
-    expect(summary).toContain('готово: 1');
     expect(summary).toContain('идёт: 1');
     expect(summary).toContain('ждёт вас: 1');
-    expect(summary).toContain('в очереди: 1');
-    expect(summary).toContain('упала: 1');
     expect(summary).toContain('стоит: 1');
-    // С заведения разбора — первого звена разделения — до «сейчас»: прогон идёт.
+    // С заведения первого звена до «сейчас»: прогон идёт.
     expect(summary).toContain('с начала 1ч 05м');
-    // Строка разбора — не группа: шесть групп, а не семь.
-    expect(textOf(html)).toContain('Групп разделения: 6');
+    // Строка разбора — не группа: три группы, а не четыре.
+    expect(textOf(html)).toContain('Группы разделения: 3');
   });
 
   it('ждущих человека нет — «ждёт вас» не пишется вовсе', () => {
     vi.useFakeTimers({ now: Date.parse('2026-09-24T11:05:00.000Z') });
-    const calm = { ...split, groups: split.groups.filter((item) => item.status !== 'held') };
-    const markup = section(render(chats, [], calm), 'data-hub-summary');
+    const calm = chats.filter((item) => !item.awaitingReply);
+    const markup = section(render(calm, []), 'data-hub-summary');
     const summary = textOf(markup);
 
     // Ни «ждёт вас: 0», ни «ждут вас: 0» — пустая корзина не пишется вовсе.
     expect(summary).not.toContain('вас');
     expect(markup).not.toContain('data-hub-count="ask"');
-    expect(summary).toContain('готово: 1');
+    expect(summary).toContain('стоят: 2');
   });
 });
 
-describe('хаб разделения — отброшенные перезапуском (L20)', () => {
+describe('хаб — отброшенные перезапуском (L20)', () => {
   it('чат с меткой `retired` — внизу под «Неактивно», не строка группы и не в счёте', () => {
     vi.useFakeTimers({ now: Date.parse('2026-09-24T11:05:00.000Z') });
     const chats = [
       triageChat,
-      // Старый чат отброшенной группы: ветка та же, что у перезапущенной группы в очереди.
+      // Старый чат отброшенной группы: ветка та же, что у живой группы.
       chat({
-        id: 'old-g3',
-        branch: 'fix/g3',
+        id: 'old-g1',
+        branch: 'fix/g1',
         stage: 'work',
         retired: true,
         title: 'Старая работа',
       }),
       chat({ id: 'busy', branch: 'fix/g1', stage: 'work', groupTitle: 'Группа 1' }),
     ];
-    const split: SplitPlanView = {
-      parentChatId: 'parent',
-      triageChatId: 'triage',
-      triage: { at: '2026-09-24T10:22:00.000Z', received: true, repairs: [], conflicts: [] },
-      order: [1, 3],
-      groups: [group(1, { status: 'started', chatId: 'busy' }), group(3, { status: 'pending' })],
-    };
-    const html = render(chats, [running('busy')], split);
+    const html = render(chats, [running('busy')]);
 
-    // Группа 3 в очереди, а не «заняла» строку мёртвого чата с той же веткой.
-    expect(html).toContain('data-hub-row="queued"');
-    expect(textOf(html)).toContain('Группы разделения: 2');
+    expect(textOf(html)).toContain('Группа разделения: 1');
     const inactive = html.slice(html.indexOf('data-hub-inactive'));
     expect(html.indexOf('data-hub-inactive')).toBeGreaterThan(-1);
     expect(textOf(inactive)).toContain('Неактивно: 1');
     expect(textOf(inactive)).toContain('Старая работа');
     // Строк групп с чатом ровно две — разбор и группа 1; отброшенный чат — не из них.
     expect(html.match(/data-hub-row="chat"/g)?.length).toBe(2);
-  });
-
-  // F5.2: копия группы прошлого разделения лежала на диске без кнопки уборки —
-  // хаб показывает строки только нынешнего плана.
-  it('снятый чат с неубранной копией — кнопка уборки у него, у прочих снятых нет', () => {
-    const chats = [
-      triageChat,
-      chat({ id: 'old-copy', retired: true, copyLeft: true, title: 'Старая с копией' }),
-      chat({ id: 'old-clean', retired: true, title: 'Старая без копии' }),
-    ];
-    const html = render(chats, []);
-
-    const inactive = html.slice(html.indexOf('data-hub-inactive'));
-    expect(textOf(inactive)).toContain('Неактивно: 2');
-    expect(inactive.match(/data-cleanup-group/g)?.length).toBe(1);
-    const withCopy = inactive.indexOf('Старая с копией');
-    const button = inactive.indexOf('data-cleanup-group');
-    expect(button).toBeGreaterThan(withCopy);
-    expect(button).toBeLessThan(inactive.indexOf('Старая без копии'));
   });
 
   // Живая приёмка 09.10 (п. 5): после нового разделения принятая группа уходила
@@ -275,77 +176,6 @@ describe('хаб разделения — отброшенные перезап�
     expect(marker).toBeGreaterThan(inactive.indexOf('Старая принятая'));
     expect(marker).toBeLessThan(inactive.indexOf('Старая непринятая'));
     expect(textOf(inactive)).toContain('принято');
-  });
-});
-
-/**
- * Живой прогон 26.09 (F2): дерево сервер отдаёт по корню, и хаб чата группы
- * рисовал план всего разделения — все группы «ждут итога разбора» и кнопку
- * «Отменить план». Путь хаба: дерево → `treeForChat` → сводка → карточка.
- */
-describe('хаб разделения — чат группы', () => {
-  const split: SplitPlanView = {
-    parentChatId: 'parent',
-    order: [1, 2],
-    groups: [group(1, { status: 'started', chatId: 'g1' }), group(2, {})],
-  };
-  // Дерево — одно на корень, какой бы чат его ни спросил.
-  const served = { root: 'parent', running: 1, nodes: [], split };
-  const chats = [
-    chat({ id: 'g1', groupIndex: 1, groupTitle: 'Группа 1', stage: 'work' }),
-    // У звена группы свой ребёнок (передача) — хаб в нём не пуст.
-    chat({ id: 'g1-next', parentId: 'g1', title: 'Передача', stage: 'work' }),
-  ];
-
-  function hubOf(chatId: string): string {
-    const tree = treeForChat(served, chatId);
-    const groups = collectChildStages(chats, chatId, [], tree?.split);
-    return renderToStaticMarkup(
-      <QueryClientProvider client={new QueryClient()}>
-        <ChildStages groups={groups} onOpen={() => {}} {...(tree ? { tree } : {})} />
-      </QueryClientProvider>,
-    );
-  }
-
-  it('родитель видит план и кнопку его отмены', () => {
-    const html = hubOf('parent');
-    expect(html).toContain('data-plan-cancel');
-    expect(textOf(html)).toContain('Группа 2');
-  });
-
-  it('чат группы не рисует чужой план — только своих детей', () => {
-    const html = hubOf('g1');
-    expect(html).not.toContain('data-plan-cancel');
-    expect(textOf(html)).not.toContain('Группа 2');
-    expect(textOf(html)).toContain('Передача');
-  });
-});
-
-/**
- * Живой прогон 26.09 (O3): отмену плана человеком фишка сводки считала
- * «упала: 1» рядом с верной подписью строки «остановлена: план отменён».
- */
-describe('хаб разделения — сводка после отмены плана', () => {
-  it('группы, закрытые отменой, считаются «отменена», а не «упала»', () => {
-    const cancelled = {
-      status: 'failed' as const,
-      error: 'план отменён человеком',
-      errorCode: 'split-group-plan-cancelled' as const,
-    };
-    const html = render([], [], {
-      parentChatId: 'parent',
-      cancelledAt: '2026-09-26T08:00:00.000Z',
-      order: [1, 2, 3],
-      groups: [
-        group(1, { status: 'done' }),
-        group(2, cancelled),
-        group(3, { status: 'failed', error: 'сбой' }),
-      ],
-    });
-    const summary = textOf(section(html, 'data-hub-summary'));
-
-    expect(summary).toContain('отменена: 1');
-    expect(summary).toContain('упала: 1');
   });
 });
 
@@ -456,23 +286,6 @@ describe('хаб разделения — индикатор группы', () =
     expect(textOf(html)).toContain('работает · 1ч 00м');
     expect(textOf(html)).toContain('7 из 14 · 50 %');
     expect(textOf(html)).toContain('Bash: pnpm test · 3м 00с');
-  });
-
-  it('билет очереди тяжёлых шагов: «ждёт очередь», сколько впереди', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-09-24T12:00:00.000Z'));
-    const html = renderWith(
-      {
-        tasks: [],
-        agents: [],
-        steps,
-        activeTool: bash,
-        heavyQueue: { since: '2026-09-24T11:58:30.000Z', ahead: 2 },
-      },
-      [running('g0')],
-    );
-    expect(html).toContain('data-group-progress="queued"');
-    expect(textOf(html)).toContain('ждёт очередь · 1м 30с · впереди 2');
   });
 
   it('запрос прав: «ждёт разрешения» с момента вызова', () => {

@@ -12,8 +12,10 @@ import {
   type LocalLimits,
   type SessionSpec,
 } from '../adapter.types.ts';
+import { isRemoteMcp } from '../mcp-carry.ts';
+import { qwenEconomy } from '../economy-carry.ts';
 import { homeDir } from '../../platform/os-kind.ts';
-import { READ_ONLY_DENIED } from '../read-only.ts';
+import { deniedClassesOf } from '../read-only.ts';
 import { trustedLayer, type LayerPolicy } from '../sdk-stream/layer-run.ts';
 import { qwenInventory } from './layer-parts.ts';
 import { repoDenyDetail, repoDenyRefusal } from '../sdk-stream/repo-deny.ts';
@@ -24,8 +26,9 @@ import {
   type SdkLaunchPlan,
 } from '../sdk-stream/sdk-adapter.ts';
 import { QWEN_OUTCOME } from './outcome.ts';
-import { mapQwenPermission, qwenDenyRules } from './permission.ts';
+import { mapQwenPermission, QWEN_NONE_EXCLUDED, qwenDenyRules } from './permission.ts';
 import { qwenSessionId } from './session-id.ts';
+import { qwenOwnsTranscript } from './transcript.ts';
 import { qwenReadLayer } from './read-layer.ts';
 import { qwenRepoDeny } from './repo-deny.ts';
 import {
@@ -235,7 +238,7 @@ export function planQwen(
 ): SdkLaunchPlan {
   // Недоверенная копия: слой копии CLI загрузит — ядро снимает, что снимается (F-86, H2).
   const repo = layer.repoLayer ? null : qwenRepoLayer(spec.cwd, homeDir(spec.env.pin));
-  const extraTools = spec.tools === 'read-only' ? READ_ONLY_DENIED : [];
+  const extraTools = deniedClassesOf(spec.tools);
   const deny = qwenDenyRules(spec.deny, spec.cwd, extraTools, platformPaths(spec));
   // Недоверенная копия: файл репозитория CLI не читает — его запреты несёт ядро (F-86).
   const repoDeny = layer.repoLayer ? null : qwenRepoDeny(spec);
@@ -245,7 +248,10 @@ export function planQwen(
   );
 
   const hook = spec.coreHook ? qwenHookCommand(spec.coreHook) : null;
+  // Рычаги экономии — младше всего прочего слоя: доверие, запреты и привязка адреса сильнее.
+  const economy = qwenEconomy(spec);
   const settings: Record<string, unknown> = {
+    ...economy.settings,
     ...trustPlan(repo),
     permissions: { deny: [...new Set([...(repoDeny?.rules ?? []), ...deny.rules])] },
     ...(hook
@@ -254,7 +260,14 @@ export function planQwen(
     mcpServers: Object.fromEntries(
       servers.map(([name, s]) => [
         name,
-        { command: s.command, args: s.args, ...(s.env ? { env: s.env } : {}), trust: false },
+        // Удалённый (s10 p8) — схема настроек Qwen Code: `httpUrl` streamable HTTP, `url` SSE.
+        isRemoteMcp(s)
+          ? {
+              ...(s.transport === 'http' ? { httpUrl: s.url } : { url: s.url }),
+              ...(s.headers ? { headers: s.headers } : {}),
+              trust: false,
+            }
+          : { command: s.command, args: s.args, ...(s.env ? { env: s.env } : {}), trust: false },
       ]),
     ),
   };
@@ -288,7 +301,9 @@ export function planQwen(
     if (own) args.push('--session-id', own);
   }
   if (spec.model) args.push(`--model=${spec.model}`);
-  if (deny.excluded.length > 0) args.push('--exclude-tools', ...deny.excluded);
+  const excluded =
+    spec.tools === 'none' ? [...new Set([...deny.excluded, ...QWEN_NONE_EXCLUDED])] : deny.excluded;
+  if (excluded.length > 0) args.push('--exclude-tools', ...excluded);
 
   const env: Record<string, string> = {
     QWEN_CODE_SYSTEM_SETTINGS_PATH: join(spec.dir, FILES.system),
@@ -303,6 +318,7 @@ export function planQwen(
     env,
     files: { [FILES.system]: JSON.stringify(merged, null, 2) },
     ...(layerDetail ? { layerDetail } : {}),
+    ...(economy.lost.length > 0 ? { layerLosses: economy.lost } : {}),
   };
 }
 
@@ -379,6 +395,9 @@ export function createQwenAdapter(options: QwenAdapterOptions = {}): SdkAdapter 
       caps: QWEN_CAPS,
       command: qwenRunFacts.binary.command,
       ...(ladder ? { ladder } : {}),
+      ownsTranscript: qwenOwnsTranscript,
+      // `--exclude-tools` каждого встроенного инструмента, что действует (`QWEN_NONE_EXCLUDED`).
+      toolsNone: true,
       echo: false,
       inBandPermit: true,
       // Без `initialize` первой строкой CLI в «прямом» режиме: вопрос о праве висит молча

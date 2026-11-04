@@ -87,6 +87,8 @@ export const decisionsEn: DecisionTexts = {
       'extend-tokens': 'Add tokens',
       answered: 'Answer received',
       'close-human-step': 'Close the human step',
+      'close-chat': 'Close the chat',
+      'close-ask': 'Close the question: the answer arrived',
       raise: 'Ask the human',
       'skip-step': 'Skip the step',
       'end-unit': 'End the unit',

@@ -10,9 +10,11 @@ import type { PlatformFetch } from '../platform/ca-fetch/ca-fetch.ts';
 import { promptText } from '../prompts/prompts.ts';
 import { driverFor } from '../platform/drivers/index.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
-import { generateImage, planImage, planImageReady, savePicture, type MediaDeps } from './images.ts';
+import { generateImage, planImage, savePicture, type MediaDeps } from './images.ts';
 import { isMediaError, type MediaError } from './errors.ts';
 import { mediaDir } from './store.ts';
+import { codeOf } from '../../lib/server-text/server-text.ts';
+import { createCoreContours } from '../platform/contours/contours.ts';
 
 /**
  * Картинки из чата: маршрут решает сервер, и недоступность называется.
@@ -119,6 +121,17 @@ function deps(extra: Partial<MediaDeps> = {}): MediaDeps {
   return { appDataDir: appData, store, ...extra };
 }
 
+/** Звено ядра (C3b): адрес ручки и заглушка ключа — то, что отдаёт `ContourLinker.link`. */
+const HOP = { baseUrl: 'http://127.0.0.1:5100', key: 'adk-hop-x' };
+
+/** Клиент учёта контуров, который каждый раз отдаёт звено и записывает, о чём спросили. */
+function linked(asked: Array<{ id: string; fresh: boolean }> = []): MediaDeps['contourLink'] {
+  return (id, fresh) => {
+    asked.push({ id, fresh: fresh === true });
+    return Promise.resolve(HOP);
+  };
+}
+
 /** Ответ чужой стороны: тело строкой, как его читает `readCapped`. */
 function reply(body: string, status = 200): Response {
   return new Response(body, { status, headers: { 'content-type': 'application/json' } });
@@ -161,7 +174,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
     // Ровно инвариант 13: в имени «vision» есть, объявления — нет.
     useContour(contour(), [model('company-vision-7b', false)]);
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }));
+    const plan = planImage(deps());
 
     expect(plan.available).toBe(false);
     expect(plan.rasterReason).toBe('no-model');
@@ -170,7 +183,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
   it('объявленная модель + поднятый шлюз — дорога «частью ответа» с промптом режима', () => {
     useContour(contour(), [model('company-chat', false), model('company-image', true)]);
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }));
+    const plan = planImage(deps());
 
     expect(plan).toMatchObject({
       available: true,
@@ -183,101 +196,19 @@ describe('planImage: чем нарисуем и почему нельзя', () =
     });
   });
 
-  it('шлюз не поднят — причина названа его тумблером, а не «нет модели»', () => {
-    useContour(contour(), [model('company-image', true)]);
-
-    const plan = planImage(deps({ gatewayPort: () => 0 }));
-
-    expect(plan.available).toBe(false);
-    expect(plan.rasterReason).toBe('gateway-off');
-  });
-
   /**
-   * A-1: «шлюз не поднят» — это ДВА разных состояния, и человеку от них нужно
-   * разное. Тумблер выключен — его выбор, и снимает его он. Тумблер включён, а
-   * слушателя нет — поднимать обязана панель, и послать человека «включить шлюз»,
-   * который уже включён, значит послать чинить не то.
+   * C3b: запрос в контур идёт через звено ядра, и шлюз панели плану больше не нужен —
+   * ни выключенный тумблер, ни погашенный слушатель дорогу контура не запирают.
    */
-  it('тумблер включён, слушателя нет — причина другая, и в ней отказ слушателя', () => {
+  it('шлюз панели выключен — дорога контура всё равно открыта', () => {
     useContour(contour(), [model('company-image', true)]);
     store.updateSettings({
-      platformGateway: { enabled: true, port: 5179, forceStream: true },
+      platformGateway: { enabled: false, port: 5179, forceStream: true },
     });
 
-    const plan = planImage(
-      deps({ gatewayPort: () => 0, gatewayFailure: () => 'listen EADDRINUSE 5179' }),
-    );
+    const plan = planImage(deps());
 
-    expect(plan.rasterReason).toBe('gateway-failed');
-    // Причину отказа панель выдумать не может — она приезжает от слушателя.
-    expect(plan.reasonDetail).toBe('listen EADDRINUSE 5179');
-  });
-
-  it('тумблер включён — план сам поднимает свой шлюз, и ровно один раз', async () => {
-    useContour(contour(), [model('company-image', true)]);
-    store.updateSettings({
-      platformGateway: { enabled: true, port: 5179, forceStream: true },
-    });
-    let raised = 0;
-    let port = 0;
-    const raising = deps({
-      gatewayPort: () => port,
-      raiseGateway: () => {
-        raised += 1;
-        port = 5179;
-        return Promise.resolve();
-      },
-    });
-
-    const plan = await planImageReady(raising);
-    expect(raised).toBe(1);
-    // И тот же расчёт отвечает уже доступной дорогой: замок там, где панель
-    // умеет поднять шлюз одним вызовом, был отказом собственной работе.
-    expect(plan).toMatchObject({ available: true, source: 'contour-chat' });
-
-    // Шлюз жив — второй расчёт ничего не поднимает.
-    await planImageReady(raising);
-    expect(raised).toBe(1);
-  });
-
-  it('тумблер ВЫКЛЮЧЕН — панель не поднимает ничего и оставляет прежний замок', async () => {
-    useContour(contour(), [model('company-image', true)]);
-    let raised = 0;
-    const plan = await planImageReady(
-      deps({
-        gatewayPort: () => 0,
-        raiseGateway: () => {
-          raised += 1;
-          return Promise.resolve();
-        },
-      }),
-    );
-
-    expect(raised).toBe(0);
-    expect(plan.rasterReason).toBe('gateway-off');
-    // Настройка не тронута: включить её за человека — дело активации контура по
-    // его же нажатию, а не расчёта плана картинки.
-    expect(store.getSettings().platformGateway.enabled).toBe(false);
-  });
-
-  it('мешает не шлюз — поднимать нечего и незачем', async () => {
-    useContour(contour(), [model('company-chat', false)]);
-    store.updateSettings({
-      platformGateway: { enabled: true, port: 5179, forceStream: true },
-    });
-    let raised = 0;
-    const plan = await planImageReady(
-      deps({
-        gatewayPort: () => 0,
-        raiseGateway: () => {
-          raised += 1;
-          return Promise.resolve();
-        },
-      }),
-    );
-
-    expect(plan.rasterReason).toBe('no-model');
-    expect(raised).toBe(0);
+    expect(plan).toMatchObject({ available: true, source: 'contour-chat', model: 'company-image' });
   });
 
   it('совместимый контур ручку не объявляет — и не запирает дорогу профиля', () => {
@@ -288,7 +219,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
       endpointProfiles: [profile({ imagesUrl: 'http://127.0.0.1:11434/v1/images/generations' })],
     });
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }));
+    const plan = planImage(deps());
 
     expect(plan).toMatchObject({ available: true, source: 'endpoint', model: 'sd-xl' });
     // У ручки картинок системного сообщения нет вовсе — и это сказано.
@@ -331,7 +262,7 @@ describe('planImage: чем нарисуем и почему нельзя', () =
     useContour(contour(), [model('company-chat', false)]);
     store.updateSettings({ endpointProfiles: [profile()] });
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }));
+    const plan = planImage(deps());
 
     expect(plan.rasterReason).toBe('endpoint-no-url');
   });
@@ -351,7 +282,7 @@ describe('planImage: дорога агента — режим работает �
   it('растровая дорога сильнее: с рисующим контуром выбирается она, а не агент', () => {
     useContour(contour(), [model('company-image', true)]);
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }), { agent: true });
+    const plan = planImage(deps(), { agent: true });
 
     // Просят обычно снимок, а агент рисует вектор кодом: продукт другой, и
     // подменять им растр, когда растр есть, панель не вправе.
@@ -362,7 +293,7 @@ describe('planImage: дорога агента — режим работает �
   it('модель разговора панели неизвестна — и она её не выдумывает', () => {
     useContour(contour(), [model('company-chat', false)]);
 
-    const plan = planImage(deps({ gatewayPort: () => 5100 }), { agent: true });
+    const plan = planImage(deps(), { agent: true });
 
     expect(plan.source).toBe('agent');
     expect(plan.model).toBe('');
@@ -435,23 +366,26 @@ function savePictureError(request: { block: string }): unknown {
   }
 }
 
-describe('generateImage: дорога «частью ответа» через свой шлюз', () => {
-  it('запрос уходит на свой шлюз в диалекте OpenAI, с промптом режима', async () => {
+describe('generateImage: дорога «частью ответа» через звено ядра', () => {
+  it('запрос уходит на звено ядра в диалекте OpenAI, с промптом режима', async () => {
     useContour(contour(), [model('company-image', true)]);
-    const seen: Array<{ url: string; body: unknown }> = [];
+    const seen: Array<{ url: string; body: unknown; headers: unknown }> = [];
+    const asked: Array<{ id: string; fresh: boolean }> = [];
     const fetchImpl: PlatformFetch = (url, init) => {
-      seen.push({ url, body: JSON.parse(String(init?.body)) });
+      seen.push({ url, body: JSON.parse(String(init?.body)), headers: init?.headers });
       return Promise.resolve(reply(framesWithImage(png())));
     };
 
-    const image = await generateImage(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const image = await generateImage(deps({ contourLink: linked(asked), fetchImpl }), {
       chatId: 'chat-1',
       prompt: 'кот на подоконнике',
     });
 
-    // Через СВОЙ шлюз, а не напрямую: там след запроса, учёт расхода и перевод
+    // Через звено ядра, а не напрямую: там ключ, след запроса, учёт расхода и перевод
     // отказов контура. И в диалекте OpenAI — мост Anthropic картинку не несёт.
-    expect(seen[0]?.url).toBe('http://127.0.0.1:5100/gor/v1/chat/completions');
+    expect(asked).toEqual([{ id: 'gor', fresh: false }]);
+    expect(seen[0]?.url).toBe('http://127.0.0.1:5100/v1/chat/completions');
+    expect(seen[0]?.headers).toMatchObject({ authorization: 'Bearer adk-hop-x' });
     expect(seen[0]?.body).toMatchObject({
       model: 'company-image',
       stream: true,
@@ -476,7 +410,7 @@ describe('generateImage: дорога «частью ответа» через �
     const bytes = png();
     const fetchImpl: PlatformFetch = () => Promise.resolve(reply(framesWithImage(bytes)));
 
-    const image = await generateImage(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const image = await generateImage(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'схема',
     });
@@ -499,7 +433,7 @@ describe('generateImage: дорога «частью ответа» через �
       'data: [DONE]\n\n';
     const fetchImpl: PlatformFetch = () => Promise.resolve(reply(frames));
 
-    const error = await generateImage(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const error = await generateImage(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'кот',
     }).catch((thrown: unknown) => thrown as MediaError);
@@ -523,7 +457,7 @@ describe('generateImage: дорога «частью ответа» через �
       })}\n\n` + 'data: [DONE]\n\n';
     const fetchImpl: PlatformFetch = () => Promise.resolve(reply(frames));
 
-    const error = await generateImage(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const error = await generateImage(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'кот',
     }).catch((thrown: unknown) => thrown as MediaError);
@@ -537,7 +471,7 @@ describe('generateImage: дорога «частью ответа» через �
     const fetchImpl: PlatformFetch = () =>
       Promise.resolve(reply(JSON.stringify({ error: { message: 'проверки контента' } }), 451));
 
-    const error = await generateImage(deps({ gatewayPort: () => 5100, fetchImpl }), {
+    const error = await generateImage(deps({ contourLink: linked(), fetchImpl }), {
       chatId: '',
       prompt: 'кот',
     }).catch((thrown: unknown) => thrown as MediaError);
@@ -662,7 +596,7 @@ describe('generateImage: ручка картинок своего эндпоин
  * контура — ручка картинок такую отвергает. Драйвер подменён на время теста тем
  * же объектом, который читает дорога: реестр драйверов закрыт.
  */
-describe('generateImage: ручка картинок контура — через свой шлюз', () => {
+describe('generateImage: ручка картинок контура — через звено ядра', () => {
   const driver = driverFor('openai-compat');
   const declared = driver.images;
   afterEach(() => {
@@ -697,40 +631,164 @@ describe('generateImage: ручка картинок контура — чере
         reply(JSON.stringify({ data: [{ b64_json: bytes.toString('base64') }] })),
       );
     };
-    const image = await generateImage(deps({ fetchImpl, gatewayPort: () => 5100 }), {
+    const image = await generateImage(deps({ fetchImpl, contourLink: linked() }), {
       chatId: 'c',
       prompt: 'кот',
     });
     return { image, seen };
   }
 
-  // Объявленный путь ручки теперь знает ШЛЮЗ (`gateway/images.ts`); домен идёт на
-  // свой маршрут шлюза без ключа — ключ, след и расход подставляет шлюз.
-  it('адрес — свой шлюз, и ключа контура в запросе панели нет', async () => {
+  // Объявленный путь ручки знает ЗВЕНО ядра (`hop-host/gateway/images.ts`); домен идёт на
+  // адрес звена с заглушкой — настоящий ключ, след и расход подставляет звено.
+  it('адрес — звено ядра, в запросе заглушка звена, а не ключ контура', async () => {
     const { image, seen } = await drawnVia([model('flux-1', true)]);
-    expect(seen[0]?.url).toBe(`http://127.0.0.1:5100/${gateway().id}/v1/images/generations`);
-    expect(Object.keys(seen[0]?.headers ?? {}).map((key) => key.toLowerCase())).not.toContain(
-      'authorization',
-    );
+    expect(seen[0]?.url).toBe('http://127.0.0.1:5100/v1/images/generations');
+    expect(seen[0]?.headers).toMatchObject({ authorization: 'Bearer adk-hop-x' });
     expect(seen[0]?.body.model).toBe('flux-1');
     expect(image.source).toBe('contour-images');
   });
 
-  it('шлюз погашен — дорога заперта причиной шлюза, наружу не уходит ничего', async () => {
+  it('звено не дало адрес (контур выключен) — 409 словами ядра, наружу не уходит ничего', async () => {
     driver.images = { api: 'images/create' };
     useContour(gateway(), [model('flux-1', true)]);
-    const plan = planImage(deps({ gatewayPort: () => 0 }));
-    expect(plan.available).toBe(false);
-    expect(plan.rasterReason ?? plan.reason).toBe('gateway-off');
     let called = false;
     const fetchImpl: PlatformFetch = () => {
       called = true;
       return Promise.resolve(reply('{}'));
     };
-    await expect(
-      generateImage(deps({ fetchImpl, gatewayPort: () => 0 }), { chatId: 'c', prompt: 'кот' }),
-    ).rejects.toMatchObject({ status: 409, reason: 'gateway-off' });
+    const refused: MediaDeps['contourLink'] = () =>
+      Promise.reject(Object.assign(new Error('Контур выключен в звене'), { status: 409 }));
+
+    const error = await generateImage(deps({ fetchImpl, contourLink: refused }), {
+      chatId: 'c',
+      prompt: 'кот',
+    }).catch((thrown: unknown) => thrown as MediaError);
+
+    expect(isMediaError(error)).toBe(true);
+    expect((error as MediaError).status).toBe(409);
+    expect((error as MediaError).message).toContain('Контур выключен в звене');
     expect(called).toBe(false);
+  });
+
+  it('ядра нет — 503, а не «шлюз не поднят»: дорога контура идёт только через звено', async () => {
+    driver.images = { api: 'images/create' };
+    useContour(gateway(), [model('flux-1', true)]);
+    let called = false;
+    const fetchImpl: PlatformFetch = () => {
+      called = true;
+      return Promise.resolve(reply('{}'));
+    };
+    const down: MediaDeps['contourLink'] = () => Promise.reject(new Error('fetch failed'));
+
+    const noCore = await generateImage(deps({ fetchImpl }), { chatId: 'c', prompt: 'кот' }).catch(
+      (thrown: unknown) => thrown as MediaError,
+    );
+    const coreDown = await generateImage(deps({ fetchImpl, contourLink: down }), {
+      chatId: 'c',
+      prompt: 'кот',
+    }).catch((thrown: unknown) => thrown as MediaError);
+
+    expect((noCore as MediaError).status).toBe(503);
+    expect((noCore as MediaError).message).toContain('ядро панели не подключено');
+    expect((coreDown as MediaError).status).toBe(503);
+    expect((coreDown as MediaError).message).toContain('fetch failed');
+    expect(called).toBe(false);
+    // Тело ответа маршрута (`codeOf` в media-routes): оба отказа едут кодом (core-s10 G12).
+    expect(codeOf(noCore)).toEqual({ messageCode: 'media-core-not-connected' });
+    expect(codeOf(coreDown)).toEqual({
+      messageCode: 'media-contour-link-failed',
+      params: { contour: 'Company · dev', reason: 'fetch failed' },
+    });
+  });
+
+  it('ядра нет у настоящего клиента контуров — причина ядра вложена кодом в отказ картинки', async () => {
+    driver.images = { api: 'images/create' };
+    useContour(gateway(), [model('flux-1', true)]);
+    const emptyHome = mkdtempSync(join(tmpdir(), 'cc-media-no-core-'));
+    const contours = createCoreContours({ home: () => emptyHome, log: () => undefined });
+    try {
+      const error = await generateImage(
+        deps({ contourLink: (id, fresh) => contours.link(id, fresh) }),
+        { chatId: 'c', prompt: 'кот' },
+      ).catch((thrown: unknown) => thrown as MediaError);
+
+      expect((error as MediaError).status).toBe(503);
+      expect(codeOf(error)).toMatchObject({
+        messageCode: 'media-contour-link-failed',
+        params: {
+          contour: 'Company · dev',
+          reason: { messageCode: 'core-link-missing', params: { reason: expect.any(String) } },
+        },
+      });
+    } finally {
+      rmSync(emptyHome, { recursive: true, force: true });
+    }
+  });
+
+  it('чужая сторона молчит дольше потолка — 504 с кодом «картинка не пришла»', async () => {
+    store.updateSettings({
+      endpointProfiles: [profile({ imagesUrl: 'http://127.0.0.1:11434/v1/images/generations' })],
+    });
+    const fetchImpl: PlatformFetch = () =>
+      Promise.reject(Object.assign(new Error('timeout'), { name: 'TimeoutError' }));
+
+    const error = await generateImage(deps({ fetchImpl }), { chatId: 'c', prompt: 'кот' }).catch(
+      (thrown: unknown) => thrown as MediaError,
+    );
+
+    expect((error as MediaError).status).toBe(504);
+    expect((error as MediaError).message).toMatch(/^Картинка не пришла за \d+ с/);
+    expect(codeOf(error)).toEqual({
+      messageCode: 'media-upstream-timeout-image',
+      params: { seconds: expect.any(Number) },
+    });
+  });
+
+  it('звено отвергло заглушку (401) — один повтор со свежей, и картинка рисуется', async () => {
+    driver.images = { api: 'images/create' };
+    useContour(gateway(), [model('flux-1', true)]);
+    const asked: Array<{ id: string; fresh: boolean }> = [];
+    const keys: string[] = [];
+    const fetchImpl: PlatformFetch = (_url, init) => {
+      keys.push(String((init?.headers as Record<string, string>).authorization));
+      return Promise.resolve(
+        keys.length === 1
+          ? reply('{"error":"unknown hop key"}', 401)
+          : reply(JSON.stringify({ data: [{ b64_json: png().toString('base64') }] })),
+      );
+    };
+
+    const image = await generateImage(deps({ fetchImpl, contourLink: linked(asked) }), {
+      chatId: 'c',
+      prompt: 'кот',
+    });
+
+    expect(image.source).toBe('contour-images');
+    // Первый раз — из кэша, второй — заново: 401 значит, что звено заглушку уже не знает.
+    expect(asked).toEqual([
+      { id: gateway().id, fresh: false },
+      { id: gateway().id, fresh: true },
+    ]);
+    expect(keys).toHaveLength(2);
+  });
+
+  it('и повторный 401 — отказ, а не третья попытка', async () => {
+    driver.images = { api: 'images/create' };
+    useContour(gateway(), [model('flux-1', true)]);
+    let calls = 0;
+    const fetchImpl: PlatformFetch = () => {
+      calls += 1;
+      return Promise.resolve(reply('{"error":"unknown hop key"}', 401));
+    };
+
+    const error = await generateImage(deps({ fetchImpl, contourLink: linked() }), {
+      chatId: 'c',
+      prompt: 'кот',
+    }).catch((thrown: unknown) => thrown as MediaError);
+
+    expect(isMediaError(error)).toBe(true);
+    expect((error as MediaError).message).toContain('401');
+    expect(calls).toBe(2);
   });
 
   it('рисующей модели в каталоге нет — чатовая не подставляется, поле модели не шлётся', async () => {

@@ -28,6 +28,8 @@ const hintModule = (await import(pathToFileURL(join(HOOKS, 'prompt', 'skill-hint
 const guard = guardModule.default;
 const record = guardModule.recordReviewRead;
 const hint = (prompt: string) => hintModule.default({}, prompt) ?? '';
+// Набор, запущенный сессией шага ядра, не должен глушить подсказку своим AGENTDECK_STEP_KIND.
+delete process.env.AGENTDECK_STEP_KIND;
 
 const MR = { project_id: 'team/app', merge_request_iid: '42' };
 const THREAD = 'mcp__gitlab__create_merge_request_thread';
@@ -57,14 +59,16 @@ describe('подсказка навыка ревью в наборе', () => {
     expect(hint('просто сделай ревью моей ветки')).toContain('agentdeck-kit:deep-review');
   });
 
-  it('ход группы панели (AGENTDECK_GROUP_STAGE) — без подсказки: навыки называет её вводная', () => {
-    const before = process.env.AGENTDECK_GROUP_STAGE;
-    process.env.AGENTDECK_GROUP_STAGE = 'deliver';
+  it('ход шага ядра (AGENTDECK_STEP_KIND, не chat) — без подсказки: навыки называет его вводная', () => {
+    const before = process.env.AGENTDECK_STEP_KIND;
     try {
+      process.env.AGENTDECK_STEP_KIND = 'review';
       expect(hint('сделай ревью моей ветки')).toBe('');
+      process.env.AGENTDECK_STEP_KIND = 'chat';
+      expect(hint('сделай ревью моей ветки')).toContain('agentdeck-kit:deep-review');
     } finally {
-      if (before === undefined) delete process.env.AGENTDECK_GROUP_STAGE;
-      else process.env.AGENTDECK_GROUP_STAGE = before;
+      if (before === undefined) delete process.env.AGENTDECK_STEP_KIND;
+      else process.env.AGENTDECK_STEP_KIND = before;
     }
     expect(hint('сделай ревью моей ветки')).toContain('agentdeck-kit:deep-review');
   });

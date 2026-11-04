@@ -46,7 +46,8 @@ export async function sandbox(page, answer) {
       body:
         `data: ${JSON.stringify({ kind: 'session', sessionId: 'help-guide' })}\n\n` +
         `data: ${JSON.stringify({ kind: 'text', text: answer })}\n\n` +
-        `data: ${JSON.stringify({ kind: 'done', costUsd: 0.004 })}\n\n`,
+        // Как шлёт маршрут: разговор — задача ядра, цены хода ядро не называет.
+        `data: ${JSON.stringify({ kind: 'done', costUsd: 0 })}\n\n`,
     }),
   );
 }

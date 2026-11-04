@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { forgeActionKey, parseForgeActionKey, type ForgeActionKey } from './action-keys.ts';
-import { hostOf, projectPathOf, selectForge } from './select.ts';
+import { hostOf, projectPathOf, selectForge } from '@agentdeck/contracts/core/forge';
 
 /**
  * Выбор форжа по адресу remote и формат цели/подсказки outbox: читатель сверки находит факт

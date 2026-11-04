@@ -38,6 +38,8 @@
  *     но не краснеет (решение владельца 27.09).
  *  9. Опись вариантов раздела `variants.json`, по которой справка выбирает
  *     файл, собрана из сегодняшних описей сценариев.
+ * 10. Печать кадра (`help-shots-seal.mjs`): текст описи и байты PNG — пара одного
+ *     снимка. Сдвинулась одна половина без другой — красное с именем кадра.
  *
  * Граница честности названа прямо: проверка видит то, что было в РАЗМЕТКЕ
  * снимаемой области. Секрет, нарисованный на canvas или пришедший картинкой, в
@@ -54,11 +56,13 @@
  * кейс одного раздела не краснел от чужого отставания; без флага — весь каталог).
  */
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { brandInText, readBrandMask } from '../help-shots/brand-mask.mjs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
   SHOTS_ROOT,
   SECRET_PATTERNS,
+  USER_PROFILE_PATH,
   DIAGRAMS_MANIFEST,
   SOURCES_MANIFEST,
   SHOT_VARIANTS,
@@ -71,7 +75,9 @@ import {
   readSourceManifest,
   sourceStates,
   sourceFingerprint,
+  readUnsealed,
 } from '../help-shots/kit.mjs';
+import { debtLine, sealProblems, selftestSeal } from './help-shots-seal.mjs';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const TOPICS_DIR = join(ROOT, 'apps/web/src/pages/Help/topics');
@@ -116,12 +122,25 @@ const VENDOR_HOST = /(?<![\w.-])(?:claude\.ai|anthropic\.com|draw\.io)\b/gi;
  */
 const LIVE_STAND_TOPICS = new Set(['platform']);
 
+/** Список марки платформы компании (вне git); нет файла — `null`, марка не ищется. */
+const BRAND = readBrandMask();
+
 /** Выражения, по которым ищутся утечки в тексте кадра. Имя → выражение. */
 const LEAK_PATTERNS = {
   'ключ контура': SECRET_PATTERNS.key,
   'хвост ключа': SECRET_PATTERNS.keyTail,
   почта: SECRET_PATTERNS.email,
   'заголовок с токеном': SECRET_PATTERNS.bearer,
+  // Папка клона панели на машине съёмки: команды хуков панели (outside-relay) собраны из её
+  // расположения и видны в «Хуках» и в паспорте среды — путём (`…\apps\server\…`) и ключом слоя
+  // (`node-C-work-<клон>-apps-server-…`). Прежнее имя собрано задом наперёд, как в
+  // `access-providers-fixture.mjs`: литерала в дереве нет. Дом стенда (`.agentdeck\api-token`)
+  // правилу не подходит — за именем нет `tools`/`apps`.
+  'путь установки панели': `(?:agentdeck|${[...'lortnoc-edualc'].reverse().join('')})[\\\\/-](?:tools|apps)[\\\\/-]`,
+  // Профиль пользователя машины съёмки — имя учётной записи (и temp Windows внутри профиля). То же
+  // выражение, что закрывает его в кадре (`USER_PROFILE_PATH` в kit.mjs): заглушки `user`/`you`
+  // из сценарных данных пропускаются, любое другое имя краснеет.
+  'профиль пользователя': USER_PROFILE_PATH.map((source) => `(?:${source})`).join('|'),
 };
 
 /**
@@ -335,12 +354,29 @@ function readUsages(dir = TOPICS_DIR) {
 }
 
 /**
+ * Кадр снят экраном падения раздела (`common.crashTitle`), а не самим разделом: 03.11.2026 так
+ * лежали history/trace/04-after (и в коммите) и overview/trouble/01-wrong-dir. Съёмка такой кадр
+ * уже не пишет (`allowCrash` в kit.mjs), сторож ловит прежние. Кадр, который падение показывает
+ * нарочно, перечисляется здесь по `<раздел>/<сценарий>/<кадр>`; сейчас таких нет.
+ */
+const CRASH_TITLES = ['Раздел не смог отрисоваться', 'This section failed to render'];
+const CRASH_ALLOWED = new Set();
+
+function crashIn(text, where = '') {
+  if (CRASH_ALLOWED.has(where)) return null;
+  return CRASH_TITLES.find((title) => text.includes(title)) ?? null;
+}
+
+/**
  * Ядро проверки: что утекло в ОДНОМ тексте. Отдельной функцией потому, что
  * самопроверка гоняет именно её — на подложенных строках, а не на настоящих
  * кадрах, где утечки (надеюсь) нет и красноты не увидеть.
  */
-function auditText(text, secrets) {
+function auditText(text, secrets, brand = BRAND) {
   const leaks = [];
+  // Марка платформы компании — списком вне git (`brand-mask.mjs`); слова не печатаются.
+  const branded = brandInText(text, brand);
+  if (branded) leaks.push(`марка платформы (${branded})`);
   for (const [label, source] of Object.entries(LEAK_PATTERNS)) {
     const hits = text.match(new RegExp(source, 'g'));
     if (hits) leaks.push(`${label} (${hits.length})`);
@@ -434,6 +470,12 @@ function verify(catalog, usages, dictionary, secrets, diagrams = [], freshness =
       const leaks = auditText(frame.text ?? '', secrets);
       if (leaks.length) {
         problems.push(`${where}/${frame.id}: УТЕЧКА — ${leaks.join('; ')}`);
+        continue;
+      }
+
+      const crash = crashIn(frame.text ?? '', `${where}/${frame.id}`);
+      if (crash) {
+        problems.push(`${where}/${frame.id}: экран ошибки «${crash}» вместо раздела — переснимите`);
         continue;
       }
 
@@ -662,6 +704,21 @@ function selftest() {
     ['редактор схем в тексте набора', 'Diagrams in draw.io format', false],
     ['похожий на редактор схем', 'контур my-draw.io отвечает', true],
     ['значение из хранилища', 'пароль абсолютно-секретное-значение в поле', true],
+    ['путь установки панели', 'node D:\\src\\agentdeck\\apps\\server\\relay-hook.mjs', true],
+    ['ключ слоя с путём установки', 'hook:Stop--node-D-src-agentdeck-apps-server-relay-hook', true],
+    ['дом стенда панели', 'token-file C:\\stand\\.agentdeck\\api-token', false],
+    ['temp в профиле', 'ФАЙЛ: C:/Users/someone/AppData/Local/Temp/cc-guide-shim', true],
+    ['профиль в форме 8.3', 'hook C:\\Users\\SOMEON~1\\AppData\\Local\\Temp\\x.mjs', true],
+    ['файл в профиле', 'C:\\Users\\someone\\.qwen\\.env', true],
+    ['ключ слоя с профилем', 'hook:Stop--node-C-Users-someone-AppData-Local-Temp-h.mjs', true],
+    ['дом macOS', 'cwd /Users/someone/projects/shop', true],
+    ['дом Linux', 'cwd /home/someone/projects/shop', true],
+    [
+      'профиль-заглушка сценария',
+      'C:\\Users\\user\\.codex\\config.toml · C:/Users/you/.claude',
+      false,
+    ],
+    ['маршрут API со словом home', 'GET /api/home/summary', false],
     [
       'чистый кадр',
       'Контур «Платформа компании · стенд» · шлюз 127.0.0.1:5179 · qwen2.5:0.5b',
@@ -669,10 +726,29 @@ function selftest() {
     ],
   ];
 
+  // Марка — вымышленным словом: настоящий список живёт вне git, а сторож обязан краснеть и без него.
+  const brand = { words: ['acmeplat', 'акмеплат'], logos: [], replace: 'Platform' };
+  cases.push(
+    ['марка платформы латиницей', 'Вход в ACMEPLAT · админка', true],
+    ['марка платформы кириллицей', 'Ключи Акмеплата', true],
+    ['домен марки', 'адрес api.acmeplat.example', true],
+  );
+
   let failed = 0;
   for (const [name, text, mustFail] of cases) {
-    const red = auditText(text, secrets).length > 0;
+    const red = auditText(text, secrets, brand).length > 0;
     const good = red === mustFail;
+    console.log(`${good ? 'ок   ' : 'ПЛОХО'} ${mustFail ? 'краснеет' : 'пропускает'}: ${name}`);
+    if (!good) failed += 1;
+  }
+
+  // Экран падения вместо раздела — отдельное правило, не утечка.
+  for (const [name, text, mustFail] of [
+    ['экран ошибки', 'Обзор Раздел не смог отрисоваться Попробовать снова', true],
+    ['экран ошибки по-английски', 'Overview This section failed to render Try again', true],
+    ['раздел на месте', 'Обзор Правила 0 включено Хуки 0', false],
+  ]) {
+    const good = Boolean(crashIn(text)) === mustFail;
     console.log(`${good ? 'ок   ' : 'ПЛОХО'} ${mustFail ? 'краснеет' : 'пропускает'}: ${name}`);
     if (!good) failed += 1;
   }
@@ -788,6 +864,7 @@ function selftest() {
   failed += selftestVariants(broken, structural);
   failed += selftestSources();
   failed += selftestTopic(broken, usages);
+  failed += selftestSeal();
 
   console.log(
     failed === 0
@@ -1050,6 +1127,11 @@ function main() {
       return existsSync(path) ? readFileSync(path, 'utf8') : undefined;
     }),
   );
+  const seals = sealProblems(scope.catalog, readUnsealed(), (entry, file) => {
+    const path = join(entry.dir, file);
+    return existsSync(path) ? readFileSync(path) : undefined;
+  });
+  problems.push(...seals.problems);
 
   console.log(
     `Кадров проверено: ${ok.length}; значений из хранилища в поиске: ${secrets.length}` +
@@ -1067,6 +1149,7 @@ function main() {
   }
   console.log(watchLine);
   for (const line of variantReport(coverage)) console.log(line);
+  console.log(debtLine(seals.debt));
   for (const problem of problems) console.log(`  ${problem}`);
 
   console.log(

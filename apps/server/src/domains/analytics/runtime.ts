@@ -3,6 +3,7 @@ import { promisify } from 'node:util';
 import { readFileSync, existsSync } from 'node:fs';
 import type { RunningAgent, ToolUsage } from '@agentdeck/contracts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../lib/brand.mjs';
+import { CIM_UTF8, parseCimJson } from '../../lib/cim-json.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -139,7 +140,7 @@ async function listWindows(): Promise<RunningAgent[]> {
     [
       '-NoProfile',
       '-Command',
-      "Get-CimInstance Win32_Process -Filter \"Name='node.exe' or Name='claude.exe'\" | Select-Object ProcessId,Name,CommandLine,WorkingSetSize,CreationDate | ConvertTo-Json -Compress",
+      `${CIM_UTF8}Get-CimInstance Win32_Process -Filter "Name='node.exe' or Name='claude.exe'" | Select-Object ProcessId,Name,CommandLine,WorkingSetSize,CreationDate | ConvertTo-Json -Compress`,
     ],
     { windowsHide: true, timeout: 10_000 },
   );
@@ -148,17 +149,9 @@ async function listWindows(): Promise<RunningAgent[]> {
 }
 
 export function parseWindowsOutput(stdout: string): RunningAgent[] {
-  // BOM в начале вывода PowerShell зависит от кодировки консоли, а JSON.parse
-  // на нём падает — снимаем до разбора, иначе список молча становится пустым.
-  const raw = stdout.replace(/^\uFEFF/, '').trim();
-  if (!raw) return [];
-
-  const parsed = JSON.parse(raw) as WindowsProcess[] | WindowsProcess;
-
-  // Один процесс PowerShell отдаёт объектом, несколько — массивом.
-  const list = Array.isArray(parsed) ? parsed : [parsed];
-
-  return list
+  // BOM, объект-или-массив и управляющие символы в командных строках (один такой процесс
+  // ронял весь список) — `parseCimJson`.
+  return parseCimJson<WindowsProcess>(stdout)
     .filter((item) => isClaudeAgentCommand(item.CommandLine ?? ''))
     .map((item) => ({
       pid: item.ProcessId,

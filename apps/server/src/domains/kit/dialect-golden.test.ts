@@ -289,7 +289,7 @@ function runAll(): Record<string, string> {
         ...process.env,
         AGENTDECK_KIT_VARIANT: '',
         AGENTDECK_KIT_CLI: '',
-        AGENTDECK_HEAVY_QUEUE_DIR: '',
+        AGENTDECK_STEP_KIND: '',
         AGENTDECK_KIT_STATE: state,
       },
       timeout: 20_000,

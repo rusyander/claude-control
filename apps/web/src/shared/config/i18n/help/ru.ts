@@ -44,7 +44,7 @@ import { phoneRu } from './ru/topics/phone';
 import { localModelsRu } from './ru/topics/localModels';
 import { kitRu } from './ru/topics/kit';
 import { coreRu } from './ru/topics/core';
-import { watcherRu } from './ru/topics/watcher';
+import { sandboxRu } from './ru/topics/sandbox';
 export const helpRu = {
   index: {
     subtitle: 'Как работает каждый раздел панели',
@@ -168,7 +168,7 @@ export const helpRu = {
     localModels: localModelsRu.shots,
     kit: kitRu.shots,
     core: coreRu.shots,
-    watcher: watcherRu.shots,
+    sandbox: sandboxRu.shots,
   },
 
   /**
@@ -186,7 +186,6 @@ export const helpRu = {
     rules: rulesRu.diagrams,
     claudeMd: claudeMdRu.diagrams,
     projects: projectsRu.diagrams,
-    groups: groupsRu.diagrams,
     permissions: permissionsRu.diagrams,
     mcp: mcpRu.diagrams,
     env: envRu.diagrams,
@@ -240,7 +239,7 @@ export const helpRu = {
     localModels: localModelsRu.topic,
     kit: kitRu.topic,
     core: coreRu.topic,
-    watcher: watcherRu.topic,
+    sandbox: sandboxRu.topic,
     platform: platformRu.topic,
     endpoints: endpointsRu.topic,
     providers: providersRu.topic,

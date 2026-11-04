@@ -14,6 +14,28 @@ export interface RouteRegistry {
   require(id: RouteId): Route;
 }
 
+/**
+ * Реестр, чей набор меняется на месте (s10 G7): держатели ссылки (экономика, дирижёр, дорога
+ * сессии) видят новый набор без пересборки. Набор проверяется целиком до подмены — пустой или
+ * повторный id оставляет прежний набор и бросает.
+ */
+export interface LiveRouteRegistry extends RouteRegistry {
+  replace(routes: readonly Route[]): void;
+}
+
+export function createLiveRouteRegistry(routes: readonly Route[]): LiveRouteRegistry {
+  let current = createRouteRegistry(routes);
+  return {
+    list: () => current.list(),
+    ofKind: (kind) => current.ofKind(kind),
+    get: (id) => current.get(id),
+    require: (id) => current.require(id),
+    replace: (next) => {
+      current = createRouteRegistry(next);
+    },
+  };
+}
+
 export function createRouteRegistry(routes: readonly Route[]): RouteRegistry {
   const byId = new Map<RouteId, Route>();
   for (const route of routes) {

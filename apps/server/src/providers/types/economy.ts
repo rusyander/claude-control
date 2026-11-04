@@ -2,7 +2,7 @@ import type { GroupEconomySupport } from '@agentdeck/contracts/group-economy-sup
 
 /**
  * Канал рычагов экономии групп на один прогон чужого CLI
- * (`domains/provider-chat/economy-run/economy-run.ts`): у каждого CLI свой
+ * (прежний канал панели, теперь `apps/core/src/adapters/economy-carry.ts` ядра): у каждого CLI свой
  * способ донести значение до ОДНОГО запуска, не трогая конфиг человека —
  * ключ `-c` у Codex, слой системных настроек у Qwen Code и Gemini, переменные
  * окружения у Goose и Continue.

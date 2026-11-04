@@ -1,10 +1,9 @@
+import { ASK_PRESET } from '@agentdeck/contracts/core/ask';
 import { CORE_STEP_KINDS, type Scenario, type StepDef } from '@agentdeck/contracts/core/scenario';
 import type { AskRecord, TaskFoldState } from '../../journal/reduce/reduce.types.ts';
+import { CONDUCTOR_QUESTIONS, answerKey, askLangOf, labelOf, optionsOf } from './answers.ts';
 import {
-  BUDGET_ANSWERS,
   END_REASON,
-  EXHAUSTED_ANSWERS,
-  ROUND_CAP_ANSWERS,
   type Attempt,
   type NextAction,
   type NextInput,
@@ -44,7 +43,7 @@ export function extraRounds(state: TaskFoldState, unitId: string, defId: string)
   const prefix = `round-cap:${unitId}:${defId}:`;
   return asksBy(
     state,
-    (a) => a.dedupe?.startsWith(prefix) === true && a.answer === ROUND_CAP_ANSWERS.more,
+    (a) => a.dedupe?.startsWith(prefix) === true && answerKey('roundCap', a.answer) === 'more',
   ).length;
 }
 
@@ -65,21 +64,23 @@ export function nextRound(
   const dedupe = roundCapKey(unitId, def.id, round);
   const ask = asksBy(state, (a) => a.dedupe === dedupe).pop();
   if (!ask) {
+    const lang = askLangOf(state);
     return {
       kind: 'raise',
       point: 6,
       stepId,
       dedupe,
-      question: `Шаг «${def.title}» исчерпал круги (${def.roundCap}). Что дальше?`,
-      options: Object.values(ROUND_CAP_ANSWERS),
-      recommendation: ROUND_CAP_ANSWERS.stop,
+      question: CONDUCTOR_QUESTIONS.roundCap(lang, def, def.roundCap),
+      options: optionsOf('roundCap', lang),
+      recommendation: labelOf('roundCap', lang, 'stop'),
       capStep,
     };
   }
-  if (ask.answer === ROUND_CAP_ANSWERS.cancel) {
-    return { kind: 'cancel-task', reason: `round-cap: ${def.id} — отмена человеком` };
+  const key = answerKey('roundCap', ask.answer);
+  if (key === 'cancel') {
+    return { kind: 'cancel-task', reason: `round-cap: ${def.id} — human cancel` };
   }
-  if (ask.answer === ROUND_CAP_ANSWERS.stop) {
+  if (key === 'stop') {
     return {
       kind: 'stop-step',
       stepId,
@@ -105,19 +106,21 @@ function overBudget(
   const dedupe = budgetKey(stepId, rec.extensions);
   const ask = asksBy(input.state, (a) => a.dedupe === dedupe).pop();
   if (!ask) {
+    const lang = askLangOf(input.state);
     return {
       kind: 'raise',
       point: 7,
       stepId,
       dedupe,
-      question: `Шаг «${def.title}» вышел за срок (${Math.round(spent / 60_000)} мин). Продлить?`,
-      options: Object.values(BUDGET_ANSWERS),
-      recommendation: BUDGET_ANSWERS.stop,
+      question: CONDUCTOR_QUESTIONS.budgetTime(lang, def, Math.round(spent / 60_000)),
+      options: optionsOf('budget', lang),
+      recommendation: labelOf('budget', lang, 'stop'),
       capStep: false,
     };
   }
-  if (ask.answer === BUDGET_ANSWERS.more) return extend;
-  if (ask.answer === BUDGET_ANSWERS.stop) return { kind: 'stop-step', stepId, reason: why };
+  const key = answerKey('budget', ask.answer);
+  if (key === 'more') return extend;
+  if (key === 'stop') return { kind: 'stop-step', stepId, reason: why };
   return { kind: 'wait', reason: `budget ask ${ask.state}` };
 }
 
@@ -129,13 +132,13 @@ function waitingHuman(input: NextInput, def: StepDef, att: Attempt): NextAction 
   if (!last || last.answer === undefined) return { kind: 'wait', reason: 'ask closed unanswered' };
   if (last.source === 'budget' && last.dedupe?.startsWith('exhausted:') === true) {
     // Исчерпанный маршрут: «ждать» — шаг в работе, но окно держит его до `clear-exhausted`.
-    return last.answer === EXHAUSTED_ANSWERS.stop
+    return answerKey('exhausted', last.answer) === 'stop'
       ? { kind: 'stop-step', stepId: att.stepId, reason: `${END_REASON.budget}: human stop` }
       : { kind: 'answered', stepId: att.stepId, askId: last.askId };
   }
   if (last.source === 'budget') {
     // Ответ на срок: продление — то же, что `once-more`; «остановить» — шаг кончается.
-    return last.answer === BUDGET_ANSWERS.more
+    return answerKey('budget', last.answer) === 'more'
       ? { kind: 'answered', stepId: att.stepId, askId: last.askId }
       : { kind: 'stop-step', stepId: att.stepId, reason: `${END_REASON.budget}: human stop` };
   }
@@ -143,6 +146,41 @@ function waitingHuman(input: NextInput, def: StepDef, att: Attempt): NextAction 
     return { kind: 'close-human-step', stepId: att.stepId, askId: last.askId };
   }
   return { kind: 'answered', stepId: att.stepId, askId: last.askId };
+}
+
+/** Применённый `end-chat` этого шага (`command.applied`, исход несёт `stepId`) — его `cmdId`. */
+export function endChatOf(state: TaskFoldState, stepId: string): string | undefined {
+  for (const [cmdId, c] of Object.entries(state.commands)) {
+    if (c.kind !== 'end-chat' || c.status !== 'applied') continue;
+    const o = c.outcome as { stepId?: unknown } | undefined;
+    if (o?.stepId === stepId) return cmdId;
+  }
+  return undefined;
+}
+
+/**
+ * Шаг чата (этап 10): открыт между ходами. Конец хода — ждать человека (ни напоминания, ни вывода
+ * исхода: молчание модели после ответа — норма разговора); ход человека доставляет `run.ts`
+ * (`message-to-step`). Закрывает только `end-chat` или отмена; сеанс, умерший сам, — остановка.
+ */
+function chatAction(input: NextInput, def: StepDef, att: Attempt): NextAction {
+  const { stepId, rec } = att;
+  const cmdId = endChatOf(input.state, stepId);
+  if (cmdId) return { kind: 'close-chat', stepId, cmdId };
+  if (rec.state === 'waiting-human') return waitingHuman(input, def, att);
+  const fact = input.live[stepId];
+  const held = windowAction(input.state, def, att, fact, input.windows?.[stepId]);
+  if (held) return held;
+  if (!fact) return { kind: 'run-step', stepId };
+  // Вопрос «ask» (этап 10, F2): один ход — его конец и есть ответ; шаг закрывает ядро, а не
+  // `end-chat`. Раньше проверки конца сессии: CLI, вышедший сразу за ответом, — не обрыв.
+  if (fact.turnEnd && input.state.created?.scenario.id === ASK_PRESET) {
+    return { kind: 'close-ask', stepId };
+  }
+  if (fact.ended) {
+    return { kind: 'stop-step', stepId, reason: `${END_REASON.chatSessionEnded}: no end-chat` };
+  }
+  return { kind: 'wait', reason: fact.turnEnd ? 'chat: waits for the human turn' : 'chat turn' };
 }
 
 export function activeAction(
@@ -158,6 +196,7 @@ export function activeAction(
   if (rec.stops.length > 0) {
     return { kind: 'stop-step', stepId, reason: `${END_REASON.stopped}: ${rec.stops.join('; ')}` };
   }
+  if (def.kind === 'chat') return chatAction(input, def, att);
   const win = input.windows?.[stepId];
   if (rec.state === 'queued') {
     if (isCoreKind(def)) return { kind: 'run-core-step', stepId };

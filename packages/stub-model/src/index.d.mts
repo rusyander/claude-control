@@ -3,7 +3,7 @@
  * `node`), а тесты ядра и пакета видят API через это объявление.
  */
 
-export type DialectId = 'anthropic-messages' | 'openai-chat' | 'openai-responses';
+export type DialectId = 'anthropic-messages' | 'openai-chat' | 'openai-responses' | 'google-genai';
 
 export declare const DIALECT_IDS: readonly DialectId[];
 
@@ -21,6 +21,8 @@ export interface ToolCall {
   args?: unknown;
   /** Свой id вызова; без него — `call_stub_<n>_<i>` / `toolu_stub_<n>_<i>`. */
   id?: string;
+  /** Пространство имён вызова (только responses: инструменты MCP у Codex); прочие протоколы его не пишут. */
+  namespace?: string;
 }
 
 /** Окно подписки / предел частоты: Anthropic — `anthropic-ratelimit-unified-*`, OpenAI — `x-ratelimit-*`. */
@@ -61,19 +63,22 @@ export interface Step {
   holdMs?: number;
   /** Держать поток после его начала, до содержимого, мс; `Infinity` — как у `holdMs`. */
   stallMs?: number;
+  /** Заголовки окна; у протокола без них (`google-genai`) — ошибка сценария. */
   window?: WindowInfo;
   /** Свои заголовки ответа (поверх заголовков окна). */
   headers?: Record<string, string>;
   /**
    * Расход в полях протокола как есть: `input` — `input_tokens` Anthropic (без кеша) /
-   * `prompt_tokens` OpenAI (с кешем); `cached` — `cache_read_input_tokens` /
-   * `prompt_tokens_details.cached_tokens` / `input_tokens_details.cached_tokens`.
+   * `prompt_tokens` OpenAI (с кешем) / `promptTokenCount` Google (с кешем); `cached` —
+   * `cache_read_input_tokens` / `prompt_tokens_details.cached_tokens` /
+   * `input_tokens_details.cached_tokens` / `cachedContentTokenCount`.
    */
   usage?: { input?: number; output?: number; cached?: number };
   /**
    * Поля сверх протокола в итоговом объекте ответа (`timings` у llama-server): JSON —
    * верхний уровень; поток — `message_delta` (Anthropic), последний чанк перед `[DONE]`
-   * (chat), объект `response` события `response.completed` (responses).
+   * (chat), объект `response` события `response.completed` (responses), последний кадр с
+   * `finishReason` (Google).
    */
   extra?: Record<string, unknown>;
   /** Модель в ответе вместо запрошенной (по умолчанию — `model` запроса): подмена маршрутом, P119. */
@@ -220,7 +225,8 @@ export declare const STUB_CAPS: {
   readonly customTools: readonly DialectId[];
   readonly errors: readonly number[];
   readonly midStreamErrors: true;
-  readonly window: true;
+  /** Протоколы с заголовками окна; у Gemini API их нет — шаг с `window` там отказ сценария. */
+  readonly window: readonly DialectId[];
   readonly hold: true;
   readonly stall: true;
   readonly chunkedText: true;

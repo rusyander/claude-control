@@ -229,15 +229,18 @@ const sizeOf = (name) => {
     return 0;
   }
 };
-// Split group (the panel sets AGENTDECK_SPLIT_CHILD=1), phase G.3: a group compacts every ~15 min
-// and every compaction re-sent each rule whole — in measured worktree sessions the re-sends were
-// twice the first sends, and the group then Read the source file anyway. There a RE-delivery (the
-// rule already reached this session once) is a card ≤ CARD_MAX: title, the file path with a Read
-// window per section, the lead clipped to fit. The first delivery stays whole (quality on first
-// contact); a human session is untouched. The `.sent` mark outlives compaction on purpose.
+// A task step of the agentdeck core (AGENTDECK_STEP_KIND, not `chat`), phase G.3 of the panel groups it
+// replaced: a group compacted every ~15 min and every compaction re-sent each rule whole — in measured
+// worktree sessions the re-sends were twice the first sends, and the group then Read the source file
+// anyway. There a RE-delivery (the rule already reached this session once) is a card ≤ CARD_MAX: title,
+// the file path with a Read window per section, the lead clipped to fit. The first delivery stays whole
+// (quality on first contact); a human session is untouched. The `.sent` mark outlives compaction on purpose.
 export const CARD_MAX = 1000;
-const splitChild = () => process.env.AGENTDECK_SPLIT_CHILD === '1';
-// Every stage of a group is a NEW session, so the `.sent` mark above never carried — one measured group
+const coreStep = () => {
+  const step = String(process.env.AGENTDECK_STEP_KIND ?? '').trim();
+  return Boolean(step) && step !== 'chat';
+};
+// Every step of a task is a NEW session, so the `.sent` mark above never carried — one measured group
 // got verification-depth whole 10×7.1k, live-check 8×4.2k, review-depth 3×6.4k (5.22M cache_read). A
 // rule ≥ COPY_CARD_MIN that reached ANY session of the same copy (the git worktree root of cwd) arrives
 // as the card in later stages; shorter rules stay whole per session (the card would save little and a
@@ -350,7 +353,7 @@ export default function ruleInjector(input, budget = PAYLOAD_MAX) {
 
   const out = [];
   let used = 0;
-  const group = splitChild();
+  const group = coreStep();
   const copy = group ? copyKey(input?.cwd) : null;
   const gate = group ? readGate(session) : {};
   // A gated rule's whole file — this call is the one cardGate denies, so the text must ride with it; a
@@ -518,7 +521,7 @@ function ownWanted(input) {
 }
 
 // Card gate (owner, 25.10.2026: the token cuts must not lower quality). A card saves tokens only when
-// the agent skips the Read, and skipping it IS the quality loss. So a split-group session that got a
+// the agent skips the Read, and skipping it IS the quality loss. So a core task step's session that got a
 // card for rule R has every call that triggers R denied until it has Read R's file (a whole section of
 // the edited file's kind, see needOf; after
 // the last compaction for a re-send card) — the first such call is the one the card came with. The
@@ -897,63 +900,12 @@ function claimFeed(session, rule, kind = 'fed') {
   }
 }
 
-// A panel one-time grant replay (g9 26.10, D-12 at 12:39): the human — or the panel's re-check — allowed
-// a deferred call, and the panel's prompt names it character for character: `tool <T> with this input,
-// unchanged (a one-time grant; any other call is not covered):\n<canonical JSON>` (server
-// `domains/chat/deferred-asks/texts.ts` exactCall). The grant matches only a byte-identical input, so
-// reading a rule cannot change that call; two card denies there cost two turns and re-sent context.
-// Only user-role text is the panel speaking — a tool result quoting the line is not.
-const GRANT_CALL =
-  /tool (\S+) with this input, unchanged \(a one-time grant; any other call is not covered\):\n(\{[^\n]*\})/g;
-const COSMETIC = (tool, key) =>
-  key === 'description' || (tool === 'Bash' && (key === 'timeout' || key === 'run_in_background'));
-/** The panel's canonical JSON (keys sorted at every depth, undefined dropped) — hash.ts canonicalJson. */
-function canonicalJson(value) {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value ?? null);
-  if (Array.isArray(value)) return `[${value.map((v) => canonicalJson(v)).join(',')}]`;
-  const entries = Object.entries(value)
-    .filter(([, v]) => v !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
-}
-/** Is this call the exact call a panel one-time grant in this transcript names? */
-export function grantedReplay(input) {
-  const tool = String(input?.tool_name ?? '');
-  const given = input?.tool_input;
-  if (!tool || !given || typeof given !== 'object') return false;
-  const own = canonicalJson(
-    Object.fromEntries(Object.entries(given).filter(([k]) => !COSMETIC(tool, k))),
-  );
-  let text;
-  try {
-    text = readFileSync(String(input?.transcript_path ?? ''), 'utf8');
-  } catch {
-    return false;
-  }
-  for (const line of text.split('\n')) {
-    if (!line.includes('a one-time grant')) continue;
-    let rec;
-    try {
-      rec = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    if (rec?.type !== 'user' || rec?.message?.role !== 'user') continue;
-    const c = rec.message.content;
-    let said = typeof c === 'string' ? c : '';
-    if (Array.isArray(c))
-      said = c
-        .filter((b) => b?.type === 'text')
-        .map((b) => String(b.text ?? ''))
-        .join('\n');
-    for (const m of said.matchAll(GRANT_CALL)) if (m[1] === tool && m[2] === own) return true;
-  }
-  return false;
-}
+// No prompt text lets a call past the card gate: the core decides permits in-band on the call itself,
+// so every call meets the gate alike, a call copied from an old permission prompt included (G16 pass 4).
 
 /** @returns {string|null} a deny reason while a card this call triggers is still unread, else null. */
 export function cardGate(input) {
-  if (!splitChild() || injectOff()) return null;
+  if (!coreStep() || injectOff()) return null;
   if (LOOKUP.test(String(input?.tool_name ?? ''))) return null;
   const session = String(input?.session_id ?? 'x').slice(0, 12);
   const gate = existsSync(gateOf(session)) ? readGate(session) : {};
@@ -964,7 +916,6 @@ export function cardGate(input) {
     (rule) => gates(rule, as.get(rule)) && (gate[rule] || fed.has(`${session}:${rule}`)),
   );
   if (!due.length) return null;
-  const granted = grantedReplay(input);
   const open = [];
   const openSibling = [];
   const attached = [];
@@ -975,16 +926,6 @@ export function cardGate(input) {
     // A later call of the batch an earlier call was refused in: written blind like it, let through (see
     // batchSibling); the note beside it came from ruleInjector.
     if (batchSibling(session, rule, input)) continue;
-    if (granted) {
-      // Never denied (see grantedReplay); text riding with THIS call lifts the gate as its deny would.
-      const feed = fed.get(`${session}:${rule}`);
-      if (feed && !feed.sibling && gate[rule]) {
-        delete gate[rule];
-        changed = true;
-      }
-      fed.delete(`${session}:${rule}`);
-      continue;
-    }
     refused.push(rule);
     const feed = fed.get(`${session}:${rule}`);
     // A method rule is only tidied here, never denied: the text riding with this call (or a parallel
@@ -1063,7 +1004,7 @@ export function cardGate(input) {
  * then refused, and again on its repeat (g8 26.10). Sieves skipped and no refusal after all → run them.
  */
 export function cardDenies(input) {
-  if (!splitChild() || injectOff()) return false;
+  if (!coreStep() || injectOff()) return false;
   if (LOOKUP.test(String(input?.tool_name ?? ''))) return false;
   const session = String(input?.session_id ?? 'x').slice(0, 12);
   if (!existsSync(gateOf(session))) return false;
@@ -1075,7 +1016,7 @@ export function cardDenies(input) {
     const { file } = gate[rule];
     if (!fileText(file)) continue;
     if (readInTranscript(input?.transcript_path, file, needOf(file, as)) !== false) continue;
-    return !grantedReplay(input);
+    return true;
   }
   return false;
 }
@@ -1173,11 +1114,11 @@ export function clearRuleStamps(session) {
 // Cards right after a compaction (g9 26.10): the card used to arrive with the FIRST call that needed it —
 // in practice the first Edit of a parallel batch — so every Edit of that batch was denied together (8 at
 // 21:32Z, 6 at 21:19Z; ~5 storms/h, each re-emitting the Edits after the Read over a 30–60k context). A
-// split child now gets, at SessionStart:compact, the cards of the gated rules its calls of the generation
+// core task step now gets, at SessionStart:compact, the cards of the gated rules its calls of the generation
 // that just ended needed, with their gates armed and stamps written, plus the window the gate will ask
 // for — so it can Read before the batch. A model that edits first meets today's deny unchanged. Logged
 // after PreCompact's `#compact`, so ruleRepeats() sees one delivery of this generation, not a repeat.
-// The kit's SessionStart block of a split child's compaction is capped at 9000 (items.mjs, 4000 elsewhere);
+// The kit's SessionStart block of a core step's compaction is capped at 9000 (items.mjs, 4000 elsewhere);
 // the budget is what the earlier SessionStart items left of it (`kit_room`), at most PRESEND_MAX.
 // g9 review 26.10 (F3): 8 compactions in one fix stage, each followed by a card deny and a 5–16k re-read of
 // the same rule. The window the gate would ask for, when it fits this budget, is now sent as TEXT: that is
@@ -1271,9 +1212,9 @@ function kitGeneration(input) {
   return calls(bounds.length > 1 ? bounds[bounds.length - 2] + 1 : 0, last);
 }
 
-/** @returns {string|null} the cards to pre-send at SessionStart:compact in a split child, else null. */
+/** @returns {string|null} the cards to pre-send at SessionStart:compact in a core task step, else null. */
 export function compactCards(input, budget = PRESEND_MAX) {
-  if (!splitChild() || injectOff() || input?.source !== 'compact') return null;
+  if (!coreStep() || injectOff() || input?.source !== 'compact') return null;
   const session = String(input?.session_id ?? '').slice(0, 12);
   if (session.length < 4) return null;
   const calls =
@@ -1365,7 +1306,7 @@ export function compactCards(input, budget = PRESEND_MAX) {
   return out.length ? out.join('\n\n') : null;
 }
 
-// Split group only: "this rule reached the session once". Not a `.stamp`, so compaction keeps it.
+// Core task step only: "this rule reached the session once". Not a `.stamp`, so compaction keeps it.
 const sentOf = (session, name) => join(CACHE, `rule-${name}-${session}.sent`);
 function markSent(session, name) {
   try {
@@ -1405,8 +1346,8 @@ export function cardOf(body, file, name = 'rule', reached = 'session') {
   else if (windows) where = ` before acting — the whole file, in parts: ${windows}${note}`;
   const head =
     (reached === 'copy'
-      ? `# ${title} — card (split group: the full text reached an earlier stage of this copy, not this session)\n`
-      : `# ${title} — card (split group, re-sent after compaction; the full text reached this session before)\n`) +
+      ? `# ${title} — card (task step: the full text reached an earlier step in this copy, not this session)\n`
+      : `# ${title} — card (task step, re-sent after compaction; the full text reached this session before)\n`) +
     `Still binding in full: Read ${path}${where}\n`;
   const titleAt = body.search(/^# /m);
   const afterTitle = titleAt < 0 ? body : body.slice(body.indexOf('\n', titleAt) + 1);

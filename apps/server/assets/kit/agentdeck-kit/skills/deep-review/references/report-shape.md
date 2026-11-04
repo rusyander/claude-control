@@ -8,11 +8,13 @@ does not show, and nothing that restates it.
 
 `.agent/reviews/<scope-slug>.agent.md`, slug = branch, MR iid or module path. Structured keys and
 values below are fixed English tokens (the tools parse them); the prose under them — theses, reasons,
-fixes — is in the user's language. **Start from `node <kit>/tools/review-plan.mjs skeleton --plan
-<plan.json> <lane reports…> --tier T2`**: every header line below, the computable ones filled, the
-rest `⟨fill: …⟩` blanks the guard refuses until filled — one Write, not a refused draft and a
-rewrite. The guard checks the file at Write, and at Stop when a shell
-command wrote it. Refused: a missing `Tier` · `Radius` · `Verified` · `Taken on trust` · `Score`; a
+fixes — is in the user's language. **Written by `review-merge.mjs assemble`** (SKILL §7): the
+`review-plan.mjs skeleton` with every header line below, the computable ones filled, then the `--fill
+header.md` applied — each `**Key:** value` line replaces the skeleton's, each `## Section` body lands
+under that heading — then the gate; refused → `<out>.draft.md` plus the problems, never a file at the
+guarded path. A run without lanes starts from `node <kit>/tools/review-plan.mjs skeleton --plan
+<plan.json> --tier <T>` (a `plan --scratch none` sizes only) and fills its `⟨fill: …⟩` blanks in one
+Write. The guard checks the file at Write, and at Stop when a shell command wrote it. Refused: a missing `Tier` · `Radius` · `Verified` · `Taken on trust` · `Score`; a
 finding without `Where` / `Axis` / `Status` (a one-line 🟢 carries them inline, §6); a 🔴/🟡 without
 `Evidence`; ≥ 2 lanes with a `Coverage` naming neither found / N̂ ("found 31, estimate ≈52") nor
 "coverage unknown"; a `Ledger` with a bare planned "rounds N" instead of "rounds k of N" (k rounds run
@@ -69,8 +71,11 @@ input; or "not run — <why>">
 **Score:** raised 17 · published 13 · confirmed by author <after replies>
 ```
 
-`Passes` answers SKILL §2 key by key — the command, the table or `file:line`, or "n/a — <the search
-showing no trigger>". `Classes` answers axis-1 §Six miss classes the same way.
+`Passes` answers SKILL §3 key by key — the command, the table or `file:line`, or "n/a — <the search
+showing no trigger>"; `Classes` answers axis-1 §Six miss classes the same way. Assemble composes both
+from the lanes' `## Passes` (non-n/a answers first, up to three per key, each with its lane, a lane's
+C-id turned into its F-id); a key no lane answered stays a blank, and a fill line replaces the whole
+line.
 
 <example>
 ```markdown

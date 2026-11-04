@@ -4,6 +4,7 @@ import type { EnvSkip, EnvTrigger, HookItem } from '@agentdeck/contracts/portabl
 import type { ConfigProvider } from '../../providers/types/types.ts';
 import { envItemId, envSkip, needsUndetermined } from './canon.ts';
 import { blockingOfEvent } from './hook-events.ts';
+import { codedIntent, type CodedIntent } from './intent-codes.ts';
 import { resolveHookNeeds, triggerOfEvent } from './needs.ts';
 import type { EnvSourceFactory } from './normalize-types.ts';
 import type { ObservedNeeds } from './types.ts';
@@ -94,6 +95,8 @@ export function normalizeHooks(
           'hook',
           'unsupported_format',
           `событие «${hook.event}» не описано ни у одного известного формата: нагрузку и смысл выдумывать нельзя`,
+          'portability-skip-hook-event',
+          { event: hook.event },
         ),
       );
       continue;
@@ -109,7 +112,7 @@ export function normalizeHooks(
       id: envItemId('hook', `${hook.event}-${hook.matcher ?? ''}-${hook.command}`),
       kind: 'hook',
       source: options.source('file'),
-      intent: intentOf(hook),
+      ...intentOf(hook),
       trigger,
       blocking: blockingOfEvent(options.provider, hook.event),
       needs: resolveHookNeeds({ event: hook.event, scriptPath, observed }),
@@ -222,9 +225,18 @@ function absolutePath(written: string, root: string | undefined): string {
   return root ? resolve(root, written) : written;
 }
 
-function intentOf(hook: HookInput): string {
-  const where = hook.matcher ? ` по фильтру ${hook.matcher}` : '';
-  return `на событие ${hook.event}${where} запускается: ${hook.command}`;
+function intentOf(hook: HookInput): CodedIntent {
+  const { event, command } = hook;
+  return hook.matcher
+    ? codedIntent(
+        `на событие ${event} по фильтру ${hook.matcher} запускается: ${command}`,
+        'portability-intent-hook-matcher',
+        { event, matcher: hook.matcher, command },
+      )
+    : codedIntent(`на событие ${event} запускается: ${command}`, 'portability-intent-hook', {
+        event,
+        command,
+      });
 }
 
 /**
@@ -282,11 +294,16 @@ export function preservedHookItem(params: {
     id: envItemId('hook', `preserved-${params.key}`),
     kind: 'hook',
     source: params.source('file'),
-    intent: `запись ${params.key}, форму которой источник не разбирает`,
+    ...codedIntent(
+      `запись ${params.key}, форму которой источник не разбирает`,
+      'portability-intent-hook-preserved',
+      { key: params.key },
+    ),
     trigger: { on: 'always' },
     blocking: 'blocks',
     needs: needsUndetermined(
       'форму записи не разбирает даже её собственный источник: что она читает — неизвестно',
+      'portability-needs-unparsed-entry',
     ),
     sideEffects: ['runs_process'],
     command: params.value,

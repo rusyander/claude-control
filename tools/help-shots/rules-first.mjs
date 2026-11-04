@@ -27,7 +27,7 @@ const SANDBOX_ANSWER =
   'Здравствуйте! Отвечаю по-русски, как требует правило «Язык общения». ' +
   'Чем помочь с проектом?';
 
-export async function shootFirst(browser, web, scenario, home) {
+export async function shootFirst(browser, web, scenario, home, lang = 'ru') {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 
   try {
@@ -122,7 +122,14 @@ export async function shootFirst(browser, web, scenario, home) {
       .first()
       .click();
     await page.waitForTimeout(3000);
-    await page.getByLabel(/^(Запрос|Prompt)$/).fill('Привет! Расскажи, чем ты можешь помочь.');
+    // Вопрос — на языке интерфейса; ответ русский, того требует правило.
+    await page
+      .getByLabel(/^(Запрос|Prompt)$/)
+      .fill(
+        lang === 'en'
+          ? 'Hi! Tell me what you can help with.'
+          : 'Привет! Расскажи, чем ты можешь помочь.',
+      );
     await page
       .getByRole('button', { name: /^(Отправить в песочницу|Send to the sandbox)$/ })
       .first()

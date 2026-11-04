@@ -79,16 +79,14 @@ export interface RunLedgerEntry {
   /** Чем прогон был для контура (`RunMeta.origin`): ход, начатый CLI после подхвата, — тот же. */
   origin?: PlatformRunConsumer;
   /**
-   * Процесс живёт за посредником (`live-relay.mjs`): после перезапуска к нему
-   * ПОДКЛЮЧАЮТСЯ, а не усыновляют без потока. `pid` записи тогда — посредник:
-   * он живёт ровно столько, сколько CLI, и держит его трубы.
+   * Только чтение: процесс за посредником живой сессии, записанный сервером до
+   * этапа 10 (G14 снял посредника). `pid` записи — посредник; `adopt` закрывает
+   * ему ввод (`endRelayInput`), иначе ждущий CLI пережил бы обновление навсегда.
+   * Запись старше `MAX_AGE_MS` не усыновляется — через сутки после обновления
+   * поле и его чтение можно убрать.
    */
   relay?: LedgerRelay;
-  /**
-   * Ход кончился, процесс ждёт следующего — живая сессия, а не прогон. Раньше
-   * такая сессия в журнал не попадала вовсе: после перезапуска её фон никто не
-   * ждал, а уборщик процессов снимал её CLI как сироту (журнал 29, 84).
-   */
+  /** Только чтение, как `relay`: ход кончился, процесс прежней версии ждал следующего. */
   idle?: true;
   /**
    * Все процессы записи — посредник, оболочка, сам CLI: уборщику процессов,
@@ -201,29 +199,15 @@ export class RunLedger {
     return readRunLedger(this.appDataDir, this.file);
   }
 
-  /**
-   * Записать или обновить запись по ключу; свежие — в конце. Запись о том же
-   * процессе посредника под другим ключом (ход пошёл под `sessionId`, а ждала
-   * сессия под `new-…`) заменяется: процесс один — и запись одна.
-   */
+  /** Записать или обновить запись по ключу; свежие — в конце. */
   upsert(entry: RunLedgerEntry): void {
-    const pipe = entry.relay?.pipe;
-    const rest = this.read().filter(
-      (item) => item.key !== entry.key && !(pipe && item.relay?.pipe === pipe),
-    );
+    const rest = this.read().filter((item) => item.key !== entry.key);
     this.write([...rest, entry].slice(-LIMIT));
   }
 
   remove(key: string): void {
     const current = this.read();
     const next = current.filter((item) => item.key !== key);
-    if (next.length !== current.length) this.write(next);
-  }
-
-  /** Процесс посредника закрылся — снять ждущую запись о нём (идущую снимет конец прогона). */
-  removeIdleRelay(pipe: string): void {
-    const current = this.read();
-    const next = current.filter((item) => !(item.idle && item.relay?.pipe === pipe));
     if (next.length !== current.length) this.write(next);
   }
 

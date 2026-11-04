@@ -5,18 +5,6 @@ export const panelActionsGroupsEntitiesEn: Record<
   keyof typeof panelActionsGroupsEntitiesRu,
   string
 > = {
-  list_discovered_groups: 'Discovered resource sets',
-  run_group_discovery: 'Search for resource sets again',
-  import_discovered_group: 'Make a discovered set a group',
-  copy_group_to_global: 'Copy a group to global',
-  apply_group_advice: 'Apply advice to a group copy',
-  merge_group_origin: 'Merge a group copy with its original',
-  read_group_override: 'Group override in a project',
-  set_group_override: 'Turn a group override on or off',
-  activate_groups_for_path: 'Switch on the groups of a folder',
-  list_resource_catalog: 'Catalog of ready resources',
-  draft_group_step: 'Draft a path step',
-  promote_group_step: 'Turn a path step into a resource',
   rename_skill: 'Rename a skill',
   move_hook: 'Move a hook',
   move_env: 'Move a variable to the other file',

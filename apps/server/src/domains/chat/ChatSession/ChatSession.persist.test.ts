@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { ChatRunRegistry, type RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { ChatSession } from './ChatSession.ts';
 import { RunLedger } from '../run-ledger/run-ledger.ts';
-import type { ChatEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent } from '../chat-events.ts';
 
 /**
  * Тумблер автоподтверждения переживает перезапуск панели (находка 16b, TASKS.md

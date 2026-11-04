@@ -1,8 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { claudeRunFacts } from '@agentdeck/providers/claude';
-import { qwenRunFacts } from '@agentdeck/providers/qwen';
 import type {
   AdapterCaps,
   AdapterEvent,
@@ -12,13 +19,14 @@ import type {
   SessionSpec,
 } from '../adapter.types.ts';
 import { FROM_HUMAN_LINE, PLATFORM_MARKER } from '@agentdeck/contracts/core/user-layer';
-import { CLAUDE_CHANNELS, createClaudeAdapter } from '../claude/claude.ts';
-import { claudeAbsolutePattern } from '../claude/permission.ts';
-import { qwenPathPattern } from '../qwen/permission.ts';
 import { PUBLISH_COMMANDS } from '../deny-overlay.ts';
 import { createAdapterRegistry } from '../index.ts';
-import { createQwenAdapter, QWEN_CHANNELS } from '../qwen/qwen.ts';
-import type { SdkAdapter, SdkAdapterOptions } from '../sdk-stream/sdk-adapter.ts';
+import { adoptRefusal } from '../../bootstrap/session-road/adopt-gate.ts';
+import { compatAdapterOf, compatFactsOf } from '../../bootstrap/session-road/compat-gate.ts';
+import { compat } from '../../routes/compat/compat.ts';
+import { createStubRoute } from '../../routes/stub/stub.ts';
+import type { RoadStart } from '../../bootstrap/session-road/road.types.ts';
+import type { SdkAdapter } from '../sdk-stream/sdk-adapter.ts';
 import { EventTap, liveFacts, liveRoot, liveSpec, type LiveRoot } from './__fixtures__/live.ts';
 import {
   fixturePath,
@@ -27,6 +35,8 @@ import {
   replayEnv,
   type ReplayRun,
 } from './__fixtures__/replay.ts';
+import { ACP_PROFILES } from './__fixtures__/profiles/acp.ts';
+import { after, PROFILES, RPC_PROFILES, type Profile } from './__fixtures__/profiles/index.ts';
 
 /**
  * Набор соответствия (03 §CLI adapter, R:PR-09, P121): одни и те же случаи для каждого
@@ -37,133 +47,9 @@ import {
 
 const A = '11111111-1111-4111-8111-111111111111';
 const B = '22222222-2222-4222-8222-222222222222';
-
-interface Profile {
-  id: string;
-  make(options: SdkAdapterOptions): SdkAdapter;
-  command: string;
-  endpoint: SessionSpec['endpoint'];
-  fixtures: {
-    basic: string;
-    resume: { name: string; cmdId: string };
-    missing: Omit<ReplayRun, 'dump'>;
-    deny: string;
-    refused: string;
-    permitAllow?: string;
-    permitDeny?: string;
-    wake?: string;
-    /** Запрет оверлея при разрешающем сервере права: CLI отказывает сам, вопроса нет. */
-    denyOverPermit?: string;
-    /** Ход со строкой окна подписки (`windowEvent`). */
-    window?: string;
-  };
-  /** Файл сеанса с правилами запрета (относительно каталога сеанса). */
-  settings: string;
-  denyRules(settings: Record<string, unknown>): string[];
-  /** Строгий список MCP: что видит CLI из argv и файлов сеанса. */
-  mcpNames(argv: string[], dir: string): string[];
-  hookCommands(settings: Record<string, unknown>): string[];
-  /** Бриф, как его получил CLI (файлом или значением флага). */
-  brief(argv: string[]): string;
-  /** Навыки сеанса выключены — по argv CLI (`skillControl`). */
-  skillsOff?(argv: readonly string[]): boolean;
-  shellRule(argv: readonly string[]): string;
-  /** Правило запрета пути в словаре CLI (форма пути у каждого своя). */
-  pathRule(cwd: string, path: string, op: 'read' | 'edit'): string;
-  /** Как CLI спрашивает о праве: инструментом сервера или строкой протокола. */
-  permitRoad: 'tool' | 'in-band';
-}
-
-const ENDPOINT = { baseUrl: 'http://127.0.0.1:9', model: 'stub-model', key: 'stub-key' };
-
-const after = (args: string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
-
-const PROFILES: Profile[] = [
-  {
-    id: claudeRunFacts.id,
-    // Подставной CLI хуков не исполняет: сеанс без хука ядра — только с явным флагом тестов (F-10).
-    make: (options) => createClaudeAdapter({ ...options, unhookedForTests: true }),
-    command: claudeRunFacts.binary.command,
-    endpoint: {
-      channel: CLAUDE_CHANNELS[0]!,
-      endpoint: { ...ENDPOINT, dialect: 'anthropic-messages' },
-    },
-    fixtures: {
-      basic: 'basic',
-      resume: { name: 'resume', cmdId: B },
-      missing: {
-        fixture: fixturePath('claude', 'missing'),
-        eager: true,
-        exit: 1,
-        stderr: 'No conversation found with session ID: 33333333-3333-4333-8333-333333333333',
-      },
-      deny: 'deny',
-      refused: 'permit',
-      wake: 'bg-permit-allow',
-      denyOverPermit: 'deny-permit-allow',
-      window: 'window',
-    },
-    settings: 'claude/settings.json',
-    brief: (argv) => readFileSync(after(argv, '--append-system-prompt-file')!, 'utf8'),
-    skillsOff: (argv) => argv.includes('--disable-slash-commands'),
-    denyRules: (s) => (s.permissions as { deny: string[] }).deny,
-    mcpNames: (argv) =>
-      Object.keys(
-        (JSON.parse(readFileSync(after(argv, '--mcp-config')!, 'utf8')) as { mcpServers: object })
-          .mcpServers,
-      ),
-    hookCommands: (s) =>
-      ((s.hooks as { PreToolUse?: { hooks: { command: string }[] }[] }).PreToolUse ?? []).flatMap(
-        (g) => g.hooks.map((h) => h.command),
-      ),
-    shellRule: (argv) => `Bash(${argv.join(' ')}:*)`,
-    pathRule: (_cwd, path, op) =>
-      `${op === 'read' ? 'Read' : 'Edit'}(${claudeAbsolutePattern(path)})`,
-    permitRoad: 'tool',
-  },
-  {
-    id: qwenRunFacts.id,
-    // Подставной CLI хуков не исполняет: сеанс без хука ядра — только с явным флагом тестов (F-10).
-    make: (options) => createQwenAdapter({ ...options, unhookedForTests: true }),
-    command: qwenRunFacts.binary.command,
-    endpoint: {
-      channel: QWEN_CHANNELS.find((c) => c.dialect === 'openai-chat')!,
-      endpoint: { ...ENDPOINT, dialect: 'openai-chat' },
-    },
-    fixtures: {
-      basic: 'basic',
-      resume: { name: 'resume', cmdId: A },
-      missing: { exit: 1, stderr: 'No saved session found with ID 33333333' },
-      deny: 'readdeny',
-      refused: 'shell',
-      permitAllow: 'permit-core-allow',
-      permitDeny: 'permit-core-deny',
-    },
-    settings: 'qwen/system-settings.json',
-    brief: (argv) =>
-      (argv.find((a) => a.startsWith('--append-system-prompt=')) ?? '').slice(
-        '--append-system-prompt='.length,
-      ),
-    denyRules: (s) => (s.permissions as { deny: string[] }).deny,
-    mcpNames: (argv) => {
-      const at = argv.indexOf('--allowed-mcp-server-names');
-      const out: string[] = [];
-      for (let i = at + 1; i < argv.length && !argv[i]!.startsWith('--'); i += 1) {
-        if (argv[i]) out.push(argv[i]!);
-      }
-      return out;
-    },
-    hookCommands: (s) =>
-      (
-        (s.hooks as { PreToolUse?: { hooks: { command: string }[] }[] } | undefined)?.PreToolUse ??
-        []
-      ).flatMap((g) => g.hooks.map((h) => h.command)),
-    shellRule: (argv) => `run_shell_command(${argv.join(' ')}:*)`,
-    pathRule: (cwd, path, op) =>
-      `${op === 'read' ? 'read_file' : 'edit'}(${qwenPathPattern(cwd, path)})`,
-    permitRoad: 'in-band',
-  },
-];
+/** PNG 1×1: картинка случая `images`. */
+const PNG_1PX =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 type BoolCap = {
   [K in keyof AdapterCaps]: AdapterCaps[K] extends boolean ? K : never;
@@ -307,6 +193,32 @@ const CASES: Case[] = [
       expect(users.map((l) => l.uuid)).toEqual([A, B]);
       expect(r.adapter.session(r.handle)?.conversationId).toBeTruthy();
       expect(await r.adapter.stop(r.handle, 'soft')).toMatchObject({ how: 'exited', code: 0 });
+    },
+  },
+  {
+    name: 'images ride the send as image blocks after the text; the turn still ends attributed',
+    needs: ['images', 'stream', 'attribution'],
+    async run(p) {
+      const r = await run(p, fx(p, p.fixtures.basic));
+      const dir = mkdtempSync(join(tmpdir(), 'conf-img-'));
+      const path = join(dir, '0.png');
+      writeFileSync(path, Buffer.from(PNG_1PX, 'base64'));
+      try {
+        await r.adapter.send(r.handle, 'what is on it?', A, 'platform', [
+          { mediaType: 'image/png', path },
+        ]);
+        expect(await r.tap.until(ended)).toMatchObject({ attribution: A, isError: false });
+        const user = r.dump().stdin.find((l) => l.type === 'user') as {
+          message: { content: Record<string, unknown>[] };
+        };
+        expect(user.message.content[0]).toMatchObject({ type: 'text' });
+        expect(String(user.message.content[0]!.text)).toContain('what is on it?');
+        expect(user.message.content.slice(1)).toEqual([
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: PNG_1PX } },
+        ]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     },
   },
   {
@@ -596,6 +508,11 @@ const CASES: Case[] = [
           warning: true,
           refusal: false,
           window: 'five_hour',
+          // Замер каждого окна с долей — для доли лимита у чата панели (проход 8).
+          windows: {
+            five_hour: { usedPct: 92, resetAt: 1_788_351_600_000 },
+            seven_day: { usedPct: 41, resetAt: 1_788_800_000_000 },
+          },
         },
       ]);
       await r.adapter.stop(r.handle, 'soft');
@@ -702,6 +619,8 @@ afterAll(async () => {
 });
 
 const TRI_STATE_CAPS: readonly string[] = ['subagentHooks'];
+/** Зарегистрированы, но без хука и оверлея на установленной версии: запуск — `no_core_hook`. */
+const GATELESS = new Set(['aider', 'continue', 'cursor']);
 
 describe('adapter conformance — P121 every declared cap has a case', () => {
   const BOOL_CAPS: BoolCap[] = [
@@ -723,10 +642,13 @@ describe('adapter conformance — P121 every declared cap has a case', () => {
 
   it('the registry holds every profiled adapter, and every boolean cap is listed here', () => {
     const registry = createAdapterRegistry({ [PROFILES[0]!.id]: { pollMs: 10 } });
-    expect(registry.ids().sort()).toEqual(PROFILES.map((p) => p.id).sort());
+    const built = registry.all().filter((a) => a.built !== false);
+    // Переходник без защиты ядра — тоже переходник (не заготовка), но без профиля: судить нечего.
+    expect(built.map((a) => a.id).sort()).toEqual(
+      [...[...PROFILES, ...RPC_PROFILES, ...ACP_PROFILES].map((p) => p.id), ...GATELESS].sort(),
+    );
     expect(registry.get('nope')).toBeUndefined();
-    expect(registry.all()).toHaveLength(PROFILES.length);
-    for (const adapter of registry.all()) {
+    for (const adapter of built.filter((a) => !GATELESS.has(a.id))) {
       // `subagentHooks` — тройное (`null` = не проверено): его доказывают живые пробы слоя
       // (`layer-probe.live.integration.test.ts`), а не подставной CLI, хуков не исполняющий.
       const declared = Object.entries(adapter.caps)
@@ -734,6 +656,81 @@ describe('adapter conformance — P121 every declared cap has a case', () => {
         .map(([k]) => k)
         .sort();
       expect(declared).toEqual([...BOOL_CAPS].sort());
+    }
+  });
+
+  // Без профиля — заготовка (`adapter_not_built`) или CLI без защиты ядра (`no_core_hook`): ни
+  // одной возможности, ни канала, запуск и привязка адреса отказаны своим кодом (этап 10, Q8).
+  // Судья compat называет ту же причину, что и запуск: CLI без судьи — `no_core_hook`, не «не
+  // построен» (переходник есть, ядру встать некуда).
+  it('every adapter without a profile is gateless or a placeholder: no cap, no channel, refused by its own code', async () => {
+    const registry = createAdapterRegistry();
+    const profiled = new Set([...PROFILES, ...RPC_PROFILES, ...ACP_PROFILES].map((p) => p.id));
+    const rest = registry.all().filter((a) => !profiled.has(a.id));
+    expect(rest.map((a) => a.id).sort()).toEqual([...GATELESS].sort());
+    const stub = createStubRoute({ name: 'x', script: ['x'] });
+    const facts = await compatFactsOf(stub, 'stub-model');
+    for (const adapter of rest) {
+      const gateless = GATELESS.has(adapter.id);
+      const code = gateless ? 'no_core_hook' : 'adapter_not_built';
+      expect(adapter.built, adapter.id).toBe(gateless ? undefined : false);
+      if (gateless) expect(adapter.cliLogin, adapter.id).toBe(false);
+      const on = Object.entries(adapter.caps).filter(([, v]) => v === true);
+      expect(on, adapter.id).toEqual([]);
+      expect(adapter.caps.channels).toEqual([]);
+      const ep = PROFILES[0]!.endpoint!;
+      const bound = adapter.bindEndpoint(ep.channel, ep.endpoint);
+      expect(bound, adapter.id).toMatchObject({ ok: false, code });
+      const launched = await adapter.launch({} as SessionSpec);
+      expect(launched.ok).toBe(false);
+      expect(launched.ok ? '' : launched.reason).toMatch(new RegExp(`^${code}: ${adapter.id} `));
+      const verdict = compat(compatAdapterOf(adapter), facts.route, facts.model, {
+        allowed: [{ adapter: adapter.id, route: stub.id, modelPattern: '*' }],
+        dlp: { required: false, parses: [] },
+        translations: [],
+        needsTools: false,
+      });
+      expect(verdict, adapter.id).toMatchObject({ kind: 'refused', code });
+    }
+  });
+
+  // Подтверждённый транскрипт ведёт дорогу к продолжению чужого разговора (F2, adopt-gate): у
+  // переходника без продолжения (`resume: false` — opencode, cursor отказывают `spec.resume`)
+  // подтверждение пропустило бы просьбу мимо `resume_unproven` к аренде и отказу уже на запуске.
+  // Codex, Goose, Kimi, Gemini продолжают (копия транскрипта в дом сеанса): суд у них — свой, id чужой формы
+  // отказан до чтения хранилища.
+  it('ownsTranscript only where the adapter resumes: without resume the adopt gate says resume_unproven', () => {
+    const registry = createAdapterRegistry();
+    for (const adapter of registry.all()) {
+      if (adapter.caps.resume !== true) {
+        expect(adapter.ownsTranscript, adapter.id).toBeUndefined();
+      }
+    }
+    for (const id of ['codex', 'goose', 'kimi', 'gemini']) {
+      const adapter = registry.get(id)!;
+      expect(adapter.caps.resume, id).toBe(true);
+      expect(typeof adapter.ownsTranscript, id).toBe('function');
+      const start = {
+        adapterId: id,
+        cwd: 'C:\\repo',
+        pin: {},
+        resume: { conversationId: '../x', adopt: { adapter: id } },
+      } as unknown as RoadStart;
+      expect(adoptRefusal(start, adapter), id).toBe('resume_not_owned');
+      expect(adoptRefusal({ ...start, adapterId: 'claude' } as RoadStart, adapter), id).toBe(
+        'resume_other_cli',
+      );
+    }
+    for (const id of ['opencode', 'cursor']) {
+      const adapter = registry.get(id)!;
+      expect(adapter.caps.resume, id).toBe(false);
+      const start = {
+        adapterId: id,
+        cwd: 'C:\\repo',
+        pin: {},
+        resume: { conversationId: 'x', adopt: { adapter: id } },
+      } as unknown as RoadStart;
+      expect(adoptRefusal(start, adapter), id).toBe('resume_unproven');
     }
   });
 

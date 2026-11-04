@@ -6,7 +6,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CORE_VARS } from '../adapters/launcher/env.ts';
-import { HOOK_WAIT_VAR } from './hook.ts';
+import { HOOK_JSON_FLAG, HOOK_WAIT_VAR } from './hook.ts';
 import { HOOK_MODE, MCP_RUN } from './main.ts';
 
 /**
@@ -54,11 +54,12 @@ async function core(answers: { status: number; body: unknown }[]): Promise<{
 function hook(
   env: Record<string, string>,
   stdin: string,
+  extra: readonly string[] = [],
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((done) => {
     const child = spawn(
       process.execPath,
-      ['--experimental-strip-types', '--no-warnings', MCP_RUN, HOOK_MODE],
+      ['--experimental-strip-types', '--no-warnings', MCP_RUN, HOOK_MODE, ...extra],
       {
         env: { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ...env },
         stdio: 'pipe',
@@ -193,5 +194,48 @@ describe('core hook process: the CLI asks, the core decides, the exit code answe
     const got = await hook(sessionEnv(refused.url), CALL);
     expect(got.code).toBe(2);
     expect(got.stderr).toContain('403');
+  }, 30_000);
+});
+
+describe('core hook process, JSON mode (`hook --json`): a refusal never rides on the exit code', () => {
+  // Codex на Windows теряет код 2 («exited with code 1») и исполняет вызов: отказ — JSON при коде 0.
+  const json = (env: Record<string, string>, stdin: string) => hook(env, stdin, [HOOK_JSON_FLAG]);
+  const denyOf = (stdout: string): Record<string, string> =>
+    (JSON.parse(stdout) as { hookSpecificOutput: Record<string, string> }).hookSpecificOutput;
+
+  it('allowed → exit 0 and NO stdout (an empty answer = «go on»)', async () => {
+    const c = await core([{ status: 200, body: { allow: true, reason: 'ok' } }]);
+    expect(await json(sessionEnv(c.url), CALL)).toMatchObject({ code: 0, stdout: '' });
+  }, 30_000);
+
+  it('denied → exit 0 with a PreToolUse deny JSON carrying the reason; stderr keeps it too', async () => {
+    const c = await core([
+      { status: 200, body: { allow: false, reason: 'publish is a platform step' } },
+    ]);
+    const got = await json(sessionEnv(c.url), CALL);
+    expect(got.code).toBe(0);
+    expect(denyOf(got.stdout)).toEqual({
+      hookEventName: 'PreToolUse',
+      permissionDecision: 'deny',
+      permissionDecisionReason: 'agentdeck: Denied by the platform: publish is a platform step.',
+    });
+    expect(got.stderr).toContain('publish is a platform step');
+  }, 30_000);
+
+  it('no session env / unreadable call / silent core → a deny JSON, never an empty stdout', async () => {
+    const none = await json({}, CALL);
+    expect(none.code).toBe(0);
+    expect(denyOf(none.stdout).permissionDecision).toBe('deny');
+    expect(denyOf(none.stdout).permissionDecisionReason).toContain(CORE_VARS.coreUrl);
+    const c = await core([{ status: 200, body: { allow: true } }]);
+    const junk = await json(sessionEnv(c.url), 'not json');
+    expect(denyOf(junk.stdout).permissionDecision).toBe('deny');
+    expect(c.seen).toEqual([]);
+    const gone = await core([]);
+    const url = gone.url;
+    await new Promise((r) => servers.pop()!.close(r));
+    const silent = await json({ ...sessionEnv(url), [HOOK_WAIT_VAR]: '600' }, CALL);
+    expect(silent.code).toBe(0);
+    expect(denyOf(silent.stdout).permissionDecisionReason).toMatch(/core unreachable/);
   }, 30_000);
 });

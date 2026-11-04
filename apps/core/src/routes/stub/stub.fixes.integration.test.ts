@@ -5,12 +5,21 @@
  * Каждый запущенный сервер снимается в afterAll, что бы ни случилось в тесте.
  */
 import { afterAll, describe, expect, it } from 'vitest';
-import type { RouteLease, RouteRecorder, RouteResource } from '@agentdeck/contracts/core/routes';
+import type {
+  Dialect,
+  RouteLease,
+  RouteRecorder,
+  RouteResource,
+} from '@agentdeck/contracts/core/routes';
 import { DIALECT_IDS } from '@agentdeck/stub-model';
 import { bindLoopback, type BindProbe } from '../../platform/ports.ts';
 import { sleep } from '../../platform/os-kind.ts';
 import { RouteAborted, RouteRefused } from '../lease.ts';
-import { createLivenessProbe, type ProcessIdentity } from '../../platform/process-identity.ts';
+import {
+  createLivenessProbe,
+  type Liveness,
+  type ProcessIdentity,
+} from '../../platform/process-identity.ts';
 import { createStubRoute, parseStubServerRef, STUB_CAPS } from './stub.ts';
 
 /** Личности запущенных серверов-заглушек (pid + старт из ссылки ресурса), для уборки. */
@@ -19,13 +28,15 @@ const see = (ref: string): void => {
   const parsed = parseStubServerRef(ref);
   if (!('unreadable' in parsed)) seen.push(parsed.identity);
 };
-const alive = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * Жизнь сервера по личности (pid + старт), не по номеру: Windows под нагрузкой отдаёт
+ * освободившийся pid новому процессу, а на Linux убитый, но ещё не подобранный ребёнок теста —
+ * зомби, и `kill(pid, 0)` видит его живым (g13 p10, C5 shutdown в контейнере). Зомби — `dead`.
+ */
+const life = async (pid: number): Promise<Liveness> => {
+  const identity = seen.findLast((one) => one.pid === pid);
+  if (!identity) throw new Error(`pid ${pid} was never seen in a resource ref`);
+  return createLivenessProbe().isAlive(identity, { fresh: true });
 };
 
 afterAll(async () => {
@@ -50,7 +61,7 @@ const pidOf = (lease: RouteLease): number =>
 /** Жив ли процесс спустя до `ms` (остановка дерева асинхронна на POSIX). */
 async function goneWithin(pid: number, ms = 5_000): Promise<boolean> {
   const deadline = Date.now() + ms;
-  while (alive(pid)) {
+  while ((await life(pid)) !== 'dead') {
     if (Date.now() > deadline) return false;
     await sleep(100);
   }
@@ -123,7 +134,11 @@ describe('stub route on failure paths (review core-s2)', () => {
     const route = createStubRoute({ name: 'f72', script: ['x'], bind });
     const r = recorder();
     const outcome = await settle(
-      route.acquire({ taskId: 't', model: 'stub-model', dialect: 'google-genai' }, r.record),
+      // Gemini API заглушка уже говорит (этап 10) — нужен диалект, которого нет ни у кого.
+      route.acquire(
+        { taskId: 't', model: 'stub-model', dialect: 'bedrock-converse' as Dialect },
+        r.record,
+      ),
     );
     if ('lease' in outcome) {
       pidOf(outcome.lease);
@@ -193,7 +208,7 @@ describe('stub route on failure paths (review core-s2)', () => {
     await expect(route.shutdown(r.record)).rejects.toThrow(
       /1 release\(s\) failed.*journal write failed/,
     );
-    expect(pids.map(alive)).toEqual([false, false]);
+    expect(await Promise.all(pids.map(life))).toEqual(['dead', 'dead']);
   }, 60_000);
 
   it('C11: an abort during the server start stops the server and refuses with RouteAborted', async () => {

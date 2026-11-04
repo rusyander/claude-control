@@ -52,6 +52,15 @@ export interface PermitContext {
      */
     readOnlyHolds?: boolean;
   };
+  /**
+   * Границы сеанса от вызывающего (`task.created.session.scope`, этап 10 F6): правка — только под
+   * масками `edit` от корня, команды с префиксом argv из `denyCommands` — отказ. Нет поля — границ
+   * сверх платформы нет. Перенос гейта прежнего прогона тестов панели (`decidePermission`).
+   */
+  scope?: {
+    edit: readonly string[];
+    denyCommands: readonly (readonly string[])[];
+  };
 }
 
 /** Область чтения сеанса вне копии (06 §Session permissions, решение владельца F-87). */
@@ -68,6 +77,11 @@ export interface ReadScope {
    * пока в нём самом нет пути платформы.
    */
   ownTemp?: string;
+  /**
+   * Копии вложений человека этой задачи (s10 G11): каталог в доме ядра, читается — на тех же
+   * условиях, что `ownTemp`: только пока в нём самом нет пути платформы.
+   */
+  attachments?: string;
   /** Файлы учётных данных CLI: закрыты и внутри разрешённого каталога, и для оболочки. */
   credentials: readonly string[];
   /** Бюджет обхода ссылок под корнем поиска (записей); нет — `LINK_SCAN_BUDGET` платформы. */
@@ -80,6 +94,8 @@ export interface ReadScopeInput {
   copyRoot: string;
   /** Временный каталог сеанса (тот, что получил CLI как TMPDIR/TEMP/TMP). */
   sessionTemp?: string;
+  /** Каталог копий вложений задачи (`conductor/attachments`) — факт задачи. */
+  taskAttachments?: string;
   /** Каталоги слоя CLI только для чтения и его файлы учётных данных — факты переходника. */
   layer: { dirs: readonly string[]; credentials: readonly string[] };
   /** Корни кешей и инструментов — факты платформы (`toolchainReadRoots`). */
@@ -100,6 +116,8 @@ export type PermitRefusal =
   /** Файл учётных данных CLI (или поиск над ним) — чтением и словом команды (F-87). */
   | 'credential-path'
   | 'denied-tool'
+  /** Инструмент записи (или не доказанного чтения) сервера форжа человека — `forge-mcp-read-only`. */
+  | 'forge-mcp-write'
   | 'platform-step'
   | 'platform-path'
   | 'endpoint-source'
@@ -120,6 +138,10 @@ export type PermitRefusal =
   | 'model-above-ceiling'
   /** Ранг модели подагента или потолка неизвестен — сравнить нечем, отказ с именем (F25). */
   | 'subagent-model-unknown'
+  /** Правка вне `scope.edit` сеанса (этап 10, F6). */
+  | 'outside-scope'
+  /** Команда с префиксом из `scope.denyCommands` сеанса (этап 10, F6). */
+  | 'scope-command'
   | 'unknown-action';
 
 export type PermitDecision =

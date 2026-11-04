@@ -7,6 +7,8 @@ export const sandboxMessageParams = {
   'sandbox-script-missing': [],
   'sandbox-ask-incomplete': [],
   'sandbox-reaped-idle': [],
+  'sandbox-core-refused': ['reason'],
+  'sandbox-repo-failed': ['reason'],
   'sandbox-nothing-to-run': [],
   'sandbox-ps1-needs-pwsh': [],
   'sandbox-hook-exit-2': [],

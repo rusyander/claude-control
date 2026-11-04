@@ -10,11 +10,6 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type {
-  SplitPlanGroupRecord,
-  SplitPlanRecord,
-} from '../../../../lib/app-store/app-store.types.ts';
-import { groupTokenLedger } from '../group-ledger.ts';
 import { foreignGroupSessions, readForeignSessionLedger } from './foreign-ledger.ts';
 import { newestForeignTranscript, qwenProjectSlug } from './foreign-transcript.ts';
 
@@ -50,66 +45,6 @@ describe('group-ledger (foreign)', () => {
   });
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
-  });
-
-  const record = { parentChatId: 'p', groups: [] } as unknown as SplitPlanRecord;
-
-  it('the card of a Qwen Code group counts the CLI sessions in its copy', async () => {
-    const copy = join(dir, 'copy-1');
-    mkdirSync(copy);
-    // Дом Qwen Code набора панели («Наши») — в данных панели.
-    const chats = join(dir, 'kit', 'qwen-home', 'projects', qwenProjectSlug(copy), 'chats');
-    mkdirSync(chats, { recursive: true });
-    copyFileSync(join(FIXTURES, 'qwen-0.24-two-turns.jsonl'), join(chats, 's1.jsonl'));
-    // Копия на Windows сохраняет время исходника: сессия «тронута» сейчас.
-    const touched = new Date();
-    utimesSync(join(chats, 's1.jsonl'), touched, touched);
-    // Чужая копия того же дома — не группа.
-    const other = join(
-      dir,
-      'kit',
-      'qwen-home',
-      'projects',
-      qwenProjectSlug(join(dir, 'x')),
-      'chats',
-    );
-    mkdirSync(other, { recursive: true });
-    copyFileSync(join(FIXTURES, 'qwen-0.24-two-turns.jsonl'), join(other, 's2.jsonl'));
-    const group = {
-      index: 1,
-      title: 'g',
-      status: 'done',
-      path: copy,
-      startedAt: new Date(Date.now() - 60_000).toISOString(),
-    } as SplitPlanGroupRecord;
-    const at = new Date('2026-10-22T20:00:00.000Z');
-    const measure = groupTokenLedger({
-      links: () => ({}),
-      projectsDir: () => join(dir, 'projects'),
-      now: () => at,
-      appDataDir: dir,
-    });
-    const ledger = await measure(record, group, 'qwen');
-    expect(ledger).toMatchObject({
-      at: at.toISOString(),
-      usage: {
-        sessions: 1,
-        turns: 7,
-        coldStart: 9001,
-        compactions: 3,
-        instructionPct: 0,
-        cacheHitPct: Math.round(
-          (28_000 / (7 * 4000 + 5001 + 5002 + 5003 + 5004 + 5005 + 5006 + 5007)) * 100,
-        ),
-      },
-    });
-    // Без каталога данных панели — как до переписки CLI: только повторы инструкций.
-    const legacy = await groupTokenLedger({
-      links: () => ({}),
-      projectsDir: () => join(dir, 'projects'),
-      now: () => at,
-    })(record, group, 'qwen');
-    expect(legacy?.usage).toBeUndefined();
   });
 
   it('the sidecar <session>.ledger.jsonl of qwen 0.24 is not a session', () => {

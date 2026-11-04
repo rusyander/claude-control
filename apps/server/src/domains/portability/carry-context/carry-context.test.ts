@@ -153,10 +153,10 @@ describe('planCarry', () => {
 });
 
 describe('carryChat', () => {
-  it('заводит разговор у нового CLI с опорой и исходным заданием', () => {
+  it('заводит разговор у нового CLI с опорой и исходным заданием', async () => {
     const { deps, opened } = setup();
 
-    const outcome = carryChat(source(), deps);
+    const outcome = await carryChat(source(), deps);
 
     expect(outcome).toMatchObject({ carried: true, chatId: 'new-1', chainDepth: 1 });
     expect(opened).toHaveLength(1);
@@ -166,10 +166,10 @@ describe('carryChat', () => {
     expect(opened[0]?.prompt).toContain('Переименуй foo в bar');
   });
 
-  it('говорит в обе ленты и не обещает переезда переписки', () => {
+  it('говорит в обе ленты и не обещает переезда переписки', async () => {
     const { deps, notices } = setup();
 
-    carryChat(source(), deps);
+    await carryChat(source(), deps);
 
     const [target, origin] = notices;
     expect(target?.[0]).toBe('new-1');
@@ -179,20 +179,20 @@ describe('carryChat', () => {
     expect(origin?.[1]).toContain(`перенос 1 из ${HANDOFF_MAX_CHAIN}`);
   });
 
-  it('заметка, которой некуда лечь, не выдаётся за сказанную', () => {
+  it('заметка, которой некуда лечь, не выдаётся за сказанную', async () => {
     // Разговор Claude без живого прогона: лента — транскрипт самого CLI.
     const { deps } = setup({ noticed: false });
 
-    expect(carryChat(source(), deps).noticedSource).toBe(false);
+    expect((await carryChat(source(), deps)).noticedSource).toBe(false);
   });
 
-  it('отказ цели назван, а не приезжает молчаливым «не перенесено»', () => {
-    // Три беды цели — прогон не пошёл, хранилище не завело разговор, задание не
-    // ушло в заведённый — различимы для человека: чинить в каждом случае разное.
-    for (const failure of ['run_not_started', 'chat_not_created', 'send_failed'] as const) {
+  it('отказ цели назван, а не приезжает молчаливым «не перенесено»', async () => {
+    // Беда цели одна — разговор у неё не пошёл (у чужого CLI это задача ядра): она
+    // приезжает названной, а не молчаливым «не перенесено».
+    for (const failure of ['run_not_started'] as const) {
       const { deps, notices } = setup({ openFailure: failure });
 
-      const outcome = carryChat(source(), deps);
+      const outcome = await carryChat(source(), deps);
 
       expect(outcome).toEqual({
         key: 'codex::work1',
@@ -205,43 +205,43 @@ describe('carryChat', () => {
     }
   });
 
-  it('второй перенос той же нетронутой работы отказывает петлёй', () => {
+  it('второй перенос той же нетронутой работы отказывает петлёй', async () => {
     const { deps, opened } = setup();
 
-    expect(carryChat(source(), deps).carried).toBe(true);
-    const second = carryChat(source(), deps);
+    expect((await carryChat(source(), deps)).carried).toBe(true);
+    const second = await carryChat(source(), deps);
 
     expect(second).toMatchObject({ carried: false, reason: 'checkpoint_unchanged' });
     // Разговора у нового CLI не завели — второй попытки в хранилище нет.
     expect(opened).toHaveLength(1);
   });
 
-  it('опора изменилась — переносить снова можно', () => {
+  it('опора изменилась — переносить снова можно', async () => {
     const chains = new HandoffChains();
     const first = setup({ chains, hash: 'sha-1' });
-    carryChat(source(), first.deps);
+    await carryChat(source(), first.deps);
 
     const second = setup({ chains, hash: 'sha-2' });
-    expect(carryChat(source(), second.deps).carried).toBe(true);
+    expect((await carryChat(source(), second.deps)).carried).toBe(true);
   });
 
-  it('разговор-продолжение уносит задание ЦЕПОЧКИ, а не свою первую реплику', () => {
+  it('разговор-продолжение уносит задание ЦЕПОЧКИ, а не свою первую реплику', async () => {
     // Исходное задание всей работы ставится первым продолжением и дальше
     // наследуется: перенос — такое же звено, и своё задание он не выдумывает.
     const chains = new HandoffChains();
     chains.link(['корень'], 'codex::work1', { rootTask: 'Разобрать модуль оплаты целиком' });
     const { deps, opened } = setup({ chains });
 
-    carryChat(source({ task: 'продолжай с тестов' }), deps);
+    await carryChat(source({ task: 'продолжай с тестов' }), deps);
 
     expect(opened[0]?.prompt).toContain('Разобрать модуль оплаты целиком');
     expect(opened[0]?.prompt).not.toContain('продолжай с тестов');
   });
 
-  it('разговор без каталога не переносится', () => {
+  it('разговор без каталога не переносится', async () => {
     const { deps, opened } = setup();
 
-    expect(carryChat(source({ cwd: undefined }), deps)).toMatchObject({
+    expect(await carryChat(source({ cwd: undefined }), deps)).toMatchObject({
       carried: false,
       reason: 'no_project',
     });
@@ -250,19 +250,23 @@ describe('carryChat', () => {
 });
 
 describe('carryChats', () => {
-  it('отвечает по строке на каждый запрошенный ключ, в том же порядке', () => {
+  it('отвечает по строке на каждый запрошенный ключ, в том же порядке', async () => {
     const { deps } = setup();
 
-    const outcomes = carryChats([source({ key: 'a' }), source({ key: 'b' })], ['b', 'a'], deps);
+    const outcomes = await carryChats(
+      [source({ key: 'a' }), source({ key: 'b' })],
+      ['b', 'a'],
+      deps,
+    );
 
     expect(outcomes.map((outcome) => outcome.key)).toEqual(['b', 'a']);
     expect(outcomes.every((outcome) => outcome.carried)).toBe(true);
   });
 
-  it('исчезнувший разговор — не отказ по причине, а отсутствие предмета', () => {
+  it('исчезнувший разговор — не отказ по причине, а отсутствие предмета', async () => {
     const { deps } = setup();
 
-    const [outcome] = carryChats([], ['ушёл'], deps);
+    const [outcome] = await carryChats([], ['ушёл'], deps);
 
     expect(outcome).toEqual({ key: 'ушёл', carried: false, noticedSource: false });
   });

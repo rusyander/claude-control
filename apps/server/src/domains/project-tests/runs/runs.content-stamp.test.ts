@@ -3,7 +3,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { ChatRun, type ChatEvent } from '../../chat/ChatRunner/ChatRunner.ts';
+import type { TestsAgentEvent } from '../agent/agent-run.types.ts';
+import { TestsCoreRun } from '../agent/core-run.ts';
 import { testsDeliveryGaps } from '../../chat/tests-gate/tests-gate.ts';
 import { readRuns } from '../runs-store/runs-store.ts';
 import { createGroup, readGroups, upsertCase, writeGroup } from '../store/store.ts';
@@ -12,7 +13,7 @@ import { ProjectTestRunRegistry } from './runs.ts';
 /**
  * Прогон агента панели (`ProjectTestRunRegistry`, запись `persist`) несёт тот же
  * отпечаток содержимого, что `tests-cli run`: снятый на старте, по `codePaths` и
- * автотесту кейса. Агент подменён на границе — процесс CLI (`ChatRun.start`):
+ * автотесту кейса. Агент подменён на границе — процесс CLI (`TestsCoreRun.start`, за которым ядро):
  * он ставит кейсам итог, как настоящий агент, а запись истории, отпечаток и
  * ворота — настоящие. Дата коммита и mtime — «через час»: по времени каждый
  * такой шаг старил бы прогон.
@@ -116,7 +117,7 @@ describe(
 
     /** Агент ставит кейсам группы `passed` — как настоящий, через файл группы. */
     async function agentRun(caseIds?: string[], during?: () => void): Promise<void> {
-      vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
+      vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
         during?.();
         const group = readGroups(dir).find((item) => item.id === 'auth');
         if (!group) throw new Error('no group');
@@ -129,7 +130,10 @@ describe(
               : item,
           ),
         });
-        (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+        (onEvent as (event: TestsAgentEvent) => void)({
+          kind: 'done',
+          sessionId: 's1',
+        } as TestsAgentEvent);
       });
       registry.start(
         { projectPath: dir, mode: 'run', groupId: 'auth', ...(caseIds ? { caseIds } : {}) },

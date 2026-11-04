@@ -49,7 +49,7 @@ function run(
       ...process.env,
       AGENTDECK_KIT_STATE: state,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_SPLIT_CHILD: opts.splitChild ? '1' : '',
+      AGENTDECK_STEP_KIND: opts.splitChild ? 'implement' : '',
       AGENTDECK_KIT_SPAWN_GUARD: '',
       CLAUDE_SPAWN_GUARD: '',
     },

@@ -25,9 +25,9 @@ export const BUDGET = {
   tasksMd: 25 * 1024, // TASKS.md is human-facing prose in the user's language — its own limit
   memoryIndex: 8 * 1024, // MEMORY.md loads every session; over this, archive closed lines
   // A skill file (SKILL.md, references/*.md) loads only when its skill runs; its size canon is
-  // tools/skills-audit.mjs. Up to 16 KB the guard stays silent (canon skills lost detail when cut
-  // to the generic 8/15 KB doc budget).
-  skill: 16 * 1024,
+  // tools/skills-audit.mjs. Up to 20 KB the guard stays silent (16 KB before: detailed canon skills
+  // lost detail when cut; the generic 8/15 KB doc budget cut them further).
+  skill: 20 * 1024,
   // Human docs cost the agent nothing per session — nothing here is auto-loaded, and README/docs
   // are read only when the user points at them. So the limit is readability for a person, not a
   // token budget: a doc past humanWarn is hard to navigate; past humanHard it is two documents.

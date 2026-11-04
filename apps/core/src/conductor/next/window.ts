@@ -6,10 +6,9 @@ import { usageOf } from '../../journal/reduce/fold-view.ts';
 import { budgetTokens } from '../../economy/cost.ts';
 import { tokenScopeOf } from '../../economy/budget/index.ts';
 import { STEP_BUDGET_SCOPE } from '../../journal/reduce/stage4.ts';
+import { CONDUCTOR_QUESTIONS, answerKey, askLangOf, labelOf, optionsOf } from './answers.ts';
 import {
-  BUDGET_ANSWERS,
   END_REASON,
-  EXHAUSTED_ANSWERS,
   type Attempt,
   type LiveStepFact,
   type NextAction,
@@ -103,20 +102,19 @@ export function windowAction(
     const dedupe = exhaustedKey(gate.routeId, att.stepId);
     const ask = asksOf(state, dedupe).pop();
     if (!ask) {
+      const lang = askLangOf(state);
       return {
         kind: 'raise',
         point: 7,
         stepId: att.stepId,
         dedupe,
-        question:
-          `Маршрут ${gate.routeId} исчерпал оплаченный бюджет, другого разрешённого маршрута у шага ` +
-          `«${def.title}» нет. Пополните счёт и снимите отметку командой clear-exhausted, или остановите шаг.`,
-        options: Object.values(EXHAUSTED_ANSWERS),
-        recommendation: EXHAUSTED_ANSWERS.wait,
+        question: CONDUCTOR_QUESTIONS.exhausted(lang, gate.routeId, def),
+        options: optionsOf('exhausted', lang),
+        recommendation: labelOf('exhausted', lang, 'wait'),
         capStep: false,
       };
     }
-    if (ask.answer === EXHAUSTED_ANSWERS.stop)
+    if (answerKey('exhausted', ask.answer) === 'stop')
       return {
         kind: 'stop-step',
         stepId: att.stepId,
@@ -162,18 +160,20 @@ export function overTokens(
   const dedupe = tokenBudgetKey(stepId, limit);
   const ask = asksOf(state, dedupe).pop();
   if (!ask) {
+    const lang = askLangOf(state);
     return {
       kind: 'raise',
       point: 7,
       stepId,
       dedupe,
-      question: `Шаг «${def.title}» вышел за бюджет токенов (${spent} из ${limit}). Продлить?`,
-      options: Object.values(BUDGET_ANSWERS),
-      recommendation: BUDGET_ANSWERS.stop,
+      question: CONDUCTOR_QUESTIONS.budgetTokens(lang, def, spent, limit),
+      options: optionsOf('budget', lang),
+      recommendation: labelOf('budget', lang, 'stop'),
       capStep: false,
     };
   }
-  if (ask.answer === BUDGET_ANSWERS.more) return extend;
-  if (ask.answer === BUDGET_ANSWERS.stop) return { kind: 'stop-step', stepId, reason: why };
+  const key = answerKey('budget', ask.answer);
+  if (key === 'more') return extend;
+  if (key === 'stop') return { kind: 'stop-step', stepId, reason: why };
   return { kind: 'wait', reason: `token budget ask ${ask.state}` };
 }

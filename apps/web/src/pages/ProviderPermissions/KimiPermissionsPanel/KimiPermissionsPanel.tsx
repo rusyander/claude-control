@@ -6,6 +6,7 @@ import { Icon } from '@shared/ui/icon';
 import { Typography } from '@shared/ui/typography';
 import { PageHeader } from '@shared/ui/page-header';
 import { ExplainBox } from '@shared/ui/explain-box';
+import { serverFieldText } from '@shared/config/i18n';
 import { KimiPermissionsForm } from '../KimiPermissionsForm/KimiPermissionsForm';
 import type { KimiPermissionsPanelProps } from '../ProviderPermissionsPanel.types';
 
@@ -79,9 +80,18 @@ export function KimiPermissionsPanel({ data, save }: KimiPermissionsPanelProps) 
             <Card padding="sm">
               <Stack direction="row" align="center" gap="var(--spacing-xs)">
                 <Icon name="warning" size={18} />
-                <Typography variant="body-sm" color="warning">
-                  {t('providerPermissions.readOnly', { path: data.filePath })}
-                </Typography>
+                <Stack gap="var(--spacing-2xs)">
+                  <Typography variant="body-sm" color="warning">
+                    {t('providerPermissions.readOnly', { path: data.filePath })}
+                  </Typography>
+                  {/* Причина с кодом (значение режима вне набора) — что именно поправить в
+                      файле; общий «формат не распознан» кода не несёт и не повторяется. */}
+                  {data.messageCode && (
+                    <Typography variant="body-sm" color="muted">
+                      {serverFieldText(data, 'error')}
+                    </Typography>
+                  )}
+                </Stack>
               </Stack>
             </Card>
           )}

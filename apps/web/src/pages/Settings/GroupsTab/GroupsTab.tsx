@@ -1,26 +1,19 @@
 import { Stack } from '@shared/ui/stack';
-import { GroupsDefaultsCard } from '../GroupsDefaultsCard/GroupsDefaultsCard';
-import { GroupEconomyCard } from '../GroupEconomyCard/GroupEconomyCard';
-import { GroupWatchCard } from '../GroupWatchCard/GroupWatchCard';
-import { GroupsProjectCard } from '../GroupsProjectCard/GroupsProjectCard';
+import { CoreEconomyCard } from '../CoreEconomyCard/CoreEconomyCard';
 import { SievesCard } from '../SievesCard/SievesCard';
-import { VerifyLedgerCard } from '../VerifyLedgerCard/VerifyLedgerCard';
-import type { SettingsTabProps } from '../SettingsTabs.types';
 
 /**
- * Раздел «Группы»: одно место для работы с разделением. Сверху — общие
- * правила и экономия, ниже — проект, который их переопределяет, и сита перед MR.
- * Хранит всё сервер: группы работают без браузера, и решать за них по вкладке нельзя.
+ * Раздел «Группы»: экономия шагов задачи и сита перед MR. Правила разделения по умолчанию, их
+ * проектная правка и журнал проверок ушли вместе с прежним исполнителем групп (этап 10, F1);
+ * карточки «Экономия групп разделения» и «Сторож групп разделения» — вместе с его рычагами и
+ * сторожем (этап 10, G15). Рычаги экономии хранит ядро (раздел `economy` его настройки), сита —
+ * сервер.
  */
-export function GroupsTab({ settings, patch }: SettingsTabProps) {
+export function GroupsTab() {
   return (
     <Stack gap="var(--spacing-lg)">
-      <GroupsDefaultsCard />
-      <GroupEconomyCard settings={settings} patch={patch} />
-      <GroupWatchCard settings={settings} patch={patch} />
-      <GroupsProjectCard />
+      <CoreEconomyCard />
       <SievesCard />
-      <VerifyLedgerCard />
     </Stack>
   );
 }

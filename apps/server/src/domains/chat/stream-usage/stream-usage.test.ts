@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { TurnTracker } from './stream-usage.ts';
-import type { ChatEvent, RawEvent } from '../ChatRunner/ChatRunner.ts';
+import type { ChatEvent, RawEvent } from '../chat-events.ts';
 
 /**
  * Расход по ходам модели из настоящего потока `stream-json`.

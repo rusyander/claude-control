@@ -5,7 +5,6 @@ import { Stack } from '@shared/ui/stack';
 import { PageHeader } from '@shared/ui/page-header';
 import { CrashCard } from '@shared/ui/error-boundary';
 import { MascotNote } from '@shared/ui/mascot';
-import { logRenderCrash } from '@shared/lib/watch-capture';
 
 /**
  * Раздел упал при отрисовке. Дефолт роутера — голое английское «Something went
@@ -18,8 +17,7 @@ export function RouteErrorPage({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // Сигнал раньше консоли — иначе перехват консоли отправил бы сбой второй раз.
-    logRenderCrash(`[agentdeck] сбой раздела ${window.location.pathname}`, error);
+    console.error(`[agentdeck] сбой раздела ${window.location.pathname}`, error);
   }, [error]);
 
   const retry = (): void => {

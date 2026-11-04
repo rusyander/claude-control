@@ -6,6 +6,7 @@ import { SelectField } from '@shared/ui/select-field';
 import { SkeletonList } from '@shared/ui/skeleton';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
+import { liveTaskOptions } from './taskOptions';
 import type { TaskTabProps } from './TaskTab.types';
 import styles from './TaskTab.module.scss';
 
@@ -42,10 +43,7 @@ export function TaskTab({ library, taskId, onPick }: TaskTabProps) {
           value={taskId ?? ''}
           options={[
             { value: '', label: t('coreScenario.task.choose'), disabled: true },
-            ...live.map((item) => ({
-              value: item.taskId,
-              label: `${item.title ?? item.taskId} · ${item.state}`,
-            })),
+            ...liveTaskOptions(t, live),
           ]}
           onChange={onPick}
         />

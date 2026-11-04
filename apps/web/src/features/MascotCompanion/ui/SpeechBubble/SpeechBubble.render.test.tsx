@@ -16,11 +16,11 @@ import type { Speech } from '../../lib/useMascotCompanion.types';
 const speech = (over: Partial<Speech> = {}): Speech => ({
   id: 1,
   kind: 'react',
-  reaction: 'groupFailed',
-  text: 'Группа «Выгрузка» упала — подробности в карточке хаба.',
+  reaction: 'runFailed',
+  text: 'Ход «Выгрузка» упал. Причина — в чате.',
   until: Date.now() + 9_000,
   mood: 'error',
-  target: { chatId: 'root', name: 'Разбор' },
+  target: { chatId: 'root', name: 'Выгрузка' },
   ...over,
 });
 
@@ -42,8 +42,8 @@ describe('mascot reaction line', () => {
     const html = renderToStaticMarkup(
       <SpeechBubble speech={speech()} inline onOpen={noop} onDismiss={noop} />,
     );
-    expect(html).toContain('data-mascot-reaction="groupFailed"');
-    expect(html).toContain('Группа «Выгрузка» упала');
+    expect(html).toContain('data-mascot-reaction="runFailed"');
+    expect(html).toContain('Ход «Выгрузка» упал');
     expect(html).toContain('data-mascot-speech-open');
     expect(html).toContain('data-mascot-speech-dismiss');
     expect(html).toContain('aria-label="Закрыть"');

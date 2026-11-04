@@ -1,68 +1,57 @@
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import type { DlpInfo, DlpPreviewResult, DlpRule } from '@agentdeck/contracts';
-import type { DlpProxy, DlpRuntime } from './DlpProxy.ts';
+import type { DlpProxy } from './core-dlp.ts';
 import { AliasVault, maskText } from '@agentdeck/dlp/mask';
 import { builtinInfos } from '@agentdeck/dlp/default-rules';
+import { resolveDlpUpstream as resolveUpstream } from '@agentdeck/dlp/proxy-config';
 import { readRules } from '@agentdeck/dlp/rules-file';
-import { coded } from '../../lib/server-text/server-text.ts';
+import { coded, errorBody } from '../../lib/server-text/server-text.ts';
+import { attachTextCodes } from '../../lib/server-texts/server-texts.ts';
 
 /**
- * Защита данных — фасад раздела. Образцы, правила, маска и разбор форматов живут
- * в пакете `@agentdeck/dlp` (их зовёт и ядро); здесь — то, что есть только у
- * панели: слушатель-прокси, его журнал, запись правил и сборка настроек в рабочую
- * конфигурацию и ответ панели.
+ * Защита данных — фасад раздела. Образцы, правила, маска, разбор форматов, журнал и выбор
+ * адреса наверх живут в пакете `@agentdeck/dlp` (их зовёт и ядро); слушатель-прокси держит
+ * хост звеньев ядра (C3c, `core-dlp.ts`). Здесь — то, что есть только у панели: запись правил,
+ * проверка настроек перед включением и сборка ответа страницы.
  *
  * Адрес, куда пересылать, берётся либо прямой строкой, либо из профиля «своего
  * эндпоинта» (часть A): прокси и профиль складываются — CLI смотрит в прокси,
  * прокси в локальную модель, и наружу не уходит ни адрес, ни данные.
  */
 
-export { DlpProxy } from './DlpProxy.ts';
+export { createCoreDlpProxy, DlpStartError, type DlpProxy } from './core-dlp.ts';
 export { readRules, parseRules, DlpRulesError } from '@agentdeck/dlp/rules-file';
 export { saveRules, validateRules } from './rules-store.ts';
-export { readJournal, clearJournal } from './journal.ts';
+export { readJournal, clearJournal } from '@agentdeck/dlp/journal';
 
 export class DlpConfigError extends Error {}
+
+/** Что ядро применит при включении — проверено панелью до записи тумблера. */
+export interface DlpRuntime {
+  port: number;
+  upstream: string;
+  rules: DlpRule[];
+  passUnknown: boolean;
+  journal: boolean;
+}
 
 /**
  * Куда прокси пересылает запросы. Пусто и там и там — не поднимаемся вовсе:
  * догадаться про облако вендора нельзя, а поднявшийся «куда-нибудь» прокси
- * увёл бы запросы не туда, где их ждут.
+ * увёл бы запросы не туда, где их ждут. Правило — общее с ядром.
  */
 export function resolveDlpUpstream(store: AppStore): string {
   const settings = store.getSettings();
-  const direct = settings.dlp.upstreamUrl.trim();
-  if (direct) return assertHttpUrl(direct);
-
-  const profileId = settings.dlp.upstreamProfileId;
-  const profile = settings.endpointProfiles.find((item) => item.id === profileId);
-  if (profile?.baseUrl) return assertHttpUrl(profile.baseUrl);
-
+  const resolved = resolveUpstream(settings.dlp, settings.endpointProfiles);
+  if ('url' in resolved) return resolved.url;
   throw coded(
-    new DlpConfigError('не задан адрес, куда пересылать запросы'),
-    'dlp-upstream-missing',
+    new DlpConfigError(resolved.detail),
+    resolved.code,
+    resolved.value !== undefined ? { value: resolved.value } : undefined,
   );
 }
 
-function assertHttpUrl(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw coded(new DlpConfigError(`адрес «${value}» не разбирается`), 'dlp-upstream-unparsed', {
-      value,
-    });
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw coded(
-      new DlpConfigError('адрес должен начинаться с http:// или https://'),
-      'dlp-upstream-scheme',
-    );
-  }
-  return url.toString().replace(/\/+$/, '');
-}
-
-/** Собрать конфигурацию запуска: адрес, правила, порт, политика неизвестного. */
+/** Проверить настройки перед включением: адрес, правила, порт, политика неизвестного. */
 export function buildDlpRuntime(store: AppStore, appDataDir: string): DlpRuntime {
   const settings = store.getSettings();
   const rules = readRules(appDataDir);
@@ -79,8 +68,6 @@ export function buildDlpRuntime(store: AppStore, appDataDir: string): DlpRuntime
     rules,
     passUnknown: settings.dlp.passUnknown,
     journal: settings.dlp.journal,
-    language: settings.language,
-    appDataDir,
   };
 }
 
@@ -88,18 +75,20 @@ export function describeDlp(store: AppStore, appDataDir: string, proxy: DlpProxy
   const settings = store.getSettings();
 
   let rules: DlpRule[] = [];
-  let error: string | undefined;
+  let rulesProblem: ReturnType<typeof errorBody> | undefined;
   try {
     rules = readRules(appDataDir);
   } catch (problem) {
-    error = problem instanceof Error ? problem.message : String(problem);
+    rulesProblem = errorBody(problem, 'error');
   }
 
+  // Причина рядом с кодом: строку ядра (`serverText`) код находит разбором, ошибка правил несёт
+  // свой (`coded`) — карточка показывает её на языке человека, а не русской строкой сервера.
   const status = proxy.status();
   return {
     settings: settings.dlp,
     rules,
-    status: { ...status, error: status.error ?? error },
+    status: status.error ? attachTextCodes(status) : { ...status, ...rulesProblem },
     builtins: builtinInfos(),
   };
 }

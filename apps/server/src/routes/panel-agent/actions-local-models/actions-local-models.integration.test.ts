@@ -9,6 +9,7 @@ import { localPaths } from '../../../domains/local-models/paths.ts';
 import { modelFilePath } from '../../../domains/local-models/hf.ts';
 import { KitService } from '../../../domains/kit/service.ts';
 import { registerLocalModelsRoutes } from '../../local-models-routes/local-models-routes.ts';
+import { fakeCoreHold } from '../../../domains/local-models/__fixtures__/fake-core-hold.ts';
 import { manageHarness, type ManageHarness } from '../manage-test-harness.ts';
 
 /**
@@ -50,9 +51,11 @@ describe('panel-agent actions: local models', () => {
         if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 20000\n';
         throw new Error(`no ${cmd}`);
       },
-      spawnServer: () => {
-        throw new Error('reading must not start a server');
-      },
+      hold: fakeCoreHold({
+        hold: () => {
+          throw new Error('reading must not start a server');
+        },
+      }),
     });
     const appData = join(root, '.claude', 'agentdeck');
     mkdirSync(appData, { recursive: true });

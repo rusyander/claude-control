@@ -27,6 +27,7 @@
  */
 import { mkdirSync, writeFileSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
+import { shotLanguage, shotTheme } from './kit.mjs';
 
 /** Проекты, вокруг которых идёт вся съёмка. Каталогов на диске нет и не нужно. */
 export const PROJECTS = [
@@ -409,6 +410,15 @@ export function buildFixture(home) {
 
   writeTranscripts(root);
   writeBackups(root);
+
+  // Тема и язык варианта — до подъёма панели: дом лежит рядом с репозиторием, не во
+  // временной папке, и правку настроек из процесса съёмки ворота «решает только
+  // человек» отклоняют (403) — `applyShotLanguage` тогда сверяет с этим файлом.
+  writeFileSync(
+    join(root, 'agentdeck', 'state.json'),
+    `${JSON.stringify({ settings: { theme: shotTheme(), language: shotLanguage() } }, null, 2)}\n`,
+    'utf8',
+  );
 
   // Каталог назван `.codex`, как у настоящего CLI: путь к файлу каждой стороны
   // пишет на кадре сервер, и подмена корня на домашний каталог человека должна

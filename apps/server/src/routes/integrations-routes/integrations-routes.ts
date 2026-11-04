@@ -6,7 +6,6 @@ import { registerIntegrationConfluenceRoutes } from '../integrations/confluence-
 import { registerIntegrationLinkRoutes } from '../integrations/link-routes.ts';
 import { registerIntegrationMcpRoutes } from '../integrations/mcp-routes.ts';
 import { registerIntegrationExchangeRoutes } from '../integrations/exchange-routes.ts';
-import { registerIntegrationForgeMrRoutes } from '../integrations/forge-mr-routes.ts';
 import type { IntegrationsDeps } from '../integrations/shared.ts';
 
 /**
@@ -35,5 +34,4 @@ export function registerIntegrationsRoutes(
   registerIntegrationLinkRoutes(app, deps);
   registerIntegrationMcpRoutes(app, deps);
   registerIntegrationExchangeRoutes(app, deps);
-  registerIntegrationForgeMrRoutes(app, deps);
 }

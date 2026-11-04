@@ -2,6 +2,7 @@ import {
   HOP_DLP_PARSES,
   HOP_TRANSLATIONS,
   type HopRegisterSpec,
+  type HopRequestRules,
   type HopUpstreamAuth,
 } from '@agentdeck/contracts/core/hops';
 import type {
@@ -39,6 +40,8 @@ export interface RoadHopFacts {
   upstreamRooted?: boolean;
   /** Манифест контура (пресет ⊕ карточка) для драйвера звена; нет — драйвер базы как есть. */
   manifest?: PlatformManifestOverrides | null;
+  /** Управляемые правила контура в полях провода (`contourRequestRules`); нет — без правил. */
+  requestRules?: HopRequestRules | null;
 }
 
 /** Хост звеньев для дороги и факты звена по маршруту (профили панели, `panel-routes.ts`). */
@@ -138,6 +141,7 @@ export async function linkHop(input: HopLinkInput): Promise<HopLinked | { refuse
     upstreamQuery: { ...facts.upstreamQuery },
     upstreamRooted: facts.upstreamRooted ?? false,
     manifest: facts.manifest ?? null,
+    requestRules: facts.requestRules ?? null,
   };
   let handle: HopHostHandle;
   try {

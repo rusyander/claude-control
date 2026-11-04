@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1050,
-      "shotAt": "2026-09-28T14:33:16.668Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\"",
+      "shotAt": "2026-11-03T16:31:26.925Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\"",
       "en": {
         "file": "01-list.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:35:39.712Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\""
+        "shotAt": "2026-11-03T16:34:40.213Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\"",
+        "seal": {
+          "png": "b998493ced4a6f46",
+          "text": "99afb1ed707dc857"
+        }
       },
       "dark": {
         "file": "01-list.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:38:02.614Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\""
+        "shotAt": "2026-11-03T16:37:55.270Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\"",
+        "seal": {
+          "png": "752734f329f8f95a",
+          "text": "10e357f27b40e238"
+        }
       },
       "darkEn": {
         "file": "01-list.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:40:22.348Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\""
+        "shotAt": "2026-11-03T16:41:03.661Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\"",
+        "seal": {
+          "png": "3c96e01c46d084d6",
+          "text": "99afb1ed707dc857"
+        }
+      },
+      "seal": {
+        "png": "fffec612bc0ff01e",
+        "text": "10e357f27b40e238"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 468,
       "height": 368,
-      "shotAt": "2026-09-28T14:33:18.283Z",
+      "shotAt": "2026-11-03T16:31:28.569Z",
       "text": "Удалить безвозвратно? Хук будет удалён из settings.local.json — вашего личного файла настроек. Файл скрипта останется на диске. Копия конфига сохранится в agentdeck/backups. Введите «SessionEnd», чтобы подтвердить Отмена Удалить",
       "en": {
         "file": "02-local.en.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T14:35:41.310Z",
-        "text": "Delete permanently? The hook will be removed from settings.local.json, your personal settings file. The script file stays on disk. A config backup goes to agentdeck/backups. Type \"SessionEnd\" to confirm Cancel Delete"
+        "shotAt": "2026-11-03T16:34:41.846Z",
+        "text": "Delete permanently? The hook will be removed from settings.local.json, your personal settings file. The script file stays on disk. A config backup goes to agentdeck/backups. Type \"SessionEnd\" to confirm Cancel Delete",
+        "seal": {
+          "png": "a8782efddc8e6183",
+          "text": "f4c363abe1333988"
+        }
       },
       "dark": {
         "file": "02-local.dark.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T14:38:04.220Z",
-        "text": "Удалить безвозвратно? Хук будет удалён из settings.local.json — вашего личного файла настроек. Файл скрипта останется на диске. Копия конфига сохранится в agentdeck/backups. Введите «SessionEnd», чтобы подтвердить Отмена Удалить"
+        "shotAt": "2026-11-03T16:37:56.885Z",
+        "text": "Удалить безвозвратно? Хук будет удалён из settings.local.json — вашего личного файла настроек. Файл скрипта останется на диске. Копия конфига сохранится в agentdeck/backups. Введите «SessionEnd», чтобы подтвердить Отмена Удалить",
+        "seal": {
+          "png": "f8d556bd56cefcb5",
+          "text": "49dd4011ab9b01d2"
+        }
       },
       "darkEn": {
         "file": "02-local.dark.en.png",
         "masked": 0,
         "width": 468,
         "height": 368,
-        "shotAt": "2026-09-28T14:40:23.981Z",
-        "text": "Delete permanently? The hook will be removed from settings.local.json, your personal settings file. The script file stays on disk. A config backup goes to agentdeck/backups. Type \"SessionEnd\" to confirm Cancel Delete"
+        "shotAt": "2026-11-03T16:41:05.264Z",
+        "text": "Delete permanently? The hook will be removed from settings.local.json, your personal settings file. The script file stays on disk. A config backup goes to agentdeck/backups. Type \"SessionEnd\" to confirm Cancel Delete",
+        "seal": {
+          "png": "3e901179d860a6c0",
+          "text": "f4c363abe1333988"
+        }
+      },
+      "seal": {
+        "png": "64ec5b24aba48dc1",
+        "text": "49dd4011ab9b01d2"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1050,
-      "shotAt": "2026-09-28T14:33:21.861Z",
-      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Перемещено",
+      "shotAt": "2026-11-03T16:31:32.176Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Перемещено",
       "en": {
         "file": "03-order.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:35:44.888Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Moved"
+        "shotAt": "2026-11-03T16:34:45.458Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Moved",
+        "seal": {
+          "png": "caeef469d1b8f9b5",
+          "text": "cfdf5edd7cd025f0"
+        }
       },
       "dark": {
         "file": "03-order.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:38:07.799Z",
-        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Перемещено"
+        "shotAt": "2026-11-03T16:38:00.484Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Перемещено",
+        "seal": {
+          "png": "5ce6274c484a0b09",
+          "text": "40d8d585339cda24"
+        }
       },
       "darkEn": {
         "file": "03-order.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:40:27.565Z",
-        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Moved"
+        "shotAt": "2026-11-03T16:41:08.867Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Moved",
+        "seal": {
+          "png": "0b8c8f9d292435c3",
+          "text": "cfdf5edd7cd025f0"
+        }
+      },
+      "seal": {
+        "png": "f22b81af1c214391",
+        "text": "40d8d585339cda24"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1050,
-      "shotAt": "2026-09-28T14:33:24.448Z",
-      "text": "AgentDeck Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Выключено Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Обновлено · копия: settings.json.2026-09-28T14-33-21-902Z.bak",
+      "shotAt": "2026-11-03T16:31:34.789Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Выключено Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Обновлено · копия: settings.json.2026-11-03T16-31-32-237Z.bak",
       "en": {
         "file": "04-off.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:35:47.456Z",
-        "text": "AgentDeck Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Disabled Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Updated · backup: settings.json.2026-09-28T14-35-44-911Z.bak"
+        "shotAt": "2026-11-03T16:34:48.050Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Disabled Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Updated · backup: settings.json.2026-11-03T16-34-45-512Z.bak",
+        "seal": {
+          "png": "67603fde21c04d3e",
+          "text": "fb5a455eb7f36f22"
+        }
       },
       "dark": {
         "file": "04-off.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:38:10.367Z",
-        "text": "AgentDeck Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Выключено Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Обновлено · копия: settings.json.2026-09-28T14-38-07-823Z.bak"
+        "shotAt": "2026-11-03T16:38:03.063Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 2 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 8 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Хуки Команды, которые запускаются на событиях Claude Code Добавить хук Как это работает PreToolUse Write|Edit Выключено Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Файл скрипта не найден node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Файл скрипта не найден локальные node \"C:/work/claude-help-config/hooks/session-close.mjs\" Обновлено · копия: settings.json.2026-11-03T16-38-00-515Z.bak",
+        "seal": {
+          "png": "d3f4dda056a64a35",
+          "text": "7cd08d887530ba53"
+        }
       },
       "darkEn": {
         "file": "04-off.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1050,
-        "shotAt": "2026-09-28T14:40:30.127Z",
-        "text": "AgentDeck Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Disabled Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Updated · backup: settings.json.2026-09-28T14-40-27-583Z.bak"
+        "shotAt": "2026-11-03T16:41:11.478Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 2 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 8 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Hooks Commands that run on Claude Code events Add hook How it works PreToolUse Write|Edit Disabled Проверяет запись файлов на строки, похожие на ключи и токены. node \"C:/work/claude-help-config/hooks/secret-guard.mjs\" Bash|PowerShell Не пропускает разрушительные команды: сверяет строку запуска со списком и требует подтверждения человека. node \"C:/work/claude-help-config/hooks/destructive-guard.mjs\" PostToolUse Write|Edit Прогоняет форматтер по файлу, который только что правили. node \"C:/work/claude-help-config/hooks/format-on-edit.mjs\" Write Script file not found node \"C:/work/claude-help-config/hooks/lint-on-edit.mjs\" SessionStart Краткая сводка в начале сессии: ветка, незакрытые правки, где лежат заметки. node \"C:/work/claude-help-config/hooks/session-brief.mjs\" SessionEnd Script file not found local node \"C:/work/claude-help-config/hooks/session-close.mjs\" Updated · backup: settings.json.2026-11-03T16-41-08-927Z.bak",
+        "seal": {
+          "png": "17c6ac7b2ed51c71",
+          "text": "71e0008310bc9fb9"
+        }
+      },
+      "seal": {
+        "png": "8f83835ad09baa70",
+        "text": "e754fbe9517d07a2"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 1428,
       "height": 928,
-      "shotAt": "2026-09-28T14:33:26.659Z",
-      "text": "Редактировать Изменения применятся после перезапуска Claude Code Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Сразу после того, как инструмент отработал Реакция на результат: отформатировать изменённый файл, запустить линт, отметить событие. Фильтр Write Edit Skill Bash Write Edit → Write|Edit Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Команда Команда оболочки. Код возврата 2 останавливает действие и требует подтверждения, остальные коды — просто сообщение. Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+      "shotAt": "2026-11-03T16:31:36.997Z",
+      "text": "Редактировать Изменения применятся после перезапуска Claude Code Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop PermissionRequest SubagentStop SessionStart SessionEnd PreCompact Сразу после того, как инструмент отработал Реакция на результат: отформатировать изменённый файл, запустить линт, отметить событие. Фильтр Write Edit Skill Bash Write Edit → Write|Edit Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Команда Команда оболочки. Код возврата 2 останавливает действие и требует подтверждения, остальные коды — просто сообщение. Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
       "en": {
         "file": "05-edit.en.png",
         "masked": 0,
         "width": 1428,
         "height": 928,
-        "shotAt": "2026-09-28T14:35:49.630Z",
-        "text": "Edit Changes apply after restarting Claude Code Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Right after a tool has finished Reacting to the result: format the changed file, run the linter, record the event. Matcher Write Edit Skill Bash Write Edit → Write|Edit Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Command Shell command. Exit code 2 blocks the action and asks for confirmation; other codes just report. Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:34:50.259Z",
+        "text": "Edit Changes apply after restarting Claude Code Event PreToolUse PostToolUse UserPromptSubmit Notification Stop PermissionRequest SubagentStop SessionStart SessionEnd PreCompact Right after a tool has finished Reacting to the result: format the changed file, run the linter, record the event. Matcher Write Edit Skill Bash Write Edit → Write|Edit Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Command Shell command. Exit code 2 blocks the action and asks for confirmation; other codes just report. Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "d9783b253397f48f",
+          "text": "9368c68b2e0b3d34"
+        }
       },
       "dark": {
         "file": "05-edit.dark.png",
         "masked": 0,
         "width": 1428,
         "height": 928,
-        "shotAt": "2026-09-28T14:38:12.578Z",
-        "text": "Редактировать Изменения применятся после перезапуска Claude Code Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Сразу после того, как инструмент отработал Реакция на результат: отформатировать изменённый файл, запустить линт, отметить событие. Фильтр Write Edit Skill Bash Write Edit → Write|Edit Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Команда Команда оболочки. Код возврата 2 останавливает действие и требует подтверждения, остальные коды — просто сообщение. Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить"
+        "shotAt": "2026-11-03T16:38:05.245Z",
+        "text": "Редактировать Изменения применятся после перезапуска Claude Code Событие PreToolUse PostToolUse UserPromptSubmit Notification Stop PermissionRequest SubagentStop SessionStart SessionEnd PreCompact Сразу после того, как инструмент отработал Реакция на результат: отформатировать изменённый файл, запустить линт, отметить событие. Фильтр Write Edit Skill Bash Write Edit → Write|Edit Ограничивает событие: имя инструмента или несколько через вертикальную черту. Пусто — срабатывает всегда. Имя файла хука Файл создастся сам в папке hooks/ с расширением .mjs. Оставьте пустым, если команда запускает уже существующую программу. Что делает этот хук Команда Команда оболочки. Код возврата 2 останавливает действие и требует подтверждения, остальные коды — просто сообщение. Таймаут, секунд Сколько секунд ждать скрипт, прежде чем оборвать его. Пусто — умолчание Claude Code (60). Помощник Опишите словами, что нужно — поля заполнятся сами Например: «хочу правило, чтобы перед словами о готовности всегда прогонялись тесты». Можно надиктовать голосом. Отмена Сохранить",
+        "seal": {
+          "png": "87cb1f80460fb8e7",
+          "text": "d8e2ee651767f9fd"
+        }
       },
       "darkEn": {
         "file": "05-edit.dark.en.png",
         "masked": 0,
         "width": 1428,
         "height": 928,
-        "shotAt": "2026-09-28T14:40:32.341Z",
-        "text": "Edit Changes apply after restarting Claude Code Event PreToolUse PostToolUse UserPromptSubmit Notification Stop SubagentStop SessionStart SessionEnd PreCompact Right after a tool has finished Reacting to the result: format the changed file, run the linter, record the event. Matcher Write Edit Skill Bash Write Edit → Write|Edit Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Command Shell command. Exit code 2 blocks the action and asks for confirmation; other codes just report. Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save"
+        "shotAt": "2026-11-03T16:41:13.673Z",
+        "text": "Edit Changes apply after restarting Claude Code Event PreToolUse PostToolUse UserPromptSubmit Notification Stop PermissionRequest SubagentStop SessionStart SessionEnd PreCompact Right after a tool has finished Reacting to the result: format the changed file, run the linter, record the event. Matcher Write Edit Skill Bash Write Edit → Write|Edit Narrows the event: a tool name, or several separated by a pipe. Empty means it always fires. Hook file name The file is created for you in hooks/ with a .mjs extension. Leave empty if the command runs an existing program. What this hook does Command Shell command. Exit code 2 blocks the action and asks for confirmation; other codes just report. Timeout, seconds How many seconds to wait for the script before cutting it off. Empty — the Claude Code default (60). Assistant Describe what you need — the fields fill themselves For example: \"I want a rule that tests are always run before claiming something is done\". You can dictate it by voice. Cancel Save",
+        "seal": {
+          "png": "2b94bfdefc7f2651",
+          "text": "9368c68b2e0b3d34"
+        }
+      },
+      "seal": {
+        "png": "d12551e9daa6fd59",
+        "text": "d8e2ee651767f9fd"
       }
     }
   ]

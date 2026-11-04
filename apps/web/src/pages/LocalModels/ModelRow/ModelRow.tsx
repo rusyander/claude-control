@@ -24,7 +24,6 @@ export function ModelRow({
   serverReady,
   busy,
   onPull,
-  onImport,
   onConnect,
   onBench,
   onRemove,
@@ -35,8 +34,7 @@ export function ModelRow({
   const { t, i18n } = useTranslation();
   const { model, choiceFit: fit, installed, job, serverJob } = row;
   const running = job?.state === 'running';
-  const importOnly = !installed && row.importable;
-  const canDownload = !row.quantInstalled && !running && !importOnly && fit.allowed;
+  const canDownload = !row.quantInstalled && !running && fit.allowed;
   const toolsFailed = model.toolsProbe === 'failed';
   // Файл, который держит сервер, не удаляется — и модель целиком тоже: корзина закрыта, причина — в «На диске».
   const loaded = row.downloaded.some((file) => file.loaded);
@@ -79,16 +77,6 @@ export function ModelRow({
         </div>
 
         <div className={styles.actions}>
-          {importOnly && !running ? (
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={onImport}
-              title={t('localModels.catalog.importHint')}
-            >
-              {t('localModels.catalog.import')}
-            </Button>
-          ) : null}
           {canDownload ? (
             <Button
               size="sm"

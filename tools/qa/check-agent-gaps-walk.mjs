@@ -8,11 +8,12 @@
  * действия → карточки → решение человека (`/api/agent/pending/:id` с Origin
  * окна) → настройка проекта в `state.json`.
  *
- * Свидетельства: ответ маршрута подбора модели, строки `agent-cli.jsonl` (что
+ * Свидетельства: состояние папки e2e проекта, строки `agent-cli.jsonl` (что
  * модель ПОЛУЧИЛА от панели) и ответ в файле разговора. Ветки: правки агента в
  * чате (чтение, без карточки), собственный `.claude` проекта (ключ из команды
- * хука до модели не дошёл), папка вне реестра (отказ до карточки), подбор
- * модели: отклонено (не изменился) и одобрено (изменился).
+ * хука до модели не дошёл), папка вне реестра (отказ до карточки), папка e2e:
+ * отклонено (не заведена) и одобрено (заведена). Прежняя ветка «подбор модели»
+ * снята с действием `set_model_cascade` (этап 10, G14).
  *
  * Проект в просьбах назван ИМЕНЕМ, не путём: имя временного каталога стенда
  * (`cc-agent-gaps-walk-32tvF6`) детектор секретов панели примерно в 5% запусков
@@ -47,6 +48,8 @@ await runOnStand(
     label: 'agent-gaps-walk',
     web: false,
     fakeCli: { claude: FAKE_PANEL_AGENT_GAPS_CLI_SOURCE },
+    // Ход агента панели идёт через ядро (s10): без `core` он отказывает «core is not running».
+    core: true,
     seed: ({ root, cfg }) => {
       project = join(root, 'gaps-project');
       outside = join(root, 'outside');
@@ -137,8 +140,8 @@ await runOnStand(
       body: { path: project, name: NAME },
     });
     check('проект зарегистрирован', registered.status === 200, registered.text.slice(0, 300));
-    const cascade = async () =>
-      (await stand.api(`/chat/cascade?path=${encodeURIComponent(project)}`)).body?.enabled;
+    const e2eState = async () =>
+      (await stand.api(`/project-tests/e2e?path=${encodeURIComponent(project)}`)).body?.state;
 
     async function turn(content, decide) {
       const conversationId = `walk-${randomUUID()}`;
@@ -215,31 +218,41 @@ await runOnStand(
     );
     check('чужая папка: правило чужой папки не прочитано', !foreign.reply.includes('foreign.md'));
 
-    // ── Подбор модели: отклонено, затем одобрено ─────────────────────────────
-    const initial = await cascade();
-    check('подбор модели: состояние читается', typeof initial === 'boolean', String(initial));
-    const verb = initial ? 'Выключи' : 'Включи';
-    const rejected = await turn(`${verb} подбор модели в проекте «${NAME}»`, () => 'reject');
+    // ── Папка e2e: отклонено, затем одобрено ─────────────────────────────────
+    // Регистрация проекта сама заводит папку e2e; снимаем её маршрутом кнопки,
+    // чтобы действию было что менять.
+    const removed = await stand.api(`/project-tests/e2e?path=${encodeURIComponent(project)}`, {
+      method: 'DELETE',
+      headers: { origin },
+    });
+    check('папка e2e: снята перед проверкой', removed.status === 200, removed.text.slice(0, 300));
     check(
-      'отклонено: одна карточка set_model_cascade:change с русской сводкой',
+      'папка e2e: состояние missing',
+      (await e2eState()) === 'missing',
+      String(await e2eState()),
+    );
+    const ask = `Заведи папку e2e в проекте «${NAME}»`;
+    const rejected = await turn(ask, () => 'reject');
+    check(
+      'отклонено: одна карточка create_e2e_folder:change с русской сводкой',
       rejected.cards.length === 1 &&
-        rejected.cards[0].name === 'set_model_cascade' &&
+        rejected.cards[0].name === 'create_e2e_folder' &&
         rejected.cards[0].risk === 'change' &&
         /[а-я]/i.test(rejected.cards[0].preview?.summary ?? ''),
       JSON.stringify(rejected.cards.map((card) => [card.name, card.risk, card.preview?.summary])),
     );
-    check('отклонено: переключатель не изменился', (await cascade()) === initial);
+    check('отклонено: папки нет', (await e2eState()) === 'missing');
     check(
-      'отклонено: ответ говорит, что не изменён',
-      rejected.reply.startsWith('Подбор модели не изменён'),
+      'отклонено: ответ говорит, что не заведена',
+      rejected.reply.startsWith('Папка e2e не заведена'),
       rejected.reply,
     );
-    const approved = await turn(`${verb} подбор модели в проекте «${NAME}»`, () => 'approve');
+    const approved = await turn(ask, () => 'approve');
     check('одобрено: одна карточка', approved.cards.length === 1);
-    check('одобрено: переключатель изменился', (await cascade()) === !initial);
+    check('одобрено: папка заведена', (await e2eState()) === 'created', String(await e2eState()));
     check(
       'одобрено: ответ называет сделанное',
-      approved.reply === `Подбор модели ${initial ? 'выключен' : 'включён'}.`,
+      approved.reply === 'Папка e2e заведена.',
       approved.reply,
     );
   },

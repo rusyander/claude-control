@@ -110,15 +110,13 @@ const HELP = `Тест-кейсы проекта без панели.
   suites    каталоги с тестами — в кейсы-наборы (кейс на каталог, итог — худший тест); --dry — только счёт
   gate      пробелы хода агента: gate --since <ISO> [--changed-at <ISO>] <файл…>; код 1 — есть пробелы
             (его зовёт хук конца хода: правил код — кейс, прогон, запись)
-  gaps      пробелы блока «Тесты» перед «доставлено» — тем же кодом, что сверяет панель:
+  gaps      пробелы блока «Тесты» перед «доставлено» — тем же кодом, что сверка доставки:
             gaps [--since <ISO начала группы>]; без --since начало берётся из состояния панели
             по пути копии; код 1 — есть пробелы
-  delivery  вся проверка доставки группы до ответа — тем же кодом, что панель после хода:
-            описание MR, строки сит, пункты владельца, блок «Тесты»;
-            delivery --answer <файл с блоком сит> [--mr <ссылка>]; описание MR и ветки
-            ревьюера читает панель (ключ форджа у неё) — описание публикуют один раз, затем
-            проверяют; --mr-description <файл> — проверить черновик до публикации или без
-            панели; код 1 — есть пробелы
+  delivery  проба сдачи копии единицы ядра до ответа — тот же суд, что шаг публикации ядра
+            (состав финальной проверки, база, конфликт, требования, сита, тексты коммитов и MR,
+            открытые вопросы человеку); через панель (/api/core/delivery); код 0 — сдавать
+            нечего, 1 — отказ (строки «- …»), 2 — судить нечем (панель/ядро молчат, копия не ядра)
   record    записать проверенное вручную (только ручные кейсы, в разделе — «вручную»):
             record <группа>:<кейс>=passed|failed|blocked|skipped …; автокейс — только run
   case-cmd  своя команда кейса у этой копии — один раз, дальше её берут run, --stale и --base:
@@ -254,11 +252,7 @@ async function main() {
   if (command === 'gaps') return await deliveryGaps(project, options);
   if (command === 'delivery') {
     const { deliveryCheck } = await import('./tests-cli-delivery.mjs');
-    return await deliveryCheck(project, options, {
-      repo: REPO,
-      cli: `node "${fileURLToPath(import.meta.url)}"`,
-      slugs: [BRAND_SLUG, LEGACY_BRAND_SLUG],
-    });
+    return await deliveryCheck(project, options, { repo: REPO });
   }
   if (command === 'suites') return await syncSuiteCases(project, options);
   if (command === 'tree') return await printTree(REPO, project, options);
@@ -598,8 +592,8 @@ async function turnGate(project, options, positional) {
 }
 
 /**
- * Пробелы блока «Тесты» перед «доставлено» — тем же `testsDeliveryGaps`, что сверяет
- * панель: группа видит весь список до сдачи, а не по кругу напоминаний. После rebase
+ * Пробелы блока «Тесты» перед «доставлено» — тем же `testsDeliveryGaps`, что и
+ * `delivery`: группа видит весь список до сдачи, а не по кругу напоминаний. После rebase
  * задетых кейсов стало 27, а напоминание называло два — каждый такой круг стоил
  * группе хода, перепроверки и нового напоминания (24.10.2026).
  */
@@ -621,7 +615,7 @@ async function deliveryGaps(project, options) {
   else console.log('Блок «Тесты»: пробелов перед сдачей нет.');
 }
 
-/** Вердикт `gaps` — один на `gaps` и `run --stale`: тот же `testsDeliveryGaps`, что у панели. */
+/** Вердикт `gaps` — один на `gaps` и `run --stale`: тот же `testsDeliveryGaps`, что у `delivery`. */
 async function gapsVerdict(project, options) {
   const since = typeof options.since === 'string' ? options.since : groupStartOf(project);
   const { testsDeliveryGaps } = await import(
@@ -1134,6 +1128,12 @@ async function runTests(project, options) {
     plan.env = { ...part.env, ...plan.env };
     plan.envKey = part.id;
   }
+  // Выбор (`--case`, `--group`) доходит до `junit-run.mjs`: скрипт с кейсами на разные аргументы
+  // гоняет только выбранные, а не все кейсы своего файла (прогон 3deb1cb9 упёрся в предел так).
+  // Список длиннее предела переменной Windows (32 767) не передаётся — тогда гоняется весь файл.
+  const pickedList = automated.map((entry) => `${entry.group}:${entry.item.id}`).join(',');
+  if ((picked || options.group) && pickedList.length < 30_000)
+    plan.env = { ...plan.env, AGENTDECK_TEST_CASES: pickedList };
   await narrowToBranchRed(project, plan, automated);
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);

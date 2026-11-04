@@ -6,18 +6,50 @@
       "id": "01-capability-row",
       "side": "panel",
       "file": "01-capability-row.png",
-      "masked": 1,
+      "masked": 2,
       "width": 932,
       "height": 49,
-      "shotAt": "2026-09-13T09:57:59.837Z",
+      "shotAt": "2026-11-03T11:53:31.082Z",
       "text": "Рисование картинок — нет рисующих моделей ключу не выдано проверено пробой",
       "en": {
         "file": "01-capability-row.en.png",
-        "masked": 1,
+        "masked": 2,
         "width": 932,
         "height": 49,
-        "shotAt": "2026-09-13T10:02:46.628Z",
-        "text": "Image generation — no рисующих моделей ключу не выдано confirmed by the probe"
+        "shotAt": "2026-11-03T11:54:56.147Z",
+        "text": "Image generation — no no drawing models granted to the key confirmed by the probe",
+        "seal": {
+          "png": "8b7935eca7899778",
+          "text": "ae4d8df8db615ffc"
+        }
+      },
+      "dark": {
+        "file": "01-capability-row.dark.png",
+        "masked": 2,
+        "width": 932,
+        "height": 49,
+        "shotAt": "2026-11-03T11:56:15.527Z",
+        "text": "Рисование картинок — нет рисующих моделей ключу не выдано проверено пробой",
+        "seal": {
+          "png": "308e8410170de2d5",
+          "text": "370880bee490bb6c"
+        }
+      },
+      "darkEn": {
+        "file": "01-capability-row.dark.en.png",
+        "masked": 2,
+        "width": 932,
+        "height": 49,
+        "shotAt": "2026-11-03T11:57:37.074Z",
+        "text": "Image generation — no no drawing models granted to the key confirmed by the probe",
+        "seal": {
+          "png": "3b3b7a085d7e4a73",
+          "text": "ae4d8df8db615ffc"
+        }
+      },
+      "seal": {
+        "png": "1cc43368f290d55c",
+        "text": "370880bee490bb6c"
       }
     },
     {
@@ -27,15 +59,47 @@
       "masked": 0,
       "width": 388,
       "height": 278,
-      "shotAt": "2026-09-13T09:58:06.174Z",
+      "shotAt": "2026-11-03T11:53:38.827Z",
       "text": "Сообщение Уходит агенту в этот разговор Картинка Нарисует агент разговора: вектор кодом, а не снимок · растра нет: в каталоге ключа нет модели с генерацией картинок Презентация Слайды надиктует агент разговора Режим доступен там, где возможность объявлена",
       "en": {
         "file": "02-mode-menu.en.png",
         "masked": 0,
         "width": 388,
         "height": 260,
-        "shotAt": "2026-09-13T10:02:52.996Z",
-        "text": "Message Goes to the agent in this conversation Image The conversation agent draws it: vector code, not a photo · no raster: the key catalog holds no image model Presentation The conversation agent dictates the slides Available where the capability is declared"
+        "shotAt": "2026-11-03T11:55:03.817Z",
+        "text": "Message Goes to the agent in this conversation Image The conversation agent draws it: vector code, not a photo · no raster: the key catalog holds no image model Presentation The conversation agent dictates the slides Available where the capability is declared",
+        "seal": {
+          "png": "eb8af20fb9a904fd",
+          "text": "c14c82e6a232a010"
+        }
+      },
+      "dark": {
+        "file": "02-mode-menu.dark.png",
+        "masked": 0,
+        "width": 388,
+        "height": 278,
+        "shotAt": "2026-11-03T11:56:23.263Z",
+        "text": "Сообщение Уходит агенту в этот разговор Картинка Нарисует агент разговора: вектор кодом, а не снимок · растра нет: в каталоге ключа нет модели с генерацией картинок Презентация Слайды надиктует агент разговора Режим доступен там, где возможность объявлена",
+        "seal": {
+          "png": "0c76cd8a48addd5c",
+          "text": "73d0867d5012804a"
+        }
+      },
+      "darkEn": {
+        "file": "02-mode-menu.dark.en.png",
+        "masked": 0,
+        "width": 388,
+        "height": 260,
+        "shotAt": "2026-11-03T11:57:44.927Z",
+        "text": "Message Goes to the agent in this conversation Image The conversation agent draws it: vector code, not a photo · no raster: the key catalog holds no image model Presentation The conversation agent dictates the slides Available where the capability is declared",
+        "seal": {
+          "png": "e800009494be4381",
+          "text": "c14c82e6a232a010"
+        }
+      },
+      "seal": {
+        "png": "da1c7b7d0134fab3",
+        "text": "73d0867d5012804a"
       }
     }
   ]

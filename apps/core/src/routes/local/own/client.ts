@@ -1,6 +1,7 @@
 import type { AbortLike } from '@agentdeck/contracts/core/routes';
 import { sleep } from '../../../platform/os-kind.ts';
 import { RouteAborted } from '../../lease.ts';
+import { matchRouterId } from './model-id.ts';
 
 /**
  * HTTP к своему llama-server в режиме маршрутизатора (`--models-preset`, сборка 11193, замер
@@ -76,6 +77,11 @@ export function createRouterClient(
   };
 
   const models = async (): Promise<RouterModel[]> => parseModels(await call('/models'));
+  /** Имя модели у маршрутизатора: секцию пресета он мог переименовать (`model-id.ts`). */
+  const routerId = async (model: string): Promise<string> => {
+    const ids = (await models()).map((item) => item.id);
+    return matchRouterId(ids, model) ?? model;
+  };
 
   const until = async (
     what: string,
@@ -107,22 +113,24 @@ export function createRouterClient(
     models,
     load: async (model, timeoutMs, signal) => {
       if (signal?.aborted) throw new RouteAborted('model load');
-      await call('/models/load', { model });
+      const id = await routerId(model);
+      await call('/models/load', { model: id });
       await until(
-        `${model} loaded`,
+        `${id} loaded`,
         timeoutMs,
         (list) => {
-          const row = list.find((item) => item.id === model);
-          if (!row) return new Error(`router does not list ${model}`);
+          const row = list.find((item) => item.id === id);
+          if (!row) return new Error(`router does not list ${id}`);
           if (row.state === 'failed')
-            return new Error(`router failed to load ${model} (exit ${row.exitCode ?? '?'})`);
+            return new Error(`router failed to load ${id} (exit ${row.exitCode ?? '?'})`);
           return row.state === 'loaded';
         },
         signal,
       );
     },
     unload: async (model, timeoutMs) => {
-      await call('/models/unload', { model });
+      const id = await routerId(model);
+      await call('/models/unload', { model: id });
       return until('no loaded model', timeoutMs, (list) =>
         list.every((item) => item.state !== 'loaded' && item.state !== 'loading'),
       );

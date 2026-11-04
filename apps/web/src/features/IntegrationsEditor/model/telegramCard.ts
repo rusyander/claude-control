@@ -20,8 +20,8 @@ import type { TelegramCardDraft, TelegramGroups } from './telegramCard.types';
 
 /** «Агент ждёт тебя» — вопрос или разрешение. */
 export const WAIT_EVENTS: readonly TelegramEvent[] = ['permission', 'question'];
-/** «Что-то сломалось» — упал прогон, красные тесты, группа зависла или пошла по кругу (сигнал сторожа). */
-export const BROKEN_EVENTS: readonly TelegramEvent[] = ['runError', 'testFailed', 'groupSignal'];
+/** «Что-то сломалось» — упал прогон или красные тесты. */
+export const BROKEN_EVENTS: readonly TelegramEvent[] = ['runError', 'testFailed'];
 /** «Бюджет контура» — в «Дополнительно». */
 export const BUDGET_EVENTS: readonly TelegramEvent[] = ['budget'];
 

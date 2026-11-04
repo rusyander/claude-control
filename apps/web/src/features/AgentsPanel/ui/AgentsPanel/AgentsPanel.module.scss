@@ -31,10 +31,9 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-/* Ползунок громкости узкий: он делит строку со счётчиком агентов и тумблером,
-   а панель шириной 360px. */
+/* Ползунок громкости делит свою строку только с тумблером «Звук» и процентом. */
 .volume {
-  width: 72px;
+  width: 120px;
   accent-color: var(--color-accent);
   cursor: pointer;
 }

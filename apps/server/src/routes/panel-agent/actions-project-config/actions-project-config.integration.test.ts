@@ -1,12 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Group } from '@agentdeck/contracts';
 import { openProjectStand, type ProjectStand } from '../project-actions.harness.ts';
 
 /**
- * Настройки проекта руками агента (U4a): CLAUDE.md, `.mcp.json`, права
- * `.claude/settings.json` и выбор стороны пары групп — настоящими маршрутами
+ * Настройки проекта руками агента (U4a): CLAUDE.md, `.mcp.json` и права
+ * `.claude/settings.json` — настоящими маршрутами
  * вкладки проекта во ВРЕМЕННОМ каталоге. Доказательство — файл на диске после
  * клика, и отказ ДО карточки там, где клик человека был бы впустую.
  */
@@ -152,57 +151,6 @@ describe('panel-agent actions: project config', () => {
     expect(removed.card.risk).toBe('danger');
     expect(removed.result.outcome).toBe('done');
     expect(readFileSync(settings, 'utf8')).not.toContain('npm run test');
-  });
-
-  it('выбор стороны пары групп: чтение, установка глобальной копии, возврат; чужой ключ — отказ без карточки', async () => {
-    const group = (id: string, name: string, patch: Partial<Group>): Group => ({
-      id,
-      name,
-      description: '',
-      color: 'accent',
-      icon: 'folder',
-      members: [],
-      env: {},
-      projectPaths: [],
-      isEnabled: true,
-      order: 0,
-      ...patch,
-    });
-    const scope = { kind: 'project' as const, path: stand.projectDir, provider: 'claude' };
-    stand.store.saveGroup(group('pa', 'Проектная', { scope }));
-    stand.store.saveGroup(
-      group('ga', 'Глобальная копия', {
-        origin: { scope, groupId: 'pa', hash: 'h', copiedAt: '2026-09-28T00:00:00.000Z' },
-      }),
-    );
-
-    const before = await stand.call('read_project_group_choice', { project: stand.projectId });
-    expect(before.outcome).toBe('done');
-    expect(before.result).toMatchObject({ choices: {} });
-
-    const set = await stand.decided('set_project_group_choice', {
-      project: stand.projectId,
-      groupKey: 'global:ga',
-    });
-    expect(set.card.risk).toBe('change');
-    expect(set.result.outcome).toBe('done');
-    const after = await stand.call('read_project_group_choice', { project: stand.projectId });
-    expect(after.result).toMatchObject({ choices: { pa: 'global:ga' } });
-
-    const foreign = await stand.call('set_project_group_choice', {
-      project: stand.projectId,
-      groupKey: 'global:nobody',
-    });
-    expect(foreign.outcome).toBe('failed');
-    expect(foreign.message).toContain('not a side of any group pair');
-
-    const reset = await stand.decided('set_project_group_choice', {
-      project: stand.projectId,
-      groupKey: null,
-    });
-    expect(reset.result.outcome).toBe('done');
-    const cleared = await stand.call('read_project_group_choice', { project: stand.projectId });
-    expect(cleared.result).toMatchObject({ choices: {} });
   });
 
   it('неизвестный проект — отказ без карточки; отказ человека оставляет файл нетронутым', async () => {

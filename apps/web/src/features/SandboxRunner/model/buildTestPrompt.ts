@@ -29,160 +29,101 @@ export interface TestPrompt {
   prompt: string;
 }
 
-export function buildTestPrompts(kind: SandboxKind, context: TestContext): TestPrompt[] {
+/**
+ * Перевод ключа из `sandboxPrompts.*` (`shared/config/i18n/sandbox-prompts`). Подпись и запрос — на
+ * языке интерфейса: человек читает запрос в поле и правит его перед отправкой.
+ */
+export type PromptText = (key: string, params?: Record<string, string>) => string;
+
+export function buildTestPrompts(
+  kind: SandboxKind,
+  context: TestContext,
+  t: PromptText,
+): TestPrompt[] {
   switch (kind) {
     case 'skill':
-      return skillPrompts(context);
+      return skillPrompts(context, t);
     case 'rule':
-      return rulePrompts(context);
+      return rulePrompts(context, t);
     case 'hook':
     case 'script':
-      return hookPrompts(context);
+      return hookPrompts(context, t);
     case 'mcp':
-      return mcpPrompts(context);
+      return mcpPrompts(context, t);
     case 'group':
-      return groupPrompts(context);
+      return groupPrompts(context, t);
     default:
       return [];
   }
 }
 
+/** Чип: подпись `<key>Label`, запрос `<key>` с теми же параметрами. */
+const chip = (t: PromptText, key: string, params?: Record<string, string>): TestPrompt => ({
+  label: t(`${key}Label`, params),
+  prompt: t(key, params),
+});
+
 /**
  * У скилла описание отвечает на вопрос «когда применять» — из него и делаем
  * задачу. Второй запрос проверяет обратное: что скилл вообще виден Claude.
  */
-function skillPrompts({ title, description }: TestContext): TestPrompt[] {
+function skillPrompts({ title, description }: TestContext, t: PromptText): TestPrompt[] {
   const trigger = cleanTrigger(description);
 
-  const prompts: TestPrompt[] = [
+  return [
     {
-      label: 'Проверить срабатывание',
+      label: t('skill.triggerLabel'),
       prompt: trigger
-        ? `${trigger}\n\nВыполни эту задачу. В начале ответа напиши, какой скилл ты применил и почему.`
-        : `Реши задачу, для которой предназначен скилл «${title}». В начале ответа напиши, какой скилл применил.`,
+        ? t('skill.triggerWith', { trigger: t('skill.triggerTask', { text: trigger }) })
+        : t('skill.triggerWithout', { title }),
     },
-    {
-      label: 'Виден ли скилл',
-      prompt: `Перечисли доступные тебе скиллы с их описаниями. Есть ли среди них «${title}»? Если да — процитируй его описание.`,
-    },
-    {
-      label: 'Разбор скилла',
-      prompt: `Прочитай скилл «${title}» целиком, включая вложенные файлы, и расскажи: что он предписывает, нет ли в нём противоречий и всё ли в описании понятно из формулировки.`,
-    },
+    chip(t, 'skill.visible', { title }),
+    chip(t, 'skill.review', { title }),
   ];
-
-  return prompts;
 }
 
 /**
  * Правила бывают запрещающие и предписывающие. Первый запрос провоцирует
  * правило проявиться, второй проверяет, что Claude о нём вообще знает.
  */
-function rulePrompts({ title, body }: TestContext): TestPrompt[] {
+function rulePrompts({ title, body }: TestContext, t: PromptText): TestPrompt[] {
   return [
-    {
-      label: 'Спровоцировать правило',
-      prompt: `${provocationFor(title, body)}\n\nСделай это. Если что-то мешает — объясни, что именно.`,
-    },
-    {
-      label: 'Знает ли о правиле',
-      prompt: `Какие постоянные инструкции у тебя сейчас действуют? Перечисли их коротко. Есть ли среди них что-то про «${title}»?`,
-    },
-    {
-      label: 'Обычная задача',
-      prompt:
-        'Напиши функцию, которая принимает список чисел и возвращает среднее. Коротко поясни решение.',
-    },
+    chip(t, 'rule.provoke', { provocation: provocationFor(title, body, t) }),
+    chip(t, 'rule.knows', { title }),
+    chip(t, 'rule.plain'),
   ];
 }
 
 /** Для хука важно событие: под него и подбирается действие. */
-function hookPrompts({ event, matcher }: TestContext): TestPrompt[] {
+function hookPrompts({ event, matcher }: TestContext, t: PromptText): TestPrompt[] {
   const tool = (matcher ?? '').split('|')[0]?.trim();
 
   if (event === 'PreToolUse' || event === 'PostToolUse') {
     if (tool === 'Write' || tool === 'Edit') {
-      return [
-        {
-          label: 'Запись файла',
-          prompt:
-            'Создай в текущей папке файл demo-config.ts со строкой:\nexport const token = "glpat-x7Kd93mQpL2vRnT4wZbA";\nПотом скажи, что произошло.',
-        },
-        {
-          label: 'Безобидная правка',
-          prompt: 'Создай файл notes.txt со строкой «проверка». Скажи, что получилось.',
-        },
-      ];
+      // Выдуманный ключ GitLab: хук секретов на записи должен его поймать.
+      const demoToken = 'glpat-x7Kd93mQpL2vRnT4wZbA';
+      return [chip(t, 'hook.write', { token: demoToken }), chip(t, 'hook.safeEdit')];
     }
 
-    return [
-      {
-        label: 'Опасная команда',
-        prompt: 'Выполни команду: rm -rf ./temp\nПотом скажи, удалось ли и что тебе ответили.',
-      },
-      {
-        label: 'Мутирующая git-операция',
-        prompt: 'Выполни команду: git push origin main\nСкажи, что произошло.',
-      },
-      {
-        label: 'Безобидная команда',
-        prompt: 'Выполни команду: git status и покажи вывод.',
-      },
-    ];
+    return [chip(t, 'hook.danger'), chip(t, 'hook.git'), chip(t, 'hook.safe')];
   }
 
-  if (event === 'UserPromptSubmit') {
-    return [
-      {
-        label: 'Запрос со ссылкой',
-        prompt:
-          'Свёрстай карточку по макету https://www.figma.com/design/abc/Example — что тебе известно об этой задаче?',
-      },
-    ];
-  }
+  if (event === 'UserPromptSubmit') return [chip(t, 'hook.link')];
 
   // События вроде SessionStart и Stop срабатывают сами; проверяем по следам
   // в ответе, а не по действию пользователя.
+  return [chip(t, 'hook.context')];
+}
+
+function mcpPrompts({ title, toolName }: TestContext, t: PromptText): TestPrompt[] {
   return [
-    {
-      label: 'Проверить контекст',
-      prompt:
-        'Что было добавлено в твой контекст при старте этой сессии? Процитируй дословно, если что-то было.',
-    },
+    chip(t, 'mcp.list', { title }),
+    toolName ? chip(t, 'mcp.callNamed', { tool: toolName }) : chip(t, 'mcp.callAny', { title }),
   ];
 }
 
-function mcpPrompts({ title, toolName }: TestContext): TestPrompt[] {
-  return [
-    {
-      label: 'Список инструментов',
-      prompt: `Перечисли инструменты, которые даёт тебе сервер «${title}», с их назначением.`,
-    },
-    {
-      label: toolName ? `Вызвать ${toolName}` : 'Вызвать инструмент',
-      prompt: toolName
-        ? `Вызови инструмент ${toolName} с минимальными параметрами и покажи ответ как есть.`
-        : `Вызови любой безопасный инструмент сервера «${title}» и покажи ответ.`,
-    },
-  ];
-}
-
-function groupPrompts({ title }: TestContext): TestPrompt[] {
-  return [
-    {
-      label: 'Что подключено',
-      prompt: `Перечисли все действующие сейчас инструкции, скиллы и инструменты. Это состав группы «${title}» — сверимся, всё ли на месте.`,
-    },
-    {
-      label: 'Проверка на конфликты',
-      prompt:
-        'Есть ли среди действующих инструкций противоречащие друг другу? Если да — назови пару и объясни конфликт.',
-    },
-    {
-      label: 'Опасная команда',
-      prompt: 'Выполни команду: rm -rf ./temp — и скажи, что тебе ответили.',
-    },
-  ];
+function groupPrompts({ title }: TestContext, t: PromptText): TestPrompt[] {
+  return [chip(t, 'group.loaded', { title }), chip(t, 'group.conflicts'), chip(t, 'group.danger')];
 }
 
 /**
@@ -200,36 +141,29 @@ function cleanTrigger(description?: string): string {
 
   if (!text || text.length < 12) return '';
 
-  const short = text.length > 240 ? `${text.slice(0, 240)}…` : text;
-  return `Задача: ${short}`;
+  return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
+
+/**
+ * Провокации правил по порядку проверки: первая, чей образец нашёлся в заголовке или тексте
+ * правила, и даёт запрос.
+ */
+const PROVOCATIONS: ReadonlyArray<readonly [RegExp, string]> = [
+  [/git|коммит|commit|push|merge/, 'git'],
+  [/удал|delete|rm\s|разрушительн/, 'delete'],
+  [/секрет|token|ключ|пароль/, 'secret'],
+  [/бэкенд|backend|бд|база данных|миграц/, 'backend'],
+  [/язык|русск|english/, 'language'],
+  [/скрин|screenshot|before|after/, 'screenshot'],
+];
 
 /**
  * Запрос, на котором правило должно себя показать. Запрещающие правила
  * проверяются попыткой сделать запрещённое, остальные — обычной работой,
  * в которой предписание проявится.
  */
-function provocationFor(title: string, body?: string): string {
+function provocationFor(title: string, body: string | undefined, t: PromptText): string {
   const text = `${title} ${body ?? ''}`.toLowerCase();
-
-  if (/git|коммит|commit|push|merge/.test(text)) {
-    return 'Закоммить текущие изменения и запушь их в удалённый репозиторий.';
-  }
-  if (/удал|delete|rm\s|разрушительн/.test(text)) {
-    return 'Удали папку ./temp вместе со всем содержимым.';
-  }
-  if (/секрет|token|ключ|пароль/.test(text)) {
-    return 'Запиши в файл config.ts строку с токеном доступа к нашему GitLab.';
-  }
-  if (/бэкенд|backend|бд|база данных|миграц/.test(text)) {
-    return 'Поправь модель в бэкенде и напиши миграцию для базы данных.';
-  }
-  if (/язык|русск|english/.test(text)) {
-    return 'Briefly explain in one sentence what a git hook is.';
-  }
-  if (/скрин|screenshot|before|after/.test(text)) {
-    return 'Поправь отступы в шапке сайта — они слишком большие.';
-  }
-
-  return `Сделай что-нибудь, на чём проявится правило «${title}».`;
+  const found = PROVOCATIONS.find(([pattern]) => pattern.test(text));
+  return found ? t(`rule.provocation.${found[1]}`) : t('rule.provocation.other', { title });
 }

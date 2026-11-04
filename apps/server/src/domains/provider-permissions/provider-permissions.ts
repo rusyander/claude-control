@@ -13,6 +13,8 @@
  * `kimi.ts`, `opencode.ts`; там же описан ведомый панелью кусок его файла.
  * Разбор черновика, чтение, запись и сводка ПО ФОРМАТУ ЦЕЛИ — `dispatch.ts`,
  * цель активного провайдера — `target.ts`, общая нормализация — `normalize.ts`.
+ * Разбор черновиков семи CLI (и отказ `yolo` у Gemini) — одной копией с ядром в
+ * `@agentdeck/contracts/permissions`; роуты берут его оттуда напрямую.
  * Этот файл — фасад: набор экспортов для роутов и тестов.
  *
  * ВАЛИДАЦИЯ ENUM ДО ЗАПИСИ: значение вне разрешённого набора отклоняется на разборе
@@ -26,15 +28,9 @@
 // Переэкспорт для роутов/тестов; класс один и тот же (из lib) — `instanceof` цел.
 export { UnrecognizedFormatError } from '../../lib/codex-toml/codex-toml.ts';
 
-export {
-  GEMINI_APPROVAL_MODES,
-  GEMINI_CLI_ONLY_APPROVAL_MODES,
-  QWEN_APPROVAL_MODES,
-} from './constants.ts';
-
 export { resolveProviderPermissionsTarget } from './target.ts';
 
-export { geminiOtherKeysProjection, isCliOnlyGeminiApprovalMode } from './gemini.ts';
+export { geminiOtherKeysProjection } from './gemini.ts';
 
 export {
   buildProviderPermissionInfo,

@@ -22,7 +22,7 @@ import styles from './DeliveryControl.module.scss';
  * Главный выключатель в настройках панели убирает кнопку совсем; каталог не
  * репозиторий — тоже: доставлять там нечего.
  */
-export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
+export function DeliveryControl({ path }: DeliveryControlProps) {
   const { t } = useTranslation();
   const { data: settings } = useSettings();
   const enabled = settings?.deliverToMr ?? true;
@@ -34,10 +34,7 @@ export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
   const view = query.data;
   if (!enabled || !view || !view.profile.repo) return null;
 
-  // В чате группы подпись — её решение из плана: настройка проекта по пути
-  // копии с ним расходится (живой прогон 25.09, O2). Внутри — проектная.
-  const deliver = groupDeliver ?? view.deliver;
-  const state = deliver ? 'buttonOn' : 'buttonOff';
+  const state = view.deliver ? 'buttonOn' : 'buttonOff';
   const label = t(`chat.delivery.${view.profile.remote ? state : 'buttonNoRemote'}`);
 
   const close = (): void => {
@@ -66,9 +63,7 @@ export function DeliveryControl({ path, groupDeliver }: DeliveryControlProps) {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        title={t(
-          groupDeliver === undefined ? 'chat.delivery.buttonHint' : 'chat.delivery.groupHint',
-        )}
+        title={t('chat.delivery.buttonHint')}
       >
         {label}
       </Button>

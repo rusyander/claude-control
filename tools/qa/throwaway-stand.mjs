@@ -31,6 +31,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
@@ -43,7 +44,6 @@ import { brandEnvName, legacyEnvName } from '../../apps/server/src/lib/brand.mjs
 import {
   filetimeFromMs,
   killLeftovers,
-  killProcessTree,
   readPosixProcessTable,
   readProcessTable,
   WATCH_SLACK_MS,
@@ -208,6 +208,45 @@ export function diffRealProviderDirs(before, after, { ignore = LIVE_SESSION_CHUR
 export class NotChecked extends Error {}
 
 /**
+ * Точка входа pnpm (`pnpm.cjs`) из PATH оболочки, запустившей проверку. Каталог pnpm в PATH стенда
+ * не попадает (в нём же лежит `claude`), поэтому `launch: 'pnpm-start'` зовёт pnpm прокладкой
+ * по абсолютному пути. Нет pnpm — `undefined`.
+ */
+function pnpmEntry() {
+  const found = spawnSync(IS_WIN ? 'where' : 'which', ['pnpm'], { encoding: 'utf8' });
+  for (const line of String(found.stdout ?? '')
+    .split(/\r?\n/)
+    .filter(Boolean)) {
+    try {
+      const real = realpathSync.native(line.trim());
+      if (real.endsWith('.cjs') || real.endsWith('.js')) return real;
+      const beside = join(dirname(real), 'node_modules', 'pnpm', 'bin', 'pnpm.cjs');
+      if (existsSync(beside)) return beside;
+    } catch {
+      // строка `where` без файла — следующая
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Каталог прокладок `node` и `pnpm` для `launch: 'pnpm-start'`: у человека оба в PATH, у стенда их
+ * каталоги вырезаны вместе с `claude`. Прокладка зовёт ровно этот node и найденный pnpm.
+ */
+function launchShims(dir) {
+  const entry = pnpmEntry();
+  if (!entry) throw new NotChecked('pnpm не найден в PATH — запуск `pnpm start` не проверить');
+  mkdirSync(dir, { recursive: true });
+  const shims = { node: [process.execPath], pnpm: [process.execPath, entry] };
+  for (const [name, argv] of Object.entries(shims)) {
+    const quoted = argv.map((part) => `"${part}"`).join(' ');
+    if (IS_WIN) writeFileSync(join(dir, `${name}.cmd`), `@echo off\r\n${quoted} %*\r\n`);
+    else writeFileSync(join(dir, name), `#!/bin/sh\nexec ${quoted} "$@"\n`, { mode: 0o755 });
+  }
+  return dir;
+}
+
+/**
  * Место необработанного исключения, если процесс Node упал на файле проекта:
  * заголовок `file:///…:N` перед строкой кода. Внутренности Node (`node:…`, занятый
  * порт) и зависимости (`node_modules`) — окружение, не код: undefined.
@@ -246,6 +285,58 @@ async function waitFor(url, seconds, gone = () => false) {
     await wait(250);
   }
   return false;
+}
+
+/** Пути модулей, которые Vite вписал в ответ: статические `from "/…"`, `import "/…"` и `import("/…")`. */
+export function moduleImports(code) {
+  const found = new Set();
+  const pattern = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\/[^"'\s]+)["']/g;
+  for (const match of code.matchAll(pattern)) found.add(match[1]);
+  return [...found];
+}
+
+/**
+ * Прогреть граф модулей фронта до первой страницы проверки. Холодный Vite собирает модули по
+ * запросу: первый `page.goto` одноразового фронта на загруженной машине шёл ~31 с — дольше
+ * штатных 30 с Playwright, и проверка падала на стенде, а не на продукте (s10 F2c, шесть
+ * скриптов). Обход идёт от `<script type="module">` страницы по тем же путям, что браузер,
+ * вместе с ленивыми разделами (`import("/…")`); предел — `seconds`, дальше проверка просто
+ * начнёт с частично тёплым фронтом.
+ */
+export async function warmFront(webUrl, { seconds = 240, parallel = 16 } = {}) {
+  const until = Date.now() + seconds * 1000;
+  const seen = new Set();
+  const queue = [];
+  const add = (path) => {
+    if (seen.has(path)) return;
+    seen.add(path);
+    queue.push(path);
+  };
+  try {
+    const html = await (await fetch(webUrl)).text();
+    for (const match of html.matchAll(/<script[^>]+type="module"[^>]+src="(\/[^"]+)"/g))
+      add(match[1]);
+  } catch {
+    return 0;
+  }
+  const worker = async () => {
+    while (queue.length && Date.now() < until) {
+      const path = queue.shift();
+      try {
+        const res = await fetch(`${webUrl}${path}`, { signal: AbortSignal.timeout(60_000) });
+        const type = res.headers.get('content-type') ?? '';
+        if (res.ok && /javascript/.test(type))
+          for (const next of moduleImports(await res.text())) add(next);
+      } catch {
+        // модуль не собрался или сброшен — браузер встретит то же, прогрев не судья
+      }
+    }
+  };
+  // Очередь растёт по ходу обхода: рабочие запускаются волнами, пока есть что брать.
+  while (queue.length && Date.now() < until) {
+    await Promise.all(Array.from({ length: Math.min(parallel, queue.length) }, worker));
+  }
+  return seen.size;
 }
 
 /**
@@ -353,12 +444,61 @@ function checkAddedPathDirs(raw) {
  * родителя и завершаются, когда она закрывается.
  */
 /**
+ * Обёртка формы npm cmd-shim для скрипта рядом с ней (`rel` — от каталога обёртки). Ядро на
+ * Windows запускает CLI без оболочки и разбирает только эту форму (`apps/core/src/platform/
+ * win-shim.ts`); тот же текст, что у фикстуры ядра `platform/__fixtures__/shims.ts npmCmdShim`.
+ */
+export function npmCmdShim(rel) {
+  return [
+    '@ECHO off',
+    'GOTO start',
+    ':find_dp0',
+    'SET dp0=%~dp0',
+    'EXIT /b',
+    ':start',
+    'SETLOCAL',
+    'CALL :find_dp0',
+    '',
+    'IF EXIST "%dp0%\\node.exe" (',
+    '  SET "_prog=%dp0%\\node.exe"',
+    ') ELSE (',
+    '  SET "_prog=node"',
+    '  SET PATHEXT=%PATHEXT:;.JS;=;%',
+    ')',
+    '',
+    `endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${rel}" %*`,
+    '',
+  ].join('\r\n');
+}
+
+/**
  * Маршрут-заглушка ядра стенда по умолчанию: один ответ текстом (`packages/stub-model`, шаг
  * `text`). Свой сценарий — `startStand({ core: { stub: [...] } })`.
  */
 export const DEFAULT_CORE_STUBS = [{ name: 'stand', script: ['stub reply'] }];
 
-/** Имя метки жизни стенда рядом с фальшивыми CLI (`fake-cli-images.mjs` её ждёт). */
+/**
+ * Окружение ядра стенда — то, что ядро человека на доме `~/.agentdeck/core` находит само, а ядро на
+ * отдельном доме (`AGENTDECK_CORE_HOME`) нет (этап 10, проход 5: мастер контура на стенде видел
+ * «Шлюз панели не поднят»):
+ * - каталог данных панели (`AGENTDECK_PANEL_DATA`, `panelAppDataDir` ядра): без него ядро не видит
+ *   ни контуров, ни ключей, ни настроек панели — каждая проверка с ядром задавала его сама;
+ * - порт шлюза контуров (`HOP_USER_GATEWAY_PORT_ENV` в contracts/core/hops.ts): ядро человека
+ *   слушает порт из настроек панели ВСЕГДА, включён тумблер шлюза или нет, а ядро на отдельном доме —
+ *   только явно заданный (иначе заняло бы 5179 человека). Прежде стенд давал порт лишь при шлюзе,
+ *   включённом в засеве, а мастер включает его на ходу — шлюз ядра стенда так и не поднимался.
+ * Порт — свой свободный порт стенда из настроек. `env` вызывающего главнее (идёт позже).
+ */
+export function standCoreEnv(core, settings, panelData) {
+  if (!core) return {};
+  const port = settings?.platformGateway?.port;
+  return {
+    ...(panelData ? { AGENTDECK_PANEL_DATA: panelData } : {}),
+    ...(Number.isInteger(port) && port > 0 ? { AGENTDECK_USER_GATEWAY_PORT: String(port) } : {}),
+  };
+}
+
+/** Имя метки жизни стенда рядом с фальшивыми CLI (`fake-cli-append.mjs` её ждёт). */
 export const STAND_ALIVE = '.stand-alive';
 
 function killTree(child) {
@@ -377,54 +517,6 @@ function killTree(child) {
   child.kill(IS_WIN ? undefined : 'SIGTERM');
 }
 
-/**
- * Снять посредников живых сессий (`live-relay.mjs`), которых запустила панель
- * стенда. Посредник нарочно отвязан от панели — сессия переживает её
- * перезапуск, а сам он гаснет после получаса простоя. Одноразовый стенд второй
- * раз не стартует: ход настоящего CLI (не фальшивого, тот умирает по метке
- * жизни) оставлял посредника с `claude.exe` под ним, и они держали временный
- * дом (EPERM при удалении). Pid берётся из журнала прогонов панели и снимается,
- * только если это всё ещё посредник: освободившийся pid мог достаться чужому.
- */
-export function reapStandRelays(stateDir) {
-  let entries;
-  try {
-    entries = JSON.parse(readFileSync(join(stateDir, 'runs.json'), 'utf8'));
-  } catch {
-    return;
-  }
-  const pids = [
-    ...new Set(
-      (Array.isArray(entries) ? entries : [])
-        .map((entry) => entry?.relay?.pid)
-        .filter((pid) => Number.isInteger(pid)),
-    ),
-  ];
-  for (const pid of pids) {
-    if (!IS_WIN) {
-      // `ps`, не `/proc`: на macOS его нет, и посредник с CLI под ним жил после
-      // стенда до получаса. Деревом — CLI под посредником уходит вместе с ним.
-      const probe = spawnSync('ps', ['-o', 'args=', '-p', String(pid)], { encoding: 'utf8' });
-      if (probe.stdout?.includes('live-relay.mjs')) killProcessTree(pid);
-      continue;
-    }
-    const probe = spawnSync(
-      'powershell',
-      [
-        '-NoProfile',
-        '-Command',
-        `(Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}').CommandLine`,
-      ],
-      { encoding: 'utf8', windowsHide: true },
-    );
-    if (!probe.stdout?.includes('live-relay.mjs')) continue;
-    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], {
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-  }
-}
-
 const readJsonQuiet = (path) => {
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
@@ -441,12 +533,49 @@ const listQuiet = (dir) => {
   }
 };
 
+/** Глубже этого в доме ядра каталогов сессий нет (самый глубокий — `tasks/…/sessions/…/base-probe`). */
+const HOST_RECORD_DEPTH = 8;
+/** Деревья, где хостов сессий не бывает, а файлов тысячи (сборки, копии репозиториев). */
+const HOST_RECORD_SKIP = new Set(['.git', 'node_modules']);
+
+/**
+ * Все `host.json` под домом ядра. Хост пишет его в СВОЙ каталог сессии, а каталоги эти не только
+ * `tasks/<задача>/sessions/<сессия>/`: замер базы кладёт свою сессию вложенной (`…/base-probe/`),
+ * проверки — в `tmp/checks/base-<id>/`. Читался один уровень — хост замера базы qwen с CLI под ним
+ * пережил стенд (проход s10, F3), а итог снятия при этом был «ничего не осталось». Ссылки и
+ * точки соединения не обходятся (`isDirectory` у них ложно): чужой каталог под домом не читается.
+ */
+function hostRecordsUnder(root, depth = 0, out = []) {
+  if (depth > HOST_RECORD_DEPTH) return out;
+  let entries;
+  try {
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (!HOST_RECORD_SKIP.has(entry.name))
+        hostRecordsUnder(join(root, entry.name), depth + 1, out);
+    } else if (entry.isFile() && entry.name === 'host.json') {
+      out.push(join(root, entry.name));
+    }
+  }
+  return out;
+}
+
 /**
  * Личности хостов сессий ядра стенда и их CLI — по записям самого ядра, не по имени процесса:
- * `host.json` каждой сессии (`tasks/<задача>/sessions/<сессия>/`, хост пишет его сам, как только
- * поднял CLI) и строки `session.started` журналов задач (`hostPid`/`hostStart`, `cliPid`/`cliStart`).
+ * `host.json` каждой сессии (любой каталог под домом ядра, `hostRecordsUnder`; хост пишет его сам,
+ * как только поднял CLI) и строки `session.started` журналов задач (`hostPid`/`hostStart`, `cliPid`/`cliStart`).
  * Обе записи нужны: ядро, убитое между запуском хоста и строкой журнала, оставляет только
  * `host.json`, а сессия с каталогом вне `sessions/` — только строку журнала.
+ *
+ * Сюда же — процессы ядра, которые по замыслу переживают его снятие (P10, P123) и уходят только
+ * при чистой остановке ядра, а стенд ядро снимает жёстко: хост звеньев (`procs.json → servers[]`,
+ * `pid`/`pidStart`) и серверы заглушки моделей (строка `resource.created` вида `stub-server`,
+ * личность в `ref`: `…&pid=…&start=…`). Без них оба жили после стенда сиротами и держали его
+ * каталог (проход s10: hop-host и четыре сервера заглушки после `core-panel.mjs`).
  */
 export function coreSessionIdentities(coreHome) {
   const found = new Map();
@@ -454,14 +583,29 @@ export function coreSessionIdentities(coreHome) {
     if (!Number.isInteger(pid) || pid <= 0 || typeof start !== 'string' || !start) return;
     found.set(`${pid}:${start}`, { pid, start, role });
   };
+  const procs = readJsonQuiet(join(coreHome, 'procs.json'));
+  for (const server of procs?.servers ?? []) {
+    add(server?.pid, server?.pidStart, server?.kind === 'hop-host' ? 'hop-host' : 'server');
+  }
+  // Ядро, поднятое надзором панели (`core: { supervised: true }`), — отвязанный процесс: дерево
+  // панели его не уносит, снимается по своей строке procs.json со сверкой старта.
+  for (const row of procs?.cores ?? []) add(row?.pid, row?.pidStart, 'core');
+  const stubIdentity = (ref) => {
+    try {
+      const url = new URL(ref);
+      add(Number(url.searchParams.get('pid')), url.searchParams.get('start'), 'stub-server');
+    } catch {
+      // Ссылка не разобралась — личность не доказать, снимать нечего.
+    }
+  };
+  for (const path of hostRecordsUnder(coreHome)) {
+    const record = readJsonQuiet(path);
+    add(record?.host?.pid, record?.host?.start, 'host');
+    add(record?.child?.pid, record?.child?.start, 'cli');
+  }
   const tasks = join(coreHome, 'tasks');
   for (const task of listQuiet(tasks)) {
     const dir = join(tasks, task);
-    for (const session of listQuiet(join(dir, 'sessions'))) {
-      const record = readJsonQuiet(join(dir, 'sessions', session, 'host.json'));
-      add(record?.host?.pid, record?.host?.start, 'host');
-      add(record?.child?.pid, record?.child?.start, 'cli');
-    }
     let text;
     try {
       text = readFileSync(join(dir, 'journal.jsonl'), 'utf8');
@@ -469,11 +613,15 @@ export function coreSessionIdentities(coreHome) {
       continue;
     }
     for (const raw of text.split('\n')) {
-      if (!raw.includes('"session.started"')) continue;
+      if (!raw.includes('"session.started"') && !raw.includes('"stub-server"')) continue;
       let line;
       try {
         line = JSON.parse(raw);
       } catch {
+        continue;
+      }
+      if (line?.kind === 'resource.created' && line.data?.kind === 'stub-server') {
+        if (typeof line.data.ref === 'string') stubIdentity(line.data.ref);
         continue;
       }
       if (line?.kind !== 'session.started') continue;
@@ -516,7 +664,8 @@ export function createdOfStart(start, platform = process.platform, clock = linux
 }
 
 /**
- * Снять хосты сессий ядра стенда вместе с их CLI (и потомками). Хост запускается отвязанным
+ * Снять хосты сессий ядра стенда вместе с их CLI (и потомками), хост звеньев и серверы заглушки
+ * (`coreSessionIdentities`). Хост запускается отвязанным
  * (на Windows — вырывом из задания через WMI): ни снятие дерева панели и ядра, ни уход процесса
  * проверки его не уносят, и хост с `claude.exe` под ним жил после стенда, держа его каталог (EBUSY
  * при удалении, проход s9). Снимается только процесс, чьё время создания совпало с записанным
@@ -576,6 +725,88 @@ export function liveCoreSessions(ids, impl = {}) {
   return left;
 }
 
+/** Хост сессии поднимается не дольше этого (`readyTimeoutMs` ядра) — старее записи не ждём. */
+const LAUNCH_FRESH_MS = 30_000;
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Каталоги под `root`: дома ядра (`procs.json` — ядро пишет его в свой дом) и сессии, чей хост ещё
+ * поднимается (`token` уже записан ядром, а `host.json`, `exit.json`, `host.err` ещё нет, и
+ * запись свежая). Ссылки и точки соединения не обходятся.
+ */
+function standRecordDirs(root, now = Date.now()) {
+  const homes = [];
+  const launching = [];
+  const walk = (dir, depth) => {
+    if (depth > HOST_RECORD_DEPTH + 2) return;
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    const files = new Set(entries.filter((e) => e.isFile()).map((e) => e.name));
+    if (files.has('procs.json')) homes.push(dir);
+    // Признак — `token`, а не `spec.json`: хост удаляет `spec.json`, прочитав его, и только потом
+    // пишет `host.json`; по `spec.json` сессия в этом окне выглядела никакой, и снятие уходило,
+    // не дождавшись хоста. `token` ядро пишет первым, хост его не трогает.
+    const launch = ['token', 'spec.json'].find((f) => files.has(f));
+    if (launch && !['host.json', 'exit.json', 'host.err'].some((f) => files.has(f))) {
+      try {
+        if (now - statSync(join(dir, launch)).mtimeMs < LAUNCH_FRESH_MS) launching.push(dir);
+      } catch {
+        // Запись ушла между чтением каталога и stat — сессия уже не поднимается.
+      }
+    }
+    for (const entry of entries)
+      if (entry.isDirectory() && !HOST_RECORD_SKIP.has(entry.name))
+        walk(join(dir, entry.name), depth + 1);
+  };
+  walk(root, 0);
+  return { homes, launching };
+}
+
+/**
+ * Снять процессы ядра, записанные под каталогом стенда (этап 10, зона C, проход 6): каждый дом
+ * ядра под ним (`reapCoreSessions`) и хосты сессий где угодно под ним — и так, пока не перестанут
+ * появляться новые. Хост, которого умирающее ядро успело запустить, пишет `host.json` сам уже
+ * ПОСЛЕ снятия ядра; однократное чтение его пропускало, и хост жил после стенда, держа каталог
+ * (`cc-agent-images-*`, 03.11). Сессия с `token` без `host.json` — поднимается: ждём её запись
+ * (не дольше `settleMs`). Только по записям под `root`, ни по имени процесса: хост звеньев
+ * человека (`~/.agentdeck/core`) сюда не попадает. Синхронно — зовётся и из `exit`.
+ * Итог: `ids` — все найденные личности, `left` — живые после снятия, `launching` — сессии, чей
+ * хост так и не записался.
+ */
+export function reapStandTree(root, { settleMs = 15_000, impl = {} } = {}) {
+  const seen = new Map();
+  const deadline = Date.now() + settleMs;
+  let launching;
+  for (let round = 0; ; round += 1) {
+    const dirs = standRecordDirs(root);
+    launching = dirs.launching;
+    let fresh = 0;
+    for (const home of new Set([root, ...dirs.homes])) {
+      for (const id of reapCoreSessions(home, impl).ids) {
+        const key = `${id.pid}:${id.start}`;
+        if (seen.has(key)) continue;
+        seen.set(key, id);
+        fresh += 1;
+      }
+    }
+    // Нашлось новое — ещё один круг: снятое ядро могло успеть запустить хост до своего конца.
+    if ((fresh === 0 && launching.length === 0) || Date.now() > deadline) break;
+    sleepSync(launching.length > 0 ? 300 : 700);
+  }
+  const ids = [...seen.values()];
+  let left = liveCoreSessions(ids, impl);
+  // TerminateProcess асинхронен: процесс уходит из снимка не мгновенно.
+  for (let round = 0; left.length > 0 && round < 6; round += 1) {
+    sleepSync(500);
+    left = liveCoreSessions(left, impl);
+  }
+  return { ids, left, launching };
+}
+
 /**
  * Поднять одноразовый стенд.
  *
@@ -613,7 +844,14 @@ export async function startStand({
   // `apps/core` со своим временным домом, тем же, что видит прокладка панели
   // (`AGENTDECK_CORE_HOME`). Маршруты моделей — только заглушки `packages/stub-model`
   // (раздел `routes.stub` настройки ядра): настоящий CLI и сеть стенду не нужны.
+  // `{ supervised: true }` — ядро стенду поднимает НАДЗОР панели (этап 10), как у человека:
+  // стенд своего процесса ядра не запускает, надзор включён, звенья P131 надзор пишет сам.
+  // `home` — чужой дом ядра (второй стенд на доме первого: одно ядро на дом, этап 10); такой
+  // дом стенд не размечает и при снятии его ядро не трогает — им владеет первый стенд.
   core = false,
+  // Как запускается панель: `'node'` — сервер напрямую, `'pnpm-start'` — `pnpm start` из корня
+  // (как у человека), `'dev-watch'` — сторож `pnpm dev` (`apps/server/src/lib/dev-watch.mjs`).
+  launch = 'node',
 } = {}) {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), `cc-${label}-`)));
   const home = join(root, 'home');
@@ -644,9 +882,11 @@ export async function startStand({
     `${JSON.stringify({ settings: { onboardingDone: true, language: 'ru', theme: 'light', ...isolated, ...settings } })}\n`,
     'utf8',
   );
-  const coreHome = core ? join(root, 'core-home') : '';
-  const hopFile = core ? join(root, 'core-hops.json') : '';
-  if (core) {
+  const foreignHome = core && typeof core.home === 'string' ? core.home : '';
+  const coreHome = foreignHome || (core ? join(root, 'core-home') : '');
+  const supervised = Boolean(core && core.supervised);
+  const hopFile = core && !supervised ? join(root, 'core-hops.json') : '';
+  if (core && !foreignHome) {
     mkdirSync(coreHome, { recursive: true });
     const stub = core === true || !core.stub ? DEFAULT_CORE_STUBS : core.stub;
     writeFileSync(
@@ -662,6 +902,7 @@ export async function startStand({
   // проверка видит, что ДОШЛО до процесса (argv, stdin), не трогая настоящий.
   const bin = join(root, 'bin');
   const shellPath = pathWithoutClaude(hideCli, join(root, 'path'));
+  const launchBin = launch === 'pnpm-start' ? [launchShims(join(root, 'launch-bin'))] : [];
   const fakes =
     shellPath.keptClaude && !fakeCli.claude ? { ...fakeCli, claude: BLOCKED_CLAUDE } : fakeCli;
   const fakeNames = Object.keys(fakes);
@@ -675,10 +916,11 @@ export async function startStand({
       const script = join(bin, `${name}.mjs`);
       writeFileSync(script, fakes[name], 'utf8');
       if (IS_WIN) {
-        writeFileSync(
-          join(bin, `${name}.cmd`),
-          `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`,
-        );
+        // Форма npm cmd-shim, а не своя `"node" "script" %*`: ядро запускает CLI без оболочки и
+        // на Windows разбирает только обёртки npm (`platform/win-shim.ts`); свою оно отвергает
+        // «unrecognised .cmd wrapper», и ход ядра на стенде не открывал сессии (s10 G13 pass 3).
+        // cmd.exe (запуск панелью через оболочку) исполняет её так же.
+        writeFileSync(join(bin, `${name}.cmd`), npmCmdShim(`${name}.mjs`));
       } else {
         writeFileSync(join(bin, name), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
           mode: 0o755,
@@ -717,13 +959,25 @@ export async function startStand({
     // («No auth type is selected», прогон 21.10), а стенд мог подхватить его сервер
     // моделей. Свой пустой каталог; проверка с настоящими моделями задаёт свой в `env`.
     AGENTDECK_LOCAL_MODELS_DIR: join(root, 'local-models'),
+    // Панель поднимает ядро сама (надзор, этап 10). Стенд по умолчанию надзор выключает: ядро
+    // стенда (`core`) он поднимает сам, а стенду без ядра лишний процесс ни к чему. Проверка
+    // надзора включает его через `env: { AGENTDECK_CORE_SUPERVISE: '1', AGENTDECK_CORE_HOME }`.
+    AGENTDECK_CORE_SUPERVISE: '0',
     // Дом ядра — общий у панели (прокладка читает его procs.json и token) и у ядра стенда.
     // Итог записи звеньев — файл сторожа стенда: прокладка не шлёт команду ядру, пока её pid
     // не записан (P131), ровно как у `dev-watch`.
-    ...(core ? { AGENTDECK_CORE_HOME: coreHome, [HOP_RECORD_ENV]: hopFile } : {}),
+    ...(core ? { AGENTDECK_CORE_HOME: coreHome } : {}),
+    ...(hopFile ? { [HOP_RECORD_ENV]: hopFile } : {}),
+    ...standCoreEnv(core, { ...isolated, ...settings }, stateDir),
     ...extraEnv,
     ...homeEnv,
-    PATH: [...(fakeNames.length > 0 ? [bin] : []), shellPath.path, ...extraPath].join(delimiter),
+    // Стенд со своим ядром — надзор выключен всегда, даже если `env` просит иначе: иначе панель
+    // усыновит или поднимет второе ядро в том же доме, и проверка увидит не своё ядро.
+    // Под надзором — наоборот: включён всегда, ядро стенда поднимает панель.
+    ...(core ? { AGENTDECK_CORE_SUPERVISE: supervised ? '1' : '0' } : {}),
+    PATH: [...(fakeNames.length > 0 ? [bin] : []), ...launchBin, shellPath.path, ...extraPath].join(
+      delimiter,
+    ),
   };
 
   const apiPort = await freePort();
@@ -746,14 +1000,7 @@ export async function startStand({
         await wait(700);
       }
       for (const child of children) killTree(child);
-      reapStandRelays(stateDir);
-      const reaped = coreHome ? reapCoreSessions(coreHome) : { ids: [] };
-      let left = liveCoreSessions(reaped.ids);
-      // TerminateProcess асинхронен: процесс уходит из снимка не мгновенно.
-      for (let round = 0; left.length > 0 && round < 6; round += 1) {
-        await wait(500);
-        left = liveCoreSessions(left);
-      }
+      const { left } = coreHome && !foreignHome ? reapStandTree(coreHome) : { left: [] };
       await wait(500);
       let removeError;
       try {
@@ -773,7 +1020,7 @@ export async function startStand({
   // переживала бы свой прогон, а отвязанные хосты сессий ядра — и панель.
   const reap = () => {
     children.forEach(killTree);
-    if (coreHome) reapCoreSessions(coreHome);
+    if (coreHome && !foreignHome) reapStandTree(coreHome, { settleMs: 5_000 });
   };
   process.once('exit', reap);
   process.once('SIGINT', () => {
@@ -789,17 +1036,25 @@ export async function startStand({
 
   let log = '';
   const spawnServer = () => {
-    const child = spawn(
-      process.execPath,
-      ['--experimental-strip-types', '--no-warnings', 'src/index.ts'],
-      {
-        cwd: serverDir,
-        env: { ...env, PORT: String(apiPort), WEB_PORT: String(webPort || apiPort + 1) },
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: false,
-        windowsHide: true,
-      },
-    );
+    const ports = { PORT: String(apiPort), WEB_PORT: String(webPort || apiPort + 1) };
+    const [command, args, cwd] =
+      launch === 'pnpm-start'
+        ? ['pnpm', ['start'], REPO]
+        : launch === 'dev-watch'
+          ? [process.execPath, ['src/lib/dev-watch.mjs'], serverDir]
+          : [
+              process.execPath,
+              ['--experimental-strip-types', '--no-warnings', 'src/index.ts'],
+              serverDir,
+            ];
+    // `pnpm` на Windows — `pnpm.cmd`: без оболочки spawn его не находит.
+    const child = spawn(command, args, {
+      cwd,
+      env: { ...env, ...ports },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: launch === 'pnpm-start' && IS_WIN,
+      windowsHide: true,
+    });
     child.stdout.on('data', (chunk) => (log += chunk));
     child.stderr.on('data', (chunk) => (log += chunk));
     child.on(
@@ -853,12 +1108,19 @@ export async function startStand({
     await stop();
     throw new NotChecked('одноразовый фронт не поднялся.');
   }
+  if (web) await warmFront(webUrl);
 
   // Ядро — после панели: готовность меряется настоящей дорогой браузера (панель → прокладка
   // → сверка строки procs.json → ядро), а не прямым запросом к порту ядра.
   let coreLog = '';
   let coreChild;
-  if (core) {
+  if (supervised) {
+    // Ядро поднимает надзор панели: готовность — та же дорога браузера через прокладку.
+    if (!(await waitFor(`${apiUrl}/api/core/health`, 90, () => server.exitCode !== null))) {
+      await stop();
+      throw new NotChecked(`надзор панели не поднял ядро стенда:\n${log.slice(-2000)}`);
+    }
+  } else if (core) {
     // Сторож звеньев стенда — тот же `watchHops`, что у `dev-watch`: звенья — сервер панели и
     // слушатель фронта; ядро, поднятое ниже, записывается первым же опросом после своей строки
     // в procs.json. Обхода только для проверок нет: стенд доверен ядру тем же путём, что прод.
@@ -960,6 +1222,9 @@ export async function startStand({
     stop,
     restartHard,
     serverPid: () => server.pid,
+    // Номер процесса, который на самом деле слушает API: под `pnpm-start`/`dev-watch` это не
+    // `server.pid` (тот — pnpm или сторож), а их потомок.
+    apiPid: () => listenerPid(apiPort),
     log: () => log,
     coreHome,
     corePid: () => coreChild?.pid,

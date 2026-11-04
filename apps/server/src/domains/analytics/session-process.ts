@@ -4,6 +4,7 @@ import { basename } from 'node:path';
 import { promisify } from 'node:util';
 import type { SessionStopResult, SessionWhere } from '@agentdeck/contracts';
 import type { SessionStopBody } from '@agentdeck/contracts/request-bodies';
+import { CIM_UTF8, parseCimJson } from '../../lib/cim-json.ts';
 import { filetimeFromMs, type ProcessRow } from '../../lib/kill-tree.mjs';
 import { killPidTree } from '../../lib/process-tree/process-tree.ts';
 import { isClaudeAgentCommand } from './runtime.ts';
@@ -156,12 +157,12 @@ interface WindowsCliRow {
   CreationDate?: string;
 }
 
-/** Разбор вывода CIM: один процесс PowerShell отдаёт объектом, несколько — массивом. */
+/**
+ * Разбор вывода CIM (`parseCimJson`): управляющий символ в командной строке одного процесса
+ * не роняет список остальных — строка приходит с пробелом на его месте.
+ */
 export function parseWindowsCli(stdout: string): CliProcess[] {
-  const raw = stdout.replace(/^\uFEFF/, '').trim();
-  if (!raw) return [];
-  const parsed = JSON.parse(raw) as WindowsCliRow[] | WindowsCliRow;
-  return (Array.isArray(parsed) ? parsed : [parsed]).flatMap((row) => {
+  return parseCimJson<WindowsCliRow>(stdout).flatMap((row) => {
     const commandLine = row.CommandLine ?? '';
     const epoch = /\/Date\((\d+)\)\//.exec(row.CreationDate ?? '');
     const startedAtMs = epoch?.[1] ? Number(epoch[1]) : Date.parse(row.CreationDate ?? '');
@@ -215,7 +216,7 @@ export async function listCliProcesses(): Promise<CliProcess[] | undefined> {
         [
           '-NoProfile',
           '-Command',
-          "Get-CimInstance Win32_Process -Filter \"Name='node.exe' or Name='claude.exe'\" | Select-Object ProcessId,ParentProcessId,CommandLine,CreationDate | ConvertTo-Json -Compress",
+          `${CIM_UTF8}Get-CimInstance Win32_Process -Filter "Name='node.exe' or Name='claude.exe'" | Select-Object ProcessId,ParentProcessId,CommandLine,CreationDate | ConvertTo-Json -Compress`,
         ],
         { windowsHide: true, timeout: 15_000, maxBuffer: 16 * 1024 * 1024 },
       );
@@ -233,10 +234,7 @@ export async function listCliProcesses(): Promise<CliProcess[] | undefined> {
 
 /** Разбор всех процессов из CIM (номер, родитель, время создания) в строки снимка. */
 export function parseWindowsTable(stdout: string): ProcessRow[] {
-  const raw = stdout.replace(/^\uFEFF/, '').trim();
-  if (!raw) return [];
-  const parsed = JSON.parse(raw) as WindowsCliRow[] | WindowsCliRow;
-  return (Array.isArray(parsed) ? parsed : [parsed]).flatMap((row) => {
+  return parseCimJson<WindowsCliRow>(stdout).flatMap((row) => {
     const epoch = /\/Date\((\d+)\)\//.exec(row.CreationDate ?? '');
     if (!epoch?.[1]) return [];
     return [

@@ -9,31 +9,47 @@
       "masked": 1,
       "width": 1116,
       "height": 480,
-      "shotAt": "2026-09-28T09:25:46.248Z",
+      "shotAt": "2026-11-03T14:20:37.536Z",
       "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
       "en": {
         "file": "01-remote-off.en.png",
         "masked": 1,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-09-28T09:25:56.616Z",
-        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:20:59.555Z",
+        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "01be9183893906b6",
+          "text": "5ef713bb1db21bf5"
+        }
       },
       "dark": {
         "file": "01-remote-off.dark.png",
         "masked": 1,
         "width": 1116,
         "height": 480,
-        "shotAt": "2026-09-28T09:26:05.824Z",
-        "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода."
+        "shotAt": "2026-11-03T14:21:14.950Z",
+        "text": "Удалённый доступ выключен Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
+        "seal": {
+          "png": "2503c988276b86fa",
+          "text": "d09e3af52beb1511"
+        }
       },
       "darkEn": {
         "file": "01-remote-off.dark.en.png",
         "masked": 1,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-09-28T09:26:15.742Z",
-        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:21:36.842Z",
+        "text": "Remote access off The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "b058985cb7abff5d",
+          "text": "5ef713bb1db21bf5"
+        }
+      },
+      "seal": {
+        "png": "e553271486b7980d",
+        "text": "d09e3af52beb1511"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1116,
       "height": 480,
-      "shotAt": "2026-09-28T09:25:48.254Z",
+      "shotAt": "2026-11-03T14:20:43.909Z",
       "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
       "en": {
         "file": "02-remote-on.en.png",
         "masked": 0,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-09-28T09:25:58.580Z",
-        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:21:03.691Z",
+        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "e1ef336a3cd4ae9f",
+          "text": "01d729aa32d5e72a"
+        }
       },
       "dark": {
         "file": "02-remote-on.dark.png",
         "masked": 0,
         "width": 1116,
         "height": 480,
-        "shotAt": "2026-09-28T09:26:08.473Z",
-        "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода."
+        "shotAt": "2026-11-03T14:21:18.901Z",
+        "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Показать код спаривания Сменить токен Проверочное уведомление Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
+        "seal": {
+          "png": "015d00465f9d6d3e",
+          "text": "fc007082cc056c9f"
+        }
       },
       "darkEn": {
         "file": "02-remote-on.dark.en.png",
         "masked": 0,
         "width": 1116,
         "height": 460,
-        "shotAt": "2026-09-28T09:26:17.864Z",
-        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:21:41.710Z",
+        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Show pairing code Rotate token Test notification Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "c122d0f46ce2a6d9",
+          "text": "01d729aa32d5e72a"
+        }
+      },
+      "seal": {
+        "png": "d66ac15dd3ab91fa",
+        "text": "fc007082cc056c9f"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 1,
       "width": 1116,
       "height": 867,
-      "shotAt": "2026-09-28T09:25:49.936Z",
+      "shotAt": "2026-11-03T14:20:46.163Z",
       "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Скрыть код Сменить токен Проверочное уведомление В приложении: Настройки → Спарить. Наведите камеру на код. •••••••••••• Этот токен открывает всё API панели. Не показывайте экран посторонним и не кладите код в переписку. Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
       "en": {
         "file": "03-pairing-code.en.png",
         "masked": 1,
         "width": 1116,
         "height": 848,
-        "shotAt": "2026-09-28T09:26:00.233Z",
-        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Hide code Rotate token Test notification In the app: Settings → Pair. Point the camera at the code. •••••••••••• This token opens the entire panel API. Do not show the screen to others and do not paste the code into a chat. Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:21:05.575Z",
+        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Hide code Rotate token Test notification In the app: Settings → Pair. Point the camera at the code. •••••••••••• This token opens the entire panel API. Do not show the screen to others and do not paste the code into a chat. Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "29c4a8bdedcf8889",
+          "text": "e1d902ea181e3a5a"
+        }
       },
       "dark": {
         "file": "03-pairing-code.dark.png",
         "masked": 1,
         "width": 1116,
         "height": 867,
-        "shotAt": "2026-09-28T09:26:10.119Z",
-        "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Скрыть код Сменить токен Проверочное уведомление В приложении: Настройки → Спарить. Наведите камеру на код. •••••••••••• Этот токен открывает всё API панели. Не показывайте экран посторонним и не кладите код в переписку. Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода."
+        "shotAt": "2026-11-03T14:21:21.240Z",
+        "text": "Удалённый доступ включён Приложение на телефоне подключается к этой же панели: тот же чат, те же проекты, та же аналитика. Панель остаётся на 127.0.0.1 — наружу её выводит Tailscale, а не открытый порт. Пускать по токену Пока выключено, до API дотягивается только эта машина. Включено — каждый запрос обязан нести токен, включая запросы из браузера на этом же компьютере. Адрес снаружи •••••••••••• · tailscale serve работает Сохраняется по Enter или когда поле теряет фокус. Скрыть код Сменить токен Проверочное уведомление В приложении: Настройки → Спарить. Наведите камеру на код. •••••••••••• Этот токен открывает всё API панели. Не показывайте экран посторонним и не кладите код в переписку. Слать уведомления на телефон Уходит только вид события (закончено, упало, нужно разрешение, задан вопрос) и имя папки проекта. Ни текста, ни кода.",
+        "seal": {
+          "png": "acb19dc35d83cd02",
+          "text": "41d15479c56a84af"
+        }
       },
       "darkEn": {
         "file": "03-pairing-code.dark.en.png",
         "masked": 1,
         "width": 1116,
         "height": 848,
-        "shotAt": "2026-09-28T09:26:19.498Z",
-        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Hide code Rotate token Test notification In the app: Settings → Pair. Point the camera at the code. •••••••••••• This token opens the entire panel API. Do not show the screen to others and do not paste the code into a chat. Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code."
+        "shotAt": "2026-11-03T14:21:44.034Z",
+        "text": "Remote access on The phone app connects to this very panel: same chat, same projects, same analytics. The panel stays on 127.0.0.1 — Tailscale carries it outside, not an open port. Require a token While off, only this machine can reach the API. Once on, every request must carry the token, including requests from the browser on this same computer. Outside address •••••••••••• · tailscale serve is running Saved on Enter or when the field loses focus. Hide code Rotate token Test notification In the app: Settings → Pair. Point the camera at the code. •••••••••••• This token opens the entire panel API. Do not show the screen to others and do not paste the code into a chat. Send notifications to the phone Only the event kind (done, failed, permission needed, question asked) and the project folder name leave the machine. No text, no code.",
+        "seal": {
+          "png": "25d856c2a3116ffe",
+          "text": "e1d902ea181e3a5a"
+        }
+      },
+      "seal": {
+        "png": "599633673110e10e",
+        "text": "41d15479c56a84af"
       }
     },
     {
@@ -111,15 +159,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:15:22.046Z",
+      "shotAt": "2026-11-04T08:01:42.609Z",
       "text": "Связь Связь Уведомления Уведомления Общее Общее  Панель Не подключено Спарить Спарить Главная  Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "04-phone-not-paired.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:16:27.741Z",
-        "text": "Link Link Alerts Alerts General General  Panel Not connected Pair Pair Home  Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-11-04T08:04:24.901Z",
+        "text": "Link Link Alerts Alerts General General  Panel Not connected Pair Pair Home  Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings ",
+        "seal": {
+          "png": "7c6c91ee149cdd32",
+          "text": "200413ffcd8aeab3"
+        }
+      },
+      "seal": {
+        "png": "9e95f29011ec35ab",
+        "text": "8b4a0843f2556205"
       }
     },
     {
@@ -129,15 +185,23 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:15:33.593Z",
-      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:55898 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
+      "shotAt": "2026-11-04T08:01:53.400Z",
+      "text": "Navigate up Подключение Код из панели Настройки → Удалённый доступ. Наведите камеру на код. Разрешить камеру Разрешить камеру Или руками http://10.0.2.2:60324 ••••••••••••••••••••••••••••••••••••••••••• Подключиться Подключиться Токен открывает всё API панели: он лежит в защищённом хранилище телефона и никуда больше не уходит. Потеряли телефон — смените токен в панели, и это устройство перестанет ходить.",
       "en": {
         "file": "05-phone-pair-screen.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:16:39.090Z",
-        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:55898 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working."
+        "shotAt": "2026-11-04T08:04:35.733Z",
+        "text": "Navigate up Connecting Code from the panel Settings → Remote access. Point the camera at the code. Allow the camera Allow the camera Or by hand http://10.0.2.2:60324 ••••••••••••••••••••••••••••••••••••••••••• Connect Connect The token opens the panel’s whole API: it lives in the phone’s secure storage and goes nowhere else. Lost the phone — rotate the token in the panel and this device stops working.",
+        "seal": {
+          "png": "f043ad39a8aae422",
+          "text": "a361eab0c0554808"
+        }
+      },
+      "seal": {
+        "png": "4788a149eaa267f7",
+        "text": "63a82d71e624f312"
       }
     },
     {
@@ -147,33 +211,49 @@
       "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:15:45.399Z",
-      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk на связи http://10.0.2.2:55898 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Гибернация Гибернация Доступ снаружи Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "shotAt": "2026-11-04T08:02:04.817Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее  desk на связи http://10.0.2.2:60324 Переименовать Переименовать Спарить заново Спарить заново Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:60324, выбран  desk Windows · 10.0.2.2:60324 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Гибернация Гибернация Подпись решений Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "06-phone-online.en.png",
         "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:16:50.220Z",
-        "text": "Link Link Alerts Alerts General General  desk online http://10.0.2.2:55898 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Hibernate Hibernate Access from outside Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-11-04T08:04:46.919Z",
+        "text": "Link Link Alerts Alerts General General  desk online http://10.0.2.2:60324 Rename Rename Pair again Pair again Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:60324, selected  desk Windows · 10.0.2.2:60324 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Hibernate Hibernate Decision signing Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings ",
+        "seal": {
+          "png": "f9caaa74a7ef4628",
+          "text": "7c884a830d033bc6"
+        }
+      },
+      "seal": {
+        "png": "859ec80633be5461",
+        "text": "9982972f23ffec34"
       }
     },
     {
       "id": "07-phone-power-confirm",
       "side": "phone",
       "file": "07-phone-power-confirm.png",
-      "masked": 1,
+      "masked": 0,
       "width": 540,
       "height": 1200,
-      "shotAt": "2026-10-16T08:15:54.650Z",
-      "text": "Связь Связь Уведомления Уведомления Общее Общее Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:55898, выбран  desk Windows · 10.0.2.2:55898 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Отправить «desk» в гибернацию? С телефона компьютер обратно не включить: пока он спит, панель, чаты и уведомления недоступны. Выключить совсем отсюда нельзя — по той же причине. Да, отправить Да, отправить Отмена Отмена Доступ снаружи Включён: панель требует токен на каждом запросе. Tailscale: https://•••••••••••• (serve работает) Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
+      "shotAt": "2026-11-04T08:02:13.754Z",
+      "text": "Связь Связь Уведомления Уведомления Общее Общее Забыть этот компьютер Забыть этот компьютер Компьютеры Телефон спаривается с каждым компьютером по коду из его панели. Выбранный — тот, чьи проекты, чаты и вопросы вы видите и куда уходит работа. , desk, Windows · 10.0.2.2:60324, выбран  desk Windows · 10.0.2.2:60324 выбран Добавить компьютер Добавить компьютер Питание Гибернация Открытое — окна, файлы, вкладки — сохраняется на диск, и компьютер выключается полностью. Включается кнопкой питания, всё открытое на месте. Отправить «desk» в гибернацию? С телефона компьютер обратно не включить: пока он спит, панель, чаты и уведомления недоступны. Выключить совсем отсюда нельзя — по той же причине. Да, отправить Да, отправить Отмена Отмена Подпись решений Режим «решения только с подписью телефона»: разрешения в чатах, ответы на вопросы агентов, одобрение карточек и запуск с полным доступом панель принимает, только если их подписал ключ привязанного телефона. Запрет и «Стоп» проходят без подписи. Окно панели и Telegram при включённом режиме разрешать не могут. Главная, ждут ответа: 1  1 Главная , Проекты  Проекты , Аналитика  Аналитика Агент  Агент , Настройки Настройки ",
       "en": {
         "file": "07-phone-power-confirm.en.png",
-        "masked": 1,
+        "masked": 0,
         "width": 540,
         "height": 1200,
-        "shotAt": "2026-10-16T08:16:59.413Z",
-        "text": "Link Link Alerts Alerts General General Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:55898, selected  desk Windows · 10.0.2.2:55898 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Put “desk” to hibernate? The phone cannot switch the computer back on: while it sleeps, the panel, chats and notifications are unreachable. Powering off completely is not offered for the same reason. Yes, do it Yes, do it Cancel Cancel Access from outside On: the panel requires a token on every request. Tailscale: https://•••••••••••• (serve is running) Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings "
+        "shotAt": "2026-11-04T08:04:56.077Z",
+        "text": "Link Link Alerts Alerts General General Forget this computer Forget this computer Computers The phone pairs with each computer through the code in its panel. The selected one is whose projects, chats and questions you see and where work goes. , desk, Windows · 10.0.2.2:60324, selected  desk Windows · 10.0.2.2:60324 selected Add a computer Add a computer Power Hibernate Everything open — windows, files, tabs — is saved to disk and the computer powers off completely. The power button brings it back with everything in place. Put “desk” to hibernate? The phone cannot switch the computer back on: while it sleeps, the panel, chats and notifications are unreachable. Powering off completely is not offered for the same reason. Yes, do it Yes, do it Cancel Cancel Decision signing The \"decisions only with the phone signature\" mode: the panel accepts chat permissions, answers to agent questions, approved cards and full-access runs only when the key of a bound phone signed them. Deny and \"Stop\" need no signature. While the mode is on, the panel window and Telegram cannot allow anything. Home, 1 waiting for an answer  1 Home , Projects  Projects , Analytics  Analytics Agent  Agent , Settings Settings ",
+        "seal": {
+          "png": "012b4482da9dac46",
+          "text": "deb92e530dd4d931"
+        }
+      },
+      "seal": {
+        "png": "c3dc99734ff860c3",
+        "text": "c5721e203cc7fe8d"
       }
     }
   ]

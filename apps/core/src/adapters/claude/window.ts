@@ -49,6 +49,28 @@ function tightest(windows: unknown): Window | null {
   return best;
 }
 
+/**
+ * Предупреждение окна. CLI 2.1.310 пишет `allowed_warning` уже не в общий `status` (там
+ * `allowed`), а в статус самого окна `unifiedWindows.<имя>.status` (живой прогон прохода 8:
+ * заглушка ставила `anthropic-ratelimit-unified-status: allowed_warning`).
+ */
+function windowWarned(windows: unknown): boolean {
+  if (!isObject(windows)) return false;
+  return Object.values(windows).some((raw) => isObject(raw) && raw.status === 'allowed_warning');
+}
+
+/** Все окна `unifiedWindows` с долей — замер загрузки для доли лимита у чата панели. */
+function windowsOf(windows: unknown): WindowObservation['windows'] {
+  if (!isObject(windows)) return undefined;
+  const out: NonNullable<WindowObservation['windows']> = {};
+  for (const [name, raw] of Object.entries(windows)) {
+    if (!isObject(raw)) continue;
+    const usedPct = pctOf(raw.utilization);
+    if (usedPct !== null) out[name] = { usedPct, resetAt: msOf(raw.resetsAt) };
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Строка потока → наблюдение окна; не строка окна или без `rate_limit_info` — `undefined`. */
 export function readClaudeWindow(line: Json): WindowObservation | undefined {
   if (line.type !== claudeRunFacts.windowEvent?.type) return undefined;
@@ -63,11 +85,13 @@ export function readClaudeWindow(line: Json): WindowObservation | undefined {
   const refusal = status === 'rejected';
   // Сброс и имя отказа — названного окна (отказало оно); иначе — того, чья доля взята.
   const own = fromUnified && !refusal ? unified : null;
+  const windows = windowsOf(info.unifiedWindows);
   return {
+    ...(windows ? { windows } : {}),
     limitKind: 'window',
     usedPct: fromUnified ? unified.usedPct : direct,
     resetAt: own?.resetAt ?? msOf(info.resetsAt) ?? unified?.resetAt ?? null,
-    warning: status === 'allowed_warning',
+    warning: status === 'allowed_warning' || windowWarned(info.unifiedWindows),
     refusal,
     window: own ? own.name : named,
   };

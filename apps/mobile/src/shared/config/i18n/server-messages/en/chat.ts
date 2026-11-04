@@ -16,11 +16,10 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'This chat’s working folder was not found: {{cwd}}. The conversation started there and can only continue from there.',
   'run-session-unknown':
     'Conversation {{sessionId}} was not found: there is no transcript with this sessionId. The message was not sent — a new conversation without a sessionId starts separately.',
-  'branch-name-required': 'No branch name given — there is nothing to create the copy under.',
-  'branch-run-gone':
-    'The run waiting on the branch decision has finished: there is no one to create the copy for.',
   'permission-expired':
     'This permission request has expired: the agent stopped waiting for an answer, so the decision would not run anything. If it asks again, answer the new request.',
+  'core-permit-browser-only':
+    'A permission question of a core task is answered with the card’s button in the chat window: the answer goes to the core as a browser command, and this route does not pass it to the core.',
   'decision-human-only':
     'Decision rejected: it came from a process of a panel agent. Only a human answers permission requests and queued items.',
   'decision-peer-unknown':
@@ -66,29 +65,35 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The conversation context is full: it will not accept another message. Compact the context or continue in a new session.',
   'chat-process-lost':
     'The chat process was lost: it was ended outside the panel. The conversation is saved — send a message and it continues where it stopped.',
+  'core-chat-contour-down':
+    'The turn was not sent: the required contour {{contour}} is unavailable — its gateway has no route or key. The turn never goes to the vendor cloud instead. Check the contour in «Contours».',
+  'core-chat-model-needed':
+    'The turn was not sent: route {{route}} needs a concrete model. Pick a chat model or set the contour default model.',
+  'core-chat-contour-model':
+    'The turn was not sent: model {{model}} is not available in contour {{contour}} — the contour key does not allow it. The turn never goes to the vendor cloud instead. Pick a chat model the contour opens to its key (listed in «Contours»), or ask the platform administrator to allow this model for the key.',
+  'core-chat-estimate-refused':
+    'The turn was not sent: the task core did not accept it (code {{code}}). Core reason: {{reason}}',
+  'core-chat-refused':
+    'The task core refused the chat turn (code {{code}}). The reason is in the core task journal.',
+  'core-chat-kit-hooks':
+    'The turn did not start: this step runs your layer’s hooks as «{{mode}}» (narrowed by the scenario or a contour rule), and the panel kit adds its hooks only while they are on. Remove the hook narrowing from the contour rule, or switch the kit for this CLI to «Yours only» and turn its guards off on the «Panel kit» page.',
+  'core-chat-kit-mcp':
+    'The turn did not start: the kit folder {{path}} declares MCP servers (.mcp.json or mcpServers in plugin.json) — they would bypass the core session’s MCP list. Remove them from your kit files on the «Panel kit» page; MCP servers are connected in the «MCP servers» section.',
+  'core-chat-kit-missing':
+    'The turn did not start: the core could not find or read the kit folder {{path}}. The panel rebuilds the kit on every turn — send the message again; if it repeats, check that the folder is readable.',
+  'core-chat-layer-untrusted':
+    'The turn did not start: the project local layer is on in this folder, and Claude Code does not trust the folder. The layer is built from repository files, and the core does not run it without trust. Trust the folder: open claude in it in a terminal and answer «yes» to the trust question, then send the message again. Or turn the layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off»; the chat then runs without the repository files until the folder is trusted.',
+  'core-chat-layer-mode':
+    'The turn did not start: this step runs your configuration layer as «{{mode}}» (narrowed by the scenario or a contour rule), and the project local layer rides only with the full one. Remove the narrowing from the contour rule, or turn the local layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off».',
+  'core-chat-layer-sources':
+    'The turn did not start: the panel assembled the session with the project team files beside the local layer — the layer would duplicate them. This is a panel fault, not your setting: send the message again; if it repeats, turn the local layer off («Projects» → the project → «From the project» → «Local layer» → «Off») and report the fault.',
+  'core-chat-layer-build':
+    'The turn did not start: the core could not use the local layer build {{path}} — the folder is missing, unreadable or declares MCP servers. The panel rebuilds the layer on every turn — send the message again; if it repeats, open the «Local layer» card («Projects» → the project → «From the project»): the build error is shown there — or turn the layer off.',
+  'core-chat-layer-fit':
+    'The turn did not start: the project local layer does not fit the core session (part «{{field}}»: instructions over 200,000 characters or a hook of a foreign shape). Compress the layer instructions or turn the layer off: «Projects» → the project → «From the project» → «Local layer» → mode «Off».',
+  'core-chat-carry-unsupported':
+    'The turn did not start: the {{adapter}} CLI cannot take part of the panel layer into the core session ({{fields}}: the kit, the local layer or a settings narrowing). Start the chat in Claude Code, or turn that part off for this CLI.',
   'conversation-unspecified': 'No conversation specified',
-  'split-proposal-invalid':
-    'The split could not be parsed: at least two groups with tasks are required',
-  'split-conveyor-off': 'The level conveyor is off',
-  'split-group-number-required': 'A group number is required',
-  'split-group-not-found': 'Group not found',
-  'split-answer-empty': 'The answer is empty',
-  'split-question-empty': 'The question is empty',
-  'split-question-too-long': 'The question is longer than {{max}} characters',
-  'split-groups-missing': 'The split has no groups yet',
-  'split-status-not-started': 'The question was not accepted: a run with this key is already going',
-  'split-overlap-off': 'Branch comparison is off',
-  'split-levels-missing': 'There is no split with levels here',
-  'split-review-off': 'Review by links is off',
-  'split-review-decision-unknown': 'Unknown decision',
-  'split-review-decided': 'A decision on this review has already been made',
-  'split-review-nothing-to-send': 'Nothing to send: there were no review fixes here',
-  'split-review-branch-unknown':
-    'The MR branch is unknown — a push would create a new branch instead of updating the MR',
-  'split-review-no-session': 'The conversation has not started yet — nothing to continue',
-  'split-review-busy': 'The chat is still working — wait for the turn to end',
-  'split-review-start-failed': 'The run could not start',
-  'split-review-not-missing': 'The review result is already in — nothing to repeat',
   'conversation-not-found': 'Conversation not found',
   'panel-help-query-empty': 'Empty help query.',
   'panel-card-click-only': 'A card decision is made only by a click in the panel window.',
@@ -101,15 +106,6 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'A turn is running in this conversation — delete it after the agent answers.',
   'foreign-chat-not-for-claude': 'Claude has its own chat — these routes are not for it.',
   'conversation-create-failed': 'Could not create the conversation',
-  'request-empty': 'Empty request',
-  'foreign-answer-running': 'The answer to the previous question is still coming',
-  'foreign-queued-gone': 'The queued message is no longer there',
-  'foreign-permission-gone': 'This permission request is already closed',
-  'foreign-restart-running':
-    'The answer is still coming: wait for the turn to end or stop it, then restart',
-  'foreign-restart-no-cwd':
-    'The conversation has no working folder — there is nowhere to start a new one',
-  'foreign-continuation-store-failed': 'The continuation was not created: the store refused',
   'panel-help-topic-missing': 'There is no help topic “{{id}}”. Available: {{known}}.',
   'panel-agent-busy':
     'The agent is still answering in this conversation — wait for the turn to end.',
@@ -118,93 +114,27 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'panel-agent-turn-gone': 'The start of the turn is no longer kept — open the conversation again.',
   'panel-agent-provider-unsupported':
     'The panel agent does not work with {{provider}}: this CLI has no run in which the agent acts through the panel tools alone. The agent works with Claude Code, Qwen Code, Codex, Gemini CLI, OpenCode, Goose and Kimi Code — switch the active CLI in «Providers».',
-  'panel-agent-cli-not-found':
-    '{{provider}} was not found in the PATH of the panel process — the agent has nothing to work with. Without the CLI the agent has no panel tools; an API key does not help here.',
-  'panel-agent-contour-foreign':
-    'The panel agent goes through a contour only with Claude Code, and the active CLI is {{provider}}. The turn was not started so as not to go to the vendor cloud: untick «Panel assistant» on the contour or switch the CLI to Claude Code.',
   'panel-agent-stopped': 'The turn was stopped.',
-  'panel-agent-extra-tools-qwen':
-    'Qwen Code offered the agent tools beyond the panel bridge ({{tools}}) — the turn was stopped so that the agent has no extra hands.',
   'panel-agent-extra-tool':
     'The CLI gave the agent a tool beyond the panel bridge ({{tool}}) — the turn was stopped so that the agent has no extra hands.',
   'panel-agent-timeout': 'The agent did not finish the turn in the allotted time.',
   'panel-agent-no-reply': 'The agent did not answer.',
   'panel-agent-cli-exit': 'The CLI exited with code {{code}} without an answer.',
-  'panel-agent-images-gemini':
-    'The panel agent on Gemini CLI takes no images: the CLI reads them only with its own file tool, which the agent does not have. Send the question without the image.',
-  'panel-agent-images-goose':
-    'The panel agent on Goose takes no images: in a one-shot run Goose does not pass them to the model. Send the question without the image.',
-  'panel-agent-images-kimi':
-    'The panel agent on Kimi Code takes no images: a one-shot Kimi run takes text only. Send the question without the image.',
-  'panel-agent-kimi-long':
-    'The message is longer than {{max}} characters: Kimi Code takes it only on the launch line. Shorten the message or split it into parts.',
+  'panel-agent-model-error': 'The model turn ended with an error and the CLI gave no words for it.',
   'tests-agent-provider-unsupported':
-    'The Tests block agent works with Claude Code, Qwen Code and Codex, and the active CLI is {{provider}}: it has no run in which the panel checks every write the agent makes. The run was not started — switch the CLI in «Providers» or mark the cases by hand.',
-  'tests-agent-cli-not-found':
-    '{{provider}} was not found in the PATH of the panel process — the run has nothing to work with. Install the CLI or switch the active CLI in «Providers».',
-  'tests-agent-contour-foreign':
-    'The Tests block agent goes through a contour only with Claude Code, and the active CLI is {{provider}}. The run was not started so as not to go to the vendor cloud: untick «Test agent» on the contour or switch the CLI to Claude Code.',
-  'tests-agent-gate-unavailable':
-    'The run on {{provider}} was not started: the panel could not start its permission check, and without it the agent could write anywhere. Start it again; if that does not help, restart the panel.',
-  'tests-agent-codex-app-server-unavailable':
-    'Codex did not start its app-server (Codex 0.160 or newer is needed): {{why}}. The run was not started.',
-  'tests-agent-gate-bypassed':
-    "The run was stopped: {{provider}} ran «{{tool}}» without passing the panel's permission check. Review the working copy — the change may have landed outside the allowed folders.",
-  'split-hold-not-waiting':
-    'The group is not waiting for an answer: there is no question or it was already answered',
-  'split-release-not-waiting':
-    'The group is not waiting for predecessors: there is nothing to release',
-  'split-relaunch-nothing': 'There is no split here: nothing to relaunch',
-  'split-ticket-missing': 'This split has no such suggested ticket',
-  'split-ticket-tracker-missing': 'No tracker is linked to the project: nowhere to file the ticket',
-  'split-ticket-batch-empty': 'No open suggested tickets: all are filed or taken into a chat',
-  'split-ticket-take-not-started': 'The chat did not start: a run with this key is already going',
-  'split-relaunch-running': 'This split is already being relaunched',
-  'split-relaunch-unconfirmed':
-    'Runs not stopped: {{count}} — the panel could not verify their processes and left them alone. The relaunch did not start: retry once they finish or are stopped.',
-  'split-plan-running':
-    'The split of this conversation is still running — wait for its groups to finish or cancel the plan',
-  'split-cleanup-nothing':
-    'Nothing to clean up: the group is not closed, has no copy, or the copy is already gone',
-  'split-cleanup-shared':
-    'Another group still works in this copy — clean it up once that group closes too',
+    'The Tests block agent runs as a core task and works with Claude Code, Qwen Code and Codex, and the active CLI is {{provider}}: the core has no adapter for it. The run was not started — switch the CLI in «Providers» or mark the cases by hand.',
+  'tests-agent-core-refused': 'The core did not start the run on {{provider}}: {{reason}}',
   'panel-agent-last-not-user': 'the last message must be from the human',
-  'split-pause-not-running': 'The group is not running — nothing to pause',
-  'split-resume-not-paused': 'The group is not paused — nothing to resume',
-  'split-resume-refused': 'Nothing to resume the group with: it has no conversation or copy',
-  'split-restart-not-cut': 'The group was not cut before its chat — nothing to start again',
-  'split-start-not-queued': 'The group is not queued — nothing to start',
-  'split-start-triage':
-    'Task triage is still running — it decides the group order; starting becomes available after it',
-  'split-accept-not-done': 'Nothing to mark: the group does not exist or is working right now',
   'split-group-no-slot': 'All slots are taken: {{running}} of {{limit}} running',
   'split-group-no-slot-paused':
     'All slots are taken: {{running}} running, {{paused}} paused, of {{limit}} — Resume or Remove on a paused group frees a slot',
-  'split-drop-nothing': 'Nothing to remove: the group is neither paused nor cut before its chat',
-  'split-continue-nothing': 'Nothing to continue: the group did not stop unfinished',
-  'split-recheck-nothing':
-    'Nothing to recheck: the group has no delivered MR or its copy was removed',
-  'split-recheck-note-invalid': 'The recheck note must be text of at most {{max}} characters',
-  'split-recheck-merged': 'The MR is already merged — nothing to recheck',
-  'split-recheck-closed': 'The MR is closed — nothing to recheck',
-  'split-tasks-jira-off': 'Jira is not connected — there is nowhere to move the tasks',
-  'split-tasks-none': 'Groups with an MR have no tracker tasks',
-  'split-tasks-status-missing': 'No status selected',
-  'split-tasks-index-bad': 'The group number must be an integer',
   'split-limit-active': 'The subscription limit is exhausted until {{until}}',
-  'split-plan-cancel-nothing':
-    'Nothing to cancel: the split of this conversation has already finished',
-  'split-plan-cancel-unknown': 'This conversation has no split',
-  'split-plan-cancelled': 'The plan is cancelled: its groups are closed — start a new split',
-  'split-group-cleanup-failed': 'The copy could not be removed: {{detail}}',
   'chat-group-pair-inactive-side':
     'Group “{{group}}” is the inactive side of its pair in this project: the other side is in effect. Pick that one, or switch the pair side on the Groups page.',
   'chat-stop-unconfirmed':
     "The agent process was not stopped: the panel could not verify that the number is still the agent's, so it left it alone. The run goes on — try Stop again.",
   'chat-keep-session-gone':
     'The new conversation is no longer running — there is no turn to move back to the old one.',
-  'branch-stop-unconfirmed':
-    'The copy {{path}} was created, but the agent process was not stopped: the panel could not verify the number still belongs to it and left it alone. The conversation stays in the main copy; the agent waits at the same card.',
   'chat-pin-invalid': 'The pinned field must be true or false',
   'agent-id-invalid': 'Invalid subagent id',
   'agent-not-found': 'Subagent not found',

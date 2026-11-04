@@ -27,7 +27,6 @@ import { isGitRepo, requireRepo } from './read.ts';
 import { assertBranchName } from './write.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
 import { carryCopyRuns } from '../project-tests/runs-store/carry-runs.ts';
-import { pruneLedgerForRemovedCopy } from '../verify-ledger/verify-ledger.ts';
 
 /**
  * Параллельные рабочие копии (`git worktree`) — то, чем несколько агентов
@@ -641,7 +640,6 @@ export async function removeWorktree(
 
   if (entry.prunable) {
     await git(projectDir, ['worktree', 'prune']);
-    pruneLedgerForRemovedCopy({ projectPath: projectDir, copyPath: entry.path });
     return {
       output: 'Каталога копии больше нет — запись убрана',
       outputCode: 'worktree-pruned',
@@ -686,10 +684,6 @@ export async function removeWorktree(
     throw error;
   }
   await sweepLinkShell(entry.path);
-  // Записи журнала проверок, которых касалась только эта копия, уходят вместе с
-  // ней, а не через срок, — каким бы путём копию ни убрали (группа, закрытое
-  // ревью, маршруты человека); сбой уборки журнала копию назад не возвращает.
-  pruneLedgerForRemovedCopy({ projectPath: projectDir, copyPath: entry.path });
   if (carried.runs > 0)
     return {
       output: `Копия ${entry.path} убрана, её прогоны блока «Тесты» (${carried.runs}) перенесены в историю проекта`,

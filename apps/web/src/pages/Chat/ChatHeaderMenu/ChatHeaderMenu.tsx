@@ -1,9 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from '@tanstack/react-router';
-import { PERMISSION_RULE_IDS, resolvePermissionRules } from '@agentdeck/contracts';
-import { useSettings, useUpdateSettings } from '@entities/AppConfig';
-import { useCascadeRule, useSetCascadeRule } from '@entities/ChatSplit';
 import { useDraftFromChat } from '@entities/ProjectTest';
 import { toast } from '@shared/lib/toast';
 import { HELP_ROUTE } from '@shared/config/routes';
@@ -13,7 +10,6 @@ import { Typography } from '@shared/ui/typography';
 import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { Toggle } from '@shared/ui/toggle';
-import { ChatGroupSettingsMenu } from '../ChatGroupSettingsMenu/ChatGroupSettingsMenu';
 import type { ChatHeaderMenuProps } from './ChatHeaderMenu.types';
 import styles from './ChatHeaderMenu.module.scss';
 import { TESTS_ROUTE } from './ChatHeaderMenu.constants';
@@ -48,28 +44,6 @@ export function ChatHeaderMenu({
   const [isOpen, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { panelRef, panelStyle } = useAnchoredPanel<HTMLDivElement>(isOpen);
-
-  // Правила прав живут в настройках ПАНЕЛИ, а не в разговоре: решение «пусть
-  // агент сам пишет комментарии в MR» относится к человеку и его сервисам, и
-  // повторять его в каждом проекте и на телефоне он не должен.
-  const { data: settings } = useSettings();
-  const updateSettings = useUpdateSettings();
-  const rules = resolvePermissionRules(settings?.autoApproveRules);
-  const setRule = (id: string, enabled: boolean): void => {
-    updateSettings.mutate({
-      autoApproveRules: { ...(settings?.autoApproveRules ?? {}), [id]: enabled },
-    });
-  };
-
-  // Подбор модели под задачу — правило ПРОЕКТА, поэтому оно и не в настройках
-  // панели: цена ошибки у репозиториев разная. Пока ответ не пришёл, показываем
-  // включённым — это умолчание, и мигать «выключено» на каждом открытии меню
-  // значило бы врать о состоянии.
-  const cascade = useCascadeRule(projectPath);
-  const setCascade = useSetCascadeRule(projectPath);
-  const cascadeOn = cascade.data?.enabled ?? true;
-  // «Ревью после работы» (R3(d), 26.10) — тот же проект, своё умолчание «включено».
-  const reviewOn = cascade.data?.reviewAfterWork ?? true;
 
   // Escape закрывает меню и возвращает фокус на кнопку: без возврата клавиатура
   // оказывается в начале страницы, а человек — там, где не был.
@@ -113,14 +87,6 @@ export function ChatHeaderMenu({
             role="dialog"
             aria-label={t('chat.menu')}
           >
-            {chatId && (
-              <ChatGroupSettingsMenu
-                chatId={chatId}
-                {...(sessionId ? { sessionId } : {})}
-                {...(projectPath ? { projectPath } : {})}
-              />
-            )}
-
             <Typography
               variant="caption"
               color="subtle"
@@ -173,87 +139,6 @@ export function ChatHeaderMenu({
                 </Typography>
               </Stack>
             )}
-
-            <div className={styles.divider} />
-
-            {/* Правила прав: та же граница «что разрешать самой», но её кладёт
-                человек и один раз на все проекты. Включённое правило снимает
-                карточку «Разрешить/Запретить», выключенное — возвращает её;
-                права `ask`/`deny` из settings.json сильнее любого тумблера. */}
-            <Typography
-              variant="caption"
-              color="subtle"
-              as="span"
-              className={styles.groupTitle}
-              id="chat-menu-rules"
-            >
-              {t('chat.rules.title')}
-            </Typography>
-
-            {/* Подбор модели под задачу. Стоит первым среди правил и отделён от
-                них по смыслу: остальные решают, что панель разрешает БЕЗ
-                вопроса, а это — чем именно будет сделана работа. Выключенное
-                возвращает прежнее поведение: все дети разделения едут на
-                модели, которую выбрал человек. */}
-            {projectPath && (
-              <Stack as="label" direction="row" className={styles.ruleRow}>
-                <Toggle
-                  size="sm"
-                  checked={cascadeOn}
-                  onCheckedChange={(next) => setCascade.mutate({ enabled: next })}
-                  aria-label={t('chat.rules.modelCascade')}
-                />
-                <span className={styles.ruleText}>
-                  <Typography variant="body-sm" color={cascadeOn ? 'default' : 'subtle'} as="span">
-                    {t('chat.rules.modelCascade')}
-                  </Typography>
-                  <Typography variant="caption" color="subtle" as="span">
-                    {t('chat.rules.modelCascadeHint')}
-                  </Typography>
-                </span>
-              </Stack>
-            )}
-
-            {/* Ревью после работы группы — рядом с подбором и той же области: раньше
-                снять его можно было только вместе с дешёвыми моделями (R3(d)).
-                Выключенное: работа группы идёт в доставку без ревью на потолке. */}
-            {projectPath && (
-              <Stack as="label" direction="row" className={styles.ruleRow}>
-                <Toggle
-                  size="sm"
-                  checked={reviewOn}
-                  onCheckedChange={(next) => setCascade.mutate({ reviewAfterWork: next })}
-                  aria-label={t('chat.rules.reviewAfterWork')}
-                />
-                <span className={styles.ruleText}>
-                  <Typography variant="body-sm" color={reviewOn ? 'default' : 'subtle'} as="span">
-                    {t('chat.rules.reviewAfterWork')}
-                  </Typography>
-                  <Typography variant="caption" color="subtle" as="span">
-                    {t('chat.rules.reviewAfterWorkHint')}
-                  </Typography>
-                </span>
-              </Stack>
-            )}
-
-            {PERMISSION_RULE_IDS.map((id) => (
-              <Stack key={id} as="label" direction="row" className={styles.ruleRow}>
-                <Toggle
-                  size="sm"
-                  checked={rules[id]}
-                  onCheckedChange={(next) => setRule(id, next)}
-                  aria-label={t(`chat.rules.${id}`)}
-                />
-                <span className={styles.ruleText}>
-                  <Typography variant="body-sm" color={rules[id] ? 'default' : 'subtle'} as="span">
-                    {t(`chat.rules.${id}`)}
-                  </Typography>
-                  <Typography variant="caption" color="subtle" as="span">
-                    {t(`chat.rules.${id}Hint`)}
-                  </Typography>
-                </span>
-              </Stack>
-            ))}
 
             <div className={styles.divider} />
 

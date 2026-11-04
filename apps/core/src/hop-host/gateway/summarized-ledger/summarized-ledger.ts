@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PlatformSummarizedLink, PlatformSummarizedReport } from '@agentdeck/contracts';
 import { readJsonFile, writeJsonFile } from '../json-file.ts';
@@ -109,6 +110,30 @@ export function summarizedReport(appDataDir: string): PlatformSummarizedReport {
         link: linkOf(record),
       })),
   };
+}
+
+/**
+ * Первый запуск звена на машине (C3b): журнал, который вела панель (`<данные панели>/
+ * platform-summarized.json`, та же форма), переезжает сюда один раз — иначе подписи «контур
+ * сжал историю» под старыми ответами погасли бы в день переезда. Свой журнал уже есть — панель
+ * не читается: записи после переезда пишет только звено.
+ */
+export function adoptPanelSummarized(stateDir: string, panelAppData: string | undefined): void {
+  if (!panelAppData || existsSync(fileOf(stateDir))) return;
+  let legacy: SummarizedRecord[];
+  try {
+    const raw = readJsonFile<unknown>(fileOf(panelAppData), []);
+    legacy = Array.isArray(raw) ? raw.filter(isRecord).slice(-SUMMARIZED_CAP) : [];
+  } catch {
+    return;
+  }
+  if (legacy.length === 0) return;
+  cache.set(stateDir, legacy);
+  try {
+    writeJsonFile(fileOf(stateDir), legacy, { preserveForm: false });
+  } catch {
+    // В памяти журнал остался: до перезапуска подписи видны, следующий запуск повторит переезд.
+  }
 }
 
 /** Для тестов: забыть кэш процесса. */

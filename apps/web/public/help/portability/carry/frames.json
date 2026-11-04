@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T16:44:42.967Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 19 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 28 сент. 2026 г., 21:44 Перенести выбранное (0)",
+      "shotAt": "2026-11-03T17:50:39.505Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 9 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 22 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 3 нояб. 2026 г., 22:50 Перенести выбранное (0)",
       "en": {
         "file": "01-list.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:12:49.721Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Environment passport What the selected CLI actually has configured — as items and named skips Passport 19 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Sep 28, 2026, 09:12 PM Carry the selected (0)"
+        "shotAt": "2026-11-03T17:56:21.770Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 9 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Environment passport What the selected CLI actually has configured — as items and named skips Passport 22 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Nov 3, 2026, 10:55 PM Carry the selected (0)",
+        "seal": {
+          "png": "e1e4b3ccb5df288a",
+          "text": "3ac2a0e80b210482"
+        }
       },
       "dark": {
         "file": "01-list.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:32:52.044Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 19 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 28 сент. 2026 г., 21:32 Перенести выбранное (0)"
+        "shotAt": "2026-11-03T18:01:46.497Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 9 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 22 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 3 нояб. 2026 г., 23:01 Перенести выбранное (0)",
+        "seal": {
+          "png": "b12967cfdde3cc27",
+          "text": "87dbfe71eaff9198"
+        }
       },
       "darkEn": {
         "file": "01-list.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:38:35.050Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Environment passport What the selected CLI actually has configured — as items and named skips Passport 19 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Sep 28, 2026, 09:38 PM Carry the selected (0)"
+        "shotAt": "2026-11-03T18:07:10.201Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 9 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Environment passport What the selected CLI actually has configured — as items and named skips Passport 22 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Nov 3, 2026, 11:06 PM Carry the selected (0)",
+        "seal": {
+          "png": "4d5ccc91c4328d61",
+          "text": "4c6a779d78107b08"
+        }
+      },
+      "seal": {
+        "png": "29ec6bdbafc98a85",
+        "text": "0371cd92c3648108"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T16:44:59.712Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 19 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service опора: .agent/PROGRESS.md Перенести нельзя: файла-опоры в каталоге нет — новому разговору нечего читать. codex 28 сент. 2026 г., 21:44 Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 28 сент. 2026 г., 21:44 Перенести выбранное (0)",
+      "shotAt": "2026-11-03T17:50:56.991Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 9 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 22 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service опора: .agent/PROGRESS.md Перенести нельзя: файла-опоры в каталоге нет — новому разговору нечего читать. codex 3 нояб. 2026 г., 22:50 Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 3 нояб. 2026 г., 22:50 Перенести выбранное (0)",
       "en": {
         "file": "02-refusal.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:13:06.521Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Environment passport What the selected CLI actually has configured — as items and named skips Passport 19 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service checkpoint: .agent/PROGRESS.md Cannot carry: there is no checkpoint file in the directory — the new conversation would have nothing to read. codex Sep 28, 2026, 09:12 PM Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Sep 28, 2026, 09:12 PM Carry the selected (0)"
+        "shotAt": "2026-11-03T17:56:39.273Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 9 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Environment passport What the selected CLI actually has configured — as items and named skips Passport 22 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service checkpoint: .agent/PROGRESS.md Cannot carry: there is no checkpoint file in the directory — the new conversation would have nothing to read. codex Nov 3, 2026, 10:56 PM Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Nov 3, 2026, 10:55 PM Carry the selected (0)",
+        "seal": {
+          "png": "ef572b72c6cb723c",
+          "text": "77c5afcf97395c6f"
+        }
       },
       "dark": {
         "file": "02-refusal.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:33:09.039Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 6 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 19 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service опора: .agent/PROGRESS.md Перенести нельзя: файла-опоры в каталоге нет — новому разговору нечего читать. codex 28 сент. 2026 г., 21:32 Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 28 сент. 2026 г., 21:32 Перенести выбранное (0)"
+        "shotAt": "2026-11-03T18:02:03.983Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 1 CLAUDE.md Скиллы 4 Команды Хуки 9 Скрипты 7 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Паспорт среды Что настроено у выбранного CLI на самом деле — записями и названными пропусками Паспорт 22 Перенос Подписка Проба цели Незакрытая работа Разговоры других CLI, оставленные на полпути, — их можно продолжить у активного CLI. Незакрытая работа у других CLI Переписка никуда не переезжает — чужого формата для неё не существует. Переезжает то же, чем живёт продолжение в чистой сессии: файл-опора в рабочем каталоге и исходное задание. Исходный разговор остаётся на месте и не закрывается. Продолжить у: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service опора: .agent/PROGRESS.md Перенести нельзя: файла-опоры в каталоге нет — новому разговору нечего читать. codex 3 нояб. 2026 г., 23:01 Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service опора: .agent/PROGRESS.md codex 3 нояб. 2026 г., 23:01 Перенести выбранное (0)",
+        "seal": {
+          "png": "832d587af04c4076",
+          "text": "6e93862695790e13"
+        }
       },
       "darkEn": {
         "file": "02-refusal.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T16:38:51.843Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 6 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help Environment passport What the selected CLI actually has configured — as items and named skips Passport 19 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service checkpoint: .agent/PROGRESS.md Cannot carry: there is no checkpoint file in the directory — the new conversation would have nothing to read. codex Sep 28, 2026, 09:38 PM Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Sep 28, 2026, 09:38 PM Carry the selected (0)"
+        "shotAt": "2026-11-03T18:07:27.727Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 1 CLAUDE.md Skills 4 Commands Hooks 9 Scripts 7 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Environment passport What the selected CLI actually has configured — as items and named skips Passport 22 Transfer Subscription Target probe Unfinished work Conversations of other CLIs left halfway — they can be continued at the active CLI. Unfinished work at other CLIs The transcript does not travel — no foreign format for it exists. What travels is what a clean-session continuation lives on: the checkpoint file in the working directory and the original task. The source conversation stays where it is and is not closed. Continue at: Claude Code Отчёт по возвратам C:\\work\\.cc-help-portability\\projects\\reports-service checkpoint: .agent/PROGRESS.md Cannot carry: there is no checkpoint file in the directory — the new conversation would have nothing to read. codex Nov 3, 2026, 11:07 PM Оплата картой падает C:\\work\\.cc-help-portability\\projects\\payments-service checkpoint: .agent/PROGRESS.md codex Nov 3, 2026, 11:06 PM Carry the selected (0)",
+        "seal": {
+          "png": "6a2437f20586240b",
+          "text": "026987433b1c00af"
+        }
+      },
+      "seal": {
+        "png": "194eb105dc138f77",
+        "text": "a2aa57062d2ed69d"
       }
     }
   ]

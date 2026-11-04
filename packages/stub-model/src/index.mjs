@@ -1,6 +1,6 @@
 /**
- * `@agentdeck/stub-model` — ОДНА заглушка модели ядра (R:PR-09, P120): три протокола
- * провода, поток SSE как его разбирают настоящие CLI, сценарий шагов (текст, вызов
+ * `@agentdeck/stub-model` — ОДНА заглушка модели ядра (R:PR-09, P120): четыре протокола
+ * провода (Anthropic, OpenAI chat и responses, Google generateContent), поток SSE как его разбирают настоящие CLI, сценарий шагов (текст, вызов
  * инструмента, шаг-функция над прошлыми телами, ошибки 402/429/451/503, окно,
  * задержки, правила по метке), след каждого запроса без значений доступа.
  *
@@ -27,7 +27,8 @@ export const STUB_CAPS = Object.freeze({
   customTools: Object.freeze(['openai-responses']),
   errors: Object.freeze([402, 429, 451, 503]),
   midStreamErrors: true,
-  window: true,
+  /** Заголовки окна / предела частоты — у Gemini API их нет, шаг с `window` там отказ сценария. */
+  window: Object.freeze(['anthropic-messages', 'openai-chat', 'openai-responses']),
   hold: true,
   stall: true,
   /** Текст шага массивом — несколько дельт одного блока; клиент склеивает их сам. */

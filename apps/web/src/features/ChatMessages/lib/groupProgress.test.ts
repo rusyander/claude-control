@@ -36,7 +36,7 @@ describe('groupProgress', () => {
     });
   });
 
-  it('файл шагов: идущий шаг ещё не сделан, у закончившей — сделан', () => {
+  it('файл шагов: идущий шаг ещё не сделан — сделано на один меньше', () => {
     const steps = { current: 8, total: 14, title: 'Прогон тестов' };
     const live = groupProgress({
       progress: { tasks: [], agents: [], steps },
@@ -44,64 +44,32 @@ describe('groupProgress', () => {
       permission: false,
     });
     expect(live).toMatchObject({ done: 7, total: 14, percent: 50 });
-    const done = groupProgress({
+    const last = groupProgress({
       progress: { tasks: [], agents: [], steps: { current: 14, total: 14 } },
-      group: { isRunning: false, status: 'done', lastAt: LAST },
+      group: { isRunning: false, lastAt: LAST },
       permission: false,
     });
-    expect(done).toMatchObject({ state: 'finished', since: LAST, done: 14, percent: 100 });
+    expect(last).toMatchObject({ state: 'stalled', since: LAST, done: 13, total: 14 });
   });
 
-  it('запрос прав сильнее очереди и работы — с момента вызова, что его ждёт', () => {
+  it('запрос прав сильнее работы — с момента вызова, что его ждёт', () => {
     const view = groupProgress({
-      progress: {
-        ...plan(2, 5),
-        activeTool: bash,
-        heavyQueue: { since: '2026-10-19T11:29:00.000Z', ahead: 1 },
-      },
+      progress: { ...plan(2, 5), activeTool: bash },
       group: running,
       permission: true,
     });
     expect(view.state).toBe('permission');
     expect(view.since).toBe(bash.startedAt);
-    expect(view.queueAhead).toBeUndefined();
   });
 
-  it('билет очереди тяжёлых шагов: «ждёт очередь» с билета и сколько впереди', () => {
-    const view = groupProgress({
-      progress: {
-        ...plan(2, 5),
-        activeTool: bash,
-        heavyQueue: { since: '2026-10-19T11:29:00.000Z', ahead: 2, command: 'pnpm test' },
-      },
-      group: running,
-      permission: false,
-    });
-    expect(view).toMatchObject({
-      state: 'queued',
-      since: '2026-10-19T11:29:00.000Z',
-      queueAhead: 2,
-      tool: bash,
-    });
-  });
-
-  it('не идёт и не доставлена — стоит с последней записи, незакрытый вызов не показан', () => {
+  it('не идёт — стоит с последней записи, незакрытый вызов не показан', () => {
     const view = groupProgress({
       progress: { ...plan(3, 6), activeTool: bash },
-      group: { isRunning: false, status: 'awaiting', startedAt: STARTED, lastAt: LAST },
+      group: { isRunning: false, startedAt: STARTED, lastAt: LAST },
       permission: false,
     });
     expect(view).toMatchObject({ state: 'stalled', since: LAST, done: 3, total: 6, percent: 50 });
     expect(view.tool).toBeUndefined();
-  });
-
-  it('влитый MR — закончила, даже если запись конвейера не «готово»', () => {
-    const view = groupProgress({
-      progress: undefined,
-      group: { isRunning: false, mrClosed: 'merged', lastAt: LAST },
-      permission: false,
-    });
-    expect(view).toEqual({ state: 'finished', since: LAST });
   });
 
   /** Живой прогон 20.10: продолженная через сутки группа «работала 21ч 09м» при часе работы. */

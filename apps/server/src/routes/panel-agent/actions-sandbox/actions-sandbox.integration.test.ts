@@ -32,17 +32,25 @@ import { registerScriptRoutes } from '../../script-routes/script-routes.ts';
 import { registerSandboxRoutes } from '../../sandbox-routes/sandbox-routes.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
 import { setSandboxAskBudgetForTests } from './actions-sandbox.ts';
+import { SANDBOX_STOP_REASON } from '../../sandbox-routes/sandbox-routes.ts';
+import {
+  fakeCorePort,
+  type FakeCorePort,
+  type FakeEv,
+} from '../../../domains/project-tests/agent/__fixtures__/fake-core-port.ts';
 
 /**
  * Песочница у агента панели (P3): прогон хука на заготовках и вопрос Claude с
  * временной копией выбранного — настоящими маршрутами окна «Песочница».
  *
  * Дом временный (песочницы лежат под `~/.agentdeck/sandboxes`), конфигурация
- * своя, а `claude` — подделка первой в PATH: она пишет, с каким каталогом
- * конфигурации и флагами её запустили и что лежало в CLAUDE.md песочницы, и
- * отвечает потоком stream-json, как настоящий CLI. Хук — настоящий скрипт,
- * настоящий `node`. Доказательство изоляции — диск: после действия ни одной
- * песочницы, и прогон видел только выбранное.
+ * своя. Вопрос — задача ядра (этап 10, F6): подменена граница процесса ядра
+ * (`fakeCorePort`); на запуске он снимает, что лежало в каталоге конфигурации
+ * песочницы, и пишет файл в её рабочую папку, как агент. `claude` — подделка
+ * первой в PATH: панель не должна запускать CLI мимо ядра, и журнал подделки
+ * остаётся пустым. Хук — настоящий скрипт, настоящий `node`. Доказательство
+ * изоляции — диск: после действия ни одной песочницы, и задача видела только
+ * выбранное.
  */
 const ORIGIN = 'http://localhost:8888';
 const SECRET = `sk-ant-api03-${'Q'.repeat(40)}`;
@@ -84,7 +92,29 @@ out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Write',
 out({ type: 'result', subtype: 'success', total_cost_usd: 0.0123, duration_ms: 5, session_id: 'fake-1' });
 `;
 
+/** Ход задачи ядра: текст с секретом, вызов Write, конец хода. */
+const TURN: FakeEv[] = [
+  { kind: 'assistant-text', data: { text: 'Отвечаю кратко. ' } },
+  { kind: 'assistant-text', data: { text: `Ключ ${SECRET} не нужен.` } },
+  {
+    kind: 'tool-call',
+    data: { toolUseId: 't1', name: 'Write', input: { file_path: 'answer.txt' } },
+  },
+  { kind: 'tool-result', data: { toolUseId: 't1', isError: false } },
+  { kind: 'turn-end', data: { isError: false, numTurns: 1 } },
+];
+
+/** Что лежало в песочнице в миг запуска задачи ядра. */
+interface LaunchSeen {
+  configDir: string;
+  cwd: string;
+  md: string;
+  credentials: boolean;
+}
+
 describe('panel-agent actions: sandbox', () => {
+  let core: FakeCorePort;
+  let seen: LaunchSeen[];
   let base: string;
   let home: string;
   let root: string;
@@ -121,7 +151,31 @@ describe('panel-agent actions: sandbox', () => {
           )
       : [];
 
+  /** Ядро для следующего вопроса; на запуске — снимок песочницы и файл агента в её рабочей папке. */
+  const coreWith = (opts: Parameters<typeof fakeCorePort>[0] = {}): FakeCorePort => {
+    seen = [];
+    const port: FakeCorePort = fakeCorePort({
+      turn: TURN,
+      ...opts,
+      onLaunch: () => {
+        const configDir = port.envs.at(-1)?.CLAUDE_CONFIG_DIR ?? '';
+        const cwd = port.estimates.at(-1)?.repos[0]?.path ?? '';
+        const mdFile = join(configDir, 'CLAUDE.md');
+        seen.push({
+          configDir,
+          cwd,
+          md: configDir && existsSync(mdFile) ? readFileSync(mdFile, 'utf8') : '',
+          credentials: existsSync(join(configDir, '.credentials.json')),
+        });
+        if (cwd) writeFileSync(join(cwd, 'answer.txt'), '42');
+      },
+    });
+    core = port;
+    return port;
+  };
+
   beforeEach(async () => {
+    coreWith();
     base = realpathSync.native(mkdtempSync(join(tmpdir(), 'cc-agent-u5c-sandbox-')));
     home = join(base, 'home');
     root = join(home, '.claude');
@@ -217,7 +271,7 @@ describe('panel-agent actions: sandbox', () => {
     registerConfigRoutes(app, ctx);
     registerEntityRoutes(app, ctx);
     registerScriptRoutes(app, ctx);
-    registerSandboxRoutes(app, ctx);
+    registerSandboxRoutes(app, ctx, { corePort: () => core.port });
     registerPanelAgentRoutes(app, ctx, { hub: createEventHub(), pending, access });
     await app.ready();
   });
@@ -393,16 +447,25 @@ describe('panel-agent actions: sandbox', () => {
     expect(data.answer).not.toContain(SECRET);
     expect(data.tools).toEqual(['Write']);
     expect(data.files).toContain('answer.txt');
-    expect(data.costUsd).toBe(0.0123);
+    // Подписка, не API: ядро цены хода не называет.
+    expect(data.costUsd).toBe(0);
 
-    const [launch] = launches();
-    expect(launch?.prompt).toBe('Сколько будет 6×7?');
-    // Каталог конфигурации — песочница, не настоящий ~/.claude; слои — только `user`.
+    // Панель CLI мимо ядра не запускала: вопрос — одна задача ядра.
+    expect(launches()).toEqual([]);
+    const asked = core.estimates[0]!;
+    expect(core.estimates).toHaveLength(1);
+    expect(asked.request).toBe('Сколько будет 6×7?');
+    // Без брифа ядра и только источник человека: проекта и предков у песочницы нет.
+    expect(asked.session).toMatchObject({
+      brief: 'none',
+      sources: 'user',
+      env: ['CLAUDE_CONFIG_DIR'],
+    });
+    // Каталог конфигурации — песочница, не настоящий ~/.claude.
+    const [launch] = seen;
+    expect(core.envs[0]?.CLAUDE_CONFIG_DIR).toBe(launch?.configDir);
     expect(launch?.configDir.startsWith(sandboxes())).toBe(true);
     expect(launch?.cwd.startsWith(sandboxes())).toBe(true);
-    const flag = launch?.argv.indexOf('--setting-sources') ?? -1;
-    expect(flag).toBeGreaterThanOrEqual(0);
-    expect(launch?.argv[flag + 1]).toBe('user');
     expect(launch?.credentials).toBe(true);
     expect(launch?.md).toContain('Отвечай в две строки.');
     expect(launch?.md).not.toContain('НИКОГДА-НЕ-В-ПЕСОЧНИЦУ');
@@ -417,20 +480,25 @@ describe('panel-agent actions: sandbox', () => {
     expect(result.message).toContain('no access to the account');
     expect(result.message).toContain('The temporary sandbox was removed.');
     expect(launches()).toEqual([]);
+    expect(core.estimates).toHaveLength(0);
     expect(leftovers()).toEqual([]);
   });
 
   it('sandbox_ask: потолок времени останавливает прогон маршрутом «Стоп»', async () => {
-    // Потолок — после того, как поддельный CLI записал свой запуск: под нагрузкой
-    // всего набора 1,5 с не хватало, и проверка видела ноль запусков.
-    const restore = setSandboxAskBudgetForTests(6_000);
+    // Ход не кончается сам: «Стоп» маршрута — команда ядру `cancel` с причиной песочницы.
+    coreWith({ hold: true });
+    const restore = setSandboxAskBudgetForTests(2_000);
     try {
       const { result } = await decided('sandbox_ask', { question: 'HANG please' }, 'approve');
       expect(result.outcome).toBe('done');
       const data = result.result as { note?: string; answer: string };
       expect(data.note).toContain('Stopped after');
       expect(data.answer).toBe('');
-      expect(launches()).toHaveLength(1);
+      expect(seen).toHaveLength(1);
+      expect(core.calls.find((c) => c.kind === 'cancel')?.fields).toEqual({
+        reason: SANDBOX_STOP_REASON,
+      });
+      expect(launches()).toEqual([]);
       expect(leftovers()).toEqual([]);
     } finally {
       restore();

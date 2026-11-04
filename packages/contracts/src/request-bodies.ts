@@ -5,7 +5,6 @@ import {
   number,
   array,
   record,
-  unknown,
   union,
   tuple,
   literal,
@@ -105,15 +104,6 @@ export type ChatSendBody = Infer<typeof chatSendBodySchema>;
 export const autoApproveBodySchema = object({ enabled: boolean().optional() }).optional();
 export type AutoApproveBody = Infer<typeof autoApproveBodySchema>;
 
-/** Запрос прав от мини-MCP-сервера: какой инструмент и с чем пришёл. */
-export const permissionRequestBodySchema = object({
-  runId: string().min(1),
-  toolName: string().min(1),
-  input: unknown(),
-  toolUseId: string(),
-});
-export type PermissionRequestBody = Infer<typeof permissionRequestBodySchema>;
-
 /** Решение человека по запросу прав (клик «Разрешить»/«Запретить»). */
 export const permissionDecisionBodySchema = object({
   toolUseId: string().min(1),
@@ -135,22 +125,6 @@ export const deferredDecisionBodySchema = object({
   via: zodEnum(['web', 'mobile', 'telegram']).optional(),
 });
 export type DeferredDecisionBody = Infer<typeof deferredDecisionBodySchema>;
-
-/**
- * Ответ человека воротам ветки. `copy` — завести копию с веткой и продолжить
- * разговор в ней, `here` — писать в основной копии (до конца прогона больше не
- * спрашивать), `stop` — отклонить саму правку.
- *
- * Имя ветки приходит от человека: панель его лишь предложила. Проверяет имя git
- * (`check-ref-format`) — здесь только форма поля, иначе отказ звучал бы дважды и
- * по-разному.
- */
-export const branchDecisionBodySchema = object({
-  toolUseId: string().min(1),
-  choice: zodEnum(['copy', 'here', 'stop']),
-  branch: string().optional(),
-});
-export type BranchDecisionBody = Infer<typeof branchDecisionBodySchema>;
 
 /**
  * Git: каталог приходит путём. Сам путь (абсолютный, существует, каталог) проверяет

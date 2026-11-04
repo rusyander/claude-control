@@ -43,7 +43,7 @@ describe('action-kit', () => {
    * хотя английская сторона двуязычных данных менялась.
    */
   it('stateCard: пустой ru-дифф при непустом en — карточка, а не отказ', () => {
-    const summary = summaryText('summary-group-copy', { name: 'a', copy: 'b' });
+    const summary = summaryText('summary-update-cli');
     const card = stateCard('state.json: x', { title: 'Шаг' }, { title: 'Шаг' }, summary, [], {
       before: { title: 'Step' },
       after: { title: 'Step two' },

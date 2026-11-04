@@ -1,5 +1,5 @@
 import { gitBaseArgs } from './encoding.ts';
-import { currentOs, factReason, hasValue, type OsKind } from './os-kind.ts';
+import { currentOs, factReason, hasValue, sleep, type OsKind } from './os-kind.ts';
 import { longForm, pathKey } from './paths.ts';
 import type { ProcessIdentity } from './process-table.ts';
 import { listeningPorts, listWorktrees } from './resource-scan.ts';
@@ -18,6 +18,30 @@ export type ReleaseResult = { verified: string } | { leak: string };
 export function releaseTmp(path: string): ReleaseResult {
   const removed = removeVerified(path);
   return removed.removed ? { verified: `${path} absent` } : { leak: removed.reason };
+}
+
+/** Срок, за который уходящие потомки CLI отпускают каталог, бывший их cwd. */
+export const TMP_SETTLE_MS = 10_000;
+const TMP_BUSY = /\b(EBUSY|EPERM|EACCES|ENOTEMPTY)\b/;
+
+/**
+ * Временный каталог, который был cwd сессии: на Windows его держат потомки CLI (MCP-серверы,
+ * хост), уходящие ещё секунды после выхода самого CLI, — `rmdir` даёт EBUSY, и короткий повтор
+ * `removeVerified` (≈0,4 с) не дожидается (замер: задача «ask» на живом claude, 3 из 3).
+ * Снятие повторяется с паузой в пределах срока; иная причина и истёкший срок — `leak` как был,
+ * «снято» — только по чтению назад.
+ */
+export async function releaseTmpSettled(
+  path: string,
+  settleMs = TMP_SETTLE_MS,
+  pauseMs = 250,
+): Promise<ReleaseResult> {
+  const deadline = Date.now() + settleMs;
+  for (;;) {
+    const got = releaseTmp(path);
+    if ('verified' in got || !TMP_BUSY.test(got.leak) || Date.now() >= deadline) return got;
+    await sleep(pauseMs);
+  }
 }
 
 export async function releaseWorktree(

@@ -248,8 +248,12 @@ describe.runIf(haveCli)('P58 socket stub through the real docker CLI', { timeout
       socketExists: () => true,
       setTimer: slack,
     });
+    // Под нагрузкой общего прогона сам docker.exe не укладывается в 8 с на мёртвом канале — это
+    // тот же мёртвый движок, другой словами; свойство теста — engine-down, а не absent.
     expect(got).toMatchObject({
-      unknown: expect.stringMatching(/^engine-down: docker: server not answering/),
+      unknown: expect.stringMatching(
+        /^engine-down: docker: (server not answering|timeout after \d+ ms)/,
+      ),
     });
   });
   it('only a Podman socket answers → engine found through the socket, kind podman', async () => {

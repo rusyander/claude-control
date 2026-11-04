@@ -28,7 +28,6 @@ export function ProviderChatProjects({
   providerId,
   providerName,
   onStart,
-  isStarting,
 }: ProviderChatProjectsProps) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
@@ -117,7 +116,7 @@ export function ProviderChatProjects({
             variant="secondary"
             leftIcon={<Icon name="plus" size={16} />}
             onClick={() => onStart(row.path)}
-            disabled={Boolean(row.problem) || isStarting}
+            disabled={Boolean(row.problem)}
             aria-label={t('providerChat.projects.startHereLabel', {
               provider: providerName,
               name: row.name,

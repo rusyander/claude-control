@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { machineStateLabel } from '@entities/CoreTask';
 import { Badge } from '@shared/ui/badge';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -42,7 +43,7 @@ export function SessionLine({ session, spend }: SessionLineProps) {
       <Typography variant="caption" color="muted" as="span" data-session-route={session.route.id}>
         {t('coreTimeline.timeline.sessionRoute', { route: session.route.id })}
       </Typography>
-      <Badge tone="neutral">{session.state}</Badge>
+      <Badge tone="neutral">{machineStateLabel(t, 'session', session.state)}</Badge>
       {spend && (
         <Typography variant="caption" as="span" data-session-tokens={tokenTotal(spend.tokens)}>
           {t('coreTimeline.timeline.tokens', {

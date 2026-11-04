@@ -37,4 +37,23 @@ describe('validateSearch', () => {
     });
     expect(validateSearch({ project: '' })).toEqual({});
   });
+
+  it('CLI нового чата ядра доезжает до формы; пустой и числовой отброшены', () => {
+    expect(validateSearch({ cli: 'qwen', project: 'C:/w/app' })).toEqual({
+      cli: 'qwen',
+      project: 'C:/w/app',
+    });
+    expect(validateSearch({ cli: '' })).toEqual({});
+    expect(validateSearch({ cli: 3 })).toEqual({});
+  });
+
+  it('продолжаемый разговор (`?resume=`) доезжает до формы чата ядра как есть; пустой отброшен', () => {
+    const id = '0d3c2b1a-9e8f-4a7b-8c6d-5e4f3a2b1c0d';
+    expect(validateSearch({ resume: id, cli: 'claude', project: 'C:/w/app' })).toEqual({
+      resume: id,
+      cli: 'claude',
+      project: 'C:/w/app',
+    });
+    expect(validateSearch({ resume: '' })).toEqual({});
+  });
 });

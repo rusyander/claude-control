@@ -14,10 +14,8 @@ import { builtinKitDir } from './service.ts';
  *     после сжатия: это и есть чтение — гейт не взводится, следующая правка проходит.
  * F5: «полный гейт уже прогнан» — ключ по скрипту гейта и его аргументам, а не по строке команды:
  *     `timeout 900`, `NODE_OPTIONS=…`, `./`, кавычки, `cd <тот же каталог> &&`, `cd пакет && node ../scripts/…`
- *     — тот же гейт (раньше — новый гейт или вовсе не гейт).
- * F11: первый вызов каждого нового разговора — `cat .agent/PROGRESS.md; cat .agent/run/notebook.agent.md`
- *     (16 тыс.), отказ общим текстом и чтение тех же файлов через Read. Заметки уже лежат во вводной панели
- *     вверху разговора — отказ теперь говорит это прямо; без вводной или после сжатия — прежний текст.
+ *     — тот же гейт (раньше — новый гейт или вовсе не гейт). Правило сессии: после зелёного гейта и правок
+ *     повтор — «уже прогнан», полный гейт ещё раз только в доставке (стадий группы в хуке больше нет).
  */
 
 // AGENTDECK_KIT_UNDER_TEST — копия набора для прогона «красный до» против старого кода; без неё — встроенный.
@@ -43,10 +41,7 @@ function hook(event: string, payload: object, env: NodeJS.ProcessEnv = {}): Hook
       AGENTDECK_KIT_VARIANT: '',
       AGENTDECK_KIT_STATE: STATE,
       AGENTDECK_KIT_CLI: '',
-      AGENTDECK_GROUP_STAGE: '',
-      AGENTDECK_GROUP_DELIVER_AHEAD: '',
-      AGENTDECK_HEAVY_QUEUE_DIR: '',
-      AGENTDECK_SPLIT_CHILD: '',
+      AGENTDECK_STEP_KIND: '',
       ...env,
     },
     timeout: 15_000,
@@ -75,7 +70,7 @@ describe('F3 rule-injector: после сжатия окно правила пр
   const copy = mkdtempSync(join(process.cwd(), 'node_modules', '.kit-g9-review-'));
   mkdirSync(join(copy, '.git'), { recursive: true });
   afterAll(() => rmSync(copy, { recursive: true, force: true }));
-  const CHILD = { AGENTDECK_SPLIT_CHILD: '1', AGENTDECK_USER_MEMORY_OFF: '1' };
+  const CHILD = { AGENTDECK_STEP_KIND: 'implement' };
   const UI = join(copy, 'inst-admin-ui/src/pages/users/CreateRolePage/index.tsx');
   const input = { file_path: UI, old_string: 'a', new_string: 'b' };
   const editPre = (session: string, tp: string) =>
@@ -159,7 +154,7 @@ describe('F3 rule-injector: после сжатия окно правила пр
       CHILD,
     );
     expect(decision(look)).toBeUndefined();
-    expect(ctx(look)).toContain('card (split group');
+    expect(ctx(look)).toContain('card (task step');
     compact();
     const start = hook(
       'session',
@@ -209,49 +204,48 @@ describe('F5 gate-at-end: переписанный вызов гейта — т�
     timestamp: stamp(-59_000),
     message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content }] },
   });
-  // g9 09:42: гейт тестов прогнан, затем 22 правки.
+  // g9 09:42: гейт тестов прогнан, затем 22 правки; сообщение — не доставка.
   const ran = [
-    { type: 'user', timestamp: stamp(-120_000), message: { role: 'user', content: 'доставь' } },
+    { type: 'user', timestamp: stamp(-120_000), message: { role: 'user', content: 'сделай' } },
     call('Bash', { command: GATE }, 'r1'),
     done('r1', 'rc=0 OK inst-admin-ui'),
     call('Edit', { file_path: 'inst-admin-ui/src/a.ts' }, 'e1'),
     done('e1', 'ok'),
   ];
-  const gate = (command: string, stage: string) =>
-    hook(
-      'pre',
-      {
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command },
-        tool_use_id: `g${++n}`,
-        cwd: repo,
-        transcript_path: transcript(ran),
-        session_id: `g9r-${n}`,
-      },
-      { AGENTDECK_GROUP_STAGE: stage, AGENTDECK_HEAVY_QUEUE_DIR: dir },
-    );
+  const gate = (command: string) =>
+    hook('pre', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command, run_in_background: true },
+      tool_use_id: `g${++n}`,
+      cwd: repo,
+      transcript_path: transcript(ran),
+      session_id: `g9r-${n}`,
+    });
   const reworded = [
     'timeout 900 node scripts/check_frontend_tests.mjs > .agent/tmp/t2.log 2>&1; echo rc=$?',
-    'CI=1 FORCE_COLOR=0 node ./scripts/check_frontend_tests.mjs 2>&1 | tail -40',
     'node "scripts/check_frontend_tests.mjs" > .agent/tmp/t3.log',
     `cd ${repo.split('\\').join('/')} && node scripts/check_frontend_tests.mjs > x.log 2>&1`,
     'cd inst-admin-ui && node ../scripts/check_frontend_tests.mjs > ../x.log 2>&1',
   ];
 
-  it('10:05–10:48 доставки: каждое переписанное написание — «уже прогнан в этой доставке»', () => {
+  it('10:05–10:48: каждое переписанное написание — «уже прогнан»', () => {
     for (const command of reworded) {
-      const out = gate(command, 'deliver');
+      const out = gate(command);
       expect(decision(out), command).toBe('deny');
       expect(reason(out), command).toContain('already ran');
     }
+    // Обрезанный вывод отклоняется раньше, своим текстом — но это тоже гейт.
+    const cut = gate('CI=1 FORCE_COLOR=0 node ./scripts/check_frontend_tests.mjs 2>&1 | tail -40');
+    expect(decision(cut)).toBe('deny');
+    expect(reason(cut)).toContain('whole output');
   });
 
   it('другие аргументы — другой прогон; соседний скрипт гейта — первый прогон', () => {
     expect(
-      reason(gate('node scripts/check_frontend_tests.mjs --only inst-admin-ui > x.log', 'deliver')),
+      reason(gate('node scripts/check_frontend_tests.mjs --only inst-admin-ui > x.log')),
     ).not.toContain('already ran');
-    expect(reason(gate('node scripts/check_frontend.mjs > x.log 2>&1', 'deliver'))).not.toContain(
+    expect(reason(gate('node scripts/check_frontend.mjs > x.log 2>&1'))).not.toContain(
       'already ran',
     );
   });
@@ -259,94 +253,26 @@ describe('F5 gate-at-end: переписанный вызов гейта — т�
   it('гейт без скрипта: `cd <тот же каталог> && …` — тот же гейт, `cd пакет && …` — другой', () => {
     const FULL = 'pnpm type-check && pnpm lint && pnpm test';
     const tp = transcript([
-      { type: 'user', timestamp: stamp(-120_000), message: { role: 'user', content: 'доставь' } },
+      { type: 'user', timestamp: stamp(-120_000), message: { role: 'user', content: 'сделай' } },
       call('Bash', { command: FULL }, 'r2'),
       done('r2', 'rc=0'),
       call('Edit', { file_path: 'inst-admin-ui/src/a.ts' }, 'e2'),
       done('e2', 'ok'),
     ]);
     const run = (command: string) =>
-      hook(
-        'pre',
-        {
-          hook_event_name: 'PreToolUse',
-          tool_name: 'Bash',
-          tool_input: { command },
-          tool_use_id: `g${++n}`,
-          cwd: repo,
-          transcript_path: tp,
-          session_id: `g9r-${n}`,
-        },
-        { AGENTDECK_GROUP_STAGE: 'deliver', AGENTDECK_HEAVY_QUEUE_DIR: dir },
-      );
+      hook('pre', {
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Bash',
+        tool_input: { command, run_in_background: true },
+        tool_use_id: `g${++n}`,
+        cwd: repo,
+        transcript_path: tp,
+        session_id: `g9r-${n}`,
+      });
     const same = run(`cd ${repo.split('\\').join('/')} && ${FULL}`);
     expect(decision(same), reason(same)).toBe('deny');
     expect(reason(same)).toContain('already ran');
     expect(reason(run(`cd inst-admin-ui && ${FULL}`))).not.toContain('already ran');
-  });
-});
-
-describe('F11 bash-read-cap: заметки из вводной панели — отказ называет вводную, а не Read', () => {
-  const repo = mkdtempSync(join(dir, 'notes-'));
-  mkdirSync(join(repo, '.agent', 'run'), { recursive: true });
-  writeFileSync(join(repo, '.agent', 'PROGRESS.md'), '- done line\n'.repeat(750), 'utf8');
-  writeFileSync(
-    join(repo, '.agent', 'run', 'notebook.agent.md'),
-    '- step line\n'.repeat(580),
-    'utf8',
-  );
-  const CAT = 'cat .agent/PROGRESS.md; cat .agent/run/notebook.agent.md';
-  const brief = prompt(
-    [
-      'Новый разговор группы.',
-      '## Notebook .agent/run/notebook.agent.md',
-      '- step line',
-      '## Notebook .agent/PROGRESS.md',
-      '- done line',
-    ].join('\n'),
-  );
-  const read = (records: object[], command = CAT) =>
-    hook(
-      'pre',
-      {
-        hook_event_name: 'PreToolUse',
-        tool_name: 'Bash',
-        tool_input: { command },
-        tool_use_id: `c${++n}`,
-        cwd: repo,
-        transcript_path: transcript(records),
-        session_id: `g9r-${n}`,
-      },
-      { AGENTDECK_SPLIT_CHILD: '1' },
-    );
-
-  it('первый вызов после вводной: отказ говорит, что заметки уже вверху разговора', () => {
-    const out = read([brief]);
-    expect(decision(out)).toBe('deny');
-    expect(reason(out)).toContain('.agent/PROGRESS.md, .agent/run/notebook.agent.md');
-    expect(reason(out)).toContain(
-      "the panel's brief at the top of this conversation already carries",
-    );
-    expect(reason(out)).not.toContain('Read the file with Read');
-  });
-
-  it('без вводной, после сжатия и для чужого файла рядом — прежний общий отказ', () => {
-    const plain = read([prompt('продолжай')]);
-    const compacted = read([
-      brief,
-      { type: 'system', subtype: 'compact_boundary' },
-      prompt('дальше'),
-    ]);
-    writeFileSync(join(repo, 'big.md'), 'x'.repeat(9000), 'utf8');
-    const mixed = read([brief], 'cat .agent/PROGRESS.md big.md');
-    // Заголовок вводной сверяется целой строкой: `.agent/PROGRESS` — не `.agent/PROGRESS.md`.
-    writeFileSync(join(repo, '.agent', 'PROGRESS'), 'y'.repeat(9000), 'utf8');
-    const prefix = read([brief], 'cat .agent/PROGRESS');
-    for (const out of [plain, compacted, mixed, prefix]) {
-      expect(decision(out)).toBe('deny');
-      expect(reason(out)).toContain('Read the file with Read');
-      expect(reason(out)).not.toContain("the panel's brief");
-    }
   });
 });
 

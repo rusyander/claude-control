@@ -61,17 +61,17 @@ const DECK_OPEN = {
  * КОДОМ, текст живёт в словаре, — поэтому прогон ждёт на экране слова словаря, а
  * не свою строку: иначе он проверял бы собственную фикстуру.
  */
-const REASON = 'Шлюз панели выключен, а запрос в контур идёт через него';
+const REASON = 'Ни активного контура, ни профиля эндпоинта — рисовать некому';
 const IMAGE_LOCKED = {
   available: false,
-  reason: 'gateway-off',
+  reason: 'no-route',
   title: '',
   model: '',
   promptSent: false,
 };
 const DECK_LOCKED = {
   available: false,
-  reason: 'gateway-off',
+  reason: 'no-route',
   title: '',
   model: '',
   pdf: { available: false, reason: 'no-browser' },

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatRun } from '../../chat/ChatRunner/ChatRunner.ts';
+import { TestsCoreRun } from '../agent/core-run.ts';
 import { ProjectTestsLockedError } from '../files.ts';
 import { ProjectTestRunRegistry } from './runs.ts';
 import { createGroup, upsertCase } from '../store/store.ts';
@@ -32,7 +32,9 @@ describe('project-tests/runs: второй запуск', () => {
   });
 
   it('пока идёт прогон — 409 с id идущего', async () => {
-    const start = vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    const start = vi
+      .spyOn(TestsCoreRun.prototype, 'start')
+      .mockImplementation(() => new Promise<void>(() => {}));
     const first = registry.start(
       { projectPath: root, mode: 'generate', groupId: 'gui' },
       '2026-09-26T00:00:00.000Z',
@@ -62,7 +64,9 @@ describe('project-tests/runs: второй запуск', () => {
    * оставлял её на диске. Теперь папку заводит реестр после своих отказов.
    */
   it('отказанный старт генерации с e2e папку не заводит, принятый — заводит', async () => {
-    const start = vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    const start = vi
+      .spyOn(TestsCoreRun.prototype, 'start')
+      .mockImplementation(() => new Promise<void>(() => {}));
     registry.start({ projectPath: root, mode: 'run', groupId: 'gui' }, '2026-09-26T00:00:00.000Z');
     await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(1));
     const ensured: string[] = [];
@@ -98,7 +102,7 @@ describe('project-tests/runs: второй запуск', () => {
    * реестр проектов стенда хранит `c:\work\…`. Точный `Map.get` их не видел.
    */
   it('замок виден и по другому написанию того же пути', async () => {
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(() => new Promise<void>(() => {}));
     const first = registry.start(
       { projectPath: root, mode: 'generate', groupId: 'gui' },
       '2026-09-26T00:00:00.000Z',
@@ -121,7 +125,9 @@ describe('project-tests/runs: второй запуск', () => {
    * портом. Так обычный прогон набора оставлял живые процессы CLI.
    */
   it('остановленный до старта CLI прогон CLI не запускает', async () => {
-    const start = vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async () => undefined);
+    const start = vi
+      .spyOn(TestsCoreRun.prototype, 'start')
+      .mockImplementation(() => new Promise<void>(() => {}));
     registry.start({ projectPath: root, mode: 'run', groupId: 'gui' }, '2026-09-26T00:00:00.000Z');
     expect(registry.stop(root)).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 300));

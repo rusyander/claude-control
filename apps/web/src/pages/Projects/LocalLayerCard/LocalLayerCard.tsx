@@ -9,10 +9,11 @@ import { Typography } from '@shared/ui/typography';
 import { useProjectLocalLayer, useSetLocalLayerMode } from '@entities/Project';
 import styles from './LocalLayerCard.module.scss';
 
-type LayerState = 'used' | 'no-config' | 'off' | 'no-gain' | 'broken';
+type LayerState = 'used' | 'untrusted' | 'no-config' | 'off' | 'no-gain' | 'broken';
 
 const TONE: Record<LayerState, BadgeTone> = {
   used: 'success',
+  untrusted: 'warning',
   'no-config': 'neutral',
   off: 'neutral',
   'no-gain': 'neutral',
@@ -20,7 +21,8 @@ const TONE: Record<LayerState, BadgeTone> = {
 };
 
 function stateOf(status: LocalLayerStatus): LayerState {
-  if (status.used) return 'used';
+  // Слой — содержимое репозитория: в недоверенную папку ядро его не везёт, и ход отказан (F-86).
+  if (status.used) return status.folderTrust === 'untrusted' ? 'untrusted' : 'used';
   if (status.reason === 'no-config' || status.reason === 'off' || status.reason === 'broken')
     return status.reason;
   return 'no-gain';
@@ -63,9 +65,16 @@ export function LocalLayerCard({ projectId }: { projectId: string }) {
         <Typography variant="caption" color="subtle" className={styles.measure}>
           {t('localLayer.intro')}
         </Typography>
-        <Typography variant="body-sm" data-testid="local-layer-reason">
-          {t(`localLayer.reason.${data.reason}`)}
-        </Typography>
+        {/* «Чаты идут на слое» в недоверенной папке — неправда: ход отказан, пока нет доверия. */}
+        {state === 'untrusted' ? (
+          <Typography variant="body-sm" data-testid="local-layer-untrusted">
+            {t('localLayer.untrusted')}
+          </Typography>
+        ) : (
+          <Typography variant="body-sm" data-testid="local-layer-reason">
+            {t(`localLayer.reason.${data.reason}`)}
+          </Typography>
+        )}
         {data.error ? (
           <Typography variant="body-sm" color="danger">
             {data.error}

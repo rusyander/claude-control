@@ -8,6 +8,7 @@
  *   node tools/core-linux.mjs --mutants plan.json  # мутанты POSIX-свойств по копии в контейнере
  *   node tools/core-linux.mjs --coverage-out <file>  # весь набор + карта покрытия Linux наружу
  *   node tools/core-linux.mjs --engine src/conductor/services.test.ts  # + движок хоста (09:48)
+ *   node tools/core-linux.mjs --clis src/adapters/gemini  # + Gemini CLI, Kimi CLI, Cursor Agent (этап 10)
  *
  * `--engine` (фаза 3, сервисы в контейнерах): образ `agentdeck-core-linux:22-engine` — тот же
  * плюс docker CLI — и сокет движка хоста внутрь (`/var/run/docker.sock`, группа 0 для
@@ -48,6 +49,13 @@ const args = process.argv.slice(2);
 const rebuild = args.includes('--rebuild');
 const withEngine = args.includes('--engine');
 const ENGINE_IMAGE = `${IMAGE}-engine`;
+// `--clis` — образ с CLI, которых нет на машине разработки (этап 10): Gemini CLI (npm),
+// Kimi Code (установщик вендора; прежний `kimi-cli` из PyPI вендор закрыл), Cursor Agent
+// (установщик вендора, версию не прибить). Версии прибиты в имени образа: сменилась — новый
+// образ строится сам, запись потока живого CLI годится, только пока известно, чем она снята.
+const withClis = args.includes('--clis');
+const CLI_PINS = { gemini: '0.66.0', kimi: '2.4.1' };
+const CLIS_IMAGE = `${IMAGE}-clis-g${CLI_PINS.gemini}-k${CLI_PINS.kimi}`;
 // `--mutants <plan.json>` — прогон плана мутантов в контейнере (core-linux-mutants.mjs).
 const mutantsAt = args.indexOf('--mutants');
 const mutantPlan =
@@ -61,7 +69,8 @@ const valued = new Set(
   [mutantsAt, coverageAt].filter((at) => at >= 0).flatMap((at) => [at, at + 1]),
 );
 const vitestArgs = args.filter(
-  (arg, index) => arg !== '--rebuild' && arg !== '--engine' && !valued.has(index),
+  (arg, index) =>
+    arg !== '--rebuild' && arg !== '--engine' && arg !== '--clis' && !valued.has(index),
 );
 
 function docker(argv, options = {}) {
@@ -117,6 +126,33 @@ function ensureEngineImage() {
   }
 }
 
+/** Образ с чужими CLI поверх основного (третий хранимый). Установки — от `node`, как у человека. */
+function ensureClisImage() {
+  const present = docker(['image', 'inspect', CLIS_IMAGE, '--format', '{{.Id}}']).status === 0;
+  if (present && !rebuild) return;
+  const dockerfile = [
+    `FROM ${IMAGE}`,
+    'RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*',
+    `RUN npm i -g @google/gemini-cli@${CLI_PINS.gemini} && npm cache clean --force`,
+    'USER node',
+    'ENV PATH=/home/node/.local/bin:/home/node/.kimi-code/bin:$PATH',
+    `RUN curl -fsSL https://code.kimi.com/kimi-code/install.sh | KIMI_VERSION=${CLI_PINS.kimi} bash`,
+    'RUN curl -fsS https://cursor.com/install | bash',
+    'USER root',
+    'LABEL agentdeck.purpose="core-linux-tests-clis"',
+    '',
+  ].join('\n');
+  console.log(`[core-linux] building ${CLIS_IMAGE} (kept for next runs)`);
+  const built = docker(['build', '-t', CLIS_IMAGE, '-'], {
+    input: dockerfile,
+    stdio: ['pipe', 'inherit', 'inherit'],
+  });
+  if (built.status !== 0) {
+    console.error('[core-linux] clis image build failed');
+    process.exit(2);
+  }
+}
+
 function quote(arg) {
   return `'${arg.replace(/'/g, `'\\''`)}'`;
 }
@@ -140,6 +176,11 @@ const PANEL_ENTRIES = [
   'apps/server/src/routes/core-proxy/__fixtures__/proxy-host.ts',
   'apps/server/src/lib/dev-watch.mjs',
   'apps/server/src/lib/dev-boot-probe.mjs',
+  // Мост панели вопроса ядра (`bootstrap/ask.integration.test.ts`): MCP SDK он берёт из
+  // зависимостей `apps/server` — они в контейнере ставятся (`--filter @agentdeck/server...`).
+  'tools/mcp/panel.mjs',
+  // `tests-cli delivery` процессом (`publish-wiring/delivery.cli.integration.test.ts`).
+  'tools/tests-cli.mjs',
 ];
 
 /**
@@ -252,6 +293,14 @@ if (mutation) {
 }
 ensureImage();
 if (withEngine) ensureEngineImage();
+if (withClis) ensureClisImage();
+if (withClis && withEngine) {
+  console.error('[core-linux] --clis and --engine are separate images; pick one');
+  process.exit(2);
+}
+let runImage = IMAGE;
+if (withEngine) runImage = ENGINE_IMAGE;
+if (withClis) runImage = CLIS_IMAGE;
 // Сокет — путь внутри ВМ движка (Docker Desktop), не путь Windows: node передаёт его как есть.
 const engineArgs = withEngine
   ? ['-v', '/var/run/docker.sock:/var/run/docker.sock', '--group-add', '0']
@@ -277,7 +326,7 @@ const child = spawn(
     ...(mutantPlan ? ['-e', `MUTANT_PLAN=${mutantPlan}`] : []),
     ...engineArgs,
     '-i',
-    withEngine ? ENGINE_IMAGE : IMAGE,
+    runImage,
     'bash',
     '-c',
     containerScript(),

@@ -27,7 +27,15 @@ import {
   ProjectTestManualRegistry,
   ProjectTestRunRegistry,
 } from '../../../domains/project-tests/project-tests.ts';
-import { PlatformGateway } from '../../../domains/platform/gateway/listener/listener.ts';
+import {
+  adoptUserGatewayPort,
+  createCoreGatewayView,
+  type CoreGatewayView,
+} from '../../../domains/platform/gateway-view/gateway-view.ts';
+import {
+  listeningGateway,
+  memoryContours,
+} from '../../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
 import { registerProjectTestsRoutes } from '../../project-tests-routes/project-tests-routes.ts';
 import { registerPlatformRoutes } from '../../platform-routes/platform-routes.ts';
@@ -35,6 +43,10 @@ import { describeProviders } from '../../../providers/registry.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
 import { registerProjectRoutes } from '../../project-routes/project-routes.ts';
 import { TEST_ACTIONS } from './actions-tests.ts';
+import {
+  fakeCorePort,
+  type FakeCorePort,
+} from '../../../domains/project-tests/agent/__fixtures__/fake-core-port.ts';
 import { WORK_ACTIONS } from '../actions-work/actions-work.ts';
 
 /** Содержимое папки целиком: путь → sha256. Равенство до и после = ничего не записано. */
@@ -50,9 +62,11 @@ function snapshot(root: string): Record<string, string> {
 
 /**
  * Действия «Тестирование» (А5) на настоящих маршрутах раздела тестов и
- * настоящих файлах проекта `.agent/tests/`. Запуск агента тестов идёт в
- * ФАЛЬШИВЫЙ `claude` на PATH; доказательство — снимок процесса, файл группы,
- * черновик и запись прогона на диске, а не текст ответа действия.
+ * настоящих файлах проекта `.agent/tests/`. Запуск агента тестов — задача ядра
+ * на управляемом порте ядра (`fakeCorePort`); ФАЛЬШИВЫЙ `claude` на PATH держит
+ * определение провайдера и ловит запуск CLI мимо ядра (снимка процесса быть не
+ * должно). Доказательство — оценка задачи ядра, файл группы, черновик и запись
+ * прогона на диске, а не текст ответа действия.
  */
 const isWindows = process.platform === 'win32';
 const ORIGIN = 'http://localhost:8888';
@@ -93,8 +107,9 @@ describe('panel-agent actions: tests', () => {
   let hub: EventHub;
   let frames: Array<Record<string, unknown>>;
   let pending: PanelPendingActions;
-  let gateway: PlatformGateway;
+  let gateway: CoreGatewayView;
   let runs: ProjectTestRunRegistry;
+  let core: FakeCorePort;
   let app: FastifyInstance;
   const savedPath = process.env.PATH;
   const savedDump = process.env.CC_FAKE_DUMP;
@@ -174,8 +189,17 @@ describe('panel-agent actions: tests', () => {
     frames = [];
     hub.subscribe((payload) => frames.push(JSON.parse(payload) as Record<string, unknown>));
     pending = new PanelPendingActions(10_000);
-    gateway = new PlatformGateway();
+    // Шлюз контуров держит ядро (этап 10, C3d): панель видит его через учёт контуров ядра, шлюз
+    // человека «слушает» на 5179 (трафика нет), порт уезжает в состояние, как с первым опросом.
+    const contours = memoryContours();
+    contours.setUserGateway(listeningGateway(5_179));
+    adoptUserGatewayPort(store, 5_179);
+    gateway = createCoreGatewayView({ store, appDataDir: appData, contours });
     runs = new ProjectTestRunRegistry();
+    // Агент тестов — задача ядра (этап 10, F6): подменена граница процесса ядра, реестр прогонов
+    // и `TestsCoreRun` идут своим путём.
+    core = fakeCorePort();
+    runs.setCorePort(core.port);
     const ctx = {
       store,
       location: { paths: { root: appData, appData } },
@@ -202,7 +226,6 @@ describe('panel-agent actions: tests', () => {
   afterEach(async () => {
     pending.cancelAll();
     runs.stop(projectDir);
-    await gateway.stop();
     await app.close();
     process.env.PATH = savedPath;
     if (savedDump === undefined) delete process.env.CC_FAKE_DUMP;
@@ -322,6 +345,7 @@ describe('panel-agent actions: tests', () => {
       expect(snapshot(outside)).toEqual(before);
       // Агент тестов не запускался: фальшивый CLI оставил бы снимок процесса.
       expect(existsSync(dumpFile)).toBe(false);
+      expect(core.estimates).toHaveLength(0);
     } finally {
       rmSync(outside, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     }
@@ -514,6 +538,7 @@ describe('panel-agent actions: tests', () => {
     await decide(card.id, 'reject');
     expect((await running).json<PanelActionResult>().outcome).toBe('rejected');
     expect(existsSync(dumpFile)).toBe(false);
+    expect(core.estimates).toHaveLength(0);
     expect((await view()).run).toBeUndefined();
     expect(existsSync(join(testsDir(), 'runs'))).toBe(false);
   });
@@ -531,6 +556,7 @@ describe('panel-agent actions: tests', () => {
     expect(env.message).toContain('no-such-env');
     expect(await listPending()).toEqual([]);
     expect(existsSync(dumpFile)).toBe(false);
+    expect(core.estimates).toHaveLength(0);
   });
 
   it('run_tests: approve запускает агента тестов — процесс, запись прогона на диске', async () => {
@@ -550,18 +576,20 @@ describe('panel-agent actions: tests', () => {
     });
     const runId = (result.result as { run: { id: string } }).run.id;
 
-    // Дождаться, пока фальшивый CLI отработает и реестр допишет запись.
+    // Дождаться, пока ход задачи ядра кончится и реестр допишет запись.
     for (let attempt = 0; attempt < 100; attempt += 1) {
       if ((await view()).run?.status !== 'running') break;
       await new Promise((done) => setTimeout(done, 100));
     }
-    const dump = JSON.parse(readFileSync(dumpFile, 'utf8')) as { cwd: string; stdin: string };
+    // Панель свой CLI не запускает: прогон — задача ядра на корне проекта с отбором в задании.
+    expect(existsSync(dumpFile)).toBe(false);
+    expect(core.calls.some((c) => c.kind === 'launch')).toBe(true);
+    const asked = core.estimates[0]!;
     // Панель канонизирует путь проекта (realpath): на Windows временный каталог
-    // приходит коротким именем 8.3 (`LONGNA~1`), а процесс получает длинное.
-    // Сравниваем канонические формы обеих сторон — это один и тот же каталог.
+    // приходит коротким именем 8.3 (`LONGNA~1`). Сравниваем канонические формы.
     const canonical = (path: string): string => realpathSync.native(path).toLowerCase();
-    expect(canonical(dump.cwd)).toBe(canonical(projectDir));
-    expect(dump.stdin).toContain('gui-002');
+    expect(canonical(asked.repos[0]!.path)).toBe(canonical(projectDir));
+    expect(asked.request).toContain('gui-002');
     const last = (await call('last_run', { projectPath: projectDir })).json<PanelActionResult>();
     expect(last.result).toMatchObject({ run: { id: runId, mode: 'run' } });
   });
@@ -594,6 +622,7 @@ describe('panel-agent actions: tests', () => {
       messageCode: 'stale_preview',
     });
     expect(existsSync(dumpFile)).toBe(false);
+    expect(core.estimates).toHaveLength(0);
     expect((await view()).run).toBeUndefined();
   });
   it('list_test_runs / read_test_run / lint_tests — история и замечания маршрутами раздела', async () => {

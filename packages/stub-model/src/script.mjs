@@ -177,8 +177,9 @@ function checkUsage(usage) {
 }
 
 const toolPart = (tool, name) => {
-  knownKeys(tool, ['name', 'args', 'id'], name);
+  knownKeys(tool, ['name', 'args', 'id', 'namespace'], name);
   optionalString(tool.id, `${name}.id`);
+  optionalString(tool.namespace, `${name}.namespace`);
   if (typeof tool?.name !== 'string' || !tool.name)
     throw new TypeError(`stub-model: ${name}.name is required`);
   return {
@@ -186,6 +187,7 @@ const toolPart = (tool, name) => {
     name: tool.name,
     args: tool.args ?? {},
     ...(tool.id ? { id: tool.id } : {}),
+    ...(tool.namespace ? { namespace: tool.namespace } : {}),
   };
 };
 

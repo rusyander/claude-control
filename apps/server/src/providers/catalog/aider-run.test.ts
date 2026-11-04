@@ -1,11 +1,7 @@
-import { EventEmitter } from 'node:events';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { runProviderCli } from '../../domains/assistant-runner/cli.ts';
-import type { RunAssistantDeps } from '../../domains/assistant-runner/assistant-runner.ts';
-import { ProviderChatRun } from '../../domains/provider-chat/ProviderChatRun/ProviderChatRun.ts';
 import { getProvider } from '../registry.ts';
 import {
   aiderOneShotArgs,
@@ -183,116 +179,10 @@ describe('aider: каталог и путь ассистента', () => {
     const assistant = getProvider('aider').assistant;
     expect(assistant?.apiKind).toBe('openai');
     expect(assistant?.apiKeyEnvVars).toEqual(['OPENAI_API_KEY']);
-    expect(assistant?.apiBaseUrl).toBeUndefined();
+    // Адрес вендора — из фактов CLI (`packages/providers/src/aider.ts`, документация OpenAI API).
+    expect(assistant?.apiBaseUrl).toBe('https://api.openai.com/v1');
     expect(assistant?.editsControl).toBe('flag');
     expect(assistant?.parseStdout).toBe(createAiderStdoutParser);
     expect(assistant?.oneShotEnv?.()).toEqual(aiderOneShotEnv());
-  });
-
-  it('ассистент формы: каталог запуска → --no-git, окружение UTF-8 и разбор stdout дошли до CLI', async () => {
-    const workdir = realpathSync.native(mkdtempSync(join(tmpdir(), 'aider-assist-')));
-    const calls: { args: string[]; env?: NodeJS.ProcessEnv; cwd?: string }[] = [];
-    const spawnImpl = ((
-      _cmd: string,
-      args: string[],
-      options: { env?: NodeJS.ProcessEnv; cwd?: string },
-    ) => {
-      calls.push({ args, env: options.env, cwd: options.cwd });
-      const child = new EventEmitter() as EventEmitter & {
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-        stdin: { write: () => void; end: () => void; on: () => void };
-        kill: () => void;
-      };
-      child.stdout = new EventEmitter();
-      child.stderr = new EventEmitter();
-      child.stdin = { write: () => {}, end: () => {}, on: () => {} };
-      child.kill = () => child.emit('close', null);
-      setTimeout(() => {
-        child.stdout.emit('data', Buffer.from(crlf(fixture('git-dry-mention'))));
-        child.emit('close', 0);
-      }, 0);
-      return child;
-    }) as unknown as RunAssistantDeps['spawnImpl'];
-    try {
-      const result = await runProviderCli(
-        getProvider('aider'),
-        'Скажи привет',
-        { appDataDir: workdir, spawnImpl },
-        process.execPath,
-        workdir,
-      );
-      expect(result.ok).toBe(true);
-      expect(result.reply).toBe('Привет! Ответ заглушки: «ёлка» — 42.\n\nВторая строка ответа.');
-      expect(calls).toHaveLength(1);
-      expect(calls[0]?.cwd).toBe(workdir);
-      expect(calls[0]?.args).toContain('--no-git');
-      expect(calls[0]?.args).toContain('--dry-run');
-      expect(calls[0]?.env?.PYTHONUTF8).toBe('1');
-    } finally {
-      rmSync(workdir, { recursive: true, force: true });
-    }
-  });
-});
-
-describe('aider: чат панели (ProviderChatRun) доносит каталог, правки, окружение и разбор', () => {
-  type SpawnImpl = Parameters<ProviderChatRun['start']>[0]['spawnImpl'];
-  let root = '';
-  afterEach(() => {
-    if (root) rmSync(root, { recursive: true, force: true });
-    root = '';
-  });
-
-  const runIn = async (workdir: string, allowEdits: boolean) => {
-    const calls: { line: string; env?: NodeJS.ProcessEnv }[] = [];
-    const spawnImpl = ((command: string, args: string[], options: { env?: NodeJS.ProcessEnv }) => {
-      calls.push({ line: [command, ...args].join(' '), env: options.env });
-      const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
-      child.stdout = new EventEmitter();
-      child.stderr = new EventEmitter();
-      child.stdin = { write: () => {}, end: () => {}, on: () => {} };
-      child.kill = () => child.emit('close', null);
-      setTimeout(() => {
-        (child.stdout as EventEmitter).emit('data', Buffer.from(crlf(fixture('git-dry-mention'))));
-        child.emit('close', 0);
-      }, 0);
-      return child;
-    }) as unknown as SpawnImpl;
-    const events: { type: string; reply?: string }[] = [];
-    await new ProviderChatRun().start(
-      {
-        provider: getProvider('aider'),
-        history: [{ id: 'm1', role: 'user', content: 'Вопрос', at: '2026-01-01T00:00:00.000Z' }],
-        chatId: 'chat',
-        appDataDir: root,
-        detect: () => true,
-        spawnImpl,
-        workdir,
-        permission: { allowEdits },
-      },
-      (event) => events.push(event as { type: string; reply?: string }),
-    );
-    return { call: calls[0], done: events.find((event) => event.type === 'done') };
-  };
-
-  it('каталог-репозиторий: git включён; без репозитория: --no-git; ответ разобран', async () => {
-    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'aider-pchat-')));
-    const repo = join(root, 'repo');
-    const plain = join(root, 'plain');
-    mkdirSync(join(repo, '.git'), { recursive: true });
-    mkdirSync(plain, { recursive: true });
-
-    const inRepo = await runIn(repo, true);
-    expect(inRepo.call?.line).toContain('--yes-always');
-    // Подстрока «--no-git» есть и в «--no-gitignore» — ищем флаг целиком.
-    expect(inRepo.call?.line).not.toMatch(/--no-git(?![\w-])/);
-    expect(inRepo.call?.env?.PYTHONUTF8).toBe('1');
-    expect(inRepo.done?.reply).toBe(
-      'Привет! Ответ заглушки: «ёлка» — 42.\n\nВторая строка ответа.',
-    );
-
-    const outside = await runIn(plain, false);
-    expect(outside.call?.line).toContain('--dry-run');
-    expect(outside.call?.line).toMatch(/--no-git(?![\w-])/);
   });
 });

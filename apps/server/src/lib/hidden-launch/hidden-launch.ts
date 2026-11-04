@@ -1,0 +1,91 @@
+import { spawn } from 'node:child_process';
+
+/**
+ * Запуск долгоживущего процесса на Windows через скрытую консоль: сервер моделей и ядро задач,
+ * которое панель поднимает сама (надзор `domains/core-supervisor`).
+ *
+ * Прямой `spawn(..., { detached: true })` даёт процессу DETACHED_PROCESS — у
+ * сервера моделей нет консоли вовсе, и каждый его служебный процесс (поиск видеокарт —
+ * полтора десятка за запуск у Ollama, замер 08.10) заводит СВОЮ консоль. При
+ * Windows Terminal по умолчанию это вкладка на каждый: живой замер 08.10 —
+ * 15 вкладок за запуск, поиск видеокарт 50 с вместо 3, потому что каждый
+ * процесс ждал открытия своей вкладки.
+ *
+ * Поэтому промежуточный PowerShell: панель поднимает его со скрытой консолью
+ * (windowsHide), он — сервер моделей через Start-Process -WindowStyle Hidden, и сервер с
+ * его детьми живут в той же невидимой консоли. Внук панели не попадает в её
+ * задание (libuv ставит SILENT_BREAKAWAY_OK), так что сервер переживает
+ * перезапуск панели так же, как прежде с detached.
+ */
+
+/** Строка в одинарных кавычках PowerShell: внутри удваивается только `'`. */
+export function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Аргумент командной строки Windows по правилам CommandLineToArgvW: `Start-Process
+ * -ArgumentList` склеивает элементы пробелом как есть, без кавычек. Пробел или `"` —
+ * в кавычки; `"` внутри — `\"`; обратные косые перед кавычкой и в конце удваиваются.
+ */
+function winArg(value: string): string {
+  if (value !== '' && !/[\s"]/.test(value)) return value;
+  const escaped = value
+    .replace(/(\\*)"/g, (_match, slashes: string) => `${slashes}${slashes}\\"`)
+    .replace(/(\\+)$/, '$1$1');
+  return `"${escaped}"`;
+}
+
+/** Скрипт PowerShell: запустить, перенаправить вывод, напечатать номер процесса. */
+export function hiddenLaunchScript(
+  binary: string,
+  args: string[],
+  log: { out: string; err: string },
+  cwd?: string,
+): string {
+  const list = args.length
+    ? ` -ArgumentList ${args.map((arg) => psQuote(winArg(arg))).join(',')}`
+    : '';
+  return (
+    `$p = Start-Process -FilePath ${psQuote(binary)}${list}${cwd ? ` -WorkingDirectory ${psQuote(cwd)}` : ''} -WindowStyle Hidden -PassThru ` +
+    `-RedirectStandardOutput ${psQuote(log.out)} -RedirectStandardError ${psQuote(log.err)}; ` +
+    `[Console]::Out.Write($p.Id)`
+  );
+}
+
+/** Запустить и вернуть номер процесса самого сервера (не PowerShell). */
+export function launchHidden(
+  binary: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  log: { out: string; err: string },
+  cwd?: string,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', hiddenLaunchScript(binary, args, log, cwd)],
+      { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    let out = '';
+    let err = '';
+    child.stdout.on('data', (chunk: Buffer) => (out += String(chunk)));
+    child.stderr.on('data', (chunk: Buffer) => (err += String(chunk)));
+    child.once('error', reject);
+    child.once('exit', (code) => {
+      const pid = Number(out.trim());
+      if (code === 0 && Number.isInteger(pid) && pid > 0) resolve(pid);
+      else reject(new Error(err.trim() || `powershell exited ${code ?? -1}`));
+    });
+  });
+}
+
+/** Жив ли процесс: сигнал 0 ничего не шлёт, только проверяет. */
+export function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}

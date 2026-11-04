@@ -11,7 +11,7 @@ export const phoneSigningEn: typeof phoneSigningRu = {
   phoneOnly:
     'Pairing a phone and switching the mode on or off happen on the phone only: Settings → Link → Decision signing. Here you see the state and can revoke a key: an “enable” button in this window could be pressed by modified code of the window itself.',
   whileOn:
-    'While the mode is on, “Allow” from the panel window and from Telegram does not go through — answer from the phone. Changes that loosen the rights of every future decision (auto mode in every chat, auto-approve rules, group permissions, settings import) are refused: switch signing off on the phone, make the change, then switch it back on.',
+    'While the mode is on, “Allow” from the panel window and from Telegram does not go through — answer from the phone. Changes that loosen the rights of every future decision (auto mode in every chat, group permissions, settings import) are refused: switch signing off on the phone, make the change, then switch it back on.',
   noDeviceOn:
     'The mode is on but no paired phone is left: nobody can “Allow” right now. To switch the mode off without a phone, delete this file on this computer',
   devices: 'Paired phones',
@@ -31,4 +31,10 @@ export const phoneSigningEn: typeof phoneSigningRu = {
     'This is the last paired phone and the mode is on: after revoking, nobody can “Allow”. Without a phone the mode can be switched off only by deleting the file {{path}} on this computer.',
   revoked: 'The phone’s key is revoked.',
   loadError: 'Could not read the signing mode — the server did not answer.',
+  coreTitle: 'Keys in the task core',
+  coreExplain:
+    'The task core checks phone signatures with its own keys. Copy the bound keys and this machine’s number there — then answers to core questions from the phone are accepted. Repeat after binding or revoking a key.',
+  coreAdopt: 'Copy keys to the core',
+  coreAdopted: 'The core accepted keys: {{count}}.',
+  coreAdoptFailed: 'The core did not accept the keys: {{reason}}',
 };

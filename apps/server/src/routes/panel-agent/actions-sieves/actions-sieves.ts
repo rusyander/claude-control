@@ -46,7 +46,7 @@ const readSievesAction = definePanelAction({
   section: 'settings',
   risk: 'read',
   description:
-    'Pre-MR sieves of split groups (Settings → Groups): the built-in checks every group reports ' +
+    'Pre-MR sieves of groups (Settings → Groups): the built-in checks every group reports ' +
     'before its MR, the sieves the panel learned from reviewer threads of past MRs (class, scope, ' +
     'trigger, check, how often seen) and the monthly tally per blocker class — escaped = a blocker ' +
     'a reviewer found in an MR, caught = one the panel stopped before the MR. A learned sieve is ' +

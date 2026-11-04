@@ -116,8 +116,8 @@ Big docs survive because every pass defers them. Deferring is not allowed twice.
 
 Covers `.agent/*.md`, `project-profile.md`, memory, kept audits (`TASKS.md` → own limit,
 `references/tasks-md.md`); `CLAUDE.md`, loaded every turn, keeps the tighter ≤6 KB of §1. Enforced by `doc-bloat-guard` + `doc-size-guard`; mirrored in
-`hooks/lib/doc-policy.mjs` `BUDGET` — change both or neither. Own skills: `SKILL.md` ≤8 KB, ≤16 KB as
-an index over ≥3 `references/` (≤16 KB each; `doc-bloat-guard` silent up to 16 KB) — canon `tools/skills-audit.mjs`, skill `agentdeck-kit:skill-authoring` §7.
+`hooks/lib/doc-policy.mjs` `BUDGET` — change both or neither. Own skills: `SKILL.md` ≤8 KB, ≤20 KB as
+an index over ≥3 `references/` (≤20 KB each; `doc-bloat-guard` silent up to 20 KB) — canon `tools/skills-audit.mjs`, skill `agentdeck-kit:skill-authoring` §7.
 
 `doc-bloat-guard` warns once per size plateau; a repeat means the file GREW, and silence is not
 approval — the daily revision still lists it.

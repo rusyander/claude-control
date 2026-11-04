@@ -1,7 +1,6 @@
 import { inputSchemaOf, MODEL_TOOL_NAMES } from '@agentdeck/contracts/core/model-tools';
 import {
   startStubModel,
-  type DialectId,
   type StepFn,
   type StepContext,
   type StepLike,
@@ -22,7 +21,7 @@ import {
   stepFor,
   TURN_END_TEXT,
 } from './__fixtures__/script.ts';
-import type { Move, StubTask } from './__fixtures__/stub-tasks.types.ts';
+import type { Move, StubTask, TaskDialect } from './__fixtures__/stub-tasks.types.ts';
 
 /**
  * Каждая задача обслуживается каждым своим протоколом через общую заглушку (P120): разговор
@@ -44,7 +43,7 @@ interface Vocabulary {
 }
 
 /** Имена встроенных — как их объявляют Claude Code (messages) и Qwen Code (chat); responses — общий вид. */
-const VOCAB: Record<DialectId, Vocabulary> = {
+const VOCAB: Record<TaskDialect, Vocabulary> = {
   'anthropic-messages': {
     path: '/v1/messages',
     write: { name: 'Write', pathKey: 'file_path' },
@@ -105,7 +104,7 @@ interface Conversation {
 }
 
 function conversation(
-  dialect: DialectId,
+  dialect: TaskDialect,
   system: string,
   user: string,
   tools: Decl[],
@@ -355,7 +354,7 @@ describe('stub tasks over the shared stub model', () => {
   });
 
   /** Инструменты ядра отложены: в списке их нет, CLI называет их только в промпте. */
-  function deferredStart(dialect: DialectId, extra: Decl) {
+  function deferredStart(dialect: TaskDialect, extra: Decl) {
     const task = STUB_TASKS.find((t) => t.id === 'happy-path')!;
     const vocab = VOCAB[dialect];
     const own = new Set(MODEL_TOOL_NAMES.map((t) => vocab.core(t)));

@@ -6,6 +6,7 @@ import { loopHooks } from './loop.ts';
 import { observerHooks } from './observer.ts';
 import { startLoops, type Loops } from './loops.ts';
 import { requirementsHooks } from './requirements.ts';
+import { reviewLinkHooks, reviewLinkWiringFor } from './review-link.ts';
 import { scenarioHooks, type ScenarioWiringDeps } from './scenario.ts';
 import { processPin } from './session-start.ts';
 import { splitEnvFor, splitHooks } from './split.ts';
@@ -29,6 +30,8 @@ export const ZONE_ORDER: readonly ZoneHooks[] = [
   userLayerHooks,
   observerHooks,
   guardHooks,
+  // Ревью по ссылке (этап 10, F8) — раньше публикатора: итог в MR и «не пушить» решаются здесь.
+  reviewLinkHooks,
   publishHooks,
   loopHooks,
 ];
@@ -50,7 +53,10 @@ export function stepInventory(deps: ConductorWiringDeps): ScenarioWiringDeps['us
 
 export function startConductor(deps: ConductorWiringDeps): ConductorHandle {
   const zoneDeps: ScenarioWiringDeps = { userLayerInventory: stepInventory(deps), ...deps };
-  const hooks = ZONE_ORDER.map((zone) => zone(zoneDeps));
+  // Опись слоя нужна только сценарию; остальные зоны получают сами `deps`: их проводки
+  // (`publishWiringFor`, `splitEnvFor`, `reviewLinkWiringFor`) — одна на объект `deps`, и ручка
+  // ниже обязана держать ту же, что крючки (иначе `publish-now` двигал бы чужую очередь).
+  const hooks = ZONE_ORDER.map((zone) => (zone === scenarioHooks ? zone(zoneDeps) : zone(deps)));
   deps.note('conductor.started', { zones: hooks.length });
   let loops: Loops | null = null;
   return {
@@ -59,6 +65,8 @@ export function startConductor(deps: ConductorWiringDeps): ConductorHandle {
     split: splitEnvFor(deps),
     // Та же проводка, что у `publishHooks(deps)`: `publish-now` двигает очередь, которой ждут попытки.
     publisher: publishWiringFor(deps).commands,
+    // Та же проводка, что у `reviewLinkHooks(deps)`: ручка открывает задачу, крючки её ведут.
+    reviewLink: reviewLinkWiringFor(deps),
     start() {
       if (loops || deps.loop === false || !deps.adapters) return;
       loops = startLoops({
@@ -71,6 +79,7 @@ export function startConductor(deps: ConductorWiringDeps): ConductorHandle {
         options: deps.loop ?? {},
         ...(deps.economy ? { economy: deps.economy } : {}),
         ...(deps.measureBase ? { measureBase: deps.measureBase } : {}),
+        ...(deps.taskEnv ? { taskEnv: deps.taskEnv } : {}),
       });
     },
     running: () => loops?.running() ?? [],

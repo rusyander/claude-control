@@ -1,13 +1,5 @@
 /** События, на которые Дека отвечает реакцией (`mascot.react.<род>`). */
-export type ReactionKind =
-  | 'linkLost'
-  | 'linkBack'
-  | 'runFailed'
-  | 'groupFailed'
-  | 'groupStopped'
-  | 'limitHit'
-  | 'longDone'
-  | 'groupDelivered';
+export type ReactionKind = 'linkLost' | 'linkBack' | 'runFailed' | 'limitHit' | 'longDone';
 
 /** Что Дека помнит о прошлых реакциях: когда говорил и какой формулировкой. */
 export interface ReactionMemory {

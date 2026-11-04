@@ -18,6 +18,8 @@ import {
   type MachineDef,
 } from './states.ts';
 import { HOOK_OBSERVATIONS_MAX, hookObservationSchema } from './user-layer.ts';
+import { GRANT_OPS } from './grant-ops.ts';
+import { sessionCarryShape } from './session-carry.ts';
 
 /**
  * Данные каждого вида события журнала, версия 1 (01 §Journal). Каждый объект строгий: лишнее
@@ -86,6 +88,8 @@ export const ACTION_KINDS = [
   'mr-create',
   'mr-update',
   'thread-reply',
+  /** Отдельная заметка в MR (не ответ в нить): итог ревью по ссылке, этап 10 F8. */
+  'mr-comment',
   'tracker-write',
   'container-start',
   'container-remove',
@@ -155,7 +159,7 @@ export const LAUNCH_POLICIES = ['confirm', 'auto'] as const;
 export const STEP_END_BASES = ['claimed', 'derived', 'core', 'not-implemented', 'human'] as const;
 export const OVERRIDE_SCOPES = ['task', 'unit', 'step'] as const;
 export const COMMAND_TIMINGS = ['safe-point', 'now'] as const;
-export const GRANT_OPS = ['edit', 'exec-db'] as const;
+export { GRANT_OPS };
 /**
  * Отчёт пишется в конце задачи. `ready-to-publish` писали задачи до публикатора (фаза 6, G8):
  * значение остаётся, чтобы старые журналы читались; новые строки его не пишут.
@@ -163,6 +167,39 @@ export const GRANT_OPS = ['edit', 'exec-db'] as const;
 export const REPORT_POINTS = ['ended', 'ready-to-publish'] as const;
 
 const gitSha = z.string().regex(/^[0-9a-f]{40,64}$/);
+
+/** Имя переменной окружения задачи — форма имени POSIX, без значения. */
+export const taskEnvNameSchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,127}$/);
+
+/**
+ * Настройки сеанса чата от вызывающего (этап 10, F6) — то, что прежний исполнитель панели делал
+ * сам, а ядро без них потеряло бы:
+ * - `env` — ИМЕНА переменных пина задачи. Значения приходят телом оценки и живут только в памяти
+ *   ядра (книга окружения задачи): в журнал, `state.json` и логи не пишутся никогда, перезапуск
+ *   ядра их теряет — сеанс без них отказан по имени, а не запущен на окружении ядра.
+ *   `CLAUDE_CONFIG_DIR` среди них — каталог конфигурации песочницы вместо каталога человека.
+ * - `brief: 'none'` — без брифа ядра: песочница проверяет правила и навыки человека, и строка
+ *   ядра в системном промпте подмешалась бы к проверяемому.
+ * - `sources: 'user'` — CLI грузит только источник человека (дом конфигурации пина): рабочая
+ *   папка песочницы лежит под домом человека, и слой проекта с инструкциями предков подхватил бы
+ *   его настоящие `CLAUDE.md`. Переходник без этого умения — отказ дороги по имени.
+ * - `scope` — границы правки сеанса: правка вне `edit` (маски от корня) и команды с префиксом
+ *   argv из `denyCommands` отказываются судьёй права ядра и пишутся в журнал (агент тестов).
+ * - дописка, плагины, сужение источников/навыков/MCP/инструментов (G6) — `session-carry.ts`.
+ */
+export const taskSessionSchema = z.strictObject({
+  ...sessionCarryShape,
+  env: z.array(taskEnvNameSchema).min(1).max(32).optional(),
+  brief: z.enum(['none']).optional(),
+  sources: z.enum(['user']).optional(),
+  scope: z
+    .strictObject({
+      edit: z.array(z.string().min(1).max(500)).min(1).max(64),
+      denyCommands: z.array(z.array(z.string().min(1).max(100)).min(1).max(4)).max(32),
+    })
+    .optional(),
+});
+export type TaskSession = z.infer<typeof taskSessionSchema>;
 
 export const JOURNAL_DATA_V1 = {
   'task.created': z.strictObject({
@@ -188,6 +225,77 @@ export const JOURNAL_DATA_V1 = {
      * Нет поля — `false`: молчание не разрешает платить.
      */
     paidOnRefusal: z.boolean().optional(),
+    /** Язык вопросов, которые ядро пишет само (вопрос запуска); нет поля — английский (P32). */
+    lang: z.enum(['ru', 'en']).optional(),
+    /**
+     * Этап 10: работа в основной папке проекта по гранту человека (06:98). Нет поля — копия;
+     * грант пишется строкой `grant.given` с тем же `cmdId`, что у оценки.
+     */
+    placement: z.enum(['copy', 'in-place', 'scratch']).optional(),
+    /**
+     * Чат на месте в папке без git (s10 G12 p7, паритет с прежним чатом панели): корень разговора.
+     * `repos` у такой задачи пуст — закрепить нечего; копии, ветки и MR нет, работа — в самой папке.
+     */
+    folder: z.string().min(1).max(1000).optional(),
+    /**
+     * Лёгкая сессия «ask» (этап 10, F2, `placement: 'scratch'`): инструменты и потребитель контура;
+     * мост панели — только адрес и разговор. Токен моста в журнал не пишется никогда.
+     */
+    ask: z
+      .strictObject({
+        tools: z.enum(['none', 'panel-bridge']),
+        consumer: z
+          .string()
+          .regex(/^[a-z][a-z0-9-]{0,39}$/)
+          .optional(),
+        bridge: z
+          .strictObject({
+            url: z.string().min(1),
+            conversation: z.string().min(1).optional(),
+          })
+          .optional(),
+        /** Картинки первого слова — файлы каталога задачи; содержимого в журнале нет. */
+        images: z
+          .array(
+            z.strictObject({
+              name: z.string().min(1).max(200),
+              mediaType: z.enum(['image/png', 'image/jpeg', 'image/gif', 'image/webp']),
+              file: z.string().regex(/^ask-images\/\d{1,2}\.(png|jpg|gif|webp)$/),
+              bytes: z.number().int().positive(),
+            }),
+          )
+          .min(1)
+          .max(8)
+          .optional(),
+      })
+      .optional(),
+    /**
+     * Этап 10, F2: разговор CLI, начатый не ядром, который чат продолжает. Просьба, а не факт:
+     * первая сессия шага чата продолжает его, только если переходник подтвердил транскрипт для
+     * этого корня (`CliAdapter.ownsTranscript`); иначе сессия отказана с кодом `resume_*`.
+     */
+    resume: z
+      .strictObject({
+        adapter: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+        conversationId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
+      })
+      .optional(),
+    /** Этап 10, F6: настройки сеанса чата от вызывающего — см. `taskSessionSchema`. */
+    session: taskSessionSchema.optional(),
+    /**
+     * Этап 10, F8: ревью MR по ссылке (`review-link@1`). Личность MR от форжа и база диффа ревью —
+     * общий предок целевой ветки и головы MR: ревьюер видит изменения MR, а не всё от начала копии.
+     */
+    review: z
+      .strictObject({
+        url: z.string().min(1).max(2000),
+        mrIid: z.number().int().positive(),
+        forge: z.enum(['gitlab', 'github']),
+        sourceBranch: z.string().min(1).max(300),
+        targetBranch: z.string().min(1).max(300),
+        reviewBase: gitSha,
+      })
+      .optional(),
   }),
   'task.transition': transition(TASK_MACHINE, 'taskId'),
   'task.ended': z.strictObject({ outcome: z.enum(['done', 'cancelled', 'failed']) }),

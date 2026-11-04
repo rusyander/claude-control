@@ -12,7 +12,11 @@ import {
  * и тумблер отскакивал; импорт снимка терял связи чатов и спаренные телефоны.
  */
 describe('settings-validation: поля аудита', () => {
-  it('PATCH принимает инициативы чата, а удалённый доступ по-прежнему отбрасывает', () => {
+  /**
+   * Тумблер разделения снят (этап 10, G14), а прежний клиент (телефон, вкладка
+   * старой версии) шлёт его в PATCH: запрос проходит, поле отбрасывается.
+   */
+  it('PATCH принимает инициативы чата, а удалённый доступ и снятый тумблер разделения отбрасывает', () => {
     const parsed = settingsPatchSchema.safeParse({
       taskSplitInitiative: true,
       handoffInitiative: false,
@@ -23,7 +27,7 @@ describe('settings-validation: поля аудита', () => {
     });
     expect(parsed.success).toBe(true);
     if (parsed.success) {
-      expect(parsed.data.taskSplitInitiative).toBe(true);
+      expect('taskSplitInitiative' in parsed.data).toBe(false);
       expect(parsed.data.handoffContextLimit).toBe(150_000);
       expect(parsed.data.deliverToMr).toBe(false);
       // Единственный писатель удалённого доступа — /api/remote.

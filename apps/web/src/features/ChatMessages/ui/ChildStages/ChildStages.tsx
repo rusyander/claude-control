@@ -2,23 +2,14 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
 import { useTickingNow } from '../../lib/useTickingNow';
-import { SplitOverlapPanel } from '../SplitOverlapPanel/SplitOverlapPanel';
-import { PlanCancel } from '../PlanCancel/PlanCancel';
-import { StatusAsk } from '../StatusAsk/StatusAsk';
-import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
 import { HubSummary } from '../HubSummary/HubSummary';
-import { HubDeferred } from '../HubDeferred/HubDeferred';
 import { RetiredChats } from '../RetiredChats/RetiredChats';
 import { GroupCard } from '../GroupCard/GroupCard';
-import { SplitFollowUps } from '../SplitFollowUps/SplitFollowUps';
-import { TriageChip } from '../TriageChip/TriageChip';
 import type { ChildStagesProps } from '../ChildStages.types';
 import styles from './ChildStages.module.scss';
 import { hubCardKey } from '../../lib/hubCardKey';
 import { orderHubGroups } from '../../lib/orderHubGroups';
 import { countedGroups } from '../../lib/countedGroups';
-import { triageElapsedMs } from '../../lib/triageElapsedMs';
-import { triageLive } from '../../lib/triageLive';
 
 /**
  * Сводка групп разделения в родительском разговоре: кто на каком звене и чем
@@ -30,9 +21,8 @@ import { triageLive } from '../../lib/triageLive';
  * группа, и пройденные звенья подписаны подряд: «план › работа › ревью»
  * читается за секунду.
  *
- * Действий три: открыть звено (в этом же окне — каталог у разговора свой,
- * вкладка копии не нужна), остановить или продолжить ВСЁ дерево разом и
- * ответить на вопрос разбора (Т1) группе, у которой чата ещё нет. Разом —
+ * Действий два: открыть звено (в этом же окне — каталог у разговора свой,
+ * вкладка копии не нужна) и остановить или продолжить ВСЁ дерево разом. Разом —
  * потому что по одному не выходит: пока человек гасит третий чат, у первого
  * уже стартовало ревью. Пауза живёт на сервере и глушит там же автостарты, так
  * что кнопка лишь показывает состояние и нажимается.
@@ -44,15 +34,7 @@ export function ChildStages({
   onPauseAll,
   onResumeAll,
   treeBusy,
-  onAnswerHold,
-  holdBusy,
-  onRelease,
-  releaseBusy,
-  onCheckOverlap,
-  overlapBusy,
   sectionsOpen = false,
-  onResumeInterrupted,
-  resumeInterruptedBusy,
   foreign,
   providerId,
   questions,
@@ -61,7 +43,7 @@ export function ChildStages({
   onPermissionDecide,
 }: ChildStagesProps) {
   const { t } = useTranslation();
-  // Время разбора и всего разделения тикает, только пока что-то идёт.
+  // Время групп тикает, только пока что-то идёт.
   const now = useTickingNow(groups.some((group) => group.isRunning));
   if (groups.length === 0) return null;
 
@@ -70,11 +52,9 @@ export function ChildStages({
   // В работе — сверху, законченные — ниже (G2): ждущая ответа группа не тонет
   // под доставленными.
   const live = orderHubGroups(groups.filter((group) => !group.retired));
-  const interrupted = live.filter((group) => group.interrupted).length;
   const paused = tree?.paused;
   const canPause = !paused && (tree?.running ?? 0) > 0 && Boolean(onPauseAll);
   const canResume = Boolean(paused) && Boolean(onResumeAll);
-  const split = tree?.split;
 
   return (
     <div className={styles.card} data-child-hub>
@@ -84,16 +64,6 @@ export function ChildStages({
               групп» при одиннадцати). */}
           {t('chat.cascade.hub.title', { count: countedGroups(groups).length })}
         </Typography>
-        {/* Итог разбора — одной фишкой: применён, не получен, ещё идёт. Что
-            панель в нём поправила, видно по наведению: это оправдание её
-            самоуправства, а не новость. */}
-        {split && (
-          <TriageChip
-            triage={split.triage}
-            live={triageLive(live, tree)}
-            elapsedMs={triageElapsedMs(live, now)}
-          />
-        )}
         {paused && (
           <Typography variant="caption" color="subtle" as="span" className={styles.chip}>
             {t('chat.cascade.tree.paused')}
@@ -127,35 +97,9 @@ export function ChildStages({
             })}
           </Button>
         )}
-        {/* Оборванные группы (WP1c) — одной кнопкой: после выключения машины
-            человек не должен обходить группы по одной. */}
-        {interrupted > 0 && onResumeInterrupted && (
-          <Button
-            size="sm"
-            variant="secondary"
-            isLoading={resumeInterruptedBusy}
-            title={t('chat.cascade.hub.resumeInterruptedHint')}
-            data-resume-interrupted="all"
-            onClick={() => onResumeInterrupted()}
-          >
-            {t('chat.cascade.hub.resumeAllInterrupted', { count: interrupted })}
-          </Button>
-        )}
-        {/* «Перевести задачи» всех групп и их вложенных разделений (G4). */}
-        {split && split.groups.some((group) => group.taskKeys?.length) && (
-          <SplitTasksMove parentChatId={split.parentChatId} connected={Boolean(split.jiraTasks)} />
-        )}
-        {split && <PlanCancel split={split} />}
       </div>
 
       <HubSummary groups={live} now={now} />
-
-      {/* Вызовы D-n групп этого разделения — ответ прямо из хаба, с фильтром по группе. */}
-      {split && <HubDeferred parentChatId={split.parentChatId} onOpen={onOpen} />}
-
-      {/* Вопрос о ходе групп — в лёгкий чат со сводкой, а не в родителя (5.1).
-          Только у Claude: лёгкий чат заводит реестр прогонов Claude. */}
-      {split && !foreign && <StatusAsk parentChatId={split.parentChatId} onOpen={onOpen} />}
 
       {/* Карточки групп — с отступом друг от друга: кнопки каждой живут в её
           карточке и не читаются кнопками соседней (владелец 05.10). */}
@@ -164,47 +108,20 @@ export function ChildStages({
           <GroupCard
             key={hubCardKey(group)}
             group={group}
-            {...(split?.parentChatId ? { parentChatId: split.parentChatId } : {})}
             {...(providerId ? { providerId } : {})}
             onOpen={onOpen}
-            {...(onAnswerHold ? { onAnswerHold } : {})}
-            {...(holdBusy !== undefined ? { holdBusy } : {})}
-            {...(onRelease ? { onRelease } : {})}
-            {...(releaseBusy !== undefined ? { releaseBusy } : {})}
-            {...(onResumeInterrupted ? { onResumeInterrupted } : {})}
-            {...(resumeInterruptedBusy !== undefined ? { resumeInterruptedBusy } : {})}
             {...(onAnswer && group.chatId && questions?.has(group.chatId)
               ? { questions: questions.get(group.chatId), onAnswer }
               : {})}
             {...(onPermissionDecide && group.chatId && permissions?.has(group.chatId)
               ? { permissions: permissions.get(group.chatId), onPermissionDecide }
               : {})}
-            sectionsOpen={sectionsOpen}
           />
         ))}
       </div>
 
-      {/* Пересечения веток (Т6) — последним разделом: это вопрос ПОСЛЕ работы,
-          и до него человек добирается, уже прочитав, кто на чём стоит. Имя
-          группы берём из сводки, а не из пересечений: в них живут номера. */}
-      <SplitOverlapPanel
-        {...(split?.overlap ? { overlap: split.overlap } : {})}
-        titleOf={(index) => split?.groups[index]?.title ?? String(index + 1)}
-        {...(onCheckOverlap ? { onCheck: onCheckOverlap } : {})}
-        {...(overlapBusy !== undefined ? { busy: overlapBusy } : {})}
-        defaultExpanded={sectionsOpen}
-      />
-
-      {/* После пересечений — то, что осталось человеку: шаги и тикеты групп.
+      {/* Под карточками групп — то, что осталось человеку: шаги и тикеты групп.
           Всё под карточками групп свёрнуто до заголовков (владелец 22.10.2026). */}
-      {split && (
-        <SplitFollowUps
-          split={split}
-          defaultExpanded={sectionsOpen}
-          onOpen={onOpen}
-          {...(foreign !== undefined ? { foreign } : {})}
-        />
-      )}
 
       <RetiredChats chats={retired} onOpen={onOpen} defaultExpanded={sectionsOpen} />
     </div>

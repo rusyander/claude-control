@@ -86,5 +86,7 @@ function row(item: EnvItem, profile: ReturnType<typeof describeTarget>): Fidelit
     itemId: item.id,
     kind: item.kind,
     intent: item.intent,
+    ...(item.intentCode ? { intentCode: item.intentCode } : {}),
+    ...(item.intentParams ? { intentParams: item.intentParams } : {}),
   };
 }

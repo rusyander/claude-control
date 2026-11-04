@@ -3,6 +3,7 @@ import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Button } from '@shared/ui/button';
+import { permissionBadge } from '../../lib/permissionBadge';
 import { summarize } from '../../lib/summarize';
 import type { PermissionCardProps } from './PermissionCard.types';
 import styles from './PermissionCard.module.scss';
@@ -32,7 +33,7 @@ export function PermissionCard({ permissions, onDecide }: PermissionCardProps) {
 
       {permissions.map((permission) => (
         <div key={permission.toolUseId} className={styles.questionItem}>
-          <span className={styles.questionBadge}>{permission.toolName}</span>
+          <span className={styles.questionBadge}>{permissionBadge(permission.toolName, t)}</span>
           {permission.guard && (
             <div className={styles.permissionGuard}>
               <Icon name="lock" size={16} />

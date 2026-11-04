@@ -73,6 +73,12 @@ export function gitBaseArgs(os: OsKind = currentOs()): string[] {
   return args;
 }
 
+/**
+ * CRLF протокола (кадр SSE Gemini API — `data: …\r\n\r\n`): его задаёт провод, не ОС, и он один
+ * на всех платформах. Литерал живёт здесь (P51: концы строк пишет только `platform/encoding`).
+ */
+export const WIRE_CRLF = '\r\n';
+
 /** Перевод строки, которым уже написан текст: правка файла пользователя не меняет его концы строк. */
 export function eolOf(text: string): '\r\n' | '\n' {
   return text.includes('\r\n') ? '\r\n' : '\n';

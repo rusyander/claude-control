@@ -18,7 +18,15 @@ import { registerAccessGate } from '../../../lib/access-gate/access-gate.ts';
 import { registerEmptyBodyGuard } from '../../../lib/empty-body.ts';
 import { createEventHub, type EventHub } from '../../../lib/event-hub/event-hub.ts';
 import { allowedOrigins } from '../../../lib/origin-guard/origin-guard.ts';
-import { PlatformGateway } from '../../../domains/platform/gateway/listener/listener.ts';
+import {
+  adoptUserGatewayPort,
+  createCoreGatewayView,
+  type CoreGatewayView,
+} from '../../../domains/platform/gateway-view/gateway-view.ts';
+import {
+  listeningGateway,
+  memoryContours,
+} from '../../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import { PanelPendingActions } from '../../../domains/panel-agent/pending/pending.ts';
 import { agentJournalPath } from '../../../domains/panel-agent/journal/journal.ts';
 import { registerPlatformRoutes } from '../../platform-routes/platform-routes.ts';
@@ -93,7 +101,7 @@ describe('panel-agent actions: contour', () => {
   let hub: EventHub;
   let frames: string[];
   let pending: PanelPendingActions;
-  let gateway: PlatformGateway;
+  let gateway: CoreGatewayView;
   let app: FastifyInstance;
   let stub: Awaited<ReturnType<typeof startStub>>;
   const results: string[] = [];
@@ -103,8 +111,6 @@ describe('panel-agent actions: contour', () => {
     appData = join(root, 'agentdeck');
     mkdirSync(appData, { recursive: true });
     store = new AppStore(appData);
-    // Порт 0: живой шлюз панели на этой машине не должен увести тест к себе.
-    store.updateSettings({ platformGateway: { ...store.getSettings().platformGateway, port: 0 } });
     stub = await startStub();
     results.length = 0;
 
@@ -112,7 +118,12 @@ describe('panel-agent actions: contour', () => {
     frames = [];
     hub.subscribe((payload) => frames.push(payload));
     pending = new PanelPendingActions(10_000);
-    gateway = new PlatformGateway();
+    // Шлюз контуров держит ядро (этап 10, C3d): панель видит его через учёт контуров ядра, шлюз
+    // человека «слушает» на 5179 (трафика нет), порт уезжает в состояние, как с первым опросом.
+    const contours = memoryContours();
+    contours.setUserGateway(listeningGateway(5_179));
+    adoptUserGatewayPort(store, 5_179);
+    gateway = createCoreGatewayView({ store, appDataDir: appData, contours });
     const ctx = {
       store,
       backupDir: join(root, 'backups'),
@@ -133,7 +144,6 @@ describe('panel-agent actions: contour', () => {
 
   afterEach(async () => {
     pending.cancelAll();
-    await gateway.stop();
     await app.close();
     await stub.close();
     rmSync(root, { recursive: true, force: true });

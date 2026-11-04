@@ -62,9 +62,9 @@
       "id": "watch-skills",
       "kit": "agentdeck-kit/skills",
       "global": "skills",
-      "pattern": "^(?:watchdog|agentdeck-watchdog)/(?:scripts|references)/.+$",
+      "pattern": "^watchdog/(?:scripts|references)/.+$",
       "strict": true,
-      "portWhy": "The group-watch skills ship with the kit: scripts byte-equal to the personal copy (each resolves its layer at run time — where.mjs, panel.mjs), references ported to kit paths and neutral wording.",
+      "portWhy": "The watch skill ships with the kit: scripts byte-equal to the personal copy (each resolves its layer at run time — where.mjs), references ported to kit paths and neutral wording.",
       "kitOnlyWhy": "",
       "globalOnlyWhy": ""
     }
@@ -85,25 +85,15 @@
       "kit": "6d1f37a917589b5d",
       "global": "24635be419cb8867"
     },
-    "hooks-lib:autonomous-pick.mjs": {
-      "same": true,
-      "kit": "3667fbe1f72f4d33",
-      "global": "3667fbe1f72f4d33"
-    },
-    "hooks-lib:bash-read-cap.mjs": {
-      "same": false,
-      "kit": "cab07954b01a8457",
-      "global": "5aa8001c78bc4469"
-    },
     "hooks-lib:batch-nudge.mjs": {
       "same": false,
-      "kit": "4f4c57a892e9ec56",
-      "global": "3959c9fba803701e"
+      "kit": "9911ad6ebfa85e2a",
+      "global": "38aa27d7daa3ccbd"
     },
     "hooks-lib:bg-wait-guard.mjs": {
       "same": false,
-      "kit": "56aed681eee38f42",
-      "global": "8494ae47656d735c"
+      "kit": "2f744cf35326c14d",
+      "global": "0b31cb7b0ef0f810"
     },
     "hooks-lib:check-cost.mjs": {
       "same": false,
@@ -112,8 +102,8 @@
     },
     "hooks-lib:cmd-duration.mjs": {
       "same": false,
-      "kit": "90017c65cbc20876",
-      "global": "e56cba9a805464f2"
+      "kit": "e8f4054d32ca5d1f",
+      "global": "8dfc536859139dd7"
     },
     "hooks-lib:consent.mjs": {
       "same": false,
@@ -122,18 +112,19 @@
     },
     "hooks-lib:context-watch.mjs": {
       "same": false,
-      "kit": "39b12f7556469760",
-      "global": "79c73a22ea62d3b8"
+      "kit": "5f2005557c900042",
+      "global": "204b44d29700a8fd"
     },
     "hooks-lib:destructive-guard.mjs": {
       "same": false,
       "kit": "852656f38b3c3e71",
-      "global": "a5654c5bf580b459"
+      "global": "c9845ae62dcb0017",
+      "omits": "the owner's standing git grant extended to discards (`git checkout -- <file>` / `restore` pass unasked unless GIT_GUARD_STRICT=1) — a personal consent decision; the kit keeps asking for a discard of real work"
     },
     "hooks-lib:dispatch.mjs": {
       "same": false,
-      "kit": "51c758ea6fea4f2f",
-      "global": "7f654a05f1213c9d"
+      "kit": "2c4334dc7ee202b9",
+      "global": "62cfc2ef9c891dc1"
     },
     "hooks-lib:doc-bloat-guard.mjs": {
       "same": false,
@@ -142,13 +133,13 @@
     },
     "hooks-lib:doc-daily-review.mjs": {
       "same": false,
-      "kit": "0890aa67b9d0c9ba",
-      "global": "5d958f3a6533eb62"
+      "kit": "a0c1a724d399c5cc",
+      "global": "ab5e3edbc0db0fc4"
     },
     "hooks-lib:doc-policy.mjs": {
       "same": false,
-      "kit": "c8d5367bde1fa50b",
-      "global": "ebd274912268c465"
+      "kit": "4ed2b0c08f8c049b",
+      "global": "c0fab679bfe86800"
     },
     "hooks-lib:doc-size-guard.mjs": {
       "same": false,
@@ -157,8 +148,8 @@
     },
     "hooks-lib:forge-merge-guard.mjs": {
       "same": true,
-      "kit": "5c16a5b39f6cf27e",
-      "global": "5c16a5b39f6cf27e"
+      "kit": "16a337f651245d14",
+      "global": "16a337f651245d14"
     },
     "hooks-lib:format-on-edit.mjs": {
       "same": false,
@@ -167,13 +158,14 @@
     },
     "hooks-lib:gate-at-end.mjs": {
       "same": false,
-      "kit": "760f5c007ccf33c7",
-      "global": "84e1ff255c1b4eb6"
+      "kit": "96aecf2385f854db",
+      "global": "f21c9999b66b8a1e"
     },
     "hooks-lib:git-guard.mjs": {
       "same": false,
       "kit": "7b6dc944528a2613",
-      "global": "90a3d3d5af46b677"
+      "global": "ae8917ede7c2640f",
+      "omits": "the owner's standing git grant (every op but merge and a push onto main/master runs unasked unless GIT_GUARD_STRICT=1) — a personal consent decision; the kit keeps the consent doors A–D for every mutating op"
     },
     "hooks-lib:import-weight-guard.mjs": {
       "same": false,
@@ -185,6 +177,11 @@
       "kit": "4a579b19eefdf97c",
       "global": "806d6a3d51c7a6ab"
     },
+    "hooks-lib:lane-budget.mjs": {
+      "same": false,
+      "kit": "f5b2352e359a27d2",
+      "global": "d2fcae4d01196171"
+    },
     "hooks-lib:language-guard.mjs": {
       "same": false,
       "kit": "d0f73fb89915950e",
@@ -194,11 +191,6 @@
       "same": true,
       "kit": "59b747e867c66709",
       "global": "59b747e867c66709"
-    },
-    "hooks-lib:mr-echo-trim.mjs": {
-      "same": false,
-      "kit": "a65b62edbb107203",
-      "global": "e98f2f0843767568"
     },
     "hooks-lib:node-tmp-hint.mjs": {
       "same": true,
@@ -242,13 +234,13 @@
     },
     "hooks-lib:prompt/skill-hint.mjs": {
       "same": false,
-      "kit": "2f5a3cf75c526b90",
-      "global": "0867d2db3f865439"
+      "kit": "ec42ca35fa962841",
+      "global": "4e18dc13dc6b478a"
     },
     "hooks-lib:prompt/verify-hard-hint.mjs": {
       "same": false,
-      "kit": "d88c58dec9334f7f",
-      "global": "26faefc125e430e8"
+      "kit": "6380e5b899e5b01e",
+      "global": "878480b990bf7506"
     },
     "hooks-lib:push-sieves-scan.mjs": {
       "same": false,
@@ -277,18 +269,18 @@
     },
     "hooks-lib:review-report.mjs": {
       "same": false,
-      "kit": "9d3c21c88086b4d4",
-      "global": "7f16c6fadf79541e"
+      "kit": "09c15ab64604e694",
+      "global": "1f7e69d61c66f0fc"
     },
     "hooks-lib:review-spawn.mjs": {
       "same": false,
-      "kit": "cc27c30efd5302ef",
-      "global": "597821ab26fe0028"
+      "kit": "c2524d1f96093456",
+      "global": "5777e3d620a6d041"
     },
     "hooks-lib:rule-injector.mjs": {
       "same": false,
-      "kit": "ffe8d926a2092efe",
-      "global": "e52ea256518fb821"
+      "kit": "f3df4c4aa96f40fb",
+      "global": "05fb90e1250e27bf"
     },
     "hooks-lib:scratch-zone.mjs": {
       "same": false,
@@ -313,13 +305,13 @@
     "hooks-lib:spawn-cost-guard.mjs": {
       "same": false,
       "kit": "07a2851134a3c244",
-      "global": "42973e98361b6795",
+      "global": "2b3f3148b3fb5744",
       "omits": "the owner-file spawn grant (takeOwnerGrant/grantCovers, written by the personal agents-grant script) — the kit ships no such script, so the kit guard keeps only its session grants"
     },
     "hooks-lib:spawn-grant.mjs": {
       "same": false,
-      "kit": "5a2d440ce3fc87eb",
-      "global": "cc9f6f169cf18659",
+      "kit": "30c00e170fe90674",
+      "global": "f6ab3d45c2294bab",
       "omits": "runsGrantScript (refuses running the personal agents-grant script except -Status/-Off) — the kit ships no such script"
     },
     "hooks-lib:split-worktree.mjs": {
@@ -329,8 +321,8 @@
     },
     "hooks-lib:task-ledger.mjs": {
       "same": false,
-      "kit": "dcc1a22c70bca792",
-      "global": "d12b0d66aeddc26e"
+      "kit": "fe7e4e8bc39aba3a",
+      "global": "76db9b0d83351082"
     },
     "hooks-lib:ticket-run.mjs": {
       "same": false,
@@ -365,17 +357,17 @@
     "hooks-top:context-budget.mjs": {
       "same": false,
       "kit": "5847bad1420f8756",
-      "global": "9586afa1e27765c4"
+      "global": "4f9f7b6f13cc51a8"
     },
     "hooks-top:doc-hygiene-autoclean.mjs": {
       "same": false,
       "kit": "382311d6c651f254",
-      "global": "dc228affd392da5c"
+      "global": "3338cc7e86f6b358"
     },
     "hooks-top:postcompact-clear-advisor.mjs": {
       "same": false,
-      "kit": "97f2d26716d25bcf",
-      "global": "f80f207864725077"
+      "kit": "96d1047aab2a63bd",
+      "global": "93227bf117994495"
     },
     "hooks-top:precompact-checkpoint.mjs": {
       "same": false,
@@ -385,7 +377,7 @@
     "hooks-top:project-onboard-check.mjs": {
       "same": false,
       "kit": "cc0222d880c95ffe",
-      "global": "e6970999e338a1fe"
+      "global": "253dd9960a695981"
     },
     "rules:config-work.md": {
       "same": false,
@@ -409,8 +401,9 @@
     },
     "rules:git-writes.md": {
       "same": false,
-      "kit": "ef80452c28f4dda0",
-      "global": "c4c477e0c8df4065"
+      "kit": "fd384d6d133e0bfc",
+      "global": "a8f7c963e11c6877",
+      "omits": "the owner's standing git grant and the company-ticket Door C wording — the kit card keeps the consent doors and its generic tracker-key Door C/C′; the red-gates push block and the attribution-trailer refusal are ported"
     },
     "rules:hook-authoring.md": {
       "same": false,
@@ -449,23 +442,18 @@
     },
     "rules:verification-depth.md": {
       "same": false,
-      "kit": "eb2acb2f953654fa",
-      "global": "c9eb97e4417d0a24"
+      "kit": "afe4c63c7d1b2117",
+      "global": "e152867f83dd89de"
     },
     "rules:visible-fix-shots.md": {
       "same": false,
-      "kit": "0353808f9c4643a3",
-      "global": "f2fae42e65e8ec94"
+      "kit": "104389b9f92fd2b5",
+      "global": "53c03757a7d5aae6"
     },
     "skills:a11y-audit/SKILL.md": {
       "same": false,
       "kit": "cbbc5637ad3227f5",
       "global": "56bb845df7fbdc96"
-    },
-    "skills:agentdeck-watchdog/SKILL.md": {
-      "same": false,
-      "kit": "28cfeac1183111c7",
-      "global": "c4651238290a088d"
     },
     "skills:api-contract-sync/SKILL.md": {
       "same": false,
@@ -494,8 +482,8 @@
     },
     "skills:deep-review/SKILL.md": {
       "same": false,
-      "kit": "e791cb36c5b4ddde",
-      "global": "d3e89dec880fcb3c"
+      "kit": "c65ab778070b0485",
+      "global": "6d2e037a6aaa9d4d"
     },
     "skills:dependency-risk-review/SKILL.md": {
       "same": false,
@@ -509,8 +497,8 @@
     },
     "skills:doc-hygiene/SKILL.md": {
       "same": false,
-      "kit": "872eeee9e8aabe68",
-      "global": "975f159ca62ed4a5"
+      "kit": "48175828f702af5d",
+      "global": "6bd325e8596146d8"
     },
     "skills:docs-triage/SKILL.md": {
       "same": false,
@@ -564,7 +552,7 @@
     },
     "skills:prepare-mr/SKILL.md": {
       "same": false,
-      "kit": "9740dfdadb0c0e55",
+      "kit": "2241a81d94f903d7",
       "global": "f85a05bab5938981"
     },
     "skills:project-audit/SKILL.md": {
@@ -599,13 +587,13 @@
     },
     "skills:skill-authoring/SKILL.md": {
       "same": false,
-      "kit": "d079c8f590199da8",
-      "global": "42bfe23c0c4d800a"
+      "kit": "5acf3409a545f95a",
+      "global": "54af3c6f68dc0d9c"
     },
     "skills:skill-map/SKILL.md": {
       "same": false,
-      "kit": "c6f12a493858cce0",
-      "global": "0d05ac173ed13683"
+      "kit": "a0095711eaf13890",
+      "global": "8ff461710d2f8fcb"
     },
     "skills:stand-doctor/SKILL.md": {
       "same": false,
@@ -629,8 +617,8 @@
     },
     "skills:ticket-delivery-2/SKILL.md": {
       "same": false,
-      "kit": "0fb8f9759af015da",
-      "global": "49020561607313c4"
+      "kit": "d6cbd1cb54113bd3",
+      "global": "3f753e8067ea8de1"
     },
     "skills:ticket-delivery/SKILL.md": {
       "same": false,
@@ -649,8 +637,8 @@
     },
     "skills:watchdog/SKILL.md": {
       "same": false,
-      "kit": "bcab59d14184b3f3",
-      "global": "8ad21a0fd45ee8e1"
+      "kit": "6946161ce7061cf5",
+      "global": "9ce184792141421c"
     },
     "tools:acceptance.mjs": {
       "same": false,
@@ -660,7 +648,8 @@
     "tools:affected.mjs": {
       "same": false,
       "kit": "b54b168894adf604",
-      "global": "c958794193c81307"
+      "global": "8015e642d384c708",
+      "omits": "the gate-policy base (no --base in a gate-policy project = the unpushed delta, from ~/.claude/gate-policy/lib.mjs) — the kit ships no gate-policy layer, so its base stays origin/HEAD → origin/main …"
     },
     "tools:agents-md-choice.mjs": {
       "same": false,
@@ -699,8 +688,9 @@
     },
     "tools:mustfail.mjs": {
       "same": false,
-      "kit": "bc51046282f08025",
-      "global": "3b39cc2021708004"
+      "kit": "9fdfa8438b397102",
+      "global": "4a52624d5be1ed35",
+      "omits": "the gate-policy base (unpushed delta from ~/.claude/gate-policy/lib.mjs) — no such layer in the kit; output stays English, the kit's own login-shell pick (checkShell) and verify-ledger unlock (unlockedLedgerEnv) stay"
     },
     "tools:node-need-brief.mjs": {
       "same": false,
@@ -717,6 +707,11 @@
       "kit": "500180ea2dcc8642",
       "global": "500180ea2dcc8642"
     },
+    "tools:review-bench.mjs": {
+      "same": false,
+      "kit": "dc30045d434412e8",
+      "global": "77f4043d3e69e45b"
+    },
     "tools:review-eval.mjs": {
       "same": false,
       "kit": "2437f8518503acd1",
@@ -732,15 +727,25 @@
       "kit": "879674f305554c51",
       "global": "4180d65459b56344"
     },
+    "tools:review-merge.mjs": {
+      "same": false,
+      "kit": "ee3e24606eebe56a",
+      "global": "68446d1a558f19eb"
+    },
     "tools:review-plan.mjs": {
       "same": false,
-      "kit": "a95a5a81ff4efb5e",
-      "global": "5bd3f2c646905b37"
+      "kit": "52a94284b4374f4b",
+      "global": "c5698c3762f1cd70"
     },
     "tools:review-position.mjs": {
       "same": false,
       "kit": "4521a4cd81b9b8d9",
       "global": "e627f62d9d712139"
+    },
+    "tools:review-publish.mjs": {
+      "same": false,
+      "kit": "484940eae38a0147",
+      "global": "865b08ae9c08582b"
     },
     "tools:review-score.mjs": {
       "same": false,
@@ -749,8 +754,8 @@
     },
     "tools:review-sweep.mjs": {
       "same": false,
-      "kit": "0d64c503a366a3c5",
-      "global": "b77353e96aaebba3"
+      "kit": "7cfd163cbb63fc4e",
+      "global": "f41276a0f95f8df4"
     },
     "tools:review-sync-brief.mjs": {
       "same": false,
@@ -759,13 +764,13 @@
     },
     "tools:review-sync.mjs": {
       "same": false,
-      "kit": "5ddf179ea3bf5776",
-      "global": "1ec7f8b5dfb6d68a"
+      "kit": "820adcf511fac450",
+      "global": "e6890da08390a2fd"
     },
     "tools:risk-tier.mjs": {
       "same": false,
-      "kit": "f8ddc735b0bbc4ae",
-      "global": "4073ada96ac8fe25"
+      "kit": "6cd2787680abb873",
+      "global": "2cc38c4ea3682554"
     },
     "tools:ticket-ledger.mjs": {
       "same": false,
@@ -782,100 +787,10 @@
       "kit": "4c8852b0c2584365",
       "global": "4c8852b0c2584365"
     },
-    "watch-skills:agentdeck-watchdog/references/classes.md": {
-      "same": false,
-      "kit": "35c1a8cad3e194df",
-      "global": "bc905b137c6d6225"
-    },
-    "watch-skills:agentdeck-watchdog/references/loop.md": {
-      "same": false,
-      "kit": "d2ea2bb0769a4a35",
-      "global": "abcf9595edfeaca6"
-    },
-    "watch-skills:agentdeck-watchdog/references/misses.md": {
-      "same": false,
-      "kit": "c298f2e563c251b9",
-      "global": "c813f380065f1b19"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/group-control.mjs": {
-      "same": true,
-      "kit": "a840e6b916f88e1e",
-      "global": "a840e6b916f88e1e"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/common.mjs": {
-      "same": true,
-      "kit": "0e6203990baa4772",
-      "global": "0e6203990baa4772"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/deferred.mjs": {
-      "same": true,
-      "kit": "58f42f1adaa5f936",
-      "global": "58f42f1adaa5f936"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/fold.mjs": {
-      "same": true,
-      "kit": "b92cc28ea78b2f17",
-      "global": "b92cc28ea78b2f17"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/legend.mjs": {
-      "same": true,
-      "kit": "0c1c7d411567c9e9",
-      "global": "0c1c7d411567c9e9"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/panel.mjs": {
-      "same": true,
-      "kit": "bb945ee43ffd070e",
-      "global": "bb945ee43ffd070e"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/pauses.mjs": {
-      "same": true,
-      "kit": "b7d8b35df0ae6ec2",
-      "global": "b7d8b35df0ae6ec2"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/restarts.mjs": {
-      "same": true,
-      "kit": "536bcb673156908f",
-      "global": "536bcb673156908f"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/rule-texts.mjs": {
-      "same": true,
-      "kit": "d846efad9cfd75ff",
-      "global": "d846efad9cfd75ff"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/lib/window.mjs": {
-      "same": true,
-      "kit": "5d717d592982823e",
-      "global": "5d717d592982823e"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/rule-texts.json": {
-      "same": true,
-      "kit": "2b17500a114d91bc",
-      "global": "2b17500a114d91bc"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/rule-texts.mjs": {
-      "same": true,
-      "kit": "96b67bb828a1ce4b",
-      "global": "96b67bb828a1ce4b"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/selftest-groups.mjs": {
-      "same": true,
-      "kit": "8b9ccc00f96a2c57",
-      "global": "8b9ccc00f96a2c57"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/selftest-stage-audit.mjs": {
-      "same": true,
-      "kit": "661482de2f3e8da7",
-      "global": "661482de2f3e8da7"
-    },
-    "watch-skills:agentdeck-watchdog/scripts/watch-groups.mjs": {
-      "same": true,
-      "kit": "1fb389ec527a3793",
-      "global": "1fb389ec527a3793"
-    },
     "watch-skills:watchdog/references/flags.md": {
       "same": false,
-      "kit": "8a05c085ce8bb815",
-      "global": "cd5b3c85b951ffbb"
+      "kit": "e10ea5d9a085f80c",
+      "global": "4250cee3f993346d"
     },
     "watch-skills:watchdog/references/ledger.md": {
       "same": false,
@@ -884,13 +799,13 @@
     },
     "watch-skills:watchdog/references/levers.md": {
       "same": false,
-      "kit": "1b5b990709a417fa",
-      "global": "0b81239042cba321"
+      "kit": "595f18d41f161f89",
+      "global": "5946b9b0a460d822"
     },
     "watch-skills:watchdog/scripts/lib/core.mjs": {
       "same": true,
-      "kit": "b7cee1bc8722aa71",
-      "global": "b7cee1bc8722aa71"
+      "kit": "c621432295c7d74d",
+      "global": "c621432295c7d74d"
     },
     "watch-skills:watchdog/scripts/lib/foreign.mjs": {
       "same": true,
@@ -904,8 +819,8 @@
     },
     "watch-skills:watchdog/scripts/lib/run.mjs": {
       "same": true,
-      "kit": "49a7c6256e28e348",
-      "global": "49a7c6256e28e348"
+      "kit": "a0dff20f0581a10c",
+      "global": "a0dff20f0581a10c"
     },
     "watch-skills:watchdog/scripts/lib/where.mjs": {
       "same": true,
@@ -934,16 +849,13 @@
     }
   },
   "kitOnly": {
-    "hooks-lib:forge-toolset-guard.mjs": "Split groups only (AGENTDECK_SPLIT_CHILD=1): the panel launches them, the personal layer never does.",
     "hooks-lib:items.mjs": "Kit plumbing: the manifest that lets the panel switch each guard off; the personal layer wires dispatchers in settings.json.",
     "hooks-lib:kit-paths.mjs": "Kit plumbing: paths of a kit copied per run into the panel data dir, and which CLI is calling.",
     "hooks-lib:local-discipline.mjs": "Local-model runs only (AGENTDECK_KIT_VARIANT=local), which the panel launches.",
-    "hooks-lib:mr-description-gate.mjs": "Panel group runs only (AGENTDECK_GROUP_STAGE): it judges a re-post against the panel's delivery check, which only a group runs.",
-    "hooks-lib:notebook-at-stop.mjs": "Panel group runs only (AGENTDECK_GROUP_STAGE): the notebook it guards is the one the panel seeds into the group's copy.",
-    "hooks-lib:own-copy-guard.mjs": "Split groups only (AGENTDECK_SPLIT_CHILD=1): each group works in its own copy the panel made.",
     "hooks-lib:run.mjs": "Kit plumbing: the one dispatcher per event; the personal layer has its own *-dispatch.mjs scripts."
   },
   "globalOnly": {
+    "hooks-lib:autonomous-pick.mjs": "Owner's personal AskUserQuestion auto-pick; inert since the panel retired chat autonomy (02.11.2026) and strips AGENTDECK_AUTONOMOUS from every run: not shipped.",
     "hooks-lib:hooks-audit.mjs": "Audits the personal settings.json hook wiring; the kit is composed by the panel and checked by its tests.",
     "hooks-lib:jira-readback.mjs": "Owner's company tracker (Jira wiki markup read-back): not shipped.",
     "hooks-lib:listing-churn-guard.mjs": "Guards edits of the owner's own skills/agents listing in ~/.claude; panel runs edit skills through the panel API.",
@@ -956,13 +868,6 @@
     "hooks-lib:undraft-guard.mjs": "Owner's company MR ledger and draft workflow: not shipped."
   },
   "wiring": [
-    {
-      "module": "autonomous-pick",
-      "tools": [
-        "AskUserQuestion"
-      ],
-      "apply": "node ~/.claude/tools/apply-autonomous-pick.mjs --apply"
-    },
     {
       "module": "forge-merge-guard",
       "tools": [

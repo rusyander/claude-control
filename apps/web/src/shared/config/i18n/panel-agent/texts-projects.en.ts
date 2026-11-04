@@ -18,7 +18,6 @@ export const panelTextsProjectsEn = {
   'journal-project-claude-md-read': 'Project instructions file',
   'journal-project-mcp-list': 'Project MCP servers',
   'journal-project-permissions-list': 'Project permissions',
-  'journal-project-group-choice': 'Which group is active in a project',
   'journal-project-copy-settings': 'Project copy and split settings',
   'journal-project-runner': 'Project dev servers',
   'journal-project-files': 'Project files',
@@ -43,10 +42,6 @@ export const panelTextsProjectsEn = {
   'value-project-decision-allow': 'allow without asking',
   'value-project-decision-ask': 'ask',
   'value-project-decision-deny': 'deny',
-  'journal-project-group-choice-set': 'Switching the group in a project',
-  'summary-project-group-choice': 'Make group “{{group}}” the active one in project “{{project}}”',
-  'summary-project-group-choice-reset':
-    'Return every group pair of project “{{project}}” to its project group',
   'journal-project-git-checkout': 'Switching a git branch',
   'summary-project-git-checkout': 'Switch “{{project}}” to branch {{branch}}',
   'journal-project-git-branch': 'New git branch',

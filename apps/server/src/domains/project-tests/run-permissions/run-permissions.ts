@@ -1,40 +1,22 @@
-import { randomUUID } from 'node:crypto';
-import { createServer, type Server } from 'node:http';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { ProjectTestCase, ProjectTestRunMode } from '@agentdeck/contracts';
 import { TESTS_DIR } from '../files.ts';
 
 /**
- * Права прогона: что агенту РАЗРЕШЕНО трогать, пока он гоняет тесты.
+ * Границы прогона: что агенту РАЗРЕШЕНО трогать, пока он гоняет тесты.
  *
- * Раньше прогон шёл с `bypassPermissions` — то есть без единой проверки, а
- * границы держало только задание словами. Слова агент соблюдает почти всегда;
- * «почти» здесь означает чужой рабочий код, поправленный посреди ночного
- * регресса, и человека, который утром находит дифф вместо отчёта.
+ * С этапа 10 (F6) прогон идёт задачей ядра, и каждый вызов инструмента судит судья ядра. Границы
+ * режима уходят ему данными (`scopeSession` → `task.created.session.scope`): правка вне масок и
+ * команды, двигающие историю, — отказ судьи с записью в журнал задачи, как отказывал прежний
+ * приёмник прав панели (`decidePermission`, в архиве). Задание называет те же границы словами
+ * (`describeScope`), а сверка на финише (`scope-audit.ts`) ловит то, что судья правки не видит:
+ * файлы, тронутые командой оболочки.
  *
- * Проверка живёт НЕ в CLI: параметром её туда не передать (`--settings` панель
- * не подставляет), зато у CLI есть штатный канал — брокер прав
- * (`--permission-prompt-tool`, см. `domains/chat/permission-prompt-server.mjs`).
- * Прогон поднимает СВОЙ крошечный приёмник этого брокера на локальной петле и
- * отвечает на каждый вызов инструмента сам, по правилам ниже. Человека при этом
- * не спрашивают ни о чём: прогон идёт без него, и вопрос означал бы зависший
- * агент.
- *
- * Правила по режимам:
- * - `generate` — запись только внутрь `.agent/tests/drafts/`: генерация пишет
- *   ЧЕРНОВИК, а файлы групп меняет панель, применяя его. Так галочка «принимать
- *   сразу» решает лишь, кто нажимает «применить», и никогда — кто пишет в
- *   библиотеку;
+ * Границы по режимам:
+ * - `generate` — запись только внутрь `.agent/tests/drafts/`: генерация пишет ЧЕРНОВИК, а файлы
+ *   групп меняет панель, применяя его;
  * - `run`, `explore` — запись внутрь `.agent/tests/`;
- * - `automate` — плюс файлы автотестов, НАЗВАННЫЕ кейсами (`automation.file`),
- *   потому что именно их этот режим и пишет;
- * - чтение, поиск и запуск команд разрешены: без них тест не пройти. У команд
- *   свой запрет — то, что меняет репозиторий (коммит, пуш, переключение ветки).
- *
- * Что гейт НЕ ловит: запись через оболочку (`echo > файл`). Это осознанный
- * размен: запретить `Bash` целиком значит запретить поднять стенд и прогнать
- * автотесты, то есть отменить сам прогон. Инструменты записи закрыты жёстко,
- * а про границу сказано и в задании — модель держит то, о чём знает.
+ * - `automate` — плюс файлы автотестов, НАЗВАННЫЕ кейсами (`automation.file`), и папка e2e.
  */
 
 /** Куда прогону можно писать. */
@@ -44,8 +26,7 @@ export interface RunScope {
   /**
    * Каталог от корня проекта, внутрь которого разрешена запись.
    *
-   * У генерации он сужен до папки черновиков: библиотеку меняет панель, а не
-   * прогон, и это должно держаться правом, а не обещанием в задании.
+   * У генерации он сужен до папки черновиков: библиотеку меняет панель, а не прогон.
    */
   writeDir: string;
   /** Пути от корня проекта, которые режим `automate` дописывает к тестовым. */
@@ -56,39 +37,6 @@ export interface RunScope {
    */
   e2eDir?: string;
 }
-
-/** Решение по одному вызову инструмента. */
-export interface PermissionDecision {
-  behavior: 'allow' | 'deny';
-  message?: string;
-  updatedInput?: unknown;
-}
-
-/** Инструменты, которые ничего не меняют: разрешаем не глядя. */
-const READ_ONLY = new Set([
-  'Read',
-  'Glob',
-  'Grep',
-  'LS',
-  'NotebookRead',
-  'WebFetch',
-  'WebSearch',
-  'TodoWrite',
-  'Task',
-  'BashOutput',
-  'KillShell',
-  'ExitPlanMode',
-]);
-
-/** Инструменты записи в файл: у них и проверяется путь. */
-const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'Update']);
-
-/**
- * Команды, меняющие репозиторий. Ровно то, что запрещено и словами в задании:
- * прогон описывает состояние приложения, а не двигает историю.
- */
-const FORBIDDEN_COMMANDS =
-  /\bgit\s+(commit|push|reset|checkout|switch|clean|rebase|merge|cherry-pick|tag|stash|worktree)\b/;
 
 /** Файлы автотестов, названные самими кейсами: их и пишет режим `automate`. */
 function automationFiles(cases: ProjectTestCase[]): string[] {
@@ -131,22 +79,6 @@ function isBelowRoot(root: string, folder: string): boolean {
   return step !== '' && !step.startsWith('..') && !isAbsolute(step);
 }
 
-/** Путь из входа инструмента: разные инструменты называют его по-разному. */
-function pathOf(input: unknown): string | undefined {
-  if (!input || typeof input !== 'object') return undefined;
-  const record = input as Record<string, unknown>;
-  const value =
-    record.file_path ?? record.filePath ?? record.notebook_path ?? record.path ?? record.target;
-  return typeof value === 'string' && value.trim() ? value : undefined;
-}
-
-/** Команда из входа `Bash`. */
-function commandOf(input: unknown): string {
-  if (!input || typeof input !== 'object') return '';
-  const value = (input as Record<string, unknown>).command;
-  return typeof value === 'string' ? value : '';
-}
-
 /**
  * Разрешено ли писать в этот путь. Каталог тестов — всегда; в режиме
  * `automate` ещё и файлы автотестов, которые назвали сами кейсы (и папки, в
@@ -174,7 +106,7 @@ export function isWritable(scope: RunScope, target: string): boolean {
   });
 }
 
-/** Границы словами — тот же текст уходит и в задание, и в отказ. */
+/** Границы словами — этот текст уходит в задание прогона (`runs.ts`). */
 export function describeScope(scope: RunScope): string {
   const base = `writing is allowed only inside ${scope.writeDir || TESTS_DIR}/`;
   if (scope.mode === 'generate') {
@@ -189,148 +121,74 @@ export function describeScope(scope: RunScope): string {
       })`
     : scope.e2eDir
       ? ''
-      : // Обещать «рядом с тестами проекта» нельзя: гейт такую запись отклонит.
+      : // Обещать «рядом с тестами проекта» нельзя: сверка на финише такую запись отметит.
         ' — the project has no e2e folder, so no test code can be written: leave automation.status at toAutomate and say why in note';
   return `${base}${folder}${named}`;
 }
 
-/** Решение по вызову инструмента. Разрешаем работать, запрещаем выходить за границы. */
-export function decidePermission(
-  scope: RunScope,
-  toolName: string,
-  input: unknown,
-): PermissionDecision {
-  // Вопрос человеку в прогоне задавать некому: агент повиснет на нём навсегда.
-  // Тот же отказ, что и в чате, но причина здесь другая — тут человека нет.
-  if (toolName === 'AskUserQuestion') {
-    return {
-      behavior: 'deny',
-      message:
-        'There is nobody to ask in this run: decide yourself and write the doubt into the case note.',
-    };
-  }
+/**
+ * Команды, меняющие репозиторий, — префиксы argv для судьи ядра: тот же список, что был у
+ * прежнего приёмника прав (`FORBIDDEN_COMMANDS`). Прогон описывает состояние приложения, а не
+ * двигает историю.
+ */
+export const RUN_DENY_COMMANDS: readonly (readonly string[])[] = [
+  'commit',
+  'push',
+  'reset',
+  'checkout',
+  'switch',
+  'clean',
+  'rebase',
+  'merge',
+  'cherry-pick',
+  'tag',
+  'stash',
+  'worktree',
+].map((verb) => ['git', verb]);
 
-  if (READ_ONLY.has(toolName) || toolName.startsWith('mcp__')) {
-    return { behavior: 'allow', updatedInput: input };
-  }
-
-  if (WRITE_TOOLS.has(toolName)) {
-    const target = pathOf(input);
-    if (!target) return { behavior: 'allow', updatedInput: input };
-    if (isWritable(scope, target)) return { behavior: 'allow', updatedInput: input };
-    return {
-      behavior: 'deny',
-      message: `Editing ${target} is forbidden for this run: ${describeScope(scope)}. A problem found in the code is a test result (status: "failed" and what is wrong in note), not a reason to fix it.`,
-    };
-  }
-
-  if (toolName === 'Bash') {
-    const command = commandOf(input);
-    if (FORBIDDEN_COMMANDS.test(command)) {
-      return {
-        behavior: 'deny',
-        message:
-          'Commands that change the repository are forbidden for this run: commit and push nothing.',
-      };
-    }
-    return { behavior: 'allow', updatedInput: input };
-  }
-
-  // Незнакомый инструмент разрешаем: прогон и раньше шёл с полным доступом, и
-  // молчаливый отказ на каждый новый инструмент CLI выглядел бы как «агент не
-  // умеет работать», а не как правило панели.
-  return { behavior: 'allow', updatedInput: input };
+/** Путь от корня проекта косыми чертами; вне корня — `undefined` (маской не станет). */
+function rootedOf(root: string, target: string): string | undefined {
+  const step = relative(resolve(root), resolve(root, target));
+  if (!step || step.startsWith('..') || isAbsolute(step)) return undefined;
+  return step.split(sep).join('/');
 }
-
-/** Приёмник решений: то, чем прогон заменяет человека у кнопки «Разрешить». */
-export interface RunPermissionGate {
-  /** Адрес, который получает брокер прав (`PERM_BASE_URL`). */
-  baseUrl: string;
-  /** Ключ прогона: чужой запрос на этот порт не пройдёт. */
-  runId: string;
-  /**
-   * Чем приёмник ответил на вызов с этим id (`toolCallId` хука Qwen) — или
-   * ничего, если вызов к нему не приходил. По этому сторож прогона чужого CLI
-   * узнаёт инструмент, исполненный мимо проверки.
-   */
-  decided(toolCallId: string): PermissionDecision['behavior'] | undefined;
-  close(): void;
-}
-
-/** Как приёмник решает: по умолчанию — правила Claude; у чужого CLI — свои (`agent/foreign-gate.ts`). */
-export type GateDecider = (scope: RunScope, toolName: string, input: unknown) => PermissionDecision;
-
-/** Что делать с отказом — прогон пишет его в свой лог, чтобы он не пропал. */
-export type DenyReporter = (toolName: string, message: string) => void;
-
-/** Тело запроса брокера прав. */
-interface BrokerRequest {
-  runId?: string;
-  toolName?: string;
-  input?: unknown;
-  /** Id вызова у CLI (хук Qwen) — ключ, по которому сторож сверяет исполненное. */
-  toolCallId?: string;
-}
-
-/** Сколько решений помнит приёмник: прогон — тысячи вызовов, память не резиновая. */
-const DECIDED_LIMIT = 20_000;
 
 /**
- * Поднять приёмник на локальной петле. Порт выбирает система, адрес уходит
- * только в дочерний процесс прогона, а ключом служит одноразовый `runId` —
- * запрос без него получает отказ.
+ * Границы прогона маской от корня для судьи ядра (`session.scope.edit`) — то же множество, что
+ * `isWritable`: каталог записи режима, папка e2e (только ниже корня), в `automate` — названные
+ * кейсами файлы и папки, где они лежат.
  */
-export function startPermissionGate(
-  scope: RunScope,
-  onDeny?: DenyReporter,
-  decide: GateDecider = decidePermission,
-): Promise<RunPermissionGate> {
-  const runId = randomUUID();
-  const decided = new Map<string, PermissionDecision['behavior']>();
-  const server: Server = createServer((request, response) => {
-    const chunks: Buffer[] = [];
-    request.on('data', (chunk: Buffer) => chunks.push(chunk));
-    request.on('end', () => {
-      let body: BrokerRequest;
-      try {
-        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as BrokerRequest;
-      } catch {
-        body = {};
-      }
-      const own = body.runId === runId;
-      const decision = own
-        ? decide(scope, String(body.toolName ?? ''), body.input)
-        : { behavior: 'deny' as const, message: 'The request is not from this run.' };
-      if (own && typeof body.toolCallId === 'string' && body.toolCallId) {
-        if (decided.size >= DECIDED_LIMIT) decided.delete(decided.keys().next().value as string);
-        decided.set(body.toolCallId, decision.behavior);
-      }
-      if (decision.behavior === 'deny')
-        onDeny?.(String(body.toolName ?? ''), decision.message ?? '');
-      response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      response.end(JSON.stringify(decision));
-    });
+export function scopeSession(scope: RunScope): {
+  edit: string[];
+  denyCommands: string[][];
+} {
+  const dirs = [scope.writeDir || TESTS_DIR];
+  if (scope.e2eDir && isBelowRoot(scope.root, scope.e2eDir)) dirs.push(scope.e2eDir);
+  const edit = dirs.flatMap((dir) => {
+    const rooted = rootedOf(scope.root, dir);
+    return rooted ? [rooted, `${rooted}/**`] : [];
   });
+  if (scope.mode === 'automate') {
+    for (const file of scope.testFiles) {
+      const rooted = rootedOf(scope.root, file);
+      if (!rooted) continue;
+      edit.push(rooted);
+      const folder = rooted.includes('/') ? rooted.slice(0, rooted.lastIndexOf('/')) : '';
+      if (folder) edit.push(`${folder}/**`);
+    }
+  }
+  return {
+    // Потолок схемы ядра — 64 маски: каталог записи идёт первым и не отрезается никогда.
+    edit: [...new Set(edit)].slice(0, 64),
+    denyCommands: RUN_DENY_COMMANDS.map((prefix) => [...prefix]),
+  };
+}
 
-  // Приёмник не должен удерживать процесс: забытый гейт не имеет права мешать
-  // панели завершиться.
-  server.unref();
-
-  return new Promise((done, fail) => {
-    server.on('error', fail);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      if (!address || typeof address === 'string') {
-        server.close();
-        fail(new Error('Приёмник прав не получил порт.'));
-        return;
-      }
-      done({
-        baseUrl: `http://127.0.0.1:${address.port}`,
-        runId,
-        decided: (toolCallId) => decided.get(toolCallId),
-        close: () => server.close(),
-      });
-    });
-  });
+/** Строка границ для задания: модель держит правило, о котором знает. */
+export function scopeClause(scope: RunScope): string {
+  return (
+    `Write scope of this run: ${describeScope(scope)}. ` +
+    'Never commit, reset or switch branches. The panel compares the working tree after the run ' +
+    'and reports every file changed outside this scope.'
+  );
 }

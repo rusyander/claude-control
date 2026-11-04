@@ -161,8 +161,6 @@ export const queryKeys = {
   mobileApk: ['mobile-apk'] as const,
   /** Вопросы сессий вне панели — на телефон: переключатель и хук. */
   outsideRelay: ['outside-relay'] as const,
-  watcher: ['watcher'] as const,
-  watcherReport: ['watcher', 'report'] as const,
   /** Лимиты подписки Claude в боковой панели: сессия, неделя, неделя модели. */
   usageLimits: ['usage-limits'] as const,
   /** Отложенный перезапуск dev-сервера: ждут ли правки живых ходов. */
@@ -174,36 +172,10 @@ export const queryKeys = {
   permissions: ['permissions'] as const,
   env: ['env'] as const,
   groups: ['groups'] as const,
-  /**
-   * Всё ниже вложено в `groups`: правка группы (копия в общие, слияние, импорт)
-   * меняет и путь, и находки — одна инвалидация `groups` обновляет их разом.
-   */
-  groupDiscovery: ['groups', 'discovery'] as const,
-  groupPath: (id: string) => ['groups', 'path', id] as const,
-  /** Все виды выбора пар проекта — префикс `groupChoice` любой пары. */
-  groupChoicesOf: (path: string) => ['groups', 'choice', path] as const,
-  groupChoice: (path: string, group = '') => ['groups', 'choice', path, group] as const,
-  /** «Числа» группы: у сервера выписка по хэшу скилла, у клиента — по группе. */
-  groupKnobs: (id: string) => ['groups', 'knobs', id] as const,
-  /** Участники группы одной строкой «что делает» — из их же файлов, без модели. */
-  groupMembers: (id: string) => ['groups', 'members', id] as const,
-  /** Что группа дала бы прогону чужого CLI — по группе и CLI. */
-  groupDelivery: (id: string, provider: string) => ['groups', 'delivery', id, provider] as const,
-  /** Каталог «Выбрать готовый»: общие ресурсы и — с путём — ресурсы проекта. */
-  groupResourceCatalog: (path: string) => ['groups', 'resource-catalog', path] as const,
-  /** Встроенные группы: удалённые человеком и изменённые им — под `groups`, удаление их обновляет. */
-  groupBuiltin: ['groups', 'builtin'] as const,
+  /** Прежние запуски групп (этап 10, F1) — только чтение на странице групп над ядром; вложен в `groups`. */
+  groupLegacyRuns: ['groups', 'legacy-runs'] as const,
   /** Сводка ресурса кэшируется сервером по хэшу содержимого — у клиента ключ по типу и id. */
   resourceSummary: (type: string, id: string) => ['resource-summary', type, id] as const,
-  /** Группа и автономность чата — по обоим ключам разговора. */
-  chatGroupSettings: (chatId: string, sessionId = '') =>
-    ['chat-group-settings', chatId, sessionId] as const,
-  /** Заметки главным чатам деревьев: один список на все, как его отдаёт сервер. */
-  chatEscalations: ['chat-escalations'] as const,
-  /** Активные сигналы сторожа одиночных чатов: один список на все, по чату. */
-  chatWatchSignals: ['chat-watch-signals'] as const,
-  /** Охват сторожа групп для строки настроек: сколько групп каким источником видно. */
-  groupWatchCoverage: ['group-watch-coverage'] as const,
   /** Отложенные вопросы D-n: один список на все чаты и группы, как его отдаёт сервер. */
   chatDeferred: ['chat-deferred'] as const,
   /** Резервные копии: список обновляется после каждой записи в конфиг. */
@@ -307,6 +279,10 @@ export const queryKeys = {
     scenarios: ['core', 'scenarios'] as const,
     scenario: (ref: string) => ['core', 'scenarios', ref] as const,
     config: ['core', 'config'] as const,
+    /** Серверы MCP человека по CLI ядра (s10 p9) — предложения экрана выбора. */
+    mcpOffers: ['core', 'mcp-offers'] as const,
+    /** Надзор панели за процессом ядра (этап 10) — под тем же корнем: перезапуск ядра перечитывает и его. */
+    supervisor: ['core', 'supervisor'] as const,
     record: (id: string) => ['core', 'records', id] as const,
     report: (taskId: string) => ['core', 'tasks', taskId, 'report'] as const,
     profile: (repoKey: string) => ['core', 'profiles', repoKey] as const,
@@ -365,10 +341,6 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   permissions: [queryKeys.permissions, queryKeys.overview, queryKeys.history, queryKeys.backups],
   env: [queryKeys.env, queryKeys.history, queryKeys.backups],
   overview: [queryKeys.overview],
-  // Ребёнок разделения сказал критичное: сервер рассылает домен сам, файла нет.
-  'chat-escalations': [queryKeys.chatEscalations],
-  // Сторож записал или закрыл сигнал одиночного чата: строка и остров перечитывают список.
-  'chat-signals': [queryKeys.chatWatchSignals],
   // Запись D-n заведена, решена или истекла: сервер шлёт домен после каждой
   // записи списка — плашка «Ждёт решения» и хаб групп перечитывают его сразу.
   'chat-deferred': [queryKeys.chatDeferred],
@@ -376,10 +348,10 @@ export const DOMAIN_KEYS: Record<string, readonly (readonly string[])[]> = {
   // стал кейсом — раздел «Тесты» перечитывает вид, историю и отчёт.
   'project-tests': [['project-tests']],
   // Собственное состояние панели, изменённое в другой вкладке или с телефона
-  // (сервер шлёт раздел сам, `lib/app-state-events/app-state-events.ts`): группы, выбор стороны
-  // пары (всё под `groups`) и группа чата — меню «Группа» открытого чата.
-  // Раздел `settings` разбирает FileWatchProvider: там мало инвалидации.
-  groups: [queryKeys.groups, ['chat-group-settings']],
+  // (сервер шлёт раздел сам, `lib/app-state-events/app-state-events.ts`): группы и выбор
+  // стороны пары (всё под `groups`). Раздел `settings` разбирает FileWatchProvider: там мало
+  // инвалидации.
+  groups: [queryKeys.groups],
   // Сверка с глобальным слоем закончилась или файл пары изменился — сервер шлёт
   // раздел сам (В5); дифф предложения перечитывается вместе с карточкой.
   globalLayer: [queryKeys.globalLayer],

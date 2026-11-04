@@ -1,5 +1,10 @@
 import type { Fact } from '@agentdeck/contracts/core/facts';
-import type { ForgeActivity, ForgePipeline, ForgePort } from '@agentdeck/contracts/core/forge';
+import type {
+  ForgeActivity,
+  ForgeNote,
+  ForgePipeline,
+  ForgePort,
+} from '@agentdeck/contracts/core/forge';
 import { ABSENT } from '../../lib/facts/read-fact.ts';
 import { ACTIVITY_PAGE, activityWindow } from './activity.ts';
 import type { ForgeAccess } from './forge.types.ts';
@@ -167,6 +172,28 @@ export function createGithubPort(access: ForgeAccess): ForgePort {
     async resolve(_iid, threadId) {
       return graphWrite(RESOLVE_MUTATION, { threadId }, `graphql resolve ${threadId}`, (d) =>
         isRecord(d.resolveReviewThread) ? true : null,
+      );
+    },
+
+    async comment(iid, body) {
+      // Заметка верхнего уровня PR — комментарий его issue (REST); нити ревью — только GraphQL.
+      return written(
+        await call('POST', `${repo}/issues/${iid}/comments`, { body }),
+        `POST issues/${iid}/comments`,
+        githubComment,
+      );
+    },
+
+    async comments(iid) {
+      return readList(
+        await call('GET', `${repo}/issues/${iid}/comments?per_page=100`),
+        `GET issues/${iid}/comments`,
+        (v) => {
+          const list = asArray(v);
+          if (!list) return null;
+          const notes = list.map(githubComment);
+          return notes.every((n) => n !== null) ? (notes as ForgeNote[]) : null;
+        },
       );
     },
 

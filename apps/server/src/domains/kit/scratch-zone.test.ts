@@ -21,7 +21,8 @@ const guard = (await import(pathToFileURL(join(HOOKS, 'destructive-guard.mjs')).
 };
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), `.scratch-zone-${process.pid}`);
-afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
+// Windows держит только что закрытый каталог (EBUSY): без повторов папка оставалась в src.
+afterAll(() => rmSync(ROOT, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 const MAIN = join(ROOT, 'main');
 const WT = join(ROOT, 'wt-probe');
 const CLONE = join(ROOT, 'clone-probe');

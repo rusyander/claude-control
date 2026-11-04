@@ -70,7 +70,7 @@ script printed four misses of its own making).
 
 The mirror bug makes a harness all RED. A mutation run carries a control — an identity mutant that
 must SURVIVE — or "11/11 killed" may mean the tool never ran: `new URL(...).pathname` keeps `%7E` from
-a Windows short path (`RUSYAN~1`), so every mutant "died" of file-not-found. Use
+a Windows short path (`LONGNA~1`), so every mutant "died" of file-not-found. Use
 `fileURLToPath`, and read WHICH test failed per mutant: the targeted one, not the first in the file.
 
 ## Proof, not conviction
@@ -80,21 +80,25 @@ same tree. A check that cannot be made to fail on the pre-fix tree is reported a
 counted as passing. Where the pre-fix tree is reachable, the red half is a command, not a memory:
 
 ```
-node <kit>/tools/mustfail.mjs --cmd "<the narrowed test command>" [--base HEAD] [--quick]
+node <kit>/tools/mustfail.mjs --cmd "npm run test:ci" [--base HEAD] [--files <fixed files>]
 ```
 
-It reverts each changed file to the base revision (default `origin/main`; `--base HEAD` for
-uncommitted edits), re-runs the check, and puts the file back; `{file}` in the command narrows each
-run to the reverted file (`--cmd "npx vitest related {file} --run"` — for vitest that is graph mode: one
-baseline + one all-reverted run attributed through vitest's module graph, `--trust-green` right after a
-green gate, `--budget <min>`; a verdict is memoised per tree, never re-proven). GREEN after a revert means that
-file's behaviour is untested whatever `@covers` claims — the suite may not be quoted as evidence for
-it. Run it ONLY on the files that carry a bug fix (`--files <file>`) — never on a whole diff, refactor
-or feature (whole-diff runs cost split groups hours a day); default `--budget` 8 min.
+It reverts a changed file to base (merge-base with `origin/main`; `--base HEAD` for uncommitted edits),
+re-runs ONLY the tests covering it, puts it back. Default scope = every CRITICAL changed file (hook,
+store, service/API, util, validation/form, page/component with real logic, in that rank); markup,
+types, constants, barrels, styles, locales, configs are skipped and named. Limit = `--budget` 10 min
+per package, cost estimated before each run; what does not fit prints «UNCHECKED (budget)» (rerun
+resumes from the memo). Tests per file (vitest/jest, or `{tests}` in `--cmd`): `@covers` + sibling →
+own-folder tests importing it → import graph, nearest 8; baseline = their union, never the suite.
+GREEN = the picked tests cannot see that file, whatever `@covers` claims — the suite may not be quoted
+as evidence for it. Bug fix → `--files <fixed>`; `--all` / `--max N` only on an explicit ask. Measured
+on a large frontend package: 36 s per page file vs ~15 min via `vitest related`.
 
 A new test over UNCHANGED code has no base to fail against: its proof is a planned mutant —
 `--mutants plan.json`, each entry a one-line break of the behaviour its named test claims; the tool
-runs the identity control itself. Shapes that ship green and the mutant exposing each:
+runs the identity control itself. Plan = JSON array,
+`[{"file":"src/x.js","find":"n >= max","replace":"n > max","test":"<FAIL-line substring>"}]` (`nth` when
+`find` repeats; full shape: `mustfail.mjs --help`). Shapes that ship green and the mutant exposing each:
 `<kit>/skills/unit-integration-tests/references/weak-tests.md`.
 
 ## Someone else's reproduction outranks mine

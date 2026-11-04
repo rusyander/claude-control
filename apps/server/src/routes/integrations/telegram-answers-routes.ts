@@ -10,7 +10,6 @@ import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
 import type { DeferredAsks } from '../../domains/chat/deferred-asks/deferred-asks.ts';
-import type { ProviderChatService } from '../../domains/provider-chat/ProviderChatService/ProviderChatService.ts';
 import { readToken } from '../../domains/integrations/store/store.ts';
 import {
   applyAnswer,
@@ -39,6 +38,7 @@ import {
 import { parseBody } from '../../lib/request-body.ts';
 import { getProvider } from '../../providers/registry.ts';
 import { deferredAsksOf } from '../chat/deferred-routes/deferred-store.ts';
+import { isCorePermitCard } from '../chat/run-routes/run-routes.ts';
 import { registerTelegramConnectRoutes } from './telegram-connect-routes.ts';
 
 /**
@@ -70,10 +70,24 @@ export function deferredVanished(asks: Pick<DeferredAsks, 'get'>, id: string): V
   return state && DECIDED.has(state) ? { kind: 'inPanel' } : { kind: 'stale' };
 }
 
+/**
+ * Карточка прав пропала из сводки (или нажатие опоздало): ответили в окне или ушла.
+ * Вопрос права задачи ядра сводка Telegram не берёт вовсе, но он ЖДЁТ — старое сообщение о нём
+ * закрывается «ответ ядру — в панели или с телефона», а не «уже не актуально».
+ */
+export function permissionVanished(
+  session: Pick<ChatSession, 'wasPermissionAnswered' | 'pendingPermissions'>,
+  runKey: string,
+  toolUseId: string,
+): Vanished {
+  if (session.wasPermissionAnswered(runKey, toolUseId)) return { kind: 'inPanel' };
+  if (isCorePermitCard(session.pendingPermissions(), toolUseId)) return { kind: 'coreOnly' };
+  return { kind: 'stale' };
+}
+
 export interface TelegramAnswersRouteDeps {
   registry: ChatRunRegistry;
   session: ChatSession;
-  providerChats: ProviderChatService;
   /** Куда опрос подставляет «права и вопросы доставляю я» (уведомления молчат). */
   cover?: TelegramAnswersCover;
   /** Имя чата по ключу прогона — для `/status`. */
@@ -111,20 +125,10 @@ export function registerTelegramAnswersRoutes(
   const vanished = (target: AskTarget): Vanished => {
     switch (target.kind) {
       case 'permission':
-      case 'branchGate': {
-        if (deps.session.wasPermissionAnswered(target.runKey, target.toolUseId)) {
-          return { kind: 'inPanel' };
-        }
-        const deferred = deferredIdOf(target.runKey, target.toolUseId);
-        return deferred ? { kind: 'deferred', id: deferred } : { kind: 'stale' };
-      }
+        return permissionVanished(deps.session, target.runKey, target.toolUseId);
       case 'question':
         // Вопрос пропал, а разговор снова идёт — ответ ушёл из панели или телефона.
         return deps.registry.isRunning(target.runKey ?? target.chatId, target.sessionId)
-          ? { kind: 'inPanel' }
-          : { kind: 'stale' };
-      case 'foreign':
-        return deps.providerChats.isChatRunning(target.chatId)
           ? { kind: 'inPanel' }
           : { kind: 'stale' };
       case 'deferred':
@@ -135,14 +139,6 @@ export function registerTelegramAnswersRoutes(
         }
       default:
         return { kind: 'stale' };
-    }
-  };
-
-  const deferredIdOf = (runKey: string, toolUseId: string): string | undefined => {
-    try {
-      return deferredAsksOf(ctx).byToolUse([runKey], toolUseId)?.id;
-    } catch {
-      return undefined;
     }
   };
 
@@ -209,17 +205,9 @@ export function registerTelegramAnswersRoutes(
       const inbox = JSON.parse(reply.body) as ChatInbox;
       return collectPendingAsks({
         inbox,
-        foreign: deps.providerChats.pendingAsks(),
         defaultCli: getProvider('claude').name,
         titleOf: (chatId) => titled(chatId).title,
         parentOf: (chatId) => ctx.store.getChatLink(chatId)?.parentChatId,
-        cliName: (id) => {
-          try {
-            return getProvider(id).name;
-          } catch {
-            return id;
-          }
-        },
       });
     },
     apply: (target, answer, clientId) => applyAnswer(target, answer, applyDeps(clientId)),
@@ -230,7 +218,7 @@ export function registerTelegramAnswersRoutes(
     log: (message) => app.log.info(message),
   });
 
-  /** Идущие разговоры панели и чужих CLI — строки `/status`. */
+  /** Идущие разговоры панели — строки `/status` (ход чужого CLI — задача ядра, его лента там). */
   const runningChats = () => {
     const own = deps.registry
       .active()
@@ -240,12 +228,7 @@ export function registerTelegramAnswersRoutes(
         ...titled(run.chatId),
         startedAt: run.startedAt,
       }));
-    const foreign = deps.providerChats.runningChats().map((chat) => ({
-      project: chat.workdir ? basename(chat.workdir) : '',
-      ...(chat.title ? { title: chat.title } : {}),
-      startedAt: chat.startedAt,
-    }));
-    return [...own, ...foreign];
+    return own;
   };
   const titled = (chatId: string): { title?: string } => {
     try {

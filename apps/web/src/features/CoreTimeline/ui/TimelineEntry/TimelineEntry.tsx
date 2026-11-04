@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { machineStateLabel } from '@entities/CoreTask';
 import { Badge } from '@shared/ui/badge';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -64,7 +65,9 @@ function EntryBody({ taskId, entry }: { taskId: string; entry: TimelineItem }) {
         >
           {t(text.key, text.params)}
         </Typography>
-        {entry.kind === 'step' && entry.step && <Badge tone="neutral">{entry.step.state}</Badge>}
+        {entry.kind === 'step' && entry.step && (
+          <Badge tone="neutral">{machineStateLabel(t, 'step', entry.step.state)}</Badge>
+        )}
         {entry.kind === 'step' && entry.spend && (
           <Typography variant="caption" as="span" data-step-tokens={tokenTotal(entry.spend.tokens)}>
             {t('coreTimeline.timeline.tokens', {

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { HopRegisterReply, HopRegisterSpec } from '@agentdeck/contracts/core/hops';
 import { startStubModel, type StubModel } from '@agentdeck/stub-model';
+import { reapCoreProcessesUnder } from '../platform/__fixtures__/reap-home.ts';
 import { isReserved } from '../platform/ports.ts';
 import { createLivenessProbe, identityOfPid } from '../platform/process-identity.ts';
 import { hasValue } from '../platform/os-kind.ts';
@@ -44,6 +45,9 @@ afterAll(async () => {
     if (hasValue(identity) && (await probe.isAlive(identity.value, { fresh: true })) === 'alive')
       process.kill(pid);
   }
+  // Хост, которого поднял не `liveHost` (подставное ядро, перезапуск после убийства), в `hostPids` не
+  // попадал и жил после прогона, держа `hop-crash-*` (проход 6, 03.11): всё записанное под домом теста.
+  await reapCoreProcessesUnder(home);
   await stub?.close();
 });
 

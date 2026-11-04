@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerContext } from '../../context.ts';
+import { isCliOnlyGeminiApprovalMode } from '@agentdeck/contracts/permissions';
 import {
   saveProviderPermissions,
   parseProviderPermissionsDraft,
-  isCliOnlyGeminiApprovalMode,
   buildProviderPermissionInfo,
 } from '../../domains/provider-permissions/provider-permissions.ts';
 import { UnrecognizedFormatError } from '../../lib/format-errors.ts';

@@ -1,4 +1,3 @@
-import type { GroupsModel } from './group-delivery.ts';
 import type { GroupEconomySupport } from './group-economy-support.ts';
 
 /**
@@ -139,13 +138,6 @@ export interface ProviderInfo {
   editsControl?: ProviderEditsControl;
   /** Смысл выключенного переключателя; нет поля — переключателя нет. */
   editsWhenOff?: ProviderEditsWhenOff;
-  /**
-   * Что значит группа для этого CLI (`group-delivery.ts`): у Claude тумблер
-   * правит его каталоги, у CLI со слоем группа едет на каждый прогон, у
-   * остальных не действует. Нет поля (сервер старше поля) — у Claude
-   * `claude-files`, у прочих `none`: обещать группу, которая не доедет, нельзя.
-   */
-  groupsModel?: GroupsModel;
   /**
    * Где действуют рычаги экономии групп у этого CLI (`group-economy-support.ts`):
    * отметки «Где действует» на странице «Настройки → Группы». Нет поля — каталог

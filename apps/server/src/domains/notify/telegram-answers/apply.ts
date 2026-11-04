@@ -23,7 +23,6 @@ export type Inject = (request: InjectRequest) => Promise<InjectReply>;
 
 export type Answer =
   | { kind: 'decision'; behavior: 'allow' | 'deny' }
-  | { kind: 'branch'; choice: 'here' | 'stop' }
   | {
       kind: 'questions';
       questions: readonly InboxQuestion[];
@@ -96,6 +95,11 @@ function routeMissing(reply: InjectReply): boolean {
 
 function outcomeOf(reply: InjectReply, goneCodes: readonly number[]): ApplyOutcome {
   if (routeMissing(reply)) return { ok: false, detail: `маршрут не найден (${reply.statusCode})` };
+  // Вопрос права задачи ядра: он ЖДЁТ, просто не отсюда. «Уже не актуально» солгало бы человеку,
+  // а ответ ядру Telegram доказать не может — нужен нонс окна или подпись телефона (W2-C).
+  if (reply.statusCode === 409 && parseBody(reply.body).code === 'core_permit_browser_only') {
+    return { ok: false, coreOnly: true, detail: refusal(reply) };
+  }
   if (goneCodes.includes(reply.statusCode)) return { ok: false, gone: true };
   if (reply.statusCode >= 300) return { ok: false, detail: refusal(reply) };
   // `permission-decision` отвечает `{ok:false}`, когда такого запроса у разговора нет.
@@ -121,14 +125,6 @@ export async function applyAnswer(
       });
       return outcomeOf(reply, [404, 409, 410]);
     }
-    case 'branchGate': {
-      if (answer.kind !== 'branch') return { ok: false, detail: 'не то решение' };
-      const reply = await post(`/api/chat/${enc(target.runKey)}/branch-decision`, {
-        toolUseId: target.toolUseId,
-        choice: answer.choice,
-      });
-      return outcomeOf(reply, [404, 409, 410]);
-    }
     case 'relayPermission': {
       if (answer.kind !== 'decision') return { ok: false, detail: 'не то решение' };
       const reply = await post(`/api/outside/asks/${enc(target.toolUseId)}/answer`, {
@@ -145,14 +141,6 @@ export async function applyAnswer(
       });
       const reply = await post(`/api/outside/asks/${enc(target.toolUseId)}/answer`, { answers });
       return outcomeOf(reply, [404, 409]);
-    }
-    case 'foreign': {
-      if (answer.kind !== 'decision') return { ok: false, detail: 'не то решение' };
-      const reply = await post(
-        `/api/provider-chat/chats/${enc(target.chatId)}/permissions/${enc(target.askId)}`,
-        { decision: answer.behavior },
-      );
-      return outcomeOf(reply, [404]);
     }
     case 'deferred': {
       if (answer.kind !== 'decision') return { ok: false, detail: 'не то решение' };

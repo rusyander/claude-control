@@ -473,6 +473,51 @@ describe('session road: one entry from compat to resource release', () => {
     });
   }, 120_000);
 
+  it('G13: the panel kit plugin rides into an unmarked repo (observe, plugin in argv); a plugin the adapter refuses names the adapter reason in the road reason', async () => {
+    const s = await stand();
+    const { core } = s;
+    const repo = tempDir('road-src-kit-');
+    const kit = tempDir('road-kit-');
+    mkdirSync(join(kit, '.claude-plugin'), { recursive: true });
+    writeFileSync(join(kit, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'kit' }));
+    const launchWithKit = async () => {
+      const live = await task(core, true, repo);
+      const base = startOf(
+        s,
+        live,
+        fixturePath(claudeRunFacts.id, 'permit'),
+        join(s.live.root, `dump-${newId()}.json`),
+      );
+      const prepared = await core.road.prepare({
+        ...base,
+        layer: { ...base.layer, carry: { plugins: [kit] } },
+      });
+      if (!prepared.ok) throw new Error(prepared.reason);
+      const p = prepared.prepared;
+      return { live, p, launched: await core.road.launch(p) };
+    };
+    const { live, p, launched } = await launchWithKit();
+    if (!launched.ok) throw new Error(launched.reason);
+    stops.push(() => p.adapter.stop(launched.handle, 'tree'));
+    core.road.started(p, launched.handle, launched.layer);
+    await p.adapter.stop(launched.handle, 'tree');
+    const started = lines(live).find((l) => l.kind === 'session.started')?.data as {
+      argv: string[];
+      layer: { ran: string; trust: string };
+    };
+    expect(started.layer).toMatchObject({ ran: 'observe', trust: 'none' });
+    expect(started.argv[started.argv.lastIndexOf('--plugin-dir') + 1]).toBe(kit);
+    // Каталог набора с MCP — отказ переходника; причина дороги несёт его слова, не один код.
+    writeFileSync(join(kit, '.mcp.json'), '{}');
+    const refused = await launchWithKit();
+    expect(refused.launched).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(
+        /^process-start failed: launch-refused: session-carry-plugin: plugin declares MCP servers/,
+      ) as unknown,
+    });
+  }, 120_000);
+
   it('continuation same-session: the road passes --resume <conversation root> to the CLI and journals resumeOf + cacheAgeMs; a fresh start journals nulls (stage 5 W)', async () => {
     const s = await stand();
     const { core } = s;

@@ -17,9 +17,13 @@ import { registerConfigRoutes } from '../../config-routes/config-routes.ts';
 import { registerEntityRoutes } from '../../entity-routes/entity-routes.ts';
 import { registerResourceRoutes } from '../../resource-routes/resource-routes.ts';
 import { registerPanelAgentRoutes } from '../panel-agent-routes/panel-agent-routes.ts';
+import type { CoreAskPort } from '../../../domains/core-ask/core-ask.types.ts';
 
-/** Маршрут окна для проверок, которым он не важен: контура нет, шлюз не поднят. */
-const NO_ROUTE = { runRoute: () => ({ env: {} }), gatewayPort: () => 0 };
+/** Вопрос ядра помощнику структуры здесь не задаётся: обращение — ошибка теста, а не тихий ответ. */
+const unused = (): never => {
+  throw new Error('core ask is not used in this test');
+};
+const NO_ROUTE: CoreAskPort = { ask: unused, task: unused, pages: unused, cancel: unused };
 
 /**
  * Действия строк сущностей (имя скилла, порядок хуков, файл переменной и

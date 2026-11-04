@@ -26,6 +26,15 @@ export {
 export { overlayScenario } from './overlay.ts';
 export { isPresetId, latestPresets, presetOf, presetStep, PRESETS } from './presets.ts';
 export {
+  localizePreset,
+  PRESET_TITLES,
+  scenarioTitleIn,
+  STEP_TITLES,
+  stepTitleIn,
+  titleLangOf,
+  type TitleLang,
+} from './titles.ts';
+export {
   decideRouting,
   routeStep,
   sessionsOf,

@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1280,
       "height": 900,
-      "shotAt": "2026-11-01T17:10:54.042Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале cancelled Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту",
+      "shotAt": "2026-11-03T19:00:03.209Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале отменена Открыть ленту README.md: typo В журнале отменена Открыть ленту README.md: typo Идёт ждёт запуска Открыть ленту README.md: typo Идёт ждёт запуска Открыть ленту",
       "en": {
         "file": "01-list.en.png",
         "masked": 0,
         "width": 1280,
         "height": 900,
-        "shotAt": "2026-11-01T17:11:01.203Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline"
+        "shotAt": "2026-11-03T19:00:10.918Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting launch Open the timeline README.md: typo Running awaiting launch Open the timeline",
+        "seal": {
+          "png": "4768a90061dbb22e",
+          "text": "725beff97fa8cdf0"
+        }
       },
       "dark": {
         "file": "01-list.dark.png",
         "masked": 0,
         "width": 1280,
         "height": 900,
-        "shotAt": "2026-11-01T17:11:08.174Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале cancelled Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту README.md: typo Идёт awaiting-launch Открыть ленту"
+        "shotAt": "2026-11-03T19:00:17.389Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 2 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Задачи ядра Задачи, которые ведёт ядро исполнения: шаги, сессии, проверки, расход и решения — по журналу задачи. Сценарии ядра Запуск задачи ядра README.md: typo В журнале отменена Открыть ленту README.md: typo В журнале отменена Открыть ленту README.md: typo Идёт ждёт запуска Открыть ленту README.md: typo Идёт ждёт запуска Открыть ленту",
+        "seal": {
+          "png": "ac5cddd39b98875c",
+          "text": "60d1244dd80d1f76"
+        }
       },
       "darkEn": {
         "file": "01-list.dark.en.png",
         "masked": 0,
         "width": 1280,
         "height": 900,
-        "shotAt": "2026-11-01T17:11:15.089Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline README.md: typo Running awaiting-launch Open the timeline"
+        "shotAt": "2026-11-03T19:00:24.087Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 2 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Core tasks Tasks run by the execution core: steps, sessions, checks, spend and decisions — from the task journal. Core scenarios Launch a core task README.md: typo In the journal cancelled Open the timeline README.md: typo In the journal cancelled Open the timeline README.md: typo Running awaiting launch Open the timeline README.md: typo Running awaiting launch Open the timeline",
+        "seal": {
+          "png": "ce863b0971ff792f",
+          "text": "725beff97fa8cdf0"
+        }
+      },
+      "seal": {
+        "png": "078fec26050e09aa",
+        "text": "60d1244dd80d1f76"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 988,
       "height": 126,
-      "shotAt": "2026-11-01T17:10:56.782Z",
-      "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Обычно панель записывает себя сама при запуске через pnpm dev или pnpm keepalive. Если плашка не уходит, перезапустите панель одной из этих команд.",
+      "shotAt": "2026-11-03T19:00:06.827Z",
+      "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Панель записывает себя ядру сама при каждом его запуске. Если плашка не уходит дольше минуты, перезапустите панель.",
       "en": {
         "file": "02-hops.en.png",
         "masked": 0,
         "width": 988,
         "height": 126,
-        "shotAt": "2026-11-01T17:11:03.993Z",
-        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel normally records itself when started with pnpm dev or pnpm keepalive. If this notice stays, restart the panel with one of those commands."
+        "shotAt": "2026-11-03T19:00:13.392Z",
+        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel records itself with the core every time the core starts. If this notice stays longer than a minute, restart the panel.",
+        "seal": {
+          "png": "e7732c666d75a0de",
+          "text": "2e3af8b9b28ded22"
+        }
       },
       "dark": {
         "file": "02-hops.dark.png",
         "masked": 0,
         "width": 988,
         "height": 126,
-        "shotAt": "2026-11-01T17:11:10.826Z",
-        "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Обычно панель записывает себя сама при запуске через pnpm dev или pnpm keepalive. Если плашка не уходит, перезапустите панель одной из этих команд."
+        "shotAt": "2026-11-03T19:00:19.893Z",
+        "text": "Ядро ещё не знает эту панель Панель не записана ядру звеном: команды из неё ядро примет только с подписью телефона. Панель записывает себя ядру сама при каждом его запуске. Если плашка не уходит дольше минуты, перезапустите панель.",
+        "seal": {
+          "png": "be069ab46e7db0e1",
+          "text": "dd0a075e297edb93"
+        }
       },
       "darkEn": {
         "file": "02-hops.dark.en.png",
         "masked": 0,
         "width": 988,
         "height": 126,
-        "shotAt": "2026-11-01T17:11:17.826Z",
-        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel normally records itself when started with pnpm dev or pnpm keepalive. If this notice stays, restart the panel with one of those commands."
+        "shotAt": "2026-11-03T19:00:27.076Z",
+        "text": "The core does not know this panel yet This panel is not recorded with the core as a hop, so the core accepts its commands only with a phone signature. The panel records itself with the core every time the core starts. If this notice stays longer than a minute, restart the panel.",
+        "seal": {
+          "png": "f858c952844073d4",
+          "text": "2e3af8b9b28ded22"
+        }
+      },
+      "seal": {
+        "png": "7507879d2554c1d6",
+        "text": "dd0a075e297edb93"
       }
     }
   ]

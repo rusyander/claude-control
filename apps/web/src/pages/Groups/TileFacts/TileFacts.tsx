@@ -13,7 +13,6 @@ import { projectName } from '../model/projectName';
  */
 export function TileFacts({
   steps,
-  stepsFailed = false,
   moreSteps = 0,
   noStepsText,
   members,
@@ -31,7 +30,7 @@ export function TileFacts({
 
   return (
     <>
-      <StepsPreview steps={steps} failed={stepsFailed} more={moreSteps} emptyText={noStepsText} />
+      <StepsPreview steps={steps} more={moreSteps} emptyText={noStepsText} />
       <Typography variant="caption" color="muted" as="p" className={styles.line}>
         {composition}
       </Typography>

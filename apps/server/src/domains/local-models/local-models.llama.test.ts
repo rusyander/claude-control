@@ -1,14 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { EventEmitter } from 'node:events';
 import {
   existsSync,
   linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -17,19 +14,18 @@ import { pathToFileURL } from 'node:url';
 import { fitModel, modelNeedGb, type HardwareGpu } from '@agentdeck/contracts/local-models';
 import { LocalJobs, type JobHandle } from './jobs.ts';
 import { localPaths } from './paths.ts';
-import { loadCatalog, createLocalModels } from './service.ts';
-import { dirSize, manifestPathOf, blobPathOf } from './store.ts';
+import { loadCatalog } from './service.ts';
+import { dirSize } from './store.ts';
 import { isGguf, quantNameOf, readGgufFacts, readGgufWeightType } from './gguf.ts';
 import { downloadModelFile, listRepoFiles, quantIdOf, quantsOf } from './hf.ts';
 import { assetsFor, fetchRelease, installPanelRuntime, loadRelease } from './runtime.ts';
 import { extractArchive } from './download.ts';
-import { importFileName, importOllamaModel } from './ollama-import.ts';
 import {
   CPU_ONLY_ENV,
+  presetArgsOf,
   serverArgs,
   serverEnv,
   sameShape,
-  testLoadModel,
   type ServerShape,
 } from './server.ts';
 import { llamaClient } from './llama-client.ts';
@@ -622,310 +618,24 @@ describe('запуск llama-server', () => {
     expect(sameShape(SHAPE, { ...SHAPE, quant: 'renamed' })).toBe(true);
   });
 
-  it('окружение: LLAMA_ARG_* снимаются, на процессоре карты спрятаны', () => {
-    const base = { PATH: 'p', LLAMA_ARG_CTX_SIZE: '1', LLAMA_ARG_N_GPU_LAYERS: '5' };
-    expect(serverEnv('gpu', base)).toEqual({ PATH: 'p' });
-    expect(serverEnv('cpu', base)).toEqual({ PATH: 'p', ...CPU_ONLY_ENV });
+  it('окружение поверх окружения ядра: на карте — ничего, на процессоре карты спрятаны', () => {
+    // LLAMA_ARG_* человека до сервера не доходят: ядро передаёт только свой список (helperEnv).
+    expect(serverEnv('gpu')).toEqual({});
+    expect(serverEnv('cpu')).toEqual(CPU_ONLY_ENV);
     expect(CPU_ONLY_ENV.CUDA_VISIBLE_DEVICES).toBe('-1');
   });
-});
 
-describe('пробная загрузка GGUF', () => {
-  /** Подмена процесса: при `listen` поднимает заглушку на порту из аргументов, при `crash` — выходит с текстом ошибки. */
-  function fakeSpawn(mode: 'listen' | 'crash') {
-    const opened: { close: () => Promise<void> }[] = [];
-    const seen: { args: string[]; env: NodeJS.ProcessEnv | undefined }[] = [];
-    const spawnImpl = ((_bin: string, args: string[], options: { env?: NodeJS.ProcessEnv }) => {
-      seen.push({ args, env: options.env });
-      const child = new EventEmitter() as EventEmitter & {
-        pid: number;
-        stdout: EventEmitter;
-        stderr: EventEmitter;
-        unref: () => void;
-      };
-      child.pid = 4321;
-      child.stdout = new EventEmitter();
-      child.stderr = new EventEmitter();
-      child.unref = () => undefined;
-      if (mode === 'listen') {
-        void stubs
-          .startStubLlama({ port: Number(args[args.indexOf('--port') + 1]) })
-          .then((stub) => opened.push(stub));
-      } else {
-        setTimeout(() => {
-          child.stderr.emit(
-            'data',
-            Buffer.from(
-              "llama_model_load: error loading model: unknown model architecture: 'foo'\n",
-            ),
-          );
-          child.emit('exit', 1);
-        }, 30);
-      }
-      return child;
-    }) as unknown as Parameters<typeof testLoadModel>[0]['spawnImpl'];
-    return { spawnImpl, opened, seen };
-  }
-
-  it('файл открылся — сервер ответил на /health: на процессоре, с малым окном, без видеокарты', async () => {
-    const fake = fakeSpawn('listen');
-    const killed: number[] = [];
-    const result = await testLoadModel({
-      binary: 'llama-server',
-      file: '/m/x.gguf',
-      spawnImpl: fake.spawnImpl,
-      kill: (child) => killed.push(child.pid ?? 0),
-      timeoutMs: 5000,
+  it('строки запуска → строки пресета: флаги маршрутизатора отброшены, остальное длинными ключами', () => {
+    const preset = presetArgsOf(serverArgs({ ...SHAPE, idleSeconds: 900 }, 11435));
+    expect(preset).toMatchObject({
+      'ctx-size': '65536',
+      'n-gpu-layers': '999',
+      'cache-type-k': 'q8_0',
+      'cache-type-v': 'q8_0',
+      'spec-type': 'draft-mtp',
     });
-    expect(result).toEqual({ ok: true });
-    const args = fake.seen[0]?.args ?? [];
-    expect(args[args.indexOf('-ngl') + 1]).toBe('0');
-    expect(args[args.indexOf('-c') + 1]).toBe('512');
-    expect(fake.seen[0]?.env?.CUDA_VISIBLE_DEVICES).toBe('-1');
-    expect(killed).toEqual([4321]);
-    await Promise.all(fake.opened.map((stub) => stub.close()));
-  });
-
-  it('сервер вышел, не открыв файл — причина берётся из его же журнала', async () => {
-    const fake = fakeSpawn('crash');
-    const result = await testLoadModel({
-      binary: 'llama-server',
-      file: '/m/x.gguf',
-      spawnImpl: fake.spawnImpl,
-      kill: () => undefined,
-      timeoutMs: 5000,
-    });
-    expect(result.ok).toBe(false);
-    expect(result.ok ? '' : result.reason).toContain("unknown model architecture: 'foo'");
-  });
-
-  // Linux/macOS: бинарь без права на исполнение или стёртый — ошибка запуска ронял сервер панели.
-  it('бинарь не запускается — причина в ответе, процесс панели жив', async () => {
-    const missing = join(tmpdir(), `no-llama-server-${process.pid}`);
-    const started = Date.now();
-    const result = await testLoadModel({ binary: missing, file: '/m/x.gguf', timeoutMs: 20_000 });
-    expect(result.ok).toBe(false);
-    expect(result.ok ? '' : result.reason).toContain('ENOENT');
-    expect(Date.now() - started).toBeLessThan(10_000);
-  });
-});
-
-describe('импорт моделей Ollama', () => {
-  const TAG = 'qwen3.6:27b-coding';
-
-  /** Хранилище Ollama с одной моделью: манифест и слой-GGUF под именем sha256-<хеш>. */
-  function ollamaStore(blob: Buffer | string, tag = TAG): string {
-    const store = temp();
-    const manifest = manifestPathOf(store, tag);
-    mkdirSync(join(manifest, '..'), { recursive: true });
-    mkdirSync(join(store, 'blobs'), { recursive: true });
-    writeFileSync(blobPathOf(store, 'sha256:cfg'), '{}');
-    writeFileSync(blobPathOf(store, 'sha256:w'), blob);
-    writeFileSync(
-      manifest,
-      JSON.stringify({
-        config: { digest: 'sha256:cfg', size: 2 },
-        layers: [
-          {
-            mediaType: 'application/vnd.ollama.image.model',
-            digest: 'sha256:w',
-            size: Buffer.byteLength(blob),
-          },
-        ],
-      }),
-    );
-    return store;
-  }
-
-  it('имя файла по тегу', () => {
-    expect(importFileName('qwen3.6:27b-coding')).toBe('qwen3.6-27b-coding.gguf');
-    expect(importFileName('hf.co/org/repo:q4')).toBe('hf.co-org-repo-q4.gguf');
-  });
-
-  it('открылся — жёсткая ссылка на слой (одни байты, nlink 2), MTP из заголовка, слой не тронут', async () => {
-    const paths = localPaths(temp(), {});
-    const blob = stubs.ggufBuffer({ nextn: 1, padBytes: 512 });
-    const store = ollamaStore(blob);
-    const loaded: string[] = [];
-    let entry;
-    const job = await runJob(async (handle) => {
-      entry = await importOllamaModel({
-        paths,
-        stores: [store],
-        tag: TAG,
-        handle,
-        testLoad: async (file) => {
-          loaded.push(file);
-          return { ok: true };
-        },
-      });
-    });
-    expect(job.state).toBe('done');
-    expect(entry).toMatchObject({
-      file: 'ollama-import/qwen3.6-27b-coding.gguf',
-      mtp: true,
-      sizeBytes: blob.length,
-    });
-    const target = join(paths.ollamaImport, 'qwen3.6-27b-coding.gguf');
-    expect(loaded).toEqual([target]);
-    expect(statSync(target).nlink).toBeGreaterThanOrEqual(2);
-    expect(readFileSync(blobPathOf(store, 'sha256:w')).equals(blob)).toBe(true);
-    // Две ссылки — одно место на диске.
-    expect(await dirSize(join(paths.ollamaImport, '..'))).toBe(blob.length);
-  });
-
-  it('llama.cpp не открыл — ссылка убрана, слой Ollama цел, код называет причину', async () => {
-    const paths = localPaths(temp(), {});
-    const blob = stubs.ggufBuffer({ arch: 'exotic' });
-    const store = ollamaStore(blob);
-    const job = await runJob((handle) =>
-      importOllamaModel({
-        paths,
-        stores: [store],
-        tag: TAG,
-        handle,
-        testLoad: async () => ({ ok: false, reason: 'unknown model architecture' }),
-      }),
-    );
-    expect(job).toMatchObject({ state: 'failed', errorCode: 'local-load-failed' });
-    expect(job.errorParams).toMatchObject({ reason: 'unknown model architecture' });
-    expect(existsSync(join(paths.ollamaImport, 'qwen3.6-27b-coding.gguf'))).toBe(false);
-    expect(readFileSync(blobPathOf(store, 'sha256:w')).equals(blob)).toBe(true);
-  });
-
-  it('слой не GGUF и тега нет в хранилище — отказ до ссылки и до пробной загрузки', async () => {
-    const paths = localPaths(temp(), {});
-    let tried = 0;
-    const testLoad = async () => {
-      tried += 1;
-      return { ok: true } as const;
-    };
-    const notGguf = await runJob((handle) =>
-      importOllamaModel({ paths, stores: [ollamaStore('plain text')], tag: TAG, handle, testLoad }),
-    );
-    expect(notGguf).toMatchObject({ state: 'failed', errorCode: 'local-import-failed' });
-    const absent = await runJob((handle) =>
-      importOllamaModel({ paths, stores: [temp()], tag: TAG, handle, testLoad }),
-    );
-    expect(absent).toMatchObject({ state: 'failed', errorCode: 'local-import-failed' });
-    expect(tried).toBe(0);
-    expect(existsSync(paths.ollamaImport) ? readdirSync(paths.ollamaImport) : []).toEqual([]);
-  });
-
-  describe('через сервис', () => {
-    async function service(
-      store: string,
-      testLoad: Parameters<typeof createLocalModels>[0]['testLoad'],
-    ) {
-      const root = temp();
-      const env = {
-        AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm'),
-        OLLAMA_MODELS: store,
-        PATH: '',
-        LOCALAPPDATA: join(root, 'appdata'),
-        ProgramFiles: join(root, 'programs'),
-        HOME: root,
-        USERPROFILE: root,
-      };
-      const paths = localPaths(root, env);
-      const runtime = join(paths.runtime, 'llama-b11583');
-      mkdirSync(runtime, { recursive: true });
-      writeFileSync(
-        join(runtime, process.platform === 'win32' ? 'llama-server.exe' : 'llama-server'),
-        '',
-      );
-      const local = createLocalModels({
-        appRoot: root,
-        env,
-        port: 11_498,
-        run: async (cmd) => {
-          if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 22868\n';
-          throw new Error(`no ${cmd}`);
-        },
-        testLoad,
-      });
-      return { local, paths };
-    }
-
-    async function settle(local: Awaited<ReturnType<typeof service>>['local'], id: string) {
-      for (let i = 0; i < 200; i += 1) {
-        const job = (await local.describe()).jobs.find((item) => item.id === id);
-        if (job && job.state !== 'running') return job;
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      throw new Error('job still running');
-    }
-
-    it('системная модель предлагается, после импорта — установлена с меткой Ollama и MTP', async () => {
-      const { local } = await service(ollamaStore(stubs.ggufBuffer({ nextn: 1 })), async () => ({
-        ok: true,
-      }));
-      expect((await local.describe()).importable.map((item) => item.tag)).toEqual([TAG]);
-      const job = local.importFromSystem(TAG);
-      expect((await settle(local, job.id)).state).toBe('done');
-      const info = await local.describe();
-      expect(info.importable).toEqual([]);
-      expect(info.installed.find((item) => item.tag === TAG)).toMatchObject({
-        quant: 'Ollama',
-        source: 'ollama',
-      });
-      // Ни ключа, ни таблицы тензоров — квантование неизвестно, и метки нет: экран напишет это словами,
-      // а служебное «Ollama» квантованием не называется.
-      expect(info.installed.find((item) => item.tag === TAG)).not.toHaveProperty('quantLabel');
-      local.shutdown();
-    });
-
-    it('у файла без general.file_type квантование — тип весов по таблице тензоров', async () => {
-      const { local } = await service(
-        ollamaStore(
-          stubs.ggufBuffer({
-            nextn: 1,
-            tensors: [{ name: 'blk.0.attn_q.weight', dims: [64, 64], type: 12 }],
-          }),
-        ),
-        async () => ({ ok: true }),
-      );
-      const job = local.importFromSystem(TAG);
-      expect((await settle(local, job.id)).state).toBe('done');
-      const info = await local.describe();
-      expect(info.installed.find((item) => item.tag === TAG)).toMatchObject({
-        quant: 'Ollama',
-        quantLabel: 'Q4_K',
-      });
-      local.shutdown();
-    });
-
-    it('настоящее квантование забранного файла — из заголовка GGUF', async () => {
-      const { local } = await service(
-        ollamaStore(stubs.ggufBuffer({ nextn: 1, fileType: 15 })),
-        async () => ({ ok: true }),
-      );
-      const job = local.importFromSystem(TAG);
-      expect((await settle(local, job.id)).state).toBe('done');
-      const info = await local.describe();
-      expect(info.installed.find((item) => item.tag === TAG)).toMatchObject({
-        quant: 'Ollama',
-        quantLabel: 'Q4_K_M',
-        source: 'ollama',
-      });
-      local.shutdown();
-    });
-
-    it('не открылась — не в списке установленных, не предлагается повторно, причина показана', async () => {
-      const { local } = await service(ollamaStore(stubs.ggufBuffer()), async () => ({
-        ok: false,
-        reason: 'unknown model architecture',
-      }));
-      const job = local.importFromSystem(TAG);
-      expect((await settle(local, job.id)).state).toBe('failed');
-      const info = await local.describe();
-      expect(info.installed).toEqual([]);
-      expect(info.importable).toEqual([]);
-      expect(info.importFailed).toEqual([
-        { tag: TAG, reason: expect.stringContaining('unknown model architecture') },
-      ]);
-      local.shutdown();
-    });
+    for (const owned of ['m', 'model', 'alias', 'host', 'port', 'no-webui', 'jinja', 'metrics'])
+      expect(preset).not.toHaveProperty(owned);
   });
 });
 

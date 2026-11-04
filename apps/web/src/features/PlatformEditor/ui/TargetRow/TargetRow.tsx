@@ -39,7 +39,7 @@ export function TargetRow({
     return (
       <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap className={styles.row}>
         <Typography variant="body-sm" color="subtle" as="span">
-          — {target.title}
+          — {applyTargetTitle(target, t)}
         </Typography>
         <Typography variant="caption" color="muted" as="span">
           {t(`platform.targetReason.${target.reason ?? 'no_env_section'}`)}

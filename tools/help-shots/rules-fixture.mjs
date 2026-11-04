@@ -15,6 +15,7 @@
  */
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
+import { shotLanguage, shotTheme } from './kit.mjs';
 
 /** Куда кладётся выдуманный проект. Рядом с репозиторием, а не внутри него. */
 export const PROJECT_DIR = 'C:/work/orders-panel';
@@ -118,7 +119,9 @@ export function makeHome(home, { claudeMd = RULES_CLAUDE_MD, projects = [] } = {
   writeFileSync(join(home, 'CLAUDE.md'), claudeMd, 'utf8');
   writeFileSync(
     join(home, 'agentdeck', 'state.json'),
-    `${JSON.stringify({ projects, settings: { onboardingDone: true, theme: 'light', language: 'ru' } }, null, 2)}\n`,
+    // Язык и тема прогона — сразу в настройках: правку настроек из процесса съёмки ворота
+    // «решает только человек» на доме вне temp отклоняют (`applyShotLanguage` сверит их).
+    `${JSON.stringify({ projects, settings: { onboardingDone: true, theme: shotTheme(), language: shotLanguage() } }, null, 2)}\n`,
     'utf8',
   );
 }

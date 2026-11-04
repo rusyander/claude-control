@@ -49,14 +49,23 @@ export const testsEn: typeof testsRu = {
       'nothing syncs back.',
     vsChat: 'Not the chat',
     vsChatText:
-      'The agent here is the selected CLI: Claude Code, Qwen Code or Codex. For them the ' +
-      'panel checks every write the agent makes: for Claude through the permission broker, ' +
-      'for Qwen Code through a hook on every tool call, for Codex by answering its requests ' +
-      'for edits and commands. If the check cannot be started, the run does not start at ' +
-      'all — there is no full access instead. With another CLI selected the run does not start — the panel refuses ' +
-      'naming that CLI instead of quietly running the tests through Claude. There is no ' +
-      'conversation: a run has no feed and no questions to the human, permissions come from ' +
-      'the panel itself — read anything, change only test files. The other way round too: ' +
+      'The agent here is a core task: the core brings up the selected CLI (Claude Code, Qwen ' +
+      'Code or Codex) right in the project root and drives it like any task of its own — with ' +
+      'its hook, permission judge and journal. With another CLI selected the run does not ' +
+      'start — the panel refuses naming that CLI instead of quietly running the tests through ' +
+      'Claude; if the core does not take the task, the run ends with an error quoting the ' +
+      "core's reason word for word; a turn that ends with an error of the CLI itself closes the " +
+      "run in the CLI's words, with a generic phrase only when the CLI gave none. " +
+      'There is no conversation: a run is one turn, at its end ' +
+      'the panel closes the task and assembles the result from the case files. A run has no ' +
+      'human: a permission question the core would put to you is refused at once and lands ' +
+      'as a line in the run log. The mode’s bounds — which files may change — are held by ' +
+      'the core judge: an edit outside them and git commands that move history (commit, ' +
+      'reset) are refused before the write. The same bounds are stated to the agent in the ' +
+      'assignment, and at the finish the panel checks through git what a shell command ' +
+      'touched: a write outside the bounds shows up as a line in the log. The «Test agent» box ' +
+      'under «Where the contour works» sends the run along the route of the active company ' +
+      'contour — its gateway and key. The other way round too: ' +
       'a chat conversation does not write to the library by itself — “Make a case” in the ' +
       'chat menu builds a DRAFT from it (the steps are your messages, commands and file ' +
       'edits), and you accept or edit it here.',
@@ -549,15 +558,13 @@ export const testsEn: typeof testsRu = {
     agentTitle: 'Agent runs',
     agentCaption:
       'Four different assignments, not one "start" button. The selected CLI carries them ' +
-      'out — Claude Code, Qwen Code or Codex; the others refuse with the reason. Qwen Code and ' +
-      'Codex keep no conversation session: the record is signed with the CLI name and has no ' +
-      '"Open the conversation" link. A panel restart in the middle of a run stops the agent: the ' +
+      'out — Claude Code, Qwen Code or Codex — as a core task; the others refuse with the ' +
+      'reason. The record is signed with the CLI name and remembers its task: the "Open the ' +
+      'core task" link leads to its feed on the "Core tasks" page — every tool call and the ' +
+      'decision on it. A panel restart in the middle of a run cancels the core task: the ' +
       'history record closes as failed, what was written before stays. The agent works on this computer: ' +
-      "it brings the app up where the code lives. Its route is the chat's route: an enabled " +
-      'contour carries the run too — on its model and with the same layers switched off. Only ' +
-      'Claude Code goes through a contour: with Qwen Code or Codex and the "Test agent" tick ' +
-      'on the contour the run does not start, so as not to go to the vendor cloud. The ' +
-      'route is resolved on every start, so a cleared tick takes effect from the next run.',
+      'it brings the app up where the code lives. The model and the route to it are chosen by ' +
+      'the core — the same as for any task of its own.',
     agentGenerate: 'Generate',
     agentGenerateText:
       'The agent looks around the app and proposes cases: it extends the similar ones and ' +
@@ -585,8 +592,12 @@ export const testsEn: typeof testsRu = {
     agentAccessTitle: 'Full access for the duration of a run',
     agentAccessText:
       'A run happens in the background with nobody to ask, so the agent works without ' +
-      '"Allow" cards. The assignment holds the boundary: it may change only the files in ' +
-      '.agent/tests, and a bug it finds is a test result, not a reason to fix code.',
+      '"Allow" cards: a permission question the core would put to a human is refused. The ' +
+      'core judge holds the boundary: only the files in .agent/tests may change (automation ' +
+      'also the test code of its cases), an edit elsewhere and commit or reset are refused ' +
+      'at once. A bug it finds is a test result, not a reason to fix code. Whatever a shell ' +
+      'command touched outside the bounds the panel finds through git at the finish and ' +
+      'writes to the run log.',
     agentChangedTitle: 'Selection by the diff',
     agentChangedText:
       'A run can be narrowed to the cases touched by the uncommitted changes of the working ' +
@@ -608,9 +619,13 @@ export const testsEn: typeof testsRu = {
       'causes no restart at all.',
     agentConventionTitle: 'Asking from the chat',
     agentConventionText:
-      'The buttons of this section explain the format to the agent themselves. A project ' +
-      'chat knows about the section too: the panel appends a line to each of its agents saying ' +
-      'where the cases live and how to keep them (Qwen Code gets it in the system prompt, not in your message). Changing how the product behaves — not only ' +
+      'The buttons of this section explain the format to the agent themselves. The project ' +
+      'chat knows about the section too: a chat turn runs as a core task, and the panel puts the ' +
+      'line saying where the cases live and how to keep them into the session settings — the ' +
+      'core appends it after its own brief. Claude Code gets it, and so does another CLI — both ' +
+      'when the panel continues or carries the conversation and when it is started from the ' +
+      'core chat form. A session started outside the panel takes the format from the block in ' +
+      'the project CLAUDE.md (the button below) or from your message. Changing how the product behaves — not only ' +
       'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
       'own (tests-cli case) and records what it verified as a run: “tested” becomes a record ' +
       'in the history, not words in a reply. A manual case it records with tests-cli record — ' +
@@ -631,7 +646,7 @@ export const testsEn: typeof testsRu = {
       'are named one by one (run --case), not as their whole group: a group may hold long ' +
       'live checks against the stand, and running "the whole group" would load it mid-work. ' +
       'A turn demands at most five cases tied to the changed file by path, the narrowest ' +
-      'first; the rest are checked at the end of the task. A split group does not run its ' +
+      'first; the rest are checked at the end of the task. A group does not run its ' +
       'automated cases at the end of each turn: it runs them once before "delivered", while ' +
       'a case for the change, a recorded manual check and a red result still hold its turn ' +
       '(except a red its delivery notes as not caused by the branch — red word for word as ' +
@@ -655,34 +670,18 @@ export const testsEn: typeof testsRu = {
       'git). The panel installs it into every registry project itself, and into a new one ' +
       'when it is added; the “Agents” tab in Library settings turns it off, and the file ' +
       'is restored byte for byte if nobody edited it after the panel. Without the panel the ' +
-      'same check is pnpm tests gate. Before saying “delivered”, a split group checks the ' +
-      'block of its copy with tests-cli gaps — the same code the panel runs at the delivery ' +
-      'check, for the branch as it is now; exit code 1 means gaps remain, and the command ' +
-      'names each. The whole delivery check — MR description, sieve rows, owner’s points ' +
-      'and the block — is printed by tests-cli delivery --answer <file with the sieves ' +
-      'block>; it reads the MR description through the panel, so the description is posted ' +
-      'once and then checked (--mr-description <file> checks a draft before posting); through ' +
-      'the panel it also reads the comments of the group’s tracker tickets — every delivered ' +
-      'ticket needs a link to the MR. It checks task-N rows the way the panel does: the ' +
-      'quote of the point against the tracker ticket file in the copy ' +
-      '(.agent/run/tickets.md), the group’s task and the MR description. A quote shorter ' +
-      'than three words is a label (a tool or button name), not the point; a row naming a ' +
-      'ticket key is checked against that ticket’s section, not a neighbouring ticket; the MR ' +
-      'description’s checks, screenshots and notes sections are no source of a point. Every ' +
-      'ticket point — a list line of its description or comments (*, -, #, 1.) — needs a task-N row ' +
-      'quoting it, with any status; uncovered points are named word for word, one line per ticket. ' +
-      'A point row id is task- or owner- and a number (task-1, owner-2); a row like ' +
-      'task-1298-perms covers no point, and the check names such rows as a gap of their own — ' +
-      'renumber them, the quotes and proof stay. ' +
-      'A passed row whose sourced proof was rewritten to another meaning with no commit since ' +
-      'is a gap too: a new proof needs new work. Exit 0 ' +
-      'is the proof for the MR description and reviewer threads: the live-MR line names the ' +
-      'open threads, the last note and the note ids the description already names. A run ' +
-      'record keeps the test count of the report (passed, failed, skipped), not only the ' +
-      'cases, and the panel compares the count in a sieve row with it. A live ' +
-      'sieve is proved by the ' +
-      'block only with a run of a case carrying a live tag (live, stand, route, browser, e2e, ' +
-      'db), not a unit case.',
+      'same check is pnpm tests gate. Before saying “delivered”, an agent in a copy checks the ' +
+      'block of its copy with tests-cli gaps — the same code the full delivery check runs, ' +
+      'for the branch as it is now; exit code 1 means gaps remain, and the command ' +
+      'names each. The whole delivery check is printed by tests-cli delivery: it asks the ' +
+      'core’s publish step whether the unit whose copy this is is ready — the same verdict ' +
+      'the core reaches before publishing, not a separate panel check. Exit 0 means nothing ' +
+      'is left; exit 1 means the “- ” lines name what publishing would refuse, in the same ' +
+      'words, plus the core’s next step; exit 2 means no verdict (the panel does not answer, ' +
+      'the core is not wired, or the folder is not a core task copy). The --answer, --mr and ' +
+      '--mr-description flags are no longer read: the core judges the MR description, sieves ' +
+      'and commits itself. A run record keeps the test count of the report (passed, failed, ' +
+      'skipped), not only the cases.',
 
     sourceTitle: 'Where generation takes its material from',
     sourceCaption:
@@ -1087,8 +1086,10 @@ export const testsEn: typeof testsRu = {
       'The value is stored encrypted inside the panel on this machine, next to provider keys.',
     secretsRun: 'How the agent gets them',
     secretsRunText:
-      'Values go into the run process environment. The prompt lists only the names — enough ' +
-      'for the agent to read them itself.',
+      'Values go into the core task environment: the task journal gets only the names, the ' +
+      'core keeps the values in memory until the task ends. The prompt lists only the names ' +
+      'too — enough for the agent to read them itself. A name the core does not give a task ' +
+      'is named by the run as a line in the log.',
     secretsMissing: 'A missing value does not cancel the run',
     secretsMissingText:
       'A colleague who cloned the repository sees the declared name and «not set». The run ' +
@@ -1204,9 +1205,8 @@ export const testsEn: typeof testsRu = {
       'empty record means “the agent marked nothing”, not “the panel lost it”. ' +
       'Generation produces no results at all. Exploration stamps the cases it found: ' +
       'their “failed” and “passed” stand in the session record. A run that never started is ' +
-      'another matter: say a required contour is active in the panel while its gateway is ' +
-      'down or its key is not saved. The agent then does not start around the contour, the ' +
-      'run ends with an error, and the error names the reason and what to press.',
+      'another matter: say the core is not running or did not take the task. The run then ' +
+      "ends with an error quoting the core's reason word for word.",
     limitMuted: 'A red case does not redden the gate',
     limitMutedText:
       'Quarantine. The case runs, its status is real, it stays visible — but pnpm tests ' +
@@ -1435,15 +1435,17 @@ export const testsEn: typeof testsRu = {
         'without a run.',
       chatTest: 'The chat agent writes the test',
       chatTestText:
-        'A conversation in the project directory knows from the first message which autotest ' +
-        'folder the project has and how to name tests in it. No need to mention the folder: the ' +
-        'agent puts the spec where the panel told it to.',
+        'A conversation in the project directory gets a line: which autotest folder the project ' +
+        'has and how to name tests in it. A chat turn runs as a core task, and the line travels ' +
+        'in the session settings — the core appends it after its own brief. The same goes for a ' +
+        'conversation of any CLI started from the core chat form.',
       chatCase: 'The case appears by itself',
       chatCaseText:
         'The panel watches the e2e folder of a registry project itself: a second and a half ' +
         'after the last write into it — whoever wrote the file: the chat agent, an editor or ' +
         'git checkout — the folder is synced, and the test tagged [checkout-001] becomes a case ' +
-        'with no button. The end of the agent turn syncs once more. While an agent run in the ' +
+        'with no button. The end of a chat turn syncs once more — of any CLI: every chat turn runs ' +
+        'as a core task, and the panel syncs the folder when it ends. While an agent run in the ' +
         'section or an autotest run is going, the sync waits for it to end, and while autotests ' +
         'are closing, an agent run does not start either. Watching is off ' +
         'together with “Watch files for changes” in Settings. A project opened only as a tab is not ' +
@@ -1458,20 +1460,17 @@ export const testsEn: typeof testsRu = {
         'the tests get written but there is nothing to run them on; the button hint says so.',
       chatTitle: 'The chat agent knows about the folder',
       chatText:
-        'A conversation in the project directory knows from the first message where tests go ' +
+        'The panel line tells a conversation in the project directory where tests go ' +
         'and how to name them ([group-NNN], @smoke or @regression, Given/When/Then), which ' +
         'command syncs them with the cases and how to run them so the result lands on the case. ' +
         'It asks once and only what is yours: the stand URL, where credentials live, which flows matter most. ' +
-        'Claude gets this as a system prompt addition; another CLI gets one line at the end of ' +
-        'your message, visible in its history. A command message (/…) gets no line. The ' +
+        'A chat turn runs as a core task: the panel puts the line into the session settings, and ' +
+        'the core appends it to the system prompt after its own brief — for Claude Code and for ' +
+        'another CLI, a conversation started from the core chat form or the «New conversation ' +
+        'here» button included. A command message (/…) gets no line. The ' +
         'conversation never creates the folder itself, and the agent will not create it ' +
         'silently either: with none and a task that needs tests, it asks in that same single ' +
-        'question whether to keep them in the Tests section. A split group does not ask at ' +
-        'all: it takes the stand, credentials and flows from its task and the project notes, ' +
-        'and with no folder keeps tests in the checks the project already has. A Claude group ' +
-        'gets the line without paths: the project arrives as AGENTDECK_TESTS_PROJECT, and ' +
-        'tests-cli commands without --project take it from there — so copies of one group ' +
-        'start their request identically and share the cache. Changing how ' +
+        'question whether to keep them in the Tests section. Changing how ' +
         'the product behaves, ' +
         'it adds or updates the case for the change on its own (tests-cli case) — a step per ' +
         'behaviour, each expected naming what is seen, never “all pass” — and records ' +
@@ -1495,7 +1494,10 @@ export const testsEn: typeof testsRu = {
         'the git root — after a cd into a package the answer and the cases are looked up in the project, not ' +
         'the package; none found — the current directory); pnpm tests run ' +
         '--project <dir> [--group <group>] [--case <group:case,…>] runs them (--case runs only ' +
-        'the named cases; a bare case id works when it is unique in the project): without --cmd it starts the folder runner ' +
+        'the named cases; a bare case id works when it is unique in the project; with --case or --group the ' +
+        'selection also goes into the AGENTDECK_TEST_CASES variable — group:case, comma-separated — and a script ' +
+        'that drives several cases from one file can run only those by it; a list over 30,000 characters is not passed, ' +
+        'and such a file runs whole): without --cmd it starts the folder runner ' +
         'from the right directory with the same command as the button, takes the report of ' +
         'THIS run only (an old report file is never picked up) and records the exit code. ' +
         'pnpm tests show <group>:<case> prints a whole case — in the form run, gaps and the ' +
@@ -1735,10 +1737,6 @@ export const testsEn: typeof testsRu = {
         'The run is over: “1 of 2 failed, 1 passed” and a link to the record in the run history',
       '06-run-history':
         'The Runs tab: the “autotests” · “panel” record — 1 passed, 1 failed; below it a CI import and a manual run',
-      '07-chat-test':
-        'A chat in the project directory: the agent put the spec into the folder the panel named',
-      '08-chat-case':
-        'The turn ended — and the library already has the “Оформление” (“Checkout”) group with a case from that spec',
       '09-retry-quarantine':
         'The quarantine card after two runs: the case is green only on retry, an “on retry ×2” badge',
       '11-mutation-result':

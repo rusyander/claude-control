@@ -48,6 +48,9 @@ function requiredCases(dialect: string): string[] {
       case 'customTools':
         if (STUB_CAPS.customTools.includes(dialect as never)) required.push('customTools');
         break;
+      case 'window':
+        if (STUB_CAPS.window.includes(dialect as never)) required.push('window');
+        break;
       case 'offline':
         break; // доказывает тест сервера: слушает только 127.0.0.1, сеть не нужна
       default:
@@ -111,6 +114,28 @@ describe('undeclared cap is refused, not substituted', () => {
       expect(stub.requests.at(-1)?.scriptError).toMatch(/custom/);
     },
   );
+});
+
+describe('window step on a dialect without window headers is refused, not invented', () => {
+  let stub: StubModel;
+  beforeAll(async () => {
+    stub = await startStubModel({ script: () => ({ text: 'x', window: { utilization: 0.5 } }) });
+  });
+  afterAll(() => stub.close());
+
+  it.each(DIALECT_IDS.filter((d) => !STUB_CAPS.window.includes(d)))(
+    'window step on %s → STUB SCRIPT FAILED text, no rate-limit headers',
+    async (dialect) => {
+      const outcome = await call(stub.baseUrl, dialect, { text: 'x', stream: true });
+      const parts = (outcome.reply as { parts: { text?: string }[] }).parts;
+      expect(parts[0]?.text).toMatch(/^STUB SCRIPT FAILED: step window does not exist in /);
+      expect([...outcome.headers.keys()].filter((h) => /ratelimit/.test(h))).toEqual([]);
+    },
+  );
+
+  it('the list is not empty — google-genai has no window headers', () => {
+    expect(DIALECT_IDS.filter((d) => !STUB_CAPS.window.includes(d))).toEqual(['google-genai']);
+  });
 });
 
 describe('package hygiene', () => {

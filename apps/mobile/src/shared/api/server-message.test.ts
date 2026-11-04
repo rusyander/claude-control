@@ -71,4 +71,32 @@ describe('тексты сервера по коду на телефоне', () =
     };
     expect(serverField(record, 'error')).toMatch(/^The panel restarted while the run was going/);
   });
+
+  it('причины ядра (защита данных, звено контура) — с вложенной причиной на языке телефона', () => {
+    const dlp = {
+      error: 'Защиту данных держит ядро, а оно не отвечает: ядро не найдено (no procs.json)',
+      messageCode: 'dlp-core-down',
+      params: { reason: { messageCode: 'dlp-core-missing', params: { reason: 'no procs.json' } } },
+    };
+    const link = {
+      error: 'x',
+      messageCode: 'media-contour-link-failed',
+      params: {
+        contour: 'dev',
+        reason: { messageCode: 'core-link-missing', params: { reason: 'token: empty' } },
+      },
+    };
+    language = 'en';
+    expect(serverField(dlp, 'error')).toBe(
+      'Data protection is held by the core, and it does not answer: the core was not found (no procs.json)',
+    );
+    expect(serverField(link, 'error')).toBe(
+      'The core hop gave no address for contour «dev»: The core was not found: token: empty',
+    );
+    language = 'ru';
+    expect(serverField(dlp, 'error')).toBe(dlp.error);
+    expect(serverMessage('media-image-blocked-no-route')).toBe(
+      'Рисовать некому: ни активного контура, ни своего эндпоинта.',
+    );
+  });
 });

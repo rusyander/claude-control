@@ -81,22 +81,23 @@ export default function contextWatch(input) {
   const limits = limitsFor();
   const ctx = lastContextTokens(path);
   if (!ctx || ctx < limits.floor) return null;
-  // A split-group run (AGENTDECK_SPLIT_CHILD, set by the panel): the panel manages the window — it
-  // starts a fresh conversation by window size — and the copy keeps its state in its notebook, not in
+  // A task step of the agentdeck core (AGENTDECK_STEP_KIND, not `chat`): the core watches the window
+  // (`context-growth`) and the step keeps its state in the task notebook its brief names, not in
   // PROGRESS.md. The regular nudge was injected and ignored in every later request (g5 25.10, N8).
-  const split = process.env.AGENTDECK_SPLIT_CHILD === '1';
-  if (split && ctx < limits.urgent) return null;
+  const stepKind = String(process.env.AGENTDECK_STEP_KIND ?? '').trim();
+  const coreStep = Boolean(stepKind) && stepKind !== 'chat';
+  if (coreStep && ctx < limits.urgent) return null;
 
   const bucket = Math.floor(ctx / limits.bucket);
   const session = String(input?.session_id ?? 'x').slice(0, 12);
   if (alreadySent(session, bucket)) return null;
 
   const k = Math.round(ctx / 1000);
-  if (split) {
+  if (coreStep) {
     return (
       `[context-watch] ctx ${k}k, compaction near. Before the next step, write what a fresh ` +
-      `conversation needs into .agent/run/notebook.agent.md (done / in progress / left / decisions, ` +
-      `files by path), then continue the task.`
+      `conversation needs into the task notebook your brief names (done / in progress / left / ` +
+      `decisions, files by path), then continue the task.`
     );
   }
   if (limits.window !== null) {
@@ -117,7 +118,7 @@ export default function contextWatch(input) {
       `Then continue the task.`
     );
   }
-  // A split-group run returned above: no /clear advice there either — the advice made groups ask for
+  // A core task step returned above: no /clear advice there either — the advice made groups ask for
   // fresh sessions that re-read everything.
   return (
     `[context-watch] ctx ${k}k, re-billed whole on every request. Refresh .agent/PROGRESS.md ` +

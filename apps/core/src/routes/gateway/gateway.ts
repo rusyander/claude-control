@@ -1,6 +1,7 @@
 import type { PlatformModelInfo } from '@agentdeck/contracts/platform';
 import { chooseRunModel, type PlatformModelChoice } from '@agentdeck/contracts/platform-models';
 import { platformDriverAuth } from '@agentdeck/contracts/platform-presets';
+import { CLI_RUN_FACTS } from '@agentdeck/providers/registry';
 import {
   platformRequestHeaders,
   platformRequestUrl,
@@ -52,6 +53,16 @@ export function contourStoreId(contourId: string): string {
  */
 export function contourToolShim(profile: Pick<GatewayProfile, 'toolShim' | 'rules'>): boolean {
   return profile.toolShim === true && (profile.rules?.platform.platformTools.length ?? 0) === 0;
+}
+
+/**
+ * Имена CLI по id — для отказа закрытого раздела чужого CLI на шлюзе человека (закрыт как раз тот,
+ * которого среди разделов нет, поэтому имена — всего реестра). Реестр CLI знают только маршруты и
+ * переходники (depcruise `core-providers-only-in-adapters-routes`): хост звеньев получает имена
+ * готовыми в маршруте, а не читает реестр сам.
+ */
+export function cliDisplayNames(): Record<string, string> {
+  return Object.fromEntries(CLI_RUN_FACTS.map((facts) => [facts.id, facts.name]));
 }
 
 function authOf(profile: GatewayProfile): { header: string; scheme: string } {
@@ -127,6 +138,17 @@ export function createGatewayRoute(options: GatewayRouteOptions): Route {
     return models.find((model) => model.id === choice.model);
   };
 
+  const shimmed = contourToolShim(profile);
+  /**
+   * Инструменты модели для судьи совместимости: прослойка контура даёт их текстом протокола, и
+   * `function_calling: false` каталога её не касается (живой стенд 03.11 — отказ «no_tools» до
+   * первого запроса). Без прослойки — как пишет каталог; не пишет — факта нет.
+   */
+  const toolsOf = (model: PlatformModelInfo): { tools?: boolean } => {
+    if (shimmed) return { tools: true };
+    return model.functionCalling !== undefined ? { tools: model.functionCalling } : {};
+  };
+
   const caps: RouteCaps = {
     // Звено переводит диалекты (11 §Hop chain): вход — оба, что понимают CLI с каналом.
     dialects: ['anthropic-messages', 'openai-chat'],
@@ -159,7 +181,7 @@ export function createGatewayRoute(options: GatewayRouteOptions): Route {
           (await catalog()).filter(isChatModel).map((model) => ({
             id: model.id,
             ...(model.contextLimit !== undefined ? { contextTokens: model.contextLimit } : {}),
-            ...(model.functionCalling !== undefined ? { tools: model.functionCalling } : {}),
+            ...toolsOf(model),
             ...(model.vision !== undefined ? { images: model.vision } : {}),
           })),
         ),

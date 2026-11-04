@@ -1,20 +1,15 @@
+import { connect } from 'node:net';
 import { providerCliCommand } from '../../providers/cli/cli.ts';
 import { getProvider, isKnownProviderId, listProviders } from '../../providers/registry.ts';
-import type { RunOptions } from './ChatRunner/ChatRunner.ts';
+import type { RunOptions } from './run-options/run-options.ts';
 import type { RunMeta } from './ChatRunRegistry/ChatRunRegistry.types.ts';
-import { LiveSession, type LiveSessionPool } from './live-session/live-session.ts';
-import { connectRelay } from './live-transport/live-transport.ts';
 import type { RunLedgerEntry } from './run-ledger/run-ledger.ts';
 
 /**
- * Подхват живой сессии после перезапуска панели — через посредника.
- *
- * До посредника у перезапуска был один исход: процесс CLI жив, трубы к нему нет,
- * прогон «усыновлён без потока» (`DetachedRun`), а в конце хода CLI уходил по
- * концу ввода и уносил фон. Теперь трубы держит посредник (`live-relay.mjs`), и
- * запись журнала несёт его канал: новый сервер подключается, получает вывод,
- * накопленный без него, и дальше ведёт сессию как свою — ходы, пробуждения
- * после фона, «Остановить».
+ * Прогон из журнала после перезапуска панели: чем его продолжить (команда, провайдер,
+ * параметры, мета) и как отпустить посредника прежней версии. Своих посредников панель
+ * больше не поднимает (этап 10, G14: ход ведёт ядро) — запись с каналом приходит только
+ * от сервера до обновления, и ей закрывают ввод (`endRelayInput`).
  */
 
 /** Провайдер, чья это команда запуска (имя без каталога и регистра на Windows); чужая — `undefined`. */
@@ -103,48 +98,22 @@ export function ledgerRunMeta(entry: RunLedgerEntry): RunMeta {
 }
 
 /**
- * Подключиться к посреднику записи и отдать сессию пулу. `undefined` — не к
- * чему: запись без посредника или без `sessionId` (пул знает сессии только по
- * нему). Ход в записи не `idle` — сессия подхвачена посреди хода, и его
- * накопленный вывод ждёт прогона, который его заберёт.
- */
-export function reattachSession(
-  entry: RunLedgerEntry,
-  pool: LiveSessionPool,
-): LiveSession | undefined {
-  const relay = entry.relay;
-  if (!relay || !entry.sessionId) return undefined;
-  const session = LiveSession.reattach(
-    { pipe: relay.pipe, pid: relay.pid, ...(relay.token ? { token: relay.token } : {}) },
-    {
-      // Процесс уже идёт за посредником, нового по этой записи не поднимут; команда —
-      // для сообщений о сбое процесса, тем же именем, что у него.
-      command: commandOf(entry) ?? '',
-      args: [],
-      cwd: entry.cwd,
-      env: {},
-      shell: false,
-      signature: relay.signature,
-      ...(relay.tempDir ? { tempDir: relay.tempDir } : {}),
-      ...(relay.runIdFile ? { runIdFile: relay.runIdFile } : {}),
-    },
-    { sessionId: entry.sessionId, inTurn: !entry.idle, background: relay.background ?? 0 },
-  );
-  pool.keep(session);
-  return session;
-}
-
-/**
- * Посредник без `sessionId` подхватить в пул нельзя. Ему закрывают ввод: CLI
+ * Посредника прежней версии не подхватывают — ему закрывают ввод: CLI
  * доделает ход и выйдет, как выходил до посредника, — а прогон дочитает ответ
  * из транскрипта по жизни pid (`DetachedRun`).
  */
 export function endRelayInput(entry: RunLedgerEntry): void {
   const relay = entry.relay;
   if (!relay) return;
-  const transport = connectRelay(
-    { pipe: relay.pipe, pid: relay.pid, ...(relay.token ? { token: relay.token } : {}) },
-    { line: () => undefined, stderr: () => undefined, close: () => undefined },
-  );
-  transport.end();
+  const socket = connect(relay.pipe);
+  // Канала нет — посредник уже ушёл, закрывать нечего.
+  socket.on('error', () => socket.destroy());
+  socket.once('connect', () => {
+    // Ключ канала — первой строкой: без него посредник с ключом строк не принимает.
+    if (relay.token) {
+      socket.write(`${JSON.stringify({ type: 'relay_hello', token: relay.token })}\n`);
+    }
+    // Конец ввода и сразу конец подключения: держать канал к чужому процессу незачем.
+    socket.end(`${JSON.stringify({ type: 'relay_end' })}\n`);
+  });
 }

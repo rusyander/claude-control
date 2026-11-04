@@ -9,43 +9,11 @@
   background: var(--color-surface-sunken);
 }
 
-// MR влит (владелец 06.10.2026): работа кончена совсем — зелёный оттенок и
-// приглушённый текст, карточка стоит в самом низу (`hubOrder.ts`). Закрытый MR —
-// только приглушён: он кончен, но не успехом.
-// Оттенок — лёгкий (6 % цвета поверх фона карточки), а статус несёт полоса
-// слева: сплошная зелёная и синяя заливка во всю карточку горели на тёмной теме
-// (владелец 22.10.2026).
-.groupMerged {
-  border-color: color-mix(in srgb, var(--color-success) 25%, var(--color-border));
-  background: color-mix(in srgb, var(--color-success) 6%, var(--color-surface-sunken));
-  box-shadow: inset 3px 0 0 var(--color-success);
-  color: var(--color-fg-muted);
-}
-
-// Принята человеком (владелец 09.10.2026): акцентный оттенок и полоса слева —
-// отличается и от доставленной (фон по умолчанию), и от влитой (зелёный).
-// Карточка стоит ниже ждущих приёмки (`orderHubGroups.ts`).
-.groupAccepted {
-  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-sunken));
-  box-shadow: inset 3px 0 0 var(--color-accent);
-}
-
-.groupClosed {
-  color: var(--color-fg-muted);
-  opacity: 0.8;
-}
-
-// Ждёт человека (вопрос, решение, ответ на остановку) — жёлтая полоса слева,
-// упала — красная: по ленте карточек видно, где нужен я, не читая их.
+// Ждёт человека (вопрос, запрос прав) — жёлтая полоса слева: по ленте карточек
+// видно, где нужен я, не читая их.
 .groupAsk {
   border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
   box-shadow: inset 3px 0 0 var(--color-warning);
-}
-
-.groupFailed {
-  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
-  box-shadow: inset 3px 0 0 var(--color-danger);
 }
 
 // Карточка с чатом кликабельна целиком, поэтому наведение видно в ОБЕИХ темах.
@@ -152,38 +120,9 @@
   }
 }
 
-// Кнопка MR и её номер в очереди слияния (G3) — один кусок ряда кнопок:
-// перенос не отрывает номер от кнопки, к которой он относится.
-.mrPair {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--spacing-2xs);
-}
-
 .groupFoot {
   position: relative;
   z-index: 1;
   margin-top: var(--spacing-2xs);
   padding-left: calc(8px + var(--spacing-2xs));
-}
-
-// «Не хватает для MR» — свёрнутым разделом с пунктами списком.
-.missing {
-  margin-top: var(--spacing-3xs);
-}
-
-.missingList {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: var(--spacing-3xs) 0 0;
-  padding-left: calc(16px + var(--spacing-xs));
-  overflow-wrap: anywhere;
-}
-
-.holdActions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--spacing-2xs);
 }

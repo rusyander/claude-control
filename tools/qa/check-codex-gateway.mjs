@@ -90,8 +90,7 @@ ${out.slice(-1500)}`);
 
 async function main() {
   const { AppStore } = await import('../../apps/server/src/lib/app-store/app-store.ts');
-  const { PlatformGateway } =
-    await import('../../apps/server/src/domains/platform/gateway/listener/listener.ts');
+  const { coreGateway } = await import('./core-gateway.mjs');
   const { writePlatform, writeToken } =
     await import('../../apps/server/src/domains/platform/store/store.ts');
   const { defaultOurRules, defaultPlatformRules } =
@@ -115,7 +114,8 @@ async function main() {
   for (const dir of [appData, home, work]) mkdirSync(dir, { recursive: true });
 
   const stub = await startStubPlatform({ port: 0 });
-  const gateway = new PlatformGateway();
+  // Шлюз контуров держит ядро (этап 10): хост звеньев на временном доме, маршруты из state.json.
+  const gateway = coreGateway();
   const closers = [];
   try {
     const store = new AppStore(appData);
@@ -143,7 +143,7 @@ async function main() {
       transport: defaultPlatformTransport(),
     });
     writeToken(appData, CONTOUR, SECRET);
-    await gateway.start({ store, appDataDir: appData, port: 0, spendFlushMs: 0 });
+    await gateway.start({ appDataDir: appData });
     const gatewayPort = gateway.status().port;
     // Пишущий посредник между codex и шлюзом: при зависании видно, ЧТО codex
     // получил на самом деле, а не что шлюз считал отправленным.
@@ -212,10 +212,10 @@ async function main() {
         cwd: work,
         prompt: 'скажи готов',
         model: 'stub-chat',
-        onHang: () =>
+        onHang: async () =>
           console.log(
             `  ЗАВИС: провод ${JSON.stringify(wire.map((w) => ({ m: w.method, u: w.url, s: w.status, ended: w.ended, enc: w.headers['content-encoding'], tail: w.out.slice(-300) })))}
-  контур видел ${JSON.stringify(stub.calls.slice(before).map((c) => `${c.method} ${c.path}`))}, шлюз ${JSON.stringify(gateway.status().events.map((e) => [e.path, e.status]))}`,
+  контур видел ${JSON.stringify(stub.calls.slice(before).map((c) => `${c.method} ${c.path}`))}, шлюз ${JSON.stringify((await gateway.events()).map((e) => [e.path, e.status]))}`,
           ),
       });
       const ups = stub.calls.slice(before).filter((call) => call.method === 'POST');
@@ -234,7 +234,7 @@ async function main() {
         ups.every((call) => !String(call.authorization).includes(CODEX_KEY)),
         'ключ codex наверх не ушёл',
       );
-      const events = gateway.status().events.filter((event) => event.path.endsWith('/responses'));
+      const events = (await gateway.events()).filter((event) => event.path.endsWith('/responses'));
       check(
         events.length > 0 && events.every((event) => event.status === 200),
         'след шлюза: маршрут /v1/responses, статус 200',
@@ -252,7 +252,7 @@ async function main() {
       // на диске, созданный самим codex, а не строка в его выводе.
       const marker = 'codex-gateway-marker';
       const before = stub.calls.length;
-      const eventsBefore = gateway.status().events.length;
+      const eventsBefore = (await gateway.events()).length;
       const run = await runCodex(cli, {
         home,
         cwd: work,
@@ -284,7 +284,7 @@ async function main() {
         'ход кончился текстом контура',
         run.out.slice(-300),
       );
-      const events = gateway.status().events.slice(eventsBefore);
+      const events = (await gateway.events()).slice(eventsBefore);
       check(
         events.length === 2 && events.every((event) => event.status === 200),
         'в следе шлюза оба запроса /v1/responses со статусом 200',

@@ -1,6 +1,6 @@
 // watchdog call loop: units in, one blocking call out. Wakes 8 s after the first hi flag (settle collects what
 // follows it), 90 s after the first mid flag, or at --max with a quiet footer. Polls the filesystem in-process —
-// no shell sleep, no model turn while idle. A plugin (agentdeck-watchdog) adds units, scans and footer parts.
+// no shell sleep, no model turn while idle. A plugin may add units, scans and footer parts.
 import path from 'node:path';
 import { DEFAULTS, T, Watcher, age, configRoot, digest, discover, footerLine, hms, insideOf, kc, loadState, nativePath, parseUnitSpec, saveState, takeLock } from './core.mjs';
 import { coordinatorOf, ledgerDirFor, owedRefs, registerWatcher, stopWatcher, unrowed } from './keepalive.mjs';

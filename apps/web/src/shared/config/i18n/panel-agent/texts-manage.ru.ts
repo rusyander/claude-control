@@ -10,23 +10,11 @@ type ManageTexts = { [C in PanelTextCode]?: string };
  * запасным текстом сервера (`texts-manage.ts`).
  */
 export const panelTextsManageRu = {
-  'journal-read-split-defaults': 'Общие правила групп разделения',
-  'journal-save-split-defaults': 'Правка общих правил групп разделения',
-  'summary-save-split-defaults': 'Изменить общие правила групп разделения',
-  'label-split-human-only': 'Остаётся за вами',
-  'value-split-human-only': 'Права групп и развилки групп агент не меняет — их выставляете вы',
   'journal-read-sieves': 'Сита перед MR: выученные и счёт блокеров',
   'journal-delete-learned-sieve': 'Убрать выученное сито',
   'summary-delete-learned-sieve':
     'Убрать выученное сито класса «{{class}}» — оно перестанет попадать в задания групп',
   'label-sieve-sources': 'Выучено по тредам',
-  'journal-watcher-status': 'Состояние фонового наблюдателя',
-  'journal-set-watcher': 'Включение или выключение наблюдателя',
-  'summary-watcher-on': 'Включить фоновый наблюдатель',
-  'summary-watcher-off': 'Выключить фоновый наблюдатель',
-  'label-watcher-cost': 'Расход',
-  'value-watcher-cost': 'Сбои страниц разбирает модель в фоне — это тратит лимит',
-  'value-watcher-off': 'Разбор останавливается сразу',
   'journal-list-models': 'Каталог моделей',
   'journal-format-check': 'Сверка форматов CLI',
   'journal-read-account': 'Учётная запись и система',
@@ -61,10 +49,12 @@ export const panelTextsManageRu = {
   'journal-start-gateway': 'Запуск шлюза контура',
   'summary-start-gateway': 'Поднять шлюз контура',
   'label-port': 'Порт',
-  'value-start-gateway-effect': 'Шлюз включается в настройках и поднимается на этом порту',
+  'value-start-gateway-effect':
+    'Шлюз включается в настройках; держит его ядро — панель проверяет, что он слушает',
   'journal-restart-gateway': 'Перезапуск шлюза контура',
   'summary-restart-gateway': 'Перезапустить шлюз контура',
-  'value-restart-gateway-effect': 'Запросы, идущие через шлюз прямо сейчас, оборвутся',
+  'value-restart-gateway-effect':
+    'Панель заново спрашивает ядро, слушает ли шлюз; идущие запросы не обрываются',
   'journal-contour-spend': 'Расход контура',
   'journal-clear-contour-exhausted': 'Снятие отметки «бюджет исчерпан»',
   'summary-clear-contour-exhausted': 'Снять отметку «бюджет исчерпан» у контура «{{title}}»',

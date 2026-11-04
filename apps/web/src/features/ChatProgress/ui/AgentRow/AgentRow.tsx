@@ -3,7 +3,6 @@ import type { MouseEvent } from 'react';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { StatusDot } from '@shared/ui/status-dot';
-import { Button } from '@shared/ui/button';
 import { Icon } from '@shared/ui/icon';
 import { cn } from '@shared/lib/cn';
 import { formatDuration } from '@shared/lib/format-duration';
@@ -50,10 +49,6 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
   const toggle = (event: MouseEvent): void => {
     event.stopPropagation();
     tree?.onToggle();
-  };
-  const stop = (event: MouseEvent): void => {
-    event.stopPropagation();
-    tree?.onStop?.();
   };
 
   return (
@@ -110,20 +105,6 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
             {quiet !== undefined &&
               ` · ${t('chat.progress.agentQuiet', { ago: formatDuration(quiet, t) })}`}
           </Typography>
-          {tree?.onStop && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className={styles.stop}
-              leftIcon={<Icon name="stop" size={14} />}
-              isLoading={tree.isStopping}
-              title={t('agentTree.stopHint')}
-              data-agent-stop
-              onClick={stop}
-            >
-              {t('agentTree.stop')}
-            </Button>
-          )}
         </span>
       </div>
 
@@ -184,18 +165,6 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
           data-agent-last
         >
           {t('agentTree.last', { what: agent.lastAction })}
-        </Typography>
-      )}
-
-      {tree?.stopNote && (
-        <Typography
-          variant="caption"
-          as="div"
-          role="status"
-          className={styles.stopNote}
-          data-agent-stop-note
-        >
-          {tree.stopNote}
         </Typography>
       )}
 

@@ -191,6 +191,7 @@ function parseRun(data: unknown, fileId: string): ProjectTestRunRecord | undefin
     tokens: typeof record.tokens === 'number' ? record.tokens : undefined,
     costUsd: typeof record.costUsd === 'number' ? record.costUsd : undefined,
     sessionId: optional(record.sessionId),
+    ...(optional(record.coreTaskId) ? { coreTaskId: optional(record.coreTaskId) } : {}),
     ...(record.attested === true ? { attested: true } : {}),
     ...withStamps(record.stamps),
     ...(optional(record.tree) ? { tree: optional(record.tree) } : {}),

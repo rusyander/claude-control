@@ -6,8 +6,12 @@
  * который собрала панель, запускает из него настоящий переходник
  * (`tools/mcp/panel.mjs`), говорит с ним MCP по stdio и зовёт действия панели
  * так же, как их зовёт CLI, — значит, каждое изменение проходит карточку и ждёт
- * решения человека. Ответ — строки `--output-format stream-json`, какие читает
- * `runner.ts`: `tool_use`, `tool_result`, текст и `result`.
+ * решения человека. Ход агента панели идёт через ядро (s10): CLI зовётся как SDK
+ * (`--input-format stream-json`, stdin открыт), мост — сервер `panel-bridge` среди
+ * прочих в `--mcp-config` сессии. Скрипт отвечает так, как читает ядро
+ * (`sdk-stream/normalise.ts`): эхо строки user с её uuid (`isReplay`), `system/init`,
+ * текст частями `stream_event`, сообщения с id и расходом, `result` на ход; выход —
+ * по концу stdin.
  *
  * Ход выбирается по ТЕКУЩЕЙ просьбе (`Human (current request): …`):
  * - «создай правила для X» → два `save_rule` про X; ответ называет созданные;
@@ -19,9 +23,9 @@
  * - «перенеси переменную KEY …» → `move_env` из settings.json;
  * - «поменяй право «P» …» → `edit_permission_rule` allow → ask.
  *
- * Служебный вызов панели (`claude -p` без `--mcp-config` — поиск наборов) получает
- * ответ `serviceReply`: вся опись источника одним набором. Пишется в
- * `service-cli.jsonl`.
+ * Служебный вызов (без моста `panel-bridge` — поиск наборов; на прежней дороге —
+ * `claude -p` без `--mcp-config`) получает ответ `serviceReply`: вся опись источника
+ * одним набором. Пишется в `service-cli.jsonl`.
  *
  * Каждый вызов пишется в `agent-cli.jsonl` рядом с собой.
  * Экспорт — строка: её исходник пишется в файл стенда (`fakeCli`).
@@ -29,6 +33,8 @@
 export const FAKE_PANEL_AGENT_CLI_SOURCE = String.raw`
 import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const argv = process.argv.slice(2);
@@ -46,25 +52,121 @@ setInterval(() => {
 }, 500).unref();
 
 const log = (entry) => appendFileSync(near('agent-cli.jsonl'), JSON.stringify(entry) + '\n');
-const out = (event) => process.stdout.write(JSON.stringify(event) + '\n');
-const configPath = argv[argv.indexOf('--mcp-config') + 1];
+const flag = (name) => {
+  const at = argv.indexOf(name);
+  return at >= 0 ? argv[at + 1]?.replace(/^"|"$/g, '') : undefined;
+};
+const configPath = flag('--mcp-config');
+// Ядро (s10) зовёт CLI как SDK: «-p --input-format stream-json», stdin открыт, ходы — строки
+// user, каждая ждёт эха со своим uuid (--replay-user-messages). Прежняя дорога панели —
+// задание целиком на stdin и выход по его концу — осталась для служебных вызовов.
+const core = argv.includes('--input-format');
+const session = flag('--resume') ?? flag('--session-id') ?? randomUUID();
+const model = flag('--model') ?? 'fake-panel-agent';
+const msgId = () => 'msg_' + randomUUID().replace(/-/g, '').slice(0, 20);
+const out = (event) => {
+  if (core && (event.type === 'assistant' || event.type === 'user')) {
+    event.session_id = session;
+    event.parent_tool_use_id = null;
+    if (event.type === 'assistant') {
+      event.message = { id: msgId(), type: 'message', role: 'assistant', model, stop_reason: null,
+        usage: { input_tokens: 1, output_tokens: 1 }, ...event.message };
+      // Текст ядро берёт из потока частей (--include-partial-messages), как у настоящего CLI:
+      // целое сообщение несёт только вызовы и расход.
+      const texts = event.message.content.filter((block) => block.type === 'text');
+      if (texts.length > 0) {
+        const part = (inner) => process.stdout.write(
+          JSON.stringify({ type: 'stream_event', event: inner, session_id: session, parent_tool_use_id: null }) + '\n');
+        part({ type: 'message_start', message: { ...event.message, content: [] } });
+        texts.forEach((block, index) =>
+          part({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: block.text } }));
+        part({ type: 'message_stop' });
+      }
+    } else event.message = { role: 'user', ...event.message };
+  }
+  process.stdout.write(JSON.stringify(event) + '\n');
+};
+// Итог хода: на прежней дороге — выход, у ядра — ждать следующую строку или конец stdin.
+const finish = (reply, isError = false) =>
+  new Promise((resolve) => {
+    const line = { type: 'result', subtype: isError ? 'error_during_execution' : 'success', result: reply,
+      is_error: isError, num_turns: 1, duration_ms: 1, total_cost_usd: 0, session_id: session,
+      usage: { input_tokens: 1, output_tokens: 1 } };
+    // Выход — после того, как строка итога ушла в трубу: на Linux запись в неё асинхронна.
+    process.stdout.write(JSON.stringify(line) + '\n', () => (core ? resolve() : process.exit(isError ? 1 : 0)));
+  });
 
 let prompt = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => (prompt += chunk));
-process.stdin.on('end', () => {
-  if (!argv.includes('--mcp-config')) {
-    // Служебный вызов панели (поиск наборов: «claude -p», задание на stdin, ответ — текст).
+if (core) {
+  const queue = [];
+  let busy = false;
+  let ended = false;
+  const pump = async () => {
+    if (busy) return;
+    if (queue.length === 0) {
+      if (ended) process.exit(0);
+      return;
+    }
+    busy = true;
+    const message = queue.shift();
+    const content = message.message?.content;
+    prompt = typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('');
+    out({ type: 'user', message: message.message, uuid: message.uuid, isReplay: true });
+    out({ type: 'system', subtype: 'init', session_id: session, model, cwd: process.cwd(), tools: [],
+      mcp_servers: [] });
+    try {
+      await turn();
+    } catch (error) {
+      await finish(String(error), true);
+    } finally {
+      busy = false;
+    }
+    void pump();
+  };
+  createInterface({ input: process.stdin })
+    .on('line', (line) => {
+      let message;
+      try {
+        message = JSON.parse(line);
+      } catch {
+        return;
+      }
+      if (message.type !== 'user') return;
+      queue.push(message);
+      void pump();
+    })
+    .on('close', () => {
+      ended = true;
+      void pump();
+    });
+} else {
+  process.stdin.on('data', (chunk) => (prompt += chunk));
+  process.stdin.on('end', () => {
+    turn().catch((error) => finish(String(error), true));
+  });
+}
+
+// Ход без моста панели — служебный вызов (поиск наборов: задание текстом, ответ — текст).
+async function turn() {
+  const config = configPath ? JSON.parse(readFileSync(configPath, 'utf8')) : undefined;
+  const servers = Object.entries(config?.mcpServers ?? {});
+  const bridged = servers.find(([id]) => id === 'panel-bridge') ?? (core ? undefined : servers[0]);
+  if (!bridged) {
     const reply = serviceReply(prompt);
     appendFileSync(near('service-cli.jsonl'), JSON.stringify({ argv, reply }) + '\n');
-    process.stdout.write(reply + '\n', () => process.exit(0));
+    if (!core) {
+      process.stdout.write(reply + '\n', () => process.exit(0));
+      return;
+    }
+    // Не строка-якорь сценария (REPLY_LINE ищется подстрокой): текст ответа — отдельным блоком.
+    const answer = { type: 'text', text: reply };
+    out({ type: 'assistant', message: { content: [answer] } });
+    await finish(reply);
     return;
   }
-  main().catch((error) => {
-    out({ type: 'result', subtype: 'error', result: String(error), is_error: true });
-    process.exit(1);
-  });
-});
+  await main(bridged);
+}
 
 const parse = (text) => {
   const at = text.indexOf('{');
@@ -90,9 +192,7 @@ function serviceReply(text) {
   });
 }
 
-async function main() {
-  const config = JSON.parse(readFileSync(configPath, 'utf8'));
-  const [serverId, server] = Object.entries(config.mcpServers)[0];
+async function main([serverId, server]) {
   const bridge = spawn(server.command, server.args ?? [], {
     env: { ...process.env, ...(server.env ?? {}) },
     stdio: ['pipe', 'pipe', 'ignore'],
@@ -215,10 +315,6 @@ async function main() {
   }
   out({ type: 'assistant', message: { content: [{ type: 'text', text: reply }] } });
   bridge.kill();
-  // Выход — после того, как строка итога ушла в трубу: на Linux запись в неё асинхронна.
-  process.stdout.write(
-    JSON.stringify({ type: 'result', subtype: 'success', result: reply, is_error: false }) + '\n',
-    () => process.exit(0),
-  );
+  await finish(reply);
 }
 `;

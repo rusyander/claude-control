@@ -1,4 +1,4 @@
-import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
 import type { RunFinished, RunMeta } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 import { isRetriableRunError } from '../run-errors/run-errors.ts';

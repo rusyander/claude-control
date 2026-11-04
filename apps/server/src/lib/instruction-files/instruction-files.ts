@@ -9,6 +9,7 @@ import type {
 } from '@agentdeck/contracts';
 // Значения — подпутём: сервер идёт под `--experimental-strip-types` (AGENTS.md).
 import { instructionFilesModes } from '@agentdeck/contracts/instructions';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { readJsonFile } from '../safe-io/safe-io.ts';
 import { coded } from '../server-text/server-text.ts';
 
@@ -170,6 +171,8 @@ interface InstructionSource {
 /** Почему источник не взят — причина попадает в пропуск паспорта. */
 interface InstructionSkip {
   detail: string;
+  detailCode: ServerMessageCode;
+  detailParams?: Record<string, string>;
 }
 
 export interface InstructionSources {
@@ -193,11 +196,17 @@ export function resolveInstructionSources(
   if (choice.unreadable) {
     skips.push({
       detail: `файл настроек не разобран; взят режим по умолчанию ${DEFAULT_INSTRUCTION_FILES_MODE}`,
+      detailCode: 'instruction-files-settings-unread',
+      detailParams: { mode: DEFAULT_INSTRUCTION_FILES_MODE },
     });
   }
   if (choice.unrecognized !== undefined) {
+    const key =
+      choice.source === 'projectInstructions' ? 'projectInstructions' : 'instructionFiles';
     skips.push({
-      detail: `значение «${choice.unrecognized}» ключа ${choice.source === 'projectInstructions' ? 'projectInstructions' : 'instructionFiles'} не распознано; взят режим по умолчанию ${DEFAULT_INSTRUCTION_FILES_MODE}`,
+      detail: `значение «${choice.unrecognized}» ключа ${key} не распознано; взят режим по умолчанию ${DEFAULT_INSTRUCTION_FILES_MODE}`,
+      detailCode: 'instruction-files-value-unknown',
+      detailParams: { value: choice.unrecognized, key, mode: DEFAULT_INSTRUCTION_FILES_MODE },
     });
   }
 
@@ -205,6 +214,7 @@ export function resolveInstructionSources(
     skips.push({
       detail:
         'режим managed-only: собственные файлы инструкций CLI не читает, остаются только управляемые организацией',
+      detailCode: 'instruction-files-managed-only',
     });
     return { sources: [], skips };
   }
@@ -215,8 +225,11 @@ export function resolveInstructionSources(
 
   if (choice.mode === 'claude-md') {
     if (agentsFiles.length > 0) {
+      const files = agentsFiles.map((found) => found.name).join(', ');
       skips.push({
-        detail: `режим claude-md: ${agentsFiles.map((found) => found.name).join(', ')} лежит рядом, но CLI его не читает`,
+        detail: `режим claude-md: ${files} лежит рядом, но CLI его не читает`,
+        detailCode: 'instruction-files-claude-md',
+        detailParams: { files },
       });
     }
     return { sources: claudeFiles.map((found) => source(found, legacy)), skips };
@@ -232,8 +245,11 @@ export function resolveInstructionSources(
   // claude-md-or-agents-md: AGENTS.md берётся только там, где своего CLAUDE.md нет.
   if (claudeFiles.length > 0) {
     if (agentsFiles.length > 0) {
+      const files = agentsFiles.map((found) => found.name).join(', ');
       skips.push({
-        detail: `режим claude-md-or-agents-md: рядом есть CLAUDE.md, поэтому ${agentsFiles.map((found) => found.name).join(', ')} CLI не читает`,
+        detail: `режим claude-md-or-agents-md: рядом есть CLAUDE.md, поэтому ${files} CLI не читает`,
+        detailCode: 'instruction-files-claude-or-agents',
+        detailParams: { files },
       });
     }
     return { sources: claudeFiles.map((found) => source(found, legacy)), skips };

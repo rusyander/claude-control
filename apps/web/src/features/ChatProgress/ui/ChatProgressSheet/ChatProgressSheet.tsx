@@ -178,7 +178,6 @@ export function ChatProgressSheet({
                 {...(progress.processAlive !== undefined
                   ? { processAlive: progress.processAlive }
                   : {})}
-                canStop={progress.canStopAgents === true}
                 now={now}
               />
               {summary.agentsLost > 0 && (

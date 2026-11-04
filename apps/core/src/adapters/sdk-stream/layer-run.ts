@@ -48,6 +48,17 @@ async function resolveTrust(spec: SessionSpec, policy: LayerPolicy): Promise<Lay
     repoLayer: true,
     trust,
   });
+  // Только источник человека (этап 10, F6): слоя проекта нет вовсе, доверию к папке открывать
+  // нечего — режим как просили, слой репозитория закрыт.
+  if (spec.layer.sources === 'user') {
+    return {
+      asked,
+      ran: asked,
+      repoLayer: false,
+      trust: 'none',
+      detail: 'user setting source only (task session)',
+    };
+  }
   const untrusted = (trust: 'none' | 'unknown', detail: string): LayerRun => ({
     asked,
     ran: policy.untrusted(asked),

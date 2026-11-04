@@ -1,6 +1,5 @@
 import { getEventListeners } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTelegramNotifier } from '../telegram.ts';
 import { TelegramAnswersService, type AnswersServiceDeps } from './service.ts';
 import { SentLog } from './sent-log.ts';
 import { sleep } from './sleep.ts';
@@ -355,39 +354,6 @@ describe('пачка 25.10: ответы, сворачивание, тишина
     await sleep(1, signal);
     await sleep(1, signal);
     expect(getEventListeners(signal, 'abort')).toHaveLength(0);
-  });
-
-  it('B8: «внимание» сторожа в Telegram не уходит; «тревога» — словами, код правила в цитате', async () => {
-    const bot = fakeBot();
-    vi.stubGlobal('fetch', bot.fetchStub);
-    const notify = createTelegramNotifier({
-      settings: () => ({ enabled: true, chatId: String(OWNER), events: ['groupSignal'] }),
-      token: () => TOKEN,
-      titleOf: () => 'Аудит',
-    });
-    notify({
-      kind: 'groupSignal',
-      rule: 'R2',
-      severity: 'warn',
-      numbers: { writeK: 40 },
-      projectPath: '/w/shop',
-    });
-    notify({
-      kind: 'groupSignal',
-      rule: 'R1',
-      severity: 'alert',
-      numbers: { idleMin: 21 },
-      projectPath: '/w/shop',
-      chatId: 'g1',
-      group: { index: 2, title: 'API' },
-    });
-    await vi.waitFor(() => expect(sends(bot)).toHaveLength(1));
-    const text = String(sends(bot)[0]!.body.text);
-    expect(text.split('\n').slice(0, 3)).toEqual([
-      '<b>⚠️ ТРЕВОГА · 📁 shop · Аудит</b>',
-      '<b>группа молчит</b>',
-      '<blockquote expandable>группа 2 «API» · R1 · без событий 21 мин</blockquote>',
-    ]);
   });
 
   it('A5: удачная отправка снимает прежнюю подробность «не удалось написать»', async () => {

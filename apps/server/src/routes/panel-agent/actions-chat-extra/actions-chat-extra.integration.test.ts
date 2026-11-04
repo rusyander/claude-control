@@ -35,7 +35,6 @@ import {
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { HandoffChains } from '../../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import { chatDirectory } from '../../../domains/chat/ChatArtifacts/ChatArtifacts.ts';
-import { ProviderChatService } from '../../../domains/provider-chat/provider-chat.ts';
 import { registerChatRunRoutes } from '../../chat/run-routes/run-routes.ts';
 import { registerChatTranscriptRoutes } from '../../chat/transcript-routes/transcript-routes.ts';
 import { registerChatArtifactRoutes } from '../../chat/artifact-routes.ts';
@@ -203,7 +202,17 @@ describe('panel-agent actions: chat session, chat files, editor', () => {
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      providerChats: new ProviderChatService(),
+      coreChats: {
+        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
+        estimate: async () => ({
+          ok: false as const,
+          code: 'no-core',
+          message: 'no core in this test',
+        }),
+        command: async () => {
+          throw new Error('no core in this test');
+        },
+      },
       session,
     });
     registerPanelAgentRoutes(app, ctx, {

@@ -24,10 +24,11 @@ export default function docDailyReview(input) {
 export function reviewInventory() {
   if (process.env.AGENTDECK_KIT_DOC_REVIEW === '0' || process.env.CLAUDE_DOC_REVIEW === '0')
     return null;
-  // A panel group run (the panel names its stage) cannot act on the copy's doc list: it injected the
-  // whole inventory into a split group on a 58 KB lane report. Silent there; the day's stamp stays
-  // unspent, so the next human session still gets the review.
-  if (String(process.env.AGENTDECK_GROUP_STAGE ?? '').trim()) return null;
+  // A task step of the agentdeck core (it names the step kind; `chat` is a person at the panel) cannot act
+  // on the copy's doc list: a panel group got the whole inventory injected on a 58 KB lane report. Silent
+  // there; the day's stamp stays unspent, so the next human session still gets the review.
+  const step = String(process.env.AGENTDECK_STEP_KIND ?? '').trim();
+  if (step && step !== 'chat') return null;
   if (hygieneDisabled(process.cwd())) return null;
 
   const NOW = Date.now();

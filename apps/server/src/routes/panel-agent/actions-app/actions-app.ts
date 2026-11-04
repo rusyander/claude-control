@@ -31,7 +31,7 @@ import {
   unmasked,
 } from '../action-kit/action-kit.ts';
 import { dataField, textField } from '../texts/texts.ts';
-import { maskNamedValue, SECRET_MASK } from '@agentdeck/dlp/secret-mask';
+import { SECRET_MASK } from '@agentdeck/dlp/secret-mask';
 import { needsToken } from '../../../domains/integrations/store/store.ts';
 
 /**
@@ -50,8 +50,9 @@ const listGroups = definePanelAction({
   section: 'groups',
   risk: 'read',
   description:
-    'List panel groups (id, name, enabled, members as kind:id, env with secret values masked, bound project paths). ' +
-    'To edit env send the whole map back: masked values are kept from disk.',
+    'List the panel’s legacy groups, read-only (id, name, enabled, members as kind:id, env with secret ' +
+    'values masked, bound project paths). Groups are no longer created, edited or run here: the core runs ' +
+    'tasks, and the Groups page moves a legacy group into the core with its "To core" button — the human does that.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/groups' }),
   shape: (_input, body) => ({
@@ -61,222 +62,13 @@ const listGroups = definePanelAction({
       description: group.description,
       isEnabled: group.isEnabled,
       members: group.members.map((member) => `${member.kind}:${member.id}`),
-      // Значения, а не одни имена: env правки — полная замена, и у выключенной
-      // группы list_env их не видит — без них добавить ключ значило стереть прочие.
-      // Секреты — маской; назад маска возвращается значением с диска (groupDraft).
+      // Значения, а не одни имена: у выключенной группы list_env их не видит.
+      // Секреты — маской.
       env: maskDeep(group.env) as Record<string, string>,
       projectPaths: group.projectPaths,
     })),
   }),
   summary: 'journal-list-groups',
-});
-
-const MEMBER = z
-  .string()
-  .regex(/^(rule|hook|skill|mcp|permission|group):.+$/)
-  .describe('kind:id, e.g. "skill:review", "mcp:gitlab"');
-
-export const groupInput = z.object({
-  id: z.string().min(1).optional().describe('Existing group id; omit to create'),
-  name: z.string().trim().min(1).max(100),
-  description: z.string().max(1000).optional(),
-  members: z.array(MEMBER).optional().describe('Full member list; omit on edit to keep'),
-  env: z
-    .record(z.string(), z.string())
-    .optional()
-    .describe(
-      'Env applied while enabled; secrets are never sent. Whole map, replaces the current one: send list_groups env back with your change (masked values are kept). Omit on edit to keep',
-    ),
-  projectPaths: z.array(z.string()).optional().describe('Omit on edit to keep'),
-});
-
-export async function findGroup(inject: InjectRoute, id: string): Promise<Group> {
-  const group = (await readRoute<Group[]>(inject, '/api/groups')).find((item) => item.id === id);
-  if (!group) throw new Error(`Group «${id}» not found. Call list_groups.`);
-  return group;
-}
-
-/**
- * Значение env группы, которое модель прислала обратно. Секретное ИМЯ прячет
- * значение целиком (`maskNamedValue`), и такую маску текстовое восстановление
- * не сопоставит — оно ищет секреты детектором по тексту. Целая маска на месте
- * значения, которое под этим именем и маскируется, — «оставить как было».
- */
-function keptEnvValue(key: string, saved: string | undefined, sent: string): string {
-  if (sent === SECRET_MASK && saved !== undefined && maskNamedValue(key, saved) === SECRET_MASK) {
-    return saved;
-  }
-  return unmasked(`env.${key}`, saved, sent);
-}
-
-/** Черновик группы: всё, что модель не прислала, — из нынешней записи. */
-export async function groupDraft(input: z.infer<typeof groupInput>, inject: InjectRoute) {
-  // Маска — это «оставить как было», а не живой секрет: её сверяет unmasked ниже.
-  const env = Object.fromEntries(
-    Object.entries(input.env ?? {}).filter(([, value]) => !value.includes(SECRET_MASK)),
-  );
-  const secrets = literalSecrets(env);
-  if (secrets.length > 0) throw new Error(`env.${secrets[0]}: ${SECRET_REFUSAL}`);
-  const current = input.id === undefined ? undefined : await findGroup(inject, input.id);
-  // Значения env модель видит только маской (list_env): маска — назад значением
-  // группы с диска, а непарная или в новой группе — отказ до карточки. Иначе
-  // `••••••` молча лёг бы на место пароля, а дифф карточки маскирует обе стороны.
-  const sentEnv =
-    input.env &&
-    Object.fromEntries(
-      Object.entries(input.env).map(([key, value]) => [
-        key,
-        keptEnvValue(key, current?.env[key], value),
-      ]),
-    );
-  const draft = {
-    name: input.name,
-    description: input.description ?? current?.description ?? '',
-    color: current?.color ?? 'accent',
-    icon: current?.icon ?? 'folder',
-    members:
-      input.members?.map((member) => {
-        const at = member.indexOf(':');
-        return {
-          kind: member.slice(0, at) as Group['members'][number]['kind'],
-          id: member.slice(at + 1),
-        };
-      }) ??
-      current?.members ??
-      [],
-    env: sentEnv ?? current?.env ?? {},
-    projectPaths: input.projectPaths ?? current?.projectPaths ?? [],
-    ...(current?.scenario ? { scenario: current.scenario } : {}),
-    isEnabled: current?.isEnabled ?? true,
-  };
-  return { current, draft };
-}
-
-const saveGroup = definePanelAction({
-  name: 'save_group',
-  section: 'groups',
-  risk: 'change',
-  title: 'journal-save-group',
-  description:
-    'Create a group or edit one by id. A new group is ENABLED at once (its env is written). Needs confirmation.',
-  input: groupInput,
-  route: async (input, inject) => {
-    const { current, draft } = await groupDraft(input, inject);
-    return current
-      ? {
-          method: 'PUT',
-          url: `/api/groups/${encode(current.id)}`,
-          body: { ...draft, order: current.order },
-        }
-      : { method: 'POST', url: '/api/groups', body: draft };
-  },
-  fingerprint: async (input, inject) =>
-    input.id === undefined
-      ? routeFingerprint(inject, '/api/groups', (body) =>
-          (body as Group[]).map((group) => group.name),
-        )
-      : fingerprintOf(await findGroup(inject, input.id)),
-  preview: async (input, inject) => {
-    const { current, draft } = await groupDraft(input, inject);
-    const shown = {
-      ...draft,
-      members: draft.members.map((member) => `${member.kind}:${member.id}`),
-    };
-    return stateCard(
-      `state.json: groups/${input.name}`,
-      current
-        ? {
-            ...current,
-            members: current.members.map((member) => `${member.kind}:${member.id}`),
-            id: undefined,
-            order: undefined,
-          }
-        : undefined,
-      shown,
-      card(current ? 'summary-group-edit' : 'summary-group-create', { name: input.name }),
-      [dataField('label-members', String(draft.members.length))],
-    );
-  },
-  // Новая группа получает id только в ответе POST — фокус берётся из него.
-  page: (input, result) => {
-    const id = input.id ?? (result as Partial<Group> | undefined)?.id;
-    return { route: '/groups', ...(id ? { focus: id } : {}) };
-  },
-});
-
-const toggleGroup = definePanelAction({
-  name: 'toggle_group',
-  section: 'groups',
-  risk: 'change',
-  title: 'journal-toggle-group',
-  description:
-    'Enable or disable a group: every member is switched with it and its env is applied or removed. Needs confirmation.',
-  input: z.object({ id: z.string().min(1), isEnabled: z.boolean() }),
-  route: (input) => ({
-    method: 'POST',
-    url: `/api/groups/${encode(input.id)}/enabled`,
-    body: { isEnabled: input.isEnabled },
-  }),
-  fingerprint: async (input, inject) => fingerprintOf(await findGroup(inject, input.id)),
-  preview: async (input, inject) => {
-    const group = await findGroup(inject, input.id);
-    return stateCard(
-      `state.json: groups/${group.name}`,
-      { isEnabled: group.isEnabled },
-      { isEnabled: input.isEnabled },
-      card(input.isEnabled ? 'summary-group-enable' : 'summary-group-disable', {
-        name: group.name,
-      }),
-      [
-        dataField(
-          'label-members',
-          group.members.map((member) => `${member.kind}:${member.id}`).join(', ') || '—',
-        ),
-        ...(Object.keys(group.env).length > 0
-          ? [dataField('label-env-keys', Object.keys(group.env).join(', '))]
-          : []),
-      ],
-    );
-  },
-  page: (input) => ({ route: '/groups', focus: input.id }),
-});
-
-const deleteGroup = definePanelAction({
-  name: 'delete_group',
-  section: 'groups',
-  risk: 'danger',
-  title: 'journal-delete-group',
-  description:
-    'Delete a group. Members stay on disk and are released; env keys held only by it are removed. Needs confirmation.',
-  input: z.object({ id: z.string().min(1) }),
-  route: (input) => ({ method: 'DELETE', url: `/api/groups/${encode(input.id)}` }),
-  fingerprint: async (input, inject) => fingerprintOf(await findGroup(inject, input.id)),
-  preview: async (input, inject) => {
-    const group = await findGroup(inject, input.id);
-    const members = group.members.map((member) => `${member.kind}:${member.id}`);
-    // Удаление трогает не только запись группы: снимает её env из settings.json
-    // и оживляет участников, которых гасила только она. Карточка это называет.
-    const effect = await readRoute<{ envRemoved: string[]; membersBackOn: string[] }>(
-      inject,
-      `/api/groups/${encode(group.id)}/delete-effect`,
-    );
-    return stateCard(
-      `state.json: groups/${group.name}`,
-      { ...group, members },
-      {},
-      card('summary-group-delete', { name: group.name }),
-      [
-        dataField('label-members', members.join(', ') || '—'),
-        ...(effect.envRemoved.length > 0
-          ? [dataField('label-group-delete-env', effect.envRemoved.join(', '))]
-          : []),
-        ...(effect.membersBackOn.length > 0
-          ? [dataField('label-group-delete-back-on', effect.membersBackOn.join(', '))]
-          : []),
-      ],
-    );
-  },
-  page: () => ({ route: '/groups' }),
 });
 
 // --- Настройки и провайдер ---
@@ -297,7 +89,6 @@ const SETTINGS_KEYS = {
   mcpAutoCheck: z.boolean(),
   chatModel: z.string().max(200),
   chatEffort: z.enum(['', 'low', 'medium', 'high', 'xhigh', 'max']),
-  taskSplitInitiative: z.boolean(),
   handoffInitiative: z.boolean(),
   handoffContextLimit: z.number().int().nonnegative(),
   handoffAutoDefault: z.boolean(),
@@ -337,7 +128,6 @@ const SETTINGS_KEY_TAB: Record<keyof typeof SETTINGS_KEYS, string> = {
   mcpAutoCheck: SETTINGS_TAB.models,
   chatModel: SETTINGS_TAB.models,
   chatEffort: SETTINGS_TAB.models,
-  taskSplitInitiative: SETTINGS_TAB.models,
   handoffInitiative: SETTINGS_TAB.models,
   handoffContextLimit: SETTINGS_TAB.models,
   handoffAutoDefault: SETTINGS_TAB.models,
@@ -347,14 +137,13 @@ const SETTINGS_KEY_TAB: Record<keyof typeof SETTINGS_KEYS, string> = {
 
 /**
  * Ключи, которых нет во входе `update_settings`, — с именами, чтобы агент сказал
- * человеку, где их править, а не искал обход. Сторож и экономия групп — здесь
- * же: агент, выключивший сторожа над собственной группой, отключил бы наблюдение
- * за собой (F-60).
+ * человеку, где их править, а не искал обход. Блоки сторожа и экономии групп
+ * сняты (этап 10, G15); рычаги экономии шагов задачи — настройка ядра, её запись
+ * судится строже любой команды (`set-config`), у агента панели дороги к ней нет.
  */
 const HUMAN_ONLY_SETTINGS =
-  'claudeDirOverride, revealSecretsByDefault, backupBeforeWrite, encryptSecretBackups, autoApproveRules, chatAutoMode, ' +
-  'promptGate, modelPricing, platformGateway, remote access, groupWatch, groupEconomy, ' +
-  'deferAfterMinutes, deferredTtlDays';
+  'claudeDirOverride, revealSecretsByDefault, backupBeforeWrite, encryptSecretBackups, chatAutoMode, ' +
+  'promptGate, modelPricing, platformGateway, remote access, deferredTtlDays';
 
 const getSettings = definePanelAction({
   name: 'get_settings',
@@ -1067,9 +856,6 @@ const forgetIntegration = definePanelAction({
 
 export const APP_STATE_ACTIONS: readonly AnyPanelAction[] = [
   listGroups,
-  saveGroup,
-  toggleGroup,
-  deleteGroup,
   getSettings,
   updateSettings,
   switchProvider,

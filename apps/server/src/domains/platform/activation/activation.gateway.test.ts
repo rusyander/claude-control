@@ -1,12 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
 import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { Platform } from '@agentdeck/contracts';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import type { PlatformFetch } from '../ca-fetch/ca-fetch.ts';
-import { PlatformGateway } from '../gateway/listener/listener.ts';
+import {
+  listeningGateway,
+  memoryContours,
+  type MemoryContours,
+} from '../contours/__fixtures__/memory-contours.ts';
 import {
   activatePlatform,
   switchPlatformOn,
@@ -17,14 +23,16 @@ import { writePlatform, writeToken } from '../store/store.ts';
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 
 /**
- * Пробный запрос активации — через НАСТОЯЩИЙ шлюз: настоящий сокет на петле,
- * настоящий конвейер, подставлен только контур наверху.
+ * Пробный запрос активации — настоящим `fetch` по сокету на петле в шлюз контуров. Шлюз держит
+ * ядро (этап 10, C3d), здесь он — внешняя граница: сервер на 127.0.0.1, отвечающий так, как шлюз
+ * человека отвечает клиенту Anthropic (`/<контур>/v1/messages`, поток). Порт панель берёт у учёта
+ * контуров ядра (`memoryContours`: шлюз «слушает» на порту этого сервера).
  *
- * Ради этого транспорты и разведены (`probeFetch` / `smokeFetch`): заглушка,
- * подставленная обоим, доказывала бы работу заглушки. Здесь же запрос выходит
- * из домена в сеть, возвращается в свой же слушатель, проходит перевод диалекта
- * и подстановку ключа — то есть ровно тот путь, которым пойдёт CLI, и ни одним
- * звеном короче.
+ * Транспорты разведены (`probeFetch` / `smokeFetch`): заглушка, подставленная обоим, доказывала
+ * бы работу заглушки. Чего здесь нет и где оно доказано: перевод диалекта и подстановка ключа
+ * контура — `apps/core/src/hop-host/user-gateway.parity.integration.test.ts`; память моделей с
+ * голым `</think>` — `apps/core/src/hop-host/gateway/think-tail/think-tail.test.ts`; слушатель и
+ * его порт — `apps/core/src/hop-host/user-gateway.integration.test.ts`.
  */
 
 const SECRET = 'contour-key-corporate-4f21';
@@ -65,59 +73,62 @@ const modelsOk: PlatformFetch = () =>
 let root: string;
 let appData: string;
 let store: AppStore;
-let gateway: PlatformGateway;
-/** Куда и с чем шлюз сходил наверх: адрес, заголовки, тело. */
-let calls: { url: string; headers: Record<string, string>; body: string }[] = [];
+let contours: MemoryContours;
+let gateway: Server;
+/** Что шлюз получил от панели: путь, заголовки, тело. */
+let calls: { path: string; headers: Record<string, unknown>; body: string }[] = [];
+/** Ответ шлюза: статус и кадры потока Anthropic (или тело отказа). */
+let answer: { status: number; frames: string[] };
 
-/** Контур-заглушка НАД шлюзом: отвечает потоком, как настоящий. */
-function upstream(frames: string[], status = 200): PlatformFetch {
-  return (url, init) => {
-    calls.push({
-      url,
-      headers: (init?.headers ?? {}) as Record<string, string>,
-      body: typeof init?.body === 'string' ? init.body : '',
-    });
-    if (status >= 400) {
-      return Promise.resolve(
-        new Response(frames.join(''), {
-          status,
-          headers: { 'content-type': 'application/json' },
-        }),
-      );
-    }
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const encoder = new TextEncoder();
-        for (const frame of frames) controller.enqueue(encoder.encode(`data: ${frame}\n\n`));
-        controller.close();
-      },
-    });
-    return Promise.resolve(
-      new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
-    );
-  };
-}
+/** Кадр потока Anthropic, как его отдаёт шлюз человека клиенту `/v1/messages`. */
+const text = (chunk: string): string =>
+  JSON.stringify({
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'text_delta', text: chunk },
+  });
+const stop = (reason: string): string =>
+  JSON.stringify({ type: 'message_delta', delta: { stop_reason: reason } });
 
-const DELTA = '{"id":"c1","model":"gpt-x","choices":[{"index":0,"delta":{"content":"готов"}}]}';
-const DONE = '{"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}';
-
-beforeEach(() => {
+beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'cc-activation-gw-'));
   appData = join(root, 'agentdeck');
   mkdirSync(appData, { recursive: true });
   mkdirSync(join(root, 'claude'), { recursive: true });
   calls = [];
+  answer = { status: 200, frames: [text('готов'), stop('end_turn')] };
 
   store = new AppStore(appData);
   writePlatform(store, PLATFORM);
   writeToken(appData, PLATFORM.id, SECRET);
-  gateway = new PlatformGateway();
+
+  gateway = createServer((request, response) => {
+    let raw = '';
+    request.on('data', (chunk: Buffer) => (raw += chunk.toString()));
+    request.on('end', () => {
+      calls.push({ path: request.url ?? '', headers: { ...request.headers }, body: raw });
+      if (answer.status >= 400) {
+        response.writeHead(answer.status, { 'content-type': 'application/json' });
+        return response.end(answer.frames.join(''));
+      }
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      for (const frame of answer.frames) response.write(`data: ${frame}\n\n`);
+      response.end();
+    });
+  });
+  await new Promise<void>((resolve) => gateway.listen(0, '127.0.0.1', resolve));
+  contours = memoryContours();
 });
 
 afterEach(async () => {
-  await gateway.stop();
+  gateway.closeAllConnections();
+  await new Promise<void>((resolve) => gateway.close(() => resolve()));
   rmSync(root, { recursive: true, force: true });
 });
+
+/** Шлюз человека у ядра слушает — на порту подставного шлюза. */
+const listen = (): void =>
+  contours.setUserGateway(listeningGateway((gateway.address() as AddressInfo).port));
 
 const deps = (): ContourActivationDeps => ({
   store,
@@ -125,23 +136,14 @@ const deps = (): ContourActivationDeps => ({
   backupDir: join(root, 'backups'),
   appDataDir: appData,
   probeFetch: modelsOk,
-  // Порт — у ЖИВОГО слушателя, ровно как его берёт маршрут: порт 0 при старте
-  // означает «какой достанется», и спросить его можно только у него самого.
-  gatewayPort: () => (gateway.status().running ? gateway.status().port : 0),
-  // `smokeFetch` не задан НАМЕРЕННО: пробный запрос идёт настоящим `fetch` в
-  // настоящий слушатель на 127.0.0.1.
+  // Порт — тот, что держит шлюз человека у ядра сейчас, ровно как его берёт маршрут.
+  gatewayPort: () => contours.userGatewayPort(),
+  // `smokeFetch` не задан НАМЕРЕННО: пробный запрос идёт настоящим `fetch` по сокету.
 });
 
-describe('пробный запрос идёт через собственный шлюз', () => {
-  it('ответ модели приезжает на карточку, а ключ подставляет шлюз', async () => {
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([DELTA, DONE]),
-      spendFlushMs: 0,
-    });
-
+describe('пробный запрос идёт через шлюз контуров', () => {
+  it('ответ модели приезжает на карточку; ключа контура в запросе панели нет — его подставляет шлюз', async () => {
+    listen();
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.ok).toBe(true);
@@ -149,61 +151,50 @@ describe('пробный запрос идёт через собственный
     expect(result.smoke.model).toBe('gpt-x');
     expect(result.smoke.latencyMs).toBeGreaterThanOrEqual(0);
 
-    // Наверх ушёл ровно один запрос — на адрес контура, с ключом в заголовке.
-    // Ключ в запросе домена не встречается вовсе: его добавил шлюз.
+    // В шлюз ушёл ровно один запрос — по адресу контура, тем путём, которым пойдёт Claude Code.
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.url).toContain('api.dev.example.ru');
-    expect(JSON.stringify(calls[0]?.headers)).toContain(SECRET);
+    expect(calls[0]?.path).toBe(`/${PLATFORM.id}/v1/messages`);
+    expect(JSON.stringify(calls[0]?.headers)).not.toContain(SECRET);
+    expect(calls[0]?.body).not.toContain(SECRET);
     // Вопрос — тот, что объявил драйвер, и потолок ответа при нём.
     expect(calls[0]?.body).toContain('готов');
-    expect(JSON.parse(calls[0]?.body ?? '{}').max_tokens).toBe(SMOKE_MAX_TOKENS);
+    const sent = JSON.parse(calls[0]?.body ?? '{}') as { max_tokens: number; stream: boolean };
+    expect(sent.max_tokens).toBe(SMOKE_MAX_TOKENS);
+    expect(sent.stream).toBe(true);
   });
 
-  /**
-   * Живое подключение 14.09.2026: шлюз был погашен, активация закончилась
-   * красным «Шлюз не поднят», а подъём жил только на последнем шаге мастера.
-   * Настоящий слушатель поднимается САМОЙ активацией — и пробный запрос
-   * проходит через него.
-   */
   /**
    * Живое подключение dev 14.09.2026: Qwen3.8 пишет размышления текстом до голого
-   * `</think>`, и карточка показывала черновик модели вместо ответа. Пробный
-   * запрос — первый ответ модели через шлюз: по нему шлюз и запоминает факт.
+   * `</think>`, и карточка показывала черновик модели вместо ответа. Первый такой ответ шлюз
+   * отдаёт целиком — карточке нужен ответ, а не черновик.
    */
-  it('размышление текстом не попадает на карточку, а шлюз запоминает модель', async () => {
-    const thinking = (content: string): string =>
-      JSON.stringify({ id: 'c1', model: 'gpt-x', choices: [{ index: 0, delta: { content } }] });
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([thinking('Нужно одно слово. </th'), thinking('ink>\n\n'), DELTA, DONE]),
-      spendFlushMs: 0,
-    });
-
+  it('размышление текстом не попадает на карточку', async () => {
+    answer = {
+      status: 200,
+      frames: [text('Нужно одно слово. </th'), text('ink>\n\n'), text('готов'), stop('end_turn')],
+    };
+    listen();
     const result = await activatePlatform(deps(), PLATFORM.id);
-
     expect(result.smoke.answer).toBe('готов');
-    expect(store.getThinkTailModels(PLATFORM.id)).toEqual(['gpt-x']);
   });
 
-  it('погашенный шлюз активация поднимает сама, и пробный запрос проходит', async () => {
+  /**
+   * Живое подключение 14.09.2026: шлюз был погашен, активация закончилась красным «Шлюз не
+   * поднят», а подъём жил только на последнем шаге мастера. Активация сама просит шлюз
+   * (`ensureGateway` — свежий вопрос ядру) — и пробный запрос проходит через него.
+   */
+  it('шлюз не слушал — активация просит его сама, и пробный запрос проходит', async () => {
     const result = await activatePlatform(
       {
         ...deps(),
         ensureGateway: async () => {
-          await gateway.start({
-            store,
-            appDataDir: appData,
-            port: 0,
-            fetchImpl: upstream([DELTA, DONE]),
-            spendFlushMs: 0,
-          });
+          await contours.refresh();
+          listen();
         },
       },
       PLATFORM.id,
     );
-    expect(gateway.status().running).toBe(true);
+    expect(contours.refreshes).toBe(1);
     expect(result.smoke.ok).toBe(true);
     expect(result.smoke.answer).toBe('готов');
   });
@@ -216,17 +207,12 @@ describe('пробный запрос идёт через собственный
     expect(result.smoke.ok).toBe(false);
     expect(result.smoke.detail).toBe('Шлюз не поднялся: EADDRINUSE 5179');
     expect(store.getSettings().activePlatformId).toBe(PLATFORM.id);
+    expect(calls).toHaveLength(0);
   });
 
-  it('контур отказал — отказ виден словами, активация остаётся', async () => {
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream(['{"error":{"message":"ключ отозван"}}'], 401),
-      spendFlushMs: 0,
-    });
-
+  it('контур отказал — отказ виден словами, ключа в нём нет, активация остаётся', async () => {
+    answer = { status: 401, frames: ['{"error":{"message":"ключ отозван"}}'] };
+    listen();
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.ok).toBe(false);
@@ -236,14 +222,8 @@ describe('пробный запрос идёт через собственный
   });
 
   it('модель промолчала — это не успех', async () => {
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([DONE]),
-      spendFlushMs: 0,
-    });
-
+    answer = { status: 200, frames: [stop('end_turn')] };
+    listen();
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(result.smoke.ok).toBe(false);
@@ -273,14 +253,7 @@ describe('пробный запрос спрашивает ту модель, к
 
   it('выбор человека сильнее первой модели каталога', async () => {
     writePlatform(store, { ...PLATFORM, defaultModel: 'chat-picked' });
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([DELTA, DONE]),
-      spendFlushMs: 0,
-    });
-
+    listen();
     const probeFetch = catalog([
       { id: 'embed-first', type: 'embedding' },
       { id: 'chat-picked', type: 'chat' },
@@ -292,14 +265,7 @@ describe('пробный запрос спрашивает ту модель, к
   });
 
   it('без выбора — первая ЧАТОВАЯ модель, а не эмбеддинг', async () => {
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([DELTA, DONE]),
-      spendFlushMs: 0,
-    });
-
+    listen();
     const probeFetch = catalog([
       { id: 'embed-first', type: 'embedding' },
       { id: 'chat-1', type: 'chat' },
@@ -311,15 +277,8 @@ describe('пробный запрос спрашивает ту модель, к
   });
 
   it('потолок ответа оставляет место размышлениям, а упёршийся в него ответ назван', async () => {
-    const LENGTH = '{"id":"c1","choices":[{"index":0,"delta":{},"finish_reason":"length"}]}';
-    await gateway.start({
-      store,
-      appDataDir: appData,
-      port: 0,
-      fetchImpl: upstream([LENGTH]),
-      spendFlushMs: 0,
-    });
-
+    answer = { status: 200, frames: [stop('max_tokens')] };
+    listen();
     const result = await activatePlatform(deps(), PLATFORM.id);
 
     expect(SMOKE_MAX_TOKENS).toBeGreaterThanOrEqual(64);
@@ -330,7 +289,7 @@ describe('пробный запрос спрашивает ту модель, к
 });
 
 describe('включение без пробы (кнопка локальной модели в шапке чата)', () => {
-  it('контур активен, шлюз поднят, а наверх не ушло ни одного запроса и итог пробы не тронут', async () => {
+  it('контур активен, шлюз спрошен, а в шлюз не ушло ни одного запроса и итог пробы не тронут', async () => {
     let probed = 0;
     const result = await switchPlatformOn(
       {
@@ -340,13 +299,8 @@ describe('включение без пробы (кнопка локальной 
           return modelsOk(...args);
         },
         ensureGateway: async () => {
-          await gateway.start({
-            store,
-            appDataDir: appData,
-            port: 0,
-            fetchImpl: upstream([DELTA, DONE]),
-            spendFlushMs: 0,
-          });
+          await contours.refresh();
+          listen();
         },
       },
       PLATFORM.id,
@@ -354,7 +308,7 @@ describe('включение без пробы (кнопка локальной 
 
     expect(result).toEqual({ activePlatformId: PLATFORM.id, previousPlatformId: '' });
     expect(store.getSettings().activePlatformId).toBe(PLATFORM.id);
-    expect(gateway.status().running).toBe(true);
+    expect(contours.refreshes).toBe(1);
     expect(probed).toBe(0);
     expect(calls).toHaveLength(0);
     expect(store.getPlatformSmoke()[PLATFORM.id]).toBeUndefined();

@@ -9,6 +9,10 @@ export const configRu: Record<ConfigMessageCode, string> = {
     'Формат файла конфигурации не распознан — запись запрещена (раздел только для чтения).',
   'hook-event-unspecified': 'Не указано событие хука',
   'hook-direction-unspecified': 'Не указано направление',
+  'hook-description-outside-relay':
+    'Хук панели для сессий в терминале и VS Code — контроль с телефона. PermissionRequest — вопрос агента или запрос прав уходит и на телефон; окно на компьютере показывает его одновременно, принимается первое решение. PostToolUse, Stop — сообщение, написанное с телефона посреди хода, агент получает после ближайшего шага или вместо остановки. Любая неудача — выход без решения: CLI ведёт себя, как без хука. Хук не должен ни ронять, ни подвешивать сессию человека. Аргументы: --url <адрес панели> --token-file <файл токена>',
+  'hook-description-tests':
+    'Хук блока «Тесты» для любого Claude Code над проектом — чат панели, VS Code, терминал. Панель ставит его в .claude/settings.local.json проекта — файл в git не уходит. node tools/tests-hook.mjs session   SessionStart: короткая строка о блоке node tools/tests-hook.mjs stop      Stop: правил код — кейс, прогон, запись Экономия — главное требование: ход без правок выходит, не читая домен (один запуск node, ноль токенов); пропуск — не чаще раза за ход (`stop_hook_active`), и каждый пробел несёт готовую команду, чтобы лишний ход был один.',
   'mcp-server-not-found': 'Сервер не найден',
   'instructions-global-missing': 'У активного провайдера нет раздела глобальных инструкций.',
   'rule-not-found': 'Правило не найдено',
@@ -40,12 +44,8 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'group-override-foreign-file': 'В проекте уже есть свой файл {{file}} — панель не пишет поверх',
   'group-override-claude-only': 'Переопределение в проекте есть только у Claude',
   'group-project-missing': 'Каталог проекта не найден',
-  'group-discovery-not-found': 'Находка не найдена — запустите обнаружение заново',
-  'group-discovery-provider-source':
-    'Набор из общих каталогов провайдера импортировать нельзя — он уже глобальный',
   'group-promote-invalid': 'Ресурс не создан: {{detail}}',
   'group-copy-target-unknown': 'Провайдер «{{provider}}» панели не известен',
-  'resource-not-found': 'Ресурс не найден',
   'config-format-unrecognized': 'Формат файла конфигурации не распознан — запись запрещена.',
   'plugin-unspecified': 'Не указан плагин',
   'plugin-state-unspecified': 'Не указано состояние плагина',
@@ -85,7 +85,6 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'portability-apply-rollback-failed':
     'Запись не удалась, и откат тоже: часть файлов осталась изменённой. Копии лежат в каталоге резервных копий.',
   'portability-transfer-not-found': 'Отменять нечего: переноса к этой цели панель не делала.',
-  'portability-subscription-unknown': 'Подписки на эту цель нет.',
   'portability-subscription-layer-unknown': 'Такого слоя в каноне нет.',
   'portability-subscription-held':
     'Пересборка удержана: либо проекцию строила другая версия канона, либо ни один слой не подписан.',
@@ -99,6 +98,149 @@ export const configRu: Record<ConfigMessageCode, string> = {
     'В этом файле нет записей подписанных слоёв: брать в канон нечего.',
   'portability-drift-nothing-to-do': 'Этот исход не даёт ни одной правки: посмотрите план заново.',
   'portability-carry-nothing-chosen': 'Не выбрано ни одного разговора: переносить нечего.',
+  'portability-needs-instructions': 'текст инструкций читает модель; фактов рантайма ему не нужно',
+  'portability-needs-skill': 'скилл выбирает модель по описанию; фактов рантайма ему не нужно',
+  'portability-needs-command': 'команда разворачивается в готовый текст и аргументов не берёт',
+  'portability-needs-subagent': 'субагент получает задачу текстом; фактов рантайма ему не нужно',
+  'portability-needs-secret': 'ключ нужен процессу целиком, фактов разговора ему не требуется',
+  'portability-needs-env': 'переменная окружения действует постоянно и фактов разговора не требует',
+  'portability-needs-mcp': 'MCP-сервер поднимается вместе с CLI и фактов разговора не требует',
+  'portability-needs-permission-mode':
+    'режим подтверждений действует на весь CLI и аргументов вызова не разбирает',
+  'portability-needs-probe-server':
+    'сервер отвечает на запрос модели и фактов разговора не требует',
+  'portability-needs-hook-none':
+    'ни событие, ни текст скрипта не называют ни одного факта рантайма',
+  'portability-needs-event-unknown':
+    'событие «{{event}}» не описано ни у одного известного формата: нагрузка неизвестна',
+  'portability-needs-plugin':
+    'содержимое плагина разбирается отдельно: его требования пока неизвестны',
+  'portability-needs-unparsed-entry':
+    'форму записи не разбирает даже её собственный источник: что она читает — неизвестно',
+  'portability-needs-script-computed-key': 'скрипт обращается к нагрузке по вычисляемому ключу',
+  'portability-needs-script-calls-script':
+    'скрипт вызывает другой скрипт — его нагрузка отсюда не видна',
+  'portability-needs-script-reads-transcript':
+    'скрипт читает транскрипт, а значит может прочитать что угодно из разговора',
+  'portability-needs-script-evals': 'скрипт исполняет вычисляемый код',
+  'portability-needs-script-unread': 'скрипт {{path}} не прочитан: {{detail}}',
+  'portability-intent-instructions':
+    'файл инструкций {{name}}: его текст читает модель в каждом разговоре',
+  'portability-intent-skill': 'скилл {{name}}: {{description}}{{subtree}}',
+  'portability-intent-skill-account-only':
+    'скилл {{name}}: источник — аккаунт, файла на диске нет{{subtree}}',
+  'portability-intent-skill-account-synced':
+    'скилл {{name}}: синхронизирован с аккаунтом, владелец записи — аккаунт{{subtree}}',
+  'portability-intent-subtree-attached': ' (вложений {{count}})',
+  'portability-intent-subtree-skipped': ' (не переносится {{count}})',
+  'portability-intent-subtree-both': ' (вложений {{attached}}, не переносится {{skipped}})',
+  'portability-intent-no-description': 'без описания',
+  'portability-intent-command': 'команда {{command}}: {{description}}',
+  'portability-intent-subagent': 'субагент {{name}}: {{description}}',
+  'portability-intent-plugin': 'плагин {{name}}',
+  'portability-intent-secret': 'ключ {{key}}: значение остаётся у держателя и в перенос не едет',
+  'portability-intent-env': 'переменная окружения {{key}}',
+  'portability-intent-hook': 'на событие {{event}} запускается: {{command}}',
+  'portability-intent-hook-matcher':
+    'на событие {{event}} по фильтру {{matcher}} запускается: {{command}}',
+  'portability-intent-hook-preserved': 'запись {{key}}, форму которой источник не разбирает',
+  'portability-intent-mcp-sdk':
+    '{{name}}: сервер живёт внутри процесса SDK: его регистрирует хост-приложение при старте, а не файл конфигурации{{off}}',
+  'portability-intent-mcp-stdio':
+    'сервер инструментов {{name}}: запускается командой {{command}}{{off}}',
+  'portability-intent-mcp-url': 'сервер инструментов {{name}}: {{url}}{{off}}',
+  'portability-intent-mcp-off': ' — выключен',
+  'portability-intent-mode-policy': 'политика подтверждений {{cli}}: {{mode}}{{defaults}}',
+  'portability-intent-mode-approval': 'режим подтверждений {{cli}}: {{mode}}{{defaults}}',
+  'portability-intent-mode-plain': 'режим {{cli}}: {{mode}}{{defaults}}',
+  'portability-intent-mode-default': ' (умолчание CLI, в файле ключа нет)',
+  'portability-intent-tool-allowed': 'инструмент разрешён: {{rule}}',
+  'portability-intent-tool-denied': 'инструмент запрещён: {{rule}}',
+  'portability-intent-rule-allowed': 'разрешено: {{rule}}',
+  'portability-intent-rule-ask': 'спрашивать: {{rule}}',
+  'portability-intent-rule-denied': 'запрещено: {{rule}}',
+  'portability-intent-rule-unavailable': 'недоступно: {{rule}}',
+  'portability-intent-claude-rule-off':
+    '{{decision}}: {{rule}} — выключено панелью, в файле настроек его нет',
+  'portability-intent-probe-hook': 'Проба: хук обязан остановить условленный запрещённый вызов.',
+  'portability-intent-probe-skill': 'Проба: скилл обязан доехать до модели условленным словом.',
+  'portability-intent-probe-command': 'Проба: команда обязана развернуться в условленный текст.',
+  'portability-intent-probe-permission':
+    'Проба: право обязано отказать в чтении условленного файла.',
+  'portability-intent-probe-mcp': 'Проба: инструмент MCP обязан оказаться в списке у модели.',
+  'portability-intent-probe-env':
+    'Проба: переменная окружения обязана доехать до процесса инструмента.',
+  'portability-skip-no-section-project': '{{provider}} не имеет этого раздела на уровне проекта',
+  'portability-skip-no-section': '{{provider}} этого раздела не имеет',
+  'portability-skip-project-undocumented':
+    '{{provider}} не документирует настроек уровня проекта — переносить их некуда',
+  'portability-skip-file-missing': 'файла {{path}} нет',
+  'portability-skip-file-absent': '{{path}}: файла нет на диске',
+  'portability-skip-rule-extension': '{{path}}: расширение не читается этим CLI',
+  'portability-skip-section-unreadable': '{{where}}: раздел не прочитан — {{cause}}',
+  'portability-cause-not-json': 'файл не разбирается как JSON',
+  'portability-cause-unparsed': 'содержимое файла не разбирается',
+  'portability-skip-mcp-block': '{{path}}: {{reason}}',
+  'mcp-block-unparsed':
+    'Файл-блок не разбирается моделью панели (например, запись без имени или ссылка `uses:`) — панель его не показывает и не правит.',
+  'mcp-block-duplicate':
+    'Имя MCP-сервера из этого файла уже занято другим файлом — панель не может однозначно адресовать запись и файл не трогает.',
+  'portability-section-hooks-off': '{{path}}: ключ disableAllHooks выключает весь раздел',
+  'portability-skip-no-skill-file': '{{name}}: в каталоге нет SKILL.md',
+  'portability-skip-command-body-config': '{{command}}: тело команды не в файле',
+  'portability-skip-no-records': '{{where}}: записей нет',
+  'portability-skip-import-problem': '{{file}}: {{problem}}',
+  'portability-import-cycle': 'цикл импортов: {{path}} уже включён выше',
+  'portability-import-depth': 'превышена глубина импортов ({{depth}}): {{path}}',
+  'portability-import-unread': 'импорт не прочитан: {{path}}',
+  'portability-skip-mcp-transport': '{{name}}: транспорт «{{transport}}» не описан ни у одного CLI',
+  'portability-skip-mcp-sdk':
+    '{{name}}: сервер живёт внутри процесса SDK: его регистрирует хост-приложение при старте, а не файл конфигурации',
+  'portability-skip-hook-event':
+    'событие «{{event}}» не описано ни у одного известного формата: нагрузку и смысл выдумывать нельзя',
+  'portability-skip-hook-script-missing': '{{id}}: скрипт {{path}} не найден на диске',
+  'portability-skip-codex-sandbox':
+    'sandbox_mode = {{mode}}: модели песочницы у CLI разные, соответствия нет (отказ первоисточника)',
+  'portability-skip-permission-preserved':
+    'запись permission.{{key}} панель не ведёт: форма ключа не задокументирована',
+  'portability-skip-codex-approval':
+    'approval_policy = {{value}}: значение не разбирается панелью и в паспорт не едет — выдавать вместо него умолчание значило бы описать среду, которой нет',
+  'portability-skip-codex-agents':
+    'ключ [agents] в config.toml: субагентов Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
+  'portability-skip-codex-skills':
+    'ключ [[skills.config]] в config.toml: включение и выключение скиллов Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
+  'portability-skip-codex-prompts':
+    'каталог ~/.codex/prompts: команды Codex панель пока не разбирает, хотя односторонний импортёр самого CLI их переносит',
+  'portability-skip-plugin-registry-missing': '{{path}}: реестр плагинов не заведён',
+  'portability-skip-plugin-registry-version':
+    '{{path}}: реестр версии {{version}}, Claude Code читает только версию {{expected}} — эти плагины не действуют',
+  'plugin-registry-no-version': 'без номера',
+  'portability-skip-plugin-no-install': '{{id}}: в реестре нет пути установки',
+  'portability-skip-plugin-dir-missing': '{{id}}: каталога {{path}} нет на диске',
+  'portability-skip-plugin-disabled': '{{id}}: плагин выключен, его записи не действуют и не едут',
+  'portability-skip-plugins-home-only': 'плагины CLI ставит домом: уровня проекта у них нет',
+  'portability-skip-secrets-home-only':
+    'файл секретов панели (.mcp-secrets.env) есть только у дома: у проекта своего нет',
+  'portability-skip-subagent-problem': '{{path}}: {{problem}}',
+  'portability-subagent-not-file': 'это не обычный файл',
+  'portability-subagent-too-big': 'файл слишком велик для разбора',
+  'portability-subagent-no-frontmatter': 'нет заголовочного блока — это не субагент',
+  'portability-subagent-empty-name': 'имя субагента пустое',
+  'portability-skip-project-missing': 'каталога проекта {{path}} нет на диске',
+  'portability-skip-project-instructions-key':
+    'ключ projectInstructions устарел: CLI читает его с предупреждением, актуальный ключ — instructionFiles (режим {{mode}}, умолчание {{default}})',
+  'instruction-files-settings-unread':
+    'файл настроек не разобран; взят режим по умолчанию {{mode}}',
+  'instruction-files-value-unknown':
+    'значение «{{value}}» ключа {{key}} не распознано; взят режим по умолчанию {{mode}}',
+  'instruction-files-managed-only':
+    'режим managed-only: собственные файлы инструкций CLI не читает, остаются только управляемые организацией',
+  'instruction-files-claude-md': 'режим claude-md: {{files}} лежит рядом, но CLI его не читает',
+  'instruction-files-claude-or-agents':
+    'режим claude-md-or-agents-md: рядом есть CLAUDE.md, поэтому {{files}} CLI не читает',
+  'commands-plugin-registry-version':
+    'Реестр плагинов installed_plugins.json версии {{version}}: Claude Code читает только версию {{expected}}, команды этих плагинов в палитру не попадают.',
+  'commands-plugin-dir-missing': 'Плагин «{{id}}»: каталог установки не найден ({{path}}).',
   'resource-file-unspecified': 'Не указан файл',
   'resource-template-not-found': 'Шаблон не найден',
   'resource-kind-unknown': 'Неизвестный вид ресурса',
@@ -328,7 +470,6 @@ export const configRu: Record<ConfigMessageCode, string> = {
     'Файл hooks/{{name}} уже есть. Укажите другое имя файла или оставьте поле пустым и задайте команду.',
   'permission-rule-exists': 'Правило «{{pattern}}» с таким решением уже есть',
   'permission-not-found': 'Право «{{id}}» не найдено',
-  'script-not-found': 'Скрипт «{{id}}» не найден',
   'provider-declared-only':
     'Провайдер «{{id}}» на этой фазе только объявлен: файловый адаптер не реализован, чтение/запись запрещены.',
   'provider-no-model-api':
@@ -344,37 +485,6 @@ export const configRu: Record<ConfigMessageCode, string> = {
   'endpoint-probe-not-json': 'Ответ не является JSON — по адресу отвечает не модельный API.',
   'endpoint-probe-status': 'Адрес ответил {{status}}{{detail}}',
   'instructions-section-unsupported': 'Активный CLI не поддерживает глобальные инструкции.',
-  'group-layer-permission':
-    'Разрешения группы в {{cli}} не переносятся: у {{cli}} своя схема прав, и перевод вслепую выдал бы права, которых не просили. Задайте их в разделе «Разрешения» {{cli}}.',
-  'group-layer-mcp-sse': 'MCP «{{id}}» работает через SSE — Codex такой транспорт не поддерживает.',
-  'group-layer-mcp-name':
-    'Имя MCP «{{id}}» содержит точку — Codex читает её как вложенный ключ настроек.',
-  'group-layer-mcp-secret-header':
-    'Заголовки MCP «{{id}}» несут секрет, а передать его Codex можно только в командной строке — панель этого не делает.',
-  'group-layer-mcp-shape':
-    'Запись MCP «{{id}}» в файлах Claude незнакомой формы — переносить нечего.',
-  'group-layer-skill-name': 'Имя скилла «{{id}}» длиннее 64 знаков — Codex его не загрузит.',
-  'group-layer-hook-event':
-    'Хук на событие {{event}} в {{cli}} не срабатывает: панель проигрывает только начало сессии, отправку сообщения и конец ответа.',
-  'group-layer-hook-event-native':
-    'Хук на событие {{event}} в {{cli}} не срабатывает: у {{cli}} такого события нет.',
-  'group-layer-missing': 'Участник «{{id}}» не найден в файлах Claude — перенести нечего.',
-  'group-layer-duplicate': '«{{id}}» уже едет с группой «{{group}}» — вторая копия не подаётся.',
-  'group-layer-none':
-    '{{cli}} файлы Claude не читает, а слоя группы для него у панели нет — группа на этот прогон не действует.',
-  'group-layer-too-large':
-    'Правила группы и набора вместе длиннее предела Codex ({{limit}} знаков) — прогон не запущен, ничего не обрезано.',
-  'group-layer-notice': 'Группы на этом прогоне {{cli}}: {{groups}}.',
-  'group-layer-notice-delivered': 'Едет слоем на прогон — {{members}}.',
-  'group-layer-notice-nothing': 'Ни один участник до прогона не доехал.',
-  'group-layer-notice-refused': 'Не едет:',
-  'foreign-shell-denied': 'Панель не пропустила команду `{{command}}`. Агенту ушло: {{reason}}',
-  'group-layer-kind-rule': 'правила: {{names}}',
-  'group-layer-kind-skill': 'скиллы: {{names}}',
-  'group-layer-kind-mcp': 'MCP: {{names}}',
-  'group-layer-kind-hook': 'хуки: {{names}}',
-  'group-layer-kind-env': 'переменные: {{names}}',
-  'group-layer-enabled-for':
-    'Группа включена для прогонов {{cli}} — едет слоем на каждый, файлы Claude не менялись.',
-  'group-layer-disabled-for': 'Группа выключена для прогонов {{cli}}; файлы Claude не менялись.',
+  'kimi-mode-stale':
+    '{{key}} = "{{mode}}" Kimi Code не принимает (допустимо: {{allowed}}) и при запуске молча его выбрасывает, работая в manual. Раздел только для чтения: исправьте значение в файле (kimi doctor config покажет ошибку), и правка снова откроется.',
 };

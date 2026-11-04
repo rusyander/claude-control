@@ -2,26 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaudePaths, Group } from '@agentdeck/contracts';
-import {
-  AUTONOMOUS_ENV,
-  type StoredChatGroupSettings,
-} from '@agentdeck/contracts/chat-group-settings';
+import { type StoredChatGroupSettings } from '@agentdeck/contracts/chat-group-settings';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
-import {
-  activateChosenGroup,
-  chatGroupSettingsView,
-  rootChatOf,
-  storeTreeReader,
-  withAutonomy,
-  type ChatTreeReader,
-} from './chat-autonomy.ts';
+import { chatGroupSettingsView, storeTreeReader, type ChatTreeReader } from './chat-autonomy.ts';
 
 /**
  * Группа и автономность чата по дереву разделения. Проверяется то, ради чего
  * настройка ЧАТА, а не проекта: ребёнок без своего берёт родительское, правка у
- * ребёнка не трогает родителя, петля в связях не вешает сервер, метка автономии
- * снимается безусловно, а явная группа только включается.
+ * ребёнка не трогает родителя, петля в связях не вешает сервер.
  */
 function tree(
   own: Record<string, StoredChatGroupSettings>,
@@ -83,97 +71,31 @@ describe('действующие значения по дереву', () => {
     const reader = tree({ a: { autonomous: false } }, { a: 'b', b: 'a' });
     expect(chatGroupSettingsView(reader, ['a']).autonomous).toBe(false);
     expect(chatGroupSettingsView(reader, ['b']).autonomous).toBe(false);
-    expect(rootChatOf(reader, ['a'])).toBe('b');
-  });
-
-  it('главный чат — вершина дерева; у корня — он сам', () => {
-    const reader = tree({}, { kid: 'root', grandkid: 'kid' });
-    expect(rootChatOf(reader, ['grandkid'])).toBe('root');
-    expect(rootChatOf(reader, ['root'])).toBe('root');
-    expect(rootChatOf(reader, ['new-9', 'sess-9'])).toBe('sess-9');
   });
 });
 
-describe('метка автономии в окружении', () => {
-  it('включена — ставится', () => {
-    expect(withAutonomy({ A: '1' }, true)).toEqual({ A: '1', [AUTONOMOUS_ENV]: '1' });
-  });
-
-  it('выключена — снимается, даже пришедшая с прошлой жизни прогона', () => {
-    expect(withAutonomy({ A: '1', [AUTONOMOUS_ENV]: '1' }, false)).toEqual({ A: '1' });
-    expect(withAutonomy(undefined, false)).toEqual({});
-  });
-});
-
-describe('явно выбранная группа к старту', () => {
+describe('дерево по хранилищу панели', () => {
   let dir: string;
-  let store: AppStore;
-  let paths: ClaudePaths;
-
-  const group = (patch: Partial<Group>): Group => ({
-    id: 'g1',
-    name: 'Набор',
-    description: '',
-    color: 'accent',
-    icon: 'folder',
-    members: [],
-    env: {},
-    projectPaths: [],
-    isEnabled: false,
-    order: 0,
-    ...patch,
-  });
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'cc-chat-group-'));
     mkdirSync(join(dir, 'agentdeck'), { recursive: true });
-    writeFileSync(join(dir, 'settings.json'), '{}', 'utf8');
-    store = new AppStore(join(dir, 'agentdeck'));
-    paths = {
-      root: dir,
-      settings: join(dir, 'settings.json'),
-      settingsLocal: join(dir, 'settings.local.json'),
-      claudeMd: join(dir, 'CLAUDE.md'),
-      secretsEnv: join(dir, '.mcp-secrets.env'),
-      skills: join(dir, 'skills'),
-      hooks: join(dir, 'hooks'),
-      mcpConfig: join(dir, '.claude.json'),
-      appData: join(dir, 'agentdeck'),
-    };
   });
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('выключенная глобальная группа включается', () => {
-    store.saveGroup(group({}));
-    expect(activateChosenGroup({ paths, store }, 'global:g1')).toBe('Набор');
-    expect(store.getGroups()[0]?.isEnabled).toBe(true);
-  });
-
-  it('уже включённая, «авто» и проектная — не трогаются', () => {
-    store.saveGroup(group({ isEnabled: true }));
-    expect(activateChosenGroup({ paths, store }, 'global:g1')).toBeUndefined();
-    expect(activateChosenGroup({ paths, store }, 'auto')).toBeUndefined();
-    expect(activateChosenGroup({ paths, store }, 'project:g1')).toBeUndefined();
-    expect(activateChosenGroup({ paths, store }, 'global:missing')).toBeUndefined();
-  });
-
-  it('проектная группа не включается, даже если лежит в хранилище под своим ключом', () => {
-    // Проектная группа — файлы самого проекта: включать её глобально значило бы
-    // раздать её правила всем чатам всех проектов.
-    store.saveGroup(
-      group({ id: 'p1', scope: { kind: 'project', path: 'C:/work/p', provider: 'claude' } }),
+  it('связь и своё под обоими ключами (записи прежнего меню чата в state.json)', () => {
+    writeFileSync(
+      join(dir, 'agentdeck', 'state.json'),
+      JSON.stringify({
+        chatGroupSettings: { root: { autonomous: false }, 'new-1': { groupChoice: 'global:g1' } },
+      }),
+      'utf8',
     );
-    expect(activateChosenGroup({ paths, store }, 'project:p1')).toBeUndefined();
-    expect(store.getGroups().find((item) => item.id === 'p1')?.isEnabled).toBe(false);
-  });
-
-  it('дерево по хранилищу: связь и своё под обоими ключами', () => {
+    const store = new AppStore(join(dir, 'agentdeck'));
     store.setChatLink('new-1', { parentChatId: 'root', createdAt: '2026-09-26T00:00:00Z' });
-    store.setChatGroupSettings('root', { autonomous: false });
-    store.setChatGroupSettings('new-1', { groupChoice: 'global:g1' });
     store.linkChatSession('new-1', 'sess-1');
     const reader = storeTreeReader(store);
     const view = chatGroupSettingsView(reader, ['sess-1']);

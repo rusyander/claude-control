@@ -7,6 +7,7 @@ import {
   leverWorks,
 } from '@agentdeck/contracts/group-economy-support';
 import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
+import { economySectionSchema } from '@agentdeck/contracts/core/config';
 import { describeProviders, listProviders, type SettingsSource } from './registry.ts';
 
 /**
@@ -50,12 +51,16 @@ describe('group-economy-support', () => {
     ).toBe(false);
   });
 
-  it('every lever is a GroupEconomy key, keepWarmPings has no chip', () => {
+  it('levers = GroupEconomy keys = core economy levers; retired levers have no chip', () => {
     // Равенство, не вхождение: новый рычаг в GroupEconomy без отметки «Где действует»
-    // остался бы на странице без строки ни у одного CLI.
-    const keys = Object.keys(GROUP_ECONOMY_DEFAULTS).filter((key) => key !== 'keepWarmPings');
-    expect([...keys].sort()).toEqual([...GROUP_ECONOMY_LEVERS].sort());
-    expect(GROUP_ECONOMY_LEVERS).not.toContain('keepWarmPings');
+    // остался бы на карточке без строки ни у одного CLI.
+    expect(Object.keys(GROUP_ECONOMY_DEFAULTS).sort()).toEqual([...GROUP_ECONOMY_LEVERS].sort());
+    expect(Object.keys(economySectionSchema.shape).sort()).toEqual(
+      [...GROUP_ECONOMY_LEVERS].sort(),
+    );
+    for (const retired of ['sonnetDeliver', 'freshOnColdResume', 'keepWarm', 'keepWarmPings']) {
+      expect(GROUP_ECONOMY_LEVERS, retired).not.toContain(retired);
+    }
   });
 
   it('leverWorks: только родной ключ и работа панели', () => {
@@ -113,9 +118,6 @@ describe('registry', () => {
       readOutputTokens: 'native',
       cacheTtl: 'impossible',
       detachIde: 'meaningless',
-      sonnetDeliver: 'emulated',
-      freshOnColdResume: 'emulated',
-      keepWarm: 'disproportionate',
       workHabits: 'emulated',
     });
   });

@@ -26,16 +26,18 @@ interface LaunchFormProps {
   /** Ответа нет, ключ повтора держится: кнопка говорит «повторить тем же ключом». */
   retrying: boolean;
   onEstimate: (fields: EstimateFields) => void;
+  /** Черновик, с которого форма начинает (запуск группы со страницы «Группы»); нет — пустой. */
+  initial?: Partial<LaunchDraft>;
 }
 
 /**
  * Форма запуска. Черновик живёт здесь, а не на странице: набор текста не перерисовывает экран
  * с дорогами и делением. Наружу уходят только готовые поля оценки — той же схемой, что у ядра.
  */
-export function LaunchForm({ pending, retrying, onEstimate }: LaunchFormProps) {
-  const { t } = useTranslation();
+export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFormProps) {
+  const { t, i18n } = useTranslation();
   const scenarios = useScenarioListing();
-  const [draft, setDraft] = useState<LaunchDraft>(emptyDraft);
+  const [draft, setDraft] = useState<LaunchDraft>(() => ({ ...emptyDraft(), ...initial }));
   const [problems, setProblems] = useState<DraftProblem[]>([]);
   const P = 'coreLaunch.form';
 
@@ -53,7 +55,7 @@ export function LaunchForm({ pending, retrying, onEstimate }: LaunchFormProps) {
   };
 
   const submit = () => {
-    const got = fieldsOf(draft);
+    const got = fieldsOf(draft, i18n.language);
     if (!got.ok) {
       setProblems(got.problems);
       return;

@@ -6,6 +6,7 @@ import { readFact, type Reader } from '../lib/facts/read-fact.ts';
 import { READ_CLASSES, type ReadClassName } from '../lib/facts/read-classes.ts';
 import { readJournalLines } from '../journal/read-lines.ts';
 import type { LiveTask } from '../journal/resume.ts';
+import { CONDUCTOR_QUESTIONS, answerKey, askLangOf, optionsOf } from './next/answers.ts';
 import { openActions } from './outbox.ts';
 
 /**
@@ -24,6 +25,8 @@ export const ACTION_READ_CLASS: Record<ActionKind, ReadClassName> = {
   'mr-create': 'mr.by-source-branch',
   'mr-update': 'mr.by-source-branch',
   'thread-reply': 'thread.reply-by-hash',
+  // Та же природа чтения: своя заметка MR по хешу тела (этап 10, F8).
+  'mr-comment': 'thread.reply-by-hash',
   'tracker-write': 'tracker.write-by-hash',
   'container-start': 'container.by-label',
   'container-remove': 'container.by-label',
@@ -102,17 +105,79 @@ export function decideReconcile(
 export type ActionFactReader = (action: OpenAction) => Reader<string>;
 export type ActionFactReaders = Record<ActionKind, ActionFactReader>;
 
-/** Время первой записанной сверки каждого действия (`decision` класса `reconcile`). */
+/** Метка решения `retry`, записанного по ответу человека «повторить сверку» (точка 4). */
+export const HUMAN_RECHECK = 'human-recheck';
+
+/**
+ * Время первой записанной сверки каждого действия (`decision` класса `reconcile`). Ответ человека
+ * «повторить сверку» начинает срок заново: иначе срок, истёкший до вопроса, спросил бы снова сразу.
+ */
 function journaledFirstAsked(task: LiveTask): Map<string, number> {
   const first = new Map<string, number>();
   for (const line of readJournalLines(task.dir, task.taskId).lines) {
     if (line.kind !== 'decision') continue;
-    const data = line.data as { class?: string; output?: { actionId?: unknown } };
+    const data = line.data as { class?: string; output?: { actionId?: unknown; by?: unknown } };
     const actionId = data.output?.actionId;
     if (data.class !== 'reconcile' || typeof actionId !== 'string') continue;
-    if (!first.has(actionId)) first.set(actionId, line.at);
+    if (!first.has(actionId) || data.output?.by === HUMAN_RECHECK) first.set(actionId, line.at);
   }
   return first;
+}
+
+export type ReconcileAnswerOutcome = 'done' | 'not-done' | 'recheck' | 'unmatched' | 'settled';
+
+/**
+ * Ответ человека на вопрос сверки (точка 4). Вариант узнаётся по ключу среди подписей ВСЕХ языков
+ * (`next/answers.ts`): вопрос, заданный по-русски до перевода, и ответ, записанный тогда, ведут к
+ * тому же исходу у задачи любого языка и после перезапуска ядра. «Выполнено» — `action.done`,
+ * «не выполнено» — `action.failed`, «повторить» — решение `retry` с меткой человека: свёртка
+ * возвращает действие в начатые, сверка (таймер загрузки или следующая загрузка) читает факт
+ * снова. Чужой текст исхода не выдумывает; действие уже решено — ответ ничего не меняет.
+ */
+export function settleReconcileAnswer(
+  task: LiveTask,
+  input: { actionId: string; answer: string; cause: number },
+): ReconcileAnswerOutcome {
+  const { actionId, answer, cause } = input;
+  const action = Object.hasOwn(task.state.actions, actionId)
+    ? task.state.actions[actionId]
+    : undefined;
+  if (action?.status !== 'awaiting-human') return 'settled';
+  const key = answerKey('reconcile', answer);
+  if (key === 'done') {
+    task.append({
+      kind: 'action.done',
+      actor: 'core',
+      cause,
+      data: { actionId, result: { reconciled: true, evidence: 'human answer' } },
+    });
+    return 'done';
+  }
+  if (key === 'notDone') {
+    task.append({
+      kind: 'action.failed',
+      actor: 'core',
+      cause,
+      data: { actionId, code: 'not-happened', detail: 'human answer' },
+    });
+    return 'not-done';
+  }
+  if (key !== 'recheck') return 'unmatched';
+  task.append({
+    kind: 'decision',
+    actor: 'core',
+    cause,
+    data: {
+      decisionId: newId(),
+      class: 'reconcile',
+      inputs: [cause],
+      facts: [],
+      numbers: {},
+      reasons: ['human asked to check again'],
+      output: { actionId, verdict: 'retry', by: HUMAN_RECHECK },
+    },
+  });
+  return 'recheck';
 }
 
 export async function reconcileTask(
@@ -175,6 +240,7 @@ export async function reconcileTask(
       });
       firstAsked.delete(action.actionId);
     } else if (decision.verdict === 'ask') {
+      const lang = askLangOf(task.state);
       task.append({
         kind: 'human.asked',
         actor: 'core',
@@ -184,8 +250,13 @@ export async function reconcileTask(
           point: 4,
           source: 'reconcile',
           dedupe: action.actionId,
-          question: `Не удалось узнать, выполнено ли действие ${action.kind} → ${action.target}: ${decision.reason}`,
-          options: ['повторить сверку', 'считать выполненным', 'считать невыполненным'],
+          question: CONDUCTOR_QUESTIONS.reconcile(
+            lang,
+            action.kind,
+            action.target,
+            decision.reason,
+          ),
+          options: optionsOf('reconcile', lang),
           defaultAction: null,
         },
       });

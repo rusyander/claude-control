@@ -1,15 +1,13 @@
 import type { PlatformRunConsumer } from '@agentdeck/contracts/platform-consumers';
 import type { ChatEvent } from '../chat-events.ts';
-import type { RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
 
-/** Самый поздний ход разговора — параметры пингу тёплого кэша (`latestRunOf`). */
+/** Самый поздний ход разговора — его параметры ответу из Telegram (`latestRunOf`). */
 export interface LatestRun {
   chatId: string;
   sessionId: string;
   options: RunOptions;
   meta: RunMeta;
-  /** Параметры из журнала прогонов после перезапуска панели: префикс хода по ним не собрать. */
-  adopted?: true;
 }
 
 /** Сведения о прогоне для группировки и переподключения (в т.ч. после F5). */

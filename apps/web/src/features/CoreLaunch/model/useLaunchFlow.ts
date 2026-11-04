@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@shared/api/query-keys';
 import type { CommandKind } from '@agentdeck/contracts/core/commands';
 import type { EstimateFields, EstimateReply } from '@agentdeck/contracts/core/estimate';
 import type { GrantConfirmation } from '@agentdeck/contracts/core/user-layer';
@@ -11,9 +13,11 @@ import {
   useCoreTaskEvents,
   useCoreTaskView,
 } from '@entities/CoreTask';
-import { postEstimate } from '../api/launchApi';
+import type { ReviewLinkRefused } from '@agentdeck/contracts/core/review-link';
+import { postEstimate, postReviewLink } from '../api/launchApi';
 import type { EstimateAttempt, LaunchFold, UnitDraft } from './launch.types';
 import { attemptFor } from './launchDraft';
+import { reviewAttemptFor, reviewLinkRefusalOf, type ReviewLinkFields } from './reviewLinkDraft';
 import {
   EMPTY_FOLD,
   foldLaunchLine,
@@ -40,6 +44,7 @@ export type Busy = 'grant' | 'edit-split' | 'launch' | null;
  * «можно ли запускать», считается моделью (`launchBlockers`), а не кнопками.
  */
 export function useLaunchFlow() {
+  const queryClient = useQueryClient();
   const [attempt, setAttempt] = useState<EstimateAttempt | null>(null);
   const [reply, setReply] = useState<EstimateReply | null>(null);
   const [failure, setFailure] = useState<CoreFailure | null>(null);
@@ -50,6 +55,8 @@ export function useLaunchFlow() {
   const [busy, setBusy] = useState<Busy>(null);
   const [granting, setGranting] = useState<string | null>(null);
   const [launched, setLaunched] = useState(false);
+  const [reviewAttempt, setReviewAttempt] = useState<EstimateAttempt | null>(null);
+  const [reviewRefusal, setReviewRefusal] = useState<ReviewLinkRefused | null>(null);
 
   const taskId = reply?.taskId;
   const stream = useCoreTaskEvents(taskId, (event) =>
@@ -64,25 +71,61 @@ export function useLaunchFlow() {
   const units = split && edit && edit.seq === split.seq ? edit.units : proposed;
   const dirty = splitDirty(units, split);
 
+  /** Ответ оценки или открытия ревью — задача есть: дальше один и тот же ход экрана. */
+  const accept = (got: EstimateReply) => {
+    if (got.taskId !== taskId) {
+      setFold(EMPTY_FOLD);
+      setEdit(null);
+      setLaunched(false);
+      setCommandFailure(null);
+    }
+    setReply(got);
+    // Оценка создала задачу (G5): список задач рядом с запуском (страница групп, `/core`)
+    // иначе показывал бы «задач нет» до перезагрузки.
+    void queryClient.invalidateQueries({ queryKey: queryKeys.core.tasks });
+  };
+
   const estimate = async (fields: EstimateFields) => {
     const next = attemptFor(attempt, fields);
     setAttempt(next);
     setPending(true);
     setFailure(null);
+    setReviewRefusal(null);
     try {
-      const got = await postEstimate(next.cmdId, fields);
-      if (got.taskId !== taskId) {
-        setFold(EMPTY_FOLD);
-        setEdit(null);
-        setLaunched(false);
-        setCommandFailure(null);
-      }
-      setReply(got);
+      accept(await postEstimate(next.cmdId, fields));
       setAttempt(null);
     } catch (error) {
       const why = failureOf(error);
       setFailure(why);
       if (!KEEP_ATTEMPT.has(why.kind)) setAttempt(null);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  /**
+   * Ревью MR по ссылке (этап 10, F8): тот же ответ, что у оценки, свой ключ повтора. Отказ с кодом
+   * `review_link_*` — своя карточка (текст по коду), остальное — общий разбор отказа.
+   */
+  const reviewLink = async (fields: ReviewLinkFields) => {
+    const next = reviewAttemptFor(reviewAttempt, fields);
+    setReviewAttempt(next);
+    setPending(true);
+    setFailure(null);
+    setReviewRefusal(null);
+    try {
+      accept(await postReviewLink(next.cmdId, fields));
+      setReviewAttempt(null);
+    } catch (error) {
+      const refused = reviewLinkRefusalOf(error);
+      if (refused) {
+        setReviewRefusal(refused);
+        setReviewAttempt(null);
+        return;
+      }
+      const why = failureOf(error);
+      setFailure(why);
+      if (!KEEP_ATTEMPT.has(why.kind)) setReviewAttempt(null);
     } finally {
       setPending(false);
     }
@@ -138,6 +181,9 @@ export function useLaunchFlow() {
     pending,
     retrying: attempt !== null && failure !== null,
     estimate,
+    reviewLink,
+    reviewRefusal,
+    reviewRetrying: reviewAttempt !== null && failure !== null,
     fold,
     stream,
     viewState: view?.state ?? null,

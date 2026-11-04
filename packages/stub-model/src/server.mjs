@@ -48,9 +48,17 @@ function sendJson(res, status, body, headers = {}) {
   res.end(JSON.stringify(body));
 }
 
-/** Список моделей, понятный обоим клиентам: OpenAI (`object`, `owned_by`) и Anthropic (`type`, `has_more`). */
+/**
+ * Список моделей, понятный всем клиентам: OpenAI (`object`, `owned_by`), Anthropic (`type`,
+ * `has_more`) и Google (`models[].name` вида `models/<id>`, `supportedGenerationMethods`).
+ */
 function modelList(models) {
   return {
+    models: models.map((id) => ({
+      name: `models/${id}`,
+      displayName: id,
+      supportedGenerationMethods: ['generateContent', 'countTokens'],
+    })),
     object: 'list',
     data: models.map((id) => ({
       id,
@@ -161,7 +169,9 @@ export function startStubModel(options = {}) {
 
   async function respond(res, dialect, step, meta, record) {
     const headers = {
-      ...(step.window ? dialect.windowHeaders(step.window, nowSeconds()) : {}),
+      ...(step.window && dialect.windowHeaders
+        ? dialect.windowHeaders(step.window, nowSeconds())
+        : {}),
       ...step.headers,
     };
     if (step.holdMs && !(await hold(step.holdMs, res))) return cut(record);
@@ -272,7 +282,7 @@ export function startStubModel(options = {}) {
       return;
     }
 
-    const info = dialect.inspect(body);
+    const info = dialect.inspect(body, { path });
     const record = {
       n: requests.length + 1,
       ...base,
@@ -301,6 +311,9 @@ export function startStubModel(options = {}) {
       const foreign = step.parts.find((part) => !dialect.parts.includes(part.kind));
       if (foreign)
         throw new TypeError(`step part «${foreign.kind}» does not exist in ${dialect.id}`);
+      // Заголовков окна у протокола нет (Gemini API) — отказ, а не придуманные заголовки.
+      if (step.window && !dialect.windowHeaders)
+        throw new TypeError(`step window does not exist in ${dialect.id}`);
     } catch (error) {
       record.scriptError = error instanceof Error ? error.message : String(error);
       step = normalizeStep({ text: `STUB SCRIPT FAILED: ${record.scriptError}` });

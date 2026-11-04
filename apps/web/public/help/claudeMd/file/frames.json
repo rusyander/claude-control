@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:31:00.295Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-KDlYmu\\CLAUDE.md Символов: 717 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "shotAt": "2026-11-03T16:50:59.052Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-yQE3Ij\\CLAUDE.md Символов: 717 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
       "en": {
         "file": "01-editor.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:54.185Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-hn3v19\\CLAUDE.md Characters: 717 Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:53:07.261Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-qyKf7z\\CLAUDE.md Characters: 717 Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "eecf454f2fe7f69b",
+          "text": "a33baf23524cdad0"
+        }
       },
       "dark": {
         "file": "01-editor.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:32.518Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-u1f2Nx\\CLAUDE.md Символов: 717 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code"
+        "shotAt": "2026-11-03T16:54:58.082Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-69idSY\\CLAUDE.md Символов: 717 Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+        "seal": {
+          "png": "6f1bd6f6a1c320c9",
+          "text": "3c3187ff9320725e"
+        }
       },
       "darkEn": {
         "file": "01-editor.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:43.500Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-N1Zq8v\\CLAUDE.md Characters: 717 Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:56:51.102Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-48Pk35\\CLAUDE.md Characters: 717 Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "662a5cd927a95345",
+          "text": "f277af8ac192fa75"
+        }
+      },
+      "seal": {
+        "png": "4290a4a0a20b4870",
+        "text": "20a917087cbbdb2d"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:31:01.681Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-KDlYmu\\CLAUDE.md Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "shotAt": "2026-11-03T16:51:00.501Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-yQE3Ij\\CLAUDE.md Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
       "en": {
         "file": "02-unsaved.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:55.523Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-hn3v19\\CLAUDE.md Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:53:08.743Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-qyKf7z\\CLAUDE.md Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "a31cdc3df8a7e27b",
+          "text": "dbce0eaf2767a1cd"
+        }
       },
       "dark": {
         "file": "02-unsaved.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:34.336Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-u1f2Nx\\CLAUDE.md Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code"
+        "shotAt": "2026-11-03T16:54:59.541Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 4 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-69idSY\\CLAUDE.md Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+        "seal": {
+          "png": "034aeae3f71950a9",
+          "text": "32e96860252f6cd8"
+        }
       },
       "darkEn": {
         "file": "02-unsaved.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:45.007Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-N1Zq8v\\CLAUDE.md Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:56:52.517Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 4 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-48Pk35\\CLAUDE.md Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "6dec04a23c5a107a",
+          "text": "dc00c94653b97fd8"
+        }
+      },
+      "seal": {
+        "png": "07e433016261f17b",
+        "text": "5bad89070c41814a"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1000,
-      "shotAt": "2026-09-28T14:31:05.728Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 5 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-KDlYmu\\CLAUDE.md Файл изменился на диске, пока вы его правили. Ваши правки на месте; «Сохранить» перезапишет новую версию файла. Загрузить с диска Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+      "shotAt": "2026-11-03T16:51:04.564Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 5 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-yQE3Ij\\CLAUDE.md Файл изменился на диске, пока вы его правили. Ваши правки на месте; «Сохранить» перезапишет новую версию файла. Загрузить с диска Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
       "en": {
         "file": "03-conflict.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:34:59.604Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 5 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-hn3v19\\CLAUDE.md The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file. Load from disk Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:53:12.819Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 5 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-qyKf7z\\CLAUDE.md The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file. Load from disk Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "e6bf4e31f31e8652",
+          "text": "7bc6b4ba7b900023"
+        }
       },
       "dark": {
         "file": "03-conflict.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:32:38.396Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 5 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Справка CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-u1f2Nx\\CLAUDE.md Файл изменился на диске, пока вы его правили. Ваши правки на месте; «Сохранить» перезапишет новую версию файла. Загрузить с диска Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code"
+        "shotAt": "2026-11-03T16:55:03.614Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 5 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно CLAUDE.md Глобальный файл инструкций целиком — как его читает Claude Code Что это CLI читает CLAUDE.md, а где его нет — AGENTS.md Читается: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-69idSY\\CLAUDE.md Файл изменился на диске, пока вы его правили. Ваши правки на месте; «Сохранить» перезапишет новую версию файла. Загрузить с диска Символов: 803 · есть несохранённые правки Отменить правки Сохранить Изменения применятся после перезапуска Claude Code",
+        "seal": {
+          "png": "e69bcf1a407117fc",
+          "text": "298008120c420ed3"
+        }
       },
       "darkEn": {
         "file": "03-conflict.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1000,
-        "shotAt": "2026-09-28T14:33:49.084Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 5 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Help CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-N1Zq8v\\CLAUDE.md The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file. Load from disk Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code"
+        "shotAt": "2026-11-03T16:56:56.590Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 5 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet CLAUDE.md The whole global instructions file — exactly as Claude Code reads it What this is The CLI reads CLAUDE.md, and AGENTS.md where there is none Read: CLAUDE.md C:\\agentdeck-help-shots\\rules-guide-48Pk35\\CLAUDE.md The file changed on disk while you were editing. Your edits are kept; “Save” will overwrite the newer file. Load from disk Characters: 803 · unsaved changes Revert changes Save Changes apply after restarting Claude Code",
+        "seal": {
+          "png": "6f3040947109c8ab",
+          "text": "ffa4ade472ae61a1"
+        }
+      },
+      "seal": {
+        "png": "b727455d20053dd6",
+        "text": "5cc0ad40da115cda"
       }
     }
   ]

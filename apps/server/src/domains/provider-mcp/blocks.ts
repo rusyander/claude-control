@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { ServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { UnrecognizedFormatError, readContinueServers } from '../../lib/continue-yaml.ts';
 import type { ContinueRawServer } from '../../lib/continue-yaml.ts';
 import { readTextFile } from '../../lib/safe-io/safe-io.ts';
@@ -43,6 +44,8 @@ const BLOCK_EXTENSIONS = ['.yaml', '.yml'];
 export interface SkippedMcpBlock {
   path: string;
   reason: string;
+  /** Код `reason` — паспорт переноса показывает причину и под английским интерфейсом. */
+  reasonCode: ServerMessageCode;
 }
 
 /** Записи одного файла-блока, как они лежат в нём. */
@@ -109,7 +112,7 @@ export function scanMcpBlocks(dir: string | undefined, taken: Iterable<string>):
       servers = text.trim() ? readContinueServers(text) : [];
     } catch (error) {
       if (error instanceof UnrecognizedFormatError) {
-        skipped.push({ path, reason: UNPARSED_REASON });
+        skipped.push({ path, reason: UNPARSED_REASON, reasonCode: 'mcp-block-unparsed' });
         continue;
       }
       throw error;
@@ -117,7 +120,7 @@ export function scanMcpBlocks(dir: string | undefined, taken: Iterable<string>):
 
     const clash = servers.some((server) => names.has(String(server.name)));
     if (clash) {
-      skipped.push({ path, reason: DUPLICATE_REASON });
+      skipped.push({ path, reason: DUPLICATE_REASON, reasonCode: 'mcp-block-duplicate' });
       continue;
     }
 

@@ -6,8 +6,10 @@ import {
   openSync,
   readFileSync,
   readSync,
+  statSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import { sessionFile } from '../../session-host/protocol.ts';
 
 /**
  * Запись ввода ядра в сеанс (`core-io.jsonl` в каталоге сеанса) — то, чего нет в выводе хоста:
@@ -29,8 +31,21 @@ export interface RecordedSend {
   uuid: string;
   /** Смещение stdout.log, на котором насос стал ждать хода этой отправки. */
   at: number;
+  /**
+   * Длина stdout.log в миг записи отправки (запись с прохода 8 зоны C, 03.11; прежние — без неё).
+   * `at` — место насоса, оно отстаёт от файла: курсор вида, ушедший за `at` до записи отправки,
+   * терял ход человека в живой ленте («живьём 0, после перезагрузки 1»). Курсор вида — конец
+   * целой строки на миг его чтения, а файл только растёт, так что `seen` не меньше любого курсора,
+   * выданного до записи: показ по `seen` отдаёт такую отправку ровно один раз.
+   */
+  seen?: number;
   data: string;
   acked: boolean;
+}
+
+/** Где ход человека встаёт в ленте вида: не раньше длины вывода на миг его записи. */
+export function shownAt(send: Pick<RecordedSend, 'at' | 'seen'>): number {
+  return Math.max(send.at, send.seen ?? send.at);
 }
 
 export interface IoRecord {
@@ -40,7 +55,7 @@ export interface IoRecord {
 }
 
 type Line =
-  | { t: 'send'; cmdId: string; uuid: string; at: number; data: string }
+  | { t: 'send'; cmdId: string; uuid: string; at: number; seen?: number; data: string }
   | { t: 'ack'; cmdId: string }
   | { t: 'control'; id: string };
 
@@ -48,6 +63,8 @@ function parse(text: string): Line | null {
   try {
     const value = JSON.parse(text) as Partial<Line> & Record<string, unknown>;
     if (value.t === 'send' && typeof value.cmdId === 'string' && typeof value.at === 'number') {
+      // `seen` не число — как записи до прохода 8: показ по `at`.
+      if (value.seen !== undefined && typeof value.seen !== 'number') delete value.seen;
       return value as Line;
     }
     if (value.t === 'ack' && typeof value.cmdId === 'string') return value as Line;
@@ -111,11 +128,23 @@ function endsTorn(path: string): boolean {
   }
 }
 
+/** Длина stdout.log сеанса; файла ещё нет — 0. */
+function stdoutSize(dir: string): number {
+  return statSync(sessionFile(dir, 'stdout'), { throwIfNoEntry: false })?.size ?? 0;
+}
+
+/**
+ * Отправка получает `seen` здесь, у единственного писателя записи (насосы stream-json и JSON-RPC):
+ * длина вывода снимается ПОСЛЕ того, как насос решил отправлять, — любой курсор вида, выданный
+ * раньше, не больше её. Заданный вызывающим `seen` главнее (восстановление, тесты).
+ */
 export function appendIoRecord(dir: string, line: Line): void {
   const path = join(dir, IO_RECORD);
+  const stamped =
+    line.t === 'send' && line.seen === undefined ? { ...line, seen: stdoutSize(dir) } : line;
   // Обрывок прежнего ядра закрывается переводом строки: иначе эта запись склеится с ним.
   const lead = endsTorn(path) ? '\n' : '';
-  appendFileSync(path, `${lead}${JSON.stringify(line)}\n`, {
+  appendFileSync(path, `${lead}${JSON.stringify(stamped)}\n`, {
     encoding: 'utf8',
     mode: 0o600,
   });

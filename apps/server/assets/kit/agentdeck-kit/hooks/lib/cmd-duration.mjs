@@ -193,11 +193,10 @@ export function knownGate(command) {
   return null;
 }
 
-// A blocking watch (skills watchdog / agentdeck-watchdog) waits by design: its length is the wait the
+// A blocking watch (skill watchdog) waits by design: its length is the wait the
 // coordinator asked for (--max), and a background run ends the turn on a notifier — the dormancy the
 // watch exists to prevent. Only the timeout advice applies to it, never «run it in background».
-const WATCH_SCRIPT =
-  /skills[\\/](?:agentdeck-)?watchdog[\\/]scripts[\\/](?:watch|watch-groups)\.mjs\b/;
+const WATCH_SCRIPT = /skills[\\/]watchdog[\\/]scripts[\\/]watch\.mjs\b/;
 export function isBlockingWatch(command) {
   return WATCH_SCRIPT.test(String(command ?? ''));
 }
@@ -278,9 +277,8 @@ export function verdict({
     ? 'is a known long gate (often over 10 min'
     : `took ~${known.median} s here (${known.n} run(s)` +
       `${known.kills ? `, ${known.kills} killed at the ${CAP_S} s cap` : ''}`;
-  // A split group or a local-model run stays in the foreground (gate-at-end allows it there): the
-  // panel reads the end of a group's turn as its result, and local-discipline refuses background.
-  // A CLI whose shell has no background flag (bgParam null) cannot obey the advice at all.
+  // A local-model run stays in the foreground (gate-at-end allows it there): local-discipline refuses
+  // background. A CLI whose shell has no background flag (bgParam null) cannot obey the advice at all.
   if (!subagent && slow && !foregroundOnly && bgParam)
     return (
       `cmd-duration: this command ${seen}). Run it with ${bgParam}: true — ` +
@@ -320,9 +318,7 @@ export default function cmdDurationPre(input, file = FILE) {
     background,
     timeoutMs: Number(input.tool_input?.timeout) || undefined,
     subagent: inSubagent(input),
-    foregroundOnly:
-      Boolean(process.env.AGENTDECK_HEAVY_QUEUE_DIR) ||
-      (process.env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local',
+    foregroundOnly: (process.env.AGENTDECK_KIT_VARIANT ?? '').trim() === 'local',
     bgParam: backgroundParam(input),
     timeoutParam: hasShellTimeout(input),
   });

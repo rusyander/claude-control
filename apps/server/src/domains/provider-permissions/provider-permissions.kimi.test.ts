@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { getProvider } from '../../providers/registry.ts';
 import {
+  buildProviderPermissionInfo,
   readProviderPermissions,
   saveProviderPermissions,
   parseProviderPermissionsDraft,
@@ -105,16 +106,36 @@ base_url = "https://api.moonshot.ai/v1"
     });
   });
 
-  it('незнакомый режим: показываем дефолт, но настройка чужая — не «на дефолтах»', () => {
-    const filePath = join(root, 'unknown.toml');
-    writeFileSync(filePath, `default_permission_mode = "turbo"\n`, 'utf8');
-    expect(readKimi(filePath)).toEqual({
-      kind: 'kimi',
-      mode: 'manual',
-      rules: [],
-      usingDefaults: false,
-    });
-  });
+  // Kimi 2.4.1: `kimi doctor config` на этих значениях — «Invalid input», запуск молча их выбрасывает.
+  // `default`/`plan` — словарь ACP (его писало ядро), `turbo` — просто чужое.
+  it.each(['default', 'plan', 'turbo'])(
+    'режим вне набора (%s): отказ с названной причиной, раздел только для чтения, запись не трогает файл',
+    (stale) => {
+      const filePath = join(root, `stale-${stale}.toml`);
+      const text = `default_permission_mode = "${stale}"\n\n[[hooks]]\nevent = "PreToolUse"\ncommand = "h"\n`;
+      writeFileSync(filePath, text, 'utf8');
+
+      expect(() => readKimi(filePath)).toThrow(UnrecognizedFormatError);
+      expect(() => readKimi(filePath)).toThrow(`default_permission_mode = "${stale}"`);
+      expect(() => readKimi(filePath)).toThrow('допустимо: manual, auto, yolo');
+
+      const info = buildProviderPermissionInfo(targetFor(filePath));
+      expect(info.readOnly).toBe(true);
+      expect(info.error).toContain(`"${stale}"`);
+      // Причина едет кодом: страница прав показывает её на языке человека (core-s10 G12).
+      expect(info.messageCode).toBe('kimi-mode-stale');
+      expect(info.params).toEqual({
+        key: 'default_permission_mode',
+        mode: stale,
+        allowed: 'manual, auto, yolo',
+      });
+
+      expect(() =>
+        saveProviderPermissions(targetFor(filePath), { mode: 'manual', rules: [] }, backupDir),
+      ).toThrow(UnrecognizedFormatError);
+      expect(readFileSync(filePath, 'utf8')).toBe(text);
+    },
+  );
 
   it('запись правит только свои места: прочие ключи и комментарий целы', () => {
     const filePath = join(root, 'config.toml');
@@ -268,6 +289,10 @@ base_url = "https://api.moonshot.ai/v1"
       saveProviderPermissions(targetFor(broken), { mode: 'auto', rules: [] }, backupDir),
     ).toThrow(UnrecognizedFormatError);
     expect(readFileSync(broken, 'utf8')).toBe(text);
+    // Общий «формат не распознан» кода не несёт: страница не повторяет его второй строкой.
+    const brokenInfo = buildProviderPermissionInfo(targetFor(broken));
+    expect(brokenInfo.readOnly).toBe(true);
+    expect(brokenInfo.messageCode).toBeUndefined();
 
     const asList = join(root, 'list.toml');
     writeFileSync(asList, `default_permission_mode = ["auto"]\n`, 'utf8');

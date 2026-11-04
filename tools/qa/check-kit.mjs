@@ -17,7 +17,15 @@
  */
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { runOnStand, wait } from './throwaway-stand.mjs';
@@ -28,18 +36,21 @@ const GUARD = 'hooks/guard-destructive.mjs';
 const MARK = 'KIT-QA-MINE-RULE-MARKER';
 const DUMP = 'kit-dump.jsonl';
 
-/** Фальшивый `claude`: argv и вариант правил — строкой в файл рабочей папки, затем init и result. */
+/**
+ * Фальшивый `claude`: argv, вариант правил и рабочая папка — строкой в файл рядом с собой (каталог
+ * `bin` стенда; рабочую папку процесса выбирает ядро), затем init и result.
+ */
 const FAKE_CLAUDE = String.raw`
 import { appendFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 const argv = process.argv.slice(2);
 if (argv[0] === '--version' || argv[0] === '-v') {
   process.stdout.write('2.1.0 (Claude Code)\n');
   process.exit(0);
 }
 appendFileSync(
-  join(process.cwd(), '${DUMP}'),
-  JSON.stringify({ argv, variant: process.env.AGENTDECK_KIT_VARIANT ?? null }) + '\n',
+  fileURLToPath(import.meta.url).replace(/[^\\/]+$/, '${DUMP}'),
+  JSON.stringify({ argv, cwd: process.cwd(), variant: process.env.AGENTDECK_KIT_VARIANT ?? null }) + '\n',
 );
 const id = 'kit-qa-' + process.pid;
 process.stdout.write(JSON.stringify({ type: 'system', subtype: 'init', session_id: id, model: 'stub', tools: [] }) + '\n');
@@ -61,12 +72,36 @@ function realKitStamp() {
 }
 const realBefore = realKitStamp();
 
+/**
+ * Папка проекта — репозиторий git с одним коммитом, которому человек доверился в CLI: ход чата ядро
+ * заводит только в рабочем дереве git (оценка отказывает «not a git repository»), а без отметки
+ * доверия ведёт сеанс в режиме «observe» (`--setting-sources ''`) — флагов набора в argv не было бы.
+ */
+function projectRepo(dir, cfg) {
+  mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    spawnSync('git', ['-c', 'user.name=qa', '-c', 'user.email=qa@example.com', ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'init');
+  const trustFile = join(cfg, '.claude.json');
+  const config = existsSync(trustFile) ? JSON.parse(readFileSync(trustFile, 'utf8')) : {};
+  const key = realpathSync.native(dir).replaceAll('\\', '/');
+  config.projects = { ...config.projects, [key]: { hasTrustDialogAccepted: true } };
+  writeFileSync(trustFile, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
+}
+
 await runOnStand(
   {
     label: 'kit',
     web: false,
     fakeCli: { claude: FAKE_CLAUDE },
-    seed: ({ cfg }) => {
+    // Сообщение чата запускает CLI через ядро (этап 10): без ядра стенда процесс не стартует вовсе.
+    core: true,
+    seed: ({ root, cfg }) => {
+      projectRepo(join(root, 'project'), cfg);
       // Одноимённый навык человека — конфликт имён гибрида.
       mkdirSync(join(cfg, 'skills', 'read-before-edit'), { recursive: true });
       writeFileSync(
@@ -81,9 +116,10 @@ await runOnStand(
     mkdirSync(project, { recursive: true });
 
     /** Одно сообщение чата; ответ — argv фальшивого CLI этого прогона. */
+    const dump = join(stand.bin, DUMP);
     const send = async (label) => {
-      const before = existsSync(join(project, DUMP))
-        ? readFileSync(join(project, DUMP), 'utf8').split('\n').filter(Boolean).length
+      const before = existsSync(dump)
+        ? readFileSync(dump, 'utf8').split('\n').filter(Boolean).length
         : 0;
       const sending = stand.api('/chat/send', {
         method: 'POST',
@@ -91,8 +127,8 @@ await runOnStand(
       });
       sending.catch(() => undefined);
       for (let i = 0; i < 120; i += 1) {
-        const lines = existsSync(join(project, DUMP))
-          ? readFileSync(join(project, DUMP), 'utf8').split('\n').filter(Boolean)
+        const lines = existsSync(dump)
+          ? readFileSync(dump, 'utf8').split('\n').filter(Boolean)
           : [];
         if (lines.length > before) {
           await Promise.race([sending, wait(10_000)]);
@@ -100,7 +136,13 @@ await runOnStand(
         }
         await wait(250);
       }
-      throw new Error(`${label}: фальшивый CLI не запущен за 30 с\n${stand.log().slice(-1500)}`);
+      // Ответ /chat/send называет причину отказа (ядро не поднято, нет разрешения) — без него виден лишь срок.
+      const answer = await Promise.race([sending, wait(1000).then(() => undefined)]).catch((e) => ({
+        text: String(e),
+      }));
+      throw new Error(
+        `${label}: фальшивый CLI не запущен за 30 с; /chat/send → ${answer ? `${answer.status ?? ''} ${String(answer.text ?? '').slice(0, 400)}` : 'нет ответа'}\n${stand.log().slice(-1500)}\nЯдро (хвост):\n${stand.coreLog().slice(-1500)}`,
+      );
     };
     const pluginDir = (run) => {
       const at = run.argv.indexOf('--plugin-dir');
@@ -148,9 +190,34 @@ await runOnStand(
     );
     const effective = (mode) => join(kitRoot, 'effective', mode, 'agentdeck-kit');
 
-    // ── 2. «Глобальные»: набор к прогону не едет ───────────────────────────
+    /**
+     * «Глобальные» набор не подключают; едут только стражи, которых нет в слое человека
+     * (`guardsOverlay`, `GUARD_TWINS`) — у человека стенда их нет, значит каталог стражей есть:
+     * одни хуки `PreToolUse`, ни навыков, ни правил, ни команд.
+     */
+    /** Пусто — прогон получил одних стражей; иначе — что не так. */
+    const notGuardsOnly = (run) => {
+      const dir = pluginDir(run);
+      const want = join(kitRoot, 'effective', 'guards', 'agentdeck-kit');
+      if (dir !== want) return `--plugin-dir ${dir} ≠ ${want}`;
+      // Пустая папка сборке не мешает (CLI в ней ничего не найдёт) — считаются файлы.
+      const filesUnder = (rel) => {
+        const at = join(dir, rel);
+        if (!existsSync(at)) return [];
+        return readdirSync(at, { withFileTypes: true }).flatMap((entry) =>
+          entry.isDirectory() ? filesUnder(join(rel, entry.name)) : [join(rel, entry.name)],
+        );
+      };
+      const extra = ['skills', 'rules', 'commands'].flatMap(filesUnder);
+      if (extra.length > 0) return `в каталоге стражей лишнее: ${extra.join(', ')}`;
+      const events = Object.keys(hooksOf(dir)).join(',');
+      return events === 'PreToolUse' ? '' : `события хуков: ${events}`;
+    };
+
+    // ── 2. «Глобальные»: набор к прогону не едет, только стражи ────────────
     const g = await send('global');
-    check('«глобальные»: без --plugin-dir', pluginDir(g) === undefined, g.argv.join(' '));
+    const gWhy = notGuardsOnly(g);
+    check('«глобальные»: --plugin-dir — только стражи, без набора', !gWhy, gWhy);
     check('«глобальные»: без варианта правил', g.variant === null, String(g.variant));
 
     // ── 3. «Оба»: плагин, навык набора уступает навыку человека ─────────────
@@ -298,9 +365,11 @@ await runOnStand(
     // ── 11. «Глобальные» снова — и следа нет ────────────────────────────────
     await stand.api('/kit/mode', { method: 'PUT', body: { provider: 'claude', mode: 'global' } });
     const back = await send('global-again');
+    const backWhy = notGuardsOnly(back);
     check(
-      'снова «глобальные»: без --plugin-dir со следующего сообщения',
-      pluginDir(back) === undefined,
+      'снова «глобальные»: со следующего сообщения только стражи, набора нет',
+      !backWhy,
+      backWhy,
     );
 
     check('настоящий каталог набора человека не тронут', realKitStamp() === realBefore);

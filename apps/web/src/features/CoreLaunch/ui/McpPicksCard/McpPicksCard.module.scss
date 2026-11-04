@@ -1,0 +1,64 @@
+// Таблица выбора: строки — серверы, столбцы — виды шага; на узком экране прокручивается вбок.
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring, var(--color-accent));
+    outline-offset: 2px;
+  }
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-body-sm);
+
+  th,
+  td {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border);
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  thead th {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child th,
+  tbody tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.serverCol {
+  min-width: 220px;
+  text-align: left !important;
+  font-weight: 400;
+}
+
+.cell input {
+  cursor: pointer;
+}
+
+.cell input:disabled {
+  cursor: not-allowed;
+}
+
+.defaultToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  font-size: var(--font-size-caption);
+  font-weight: 400;
+  color: var(--color-fg-muted);
+  cursor: pointer;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}

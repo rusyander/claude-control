@@ -5,24 +5,44 @@
       "light-ru": {
         "file": "01-smoke-ok.png",
         "width": 988,
-        "height": 878
+        "height": 1773
       },
       "light-en": {
         "file": "01-smoke-ok.en.png",
         "width": 988,
-        "height": 847
+        "height": 1779
+      },
+      "dark-ru": {
+        "file": "01-smoke-ok.dark.png",
+        "width": 988,
+        "height": 1773
+      },
+      "dark-en": {
+        "file": "01-smoke-ok.dark.en.png",
+        "width": 988,
+        "height": 1779
       }
     },
     "activate/02-return-settings": {
       "light-ru": {
         "file": "02-return-settings.png",
         "width": 930,
-        "height": 1838
+        "height": 1952
       },
       "light-en": {
         "file": "02-return-settings.en.png",
         "width": 930,
-        "height": 1838
+        "height": 1910
+      },
+      "dark-ru": {
+        "file": "02-return-settings.dark.png",
+        "width": 930,
+        "height": 1952
+      },
+      "dark-en": {
+        "file": "02-return-settings.dark.en.png",
+        "width": 930,
+        "height": 1910
       }
     },
     "agent/01-chat-run": {
@@ -54,11 +74,21 @@
         "file": "01-admin-login.png",
         "width": 1280,
         "height": 820
+      },
+      "light-en": {
+        "file": "01-admin-login.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/02-admin-dashboard": {
       "light-ru": {
         "file": "02-admin-dashboard.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "02-admin-dashboard.en.png",
         "width": 1280,
         "height": 820
       }
@@ -68,11 +98,21 @@
         "file": "03-admin-models.png",
         "width": 1280,
         "height": 820
+      },
+      "light-en": {
+        "file": "03-admin-models.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/04-admin-model-create": {
       "light-ru": {
         "file": "04-admin-model-create.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "04-admin-model-create.en.png",
         "width": 1280,
         "height": 820
       }
@@ -82,11 +122,21 @@
         "file": "05-admin-keys.png",
         "width": 1280,
         "height": 820
+      },
+      "light-en": {
+        "file": "05-admin-keys.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/06-admin-key-create": {
       "light-ru": {
         "file": "06-admin-key-create.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "06-admin-key-create.en.png",
         "width": 1280,
         "height": 820
       }
@@ -96,11 +146,21 @@
         "file": "07-admin-key-issued.png",
         "width": 1280,
         "height": 820
+      },
+      "light-en": {
+        "file": "07-admin-key-issued.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/08-admin-usage": {
       "light-ru": {
         "file": "08-admin-usage.png",
+        "width": 1280,
+        "height": 820
+      },
+      "light-en": {
+        "file": "08-admin-usage.en.png",
         "width": 1280,
         "height": 820
       }
@@ -115,78 +175,148 @@
         "file": "09-panel-empty.en.png",
         "width": 1280,
         "height": 820
+      },
+      "dark-ru": {
+        "file": "09-panel-empty.dark.png",
+        "width": 1280,
+        "height": 820
+      },
+      "dark-en": {
+        "file": "09-panel-empty.dark.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/10-wizard-address": {
       "light-ru": {
         "file": "10-wizard-address.png",
         "width": 912,
-        "height": 729
+        "height": 752
       },
       "light-en": {
         "file": "10-wizard-address.en.png",
         "width": 912,
-        "height": 729
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "10-wizard-address.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "10-wizard-address.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/11-wizard-probe": {
       "light-ru": {
         "file": "11-wizard-probe.png",
         "width": 912,
-        "height": 729
+        "height": 752
       },
       "light-en": {
         "file": "11-wizard-probe.en.png",
         "width": 912,
-        "height": 729
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "11-wizard-probe.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "11-wizard-probe.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/12-wizard-key": {
       "light-ru": {
         "file": "12-wizard-key.png",
         "width": 912,
-        "height": 639
+        "height": 752
       },
       "light-en": {
         "file": "12-wizard-key.en.png",
         "width": 912,
-        "height": 639
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "12-wizard-key.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "12-wizard-key.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/13-wizard-capabilities": {
       "light-ru": {
         "file": "13-wizard-capabilities.png",
         "width": 912,
-        "height": 729
+        "height": 752
       },
       "light-en": {
         "file": "13-wizard-capabilities.en.png",
         "width": 912,
-        "height": 729
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "13-wizard-capabilities.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "13-wizard-capabilities.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/14-wizard-targets": {
       "light-ru": {
         "file": "14-wizard-targets.png",
         "width": 912,
-        "height": 1222
+        "height": 752
       },
       "light-en": {
         "file": "14-wizard-targets.en.png",
         "width": 912,
-        "height": 1222
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "14-wizard-targets.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "14-wizard-targets.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/15-wizard-gateway": {
       "light-ru": {
         "file": "15-wizard-gateway.png",
         "width": 912,
-        "height": 1222
+        "height": 752
       },
       "light-en": {
         "file": "15-wizard-gateway.en.png",
         "width": 912,
-        "height": 1222
+        "height": 752
+      },
+      "dark-ru": {
+        "file": "15-wizard-gateway.dark.png",
+        "width": 912,
+        "height": 752
+      },
+      "dark-en": {
+        "file": "15-wizard-gateway.dark.en.png",
+        "width": 912,
+        "height": 752
       }
     },
     "connect/16-panel-card": {
@@ -199,18 +329,38 @@
         "file": "16-panel-card.en.png",
         "width": 1280,
         "height": 820
+      },
+      "dark-ru": {
+        "file": "16-panel-card.dark.png",
+        "width": 1280,
+        "height": 820
+      },
+      "dark-en": {
+        "file": "16-panel-card.dark.en.png",
+        "width": 1280,
+        "height": 820
       }
     },
     "connect/18-panel-delete": {
       "light-ru": {
         "file": "18-panel-delete.png",
         "width": 452,
-        "height": 381
+        "height": 352
       },
       "light-en": {
         "file": "18-panel-delete.en.png",
         "width": 452,
-        "height": 362
+        "height": 352
+      },
+      "dark-ru": {
+        "file": "18-panel-delete.dark.png",
+        "width": 452,
+        "height": 352
+      },
+      "dark-en": {
+        "file": "18-panel-delete.dark.en.png",
+        "width": 452,
+        "height": 352
       }
     },
     "media/01-capability-row": {
@@ -221,6 +371,16 @@
       },
       "light-en": {
         "file": "01-capability-row.en.png",
+        "width": 932,
+        "height": 49
+      },
+      "dark-ru": {
+        "file": "01-capability-row.dark.png",
+        "width": 932,
+        "height": 49
+      },
+      "dark-en": {
+        "file": "01-capability-row.dark.en.png",
         "width": 932,
         "height": 49
       }
@@ -235,18 +395,38 @@
         "file": "02-mode-menu.en.png",
         "width": 388,
         "height": 260
+      },
+      "dark-ru": {
+        "file": "02-mode-menu.dark.png",
+        "width": 388,
+        "height": 278
+      },
+      "dark-en": {
+        "file": "02-mode-menu.dark.en.png",
+        "width": 388,
+        "height": 260
       }
     },
     "route/01-model-card": {
       "light-ru": {
         "file": "01-model-card.png",
         "width": 988,
-        "height": 611
+        "height": 635
       },
       "light-en": {
         "file": "01-model-card.en.png",
         "width": 988,
-        "height": 611
+        "height": 635
+      },
+      "dark-ru": {
+        "file": "01-model-card.dark.png",
+        "width": 988,
+        "height": 635
+      },
+      "dark-en": {
+        "file": "01-model-card.dark.en.png",
+        "width": 988,
+        "height": 635
       }
     },
     "route/02-chat-header": {
@@ -259,42 +439,82 @@
         "file": "02-chat-header.en.png",
         "width": 1280,
         "height": 900
+      },
+      "dark-ru": {
+        "file": "02-chat-header.dark.png",
+        "width": 1280,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "02-chat-header.dark.en.png",
+        "width": 1280,
+        "height": 900
       }
     },
     "rules/01-rules-panel": {
       "light-ru": {
         "file": "01-rules-panel.png",
-        "width": 930,
-        "height": 394
+        "width": 433,
+        "height": 632
       },
       "light-en": {
         "file": "01-rules-panel.en.png",
-        "width": 930,
-        "height": 334
+        "width": 433,
+        "height": 614
+      },
+      "dark-ru": {
+        "file": "01-rules-panel.dark.png",
+        "width": 433,
+        "height": 632
+      },
+      "dark-en": {
+        "file": "01-rules-panel.dark.en.png",
+        "width": 433,
+        "height": 614
       }
     },
     "rules/02-rules-ours": {
       "light-ru": {
         "file": "02-rules-ours.png",
-        "width": 930,
-        "height": 825
+        "width": 433,
+        "height": 1555
       },
       "light-en": {
         "file": "02-rules-ours.en.png",
-        "width": 930,
-        "height": 789
+        "width": 433,
+        "height": 1516
+      },
+      "dark-ru": {
+        "file": "02-rules-ours.dark.png",
+        "width": 433,
+        "height": 1555
+      },
+      "dark-en": {
+        "file": "02-rules-ours.dark.en.png",
+        "width": 433,
+        "height": 1516
       }
     },
     "rules/03-rules-conflicts": {
       "light-ru": {
         "file": "03-rules-conflicts.png",
         "width": 930,
-        "height": 346
+        "height": 516
       },
       "light-en": {
         "file": "03-rules-conflicts.en.png",
         "width": 930,
-        "height": 346
+        "height": 480
+      },
+      "dark-ru": {
+        "file": "03-rules-conflicts.dark.png",
+        "width": 930,
+        "height": 516
+      },
+      "dark-en": {
+        "file": "03-rules-conflicts.dark.en.png",
+        "width": 930,
+        "height": 480
       }
     },
     "scripted/01-shim-call": {
@@ -305,6 +525,16 @@
       },
       "light-en": {
         "file": "01-shim-call.en.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "dark-ru": {
+        "file": "01-shim-call.dark.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "01-shim-call.dark.en.png",
         "width": 1280,
         "height": 1000
       }
@@ -319,18 +549,38 @@
         "file": "02-shim-quote.en.png",
         "width": 1280,
         "height": 1000
+      },
+      "dark-ru": {
+        "file": "02-shim-quote.dark.png",
+        "width": 1280,
+        "height": 1000
+      },
+      "dark-en": {
+        "file": "02-shim-quote.dark.en.png",
+        "width": 1280,
+        "height": 1000
       }
     },
     "scripted/03-shim-card": {
       "light-ru": {
         "file": "03-shim-card.png",
         "width": 988,
-        "height": 245
+        "height": 283
       },
       "light-en": {
         "file": "03-shim-card.en.png",
         "width": 988,
-        "height": 245
+        "height": 283
+      },
+      "dark-ru": {
+        "file": "03-shim-card.dark.png",
+        "width": 988,
+        "height": 283
+      },
+      "dark-en": {
+        "file": "03-shim-card.dark.en.png",
+        "width": 988,
+        "height": 283
       }
     },
     "scripted/04-image-menu": {
@@ -341,6 +591,16 @@
       },
       "light-en": {
         "file": "04-image-menu.en.png",
+        "width": 388,
+        "height": 242
+      },
+      "dark-ru": {
+        "file": "04-image-menu.dark.png",
+        "width": 388,
+        "height": 242
+      },
+      "dark-en": {
+        "file": "04-image-menu.dark.en.png",
         "width": 388,
         "height": 242
       }
@@ -355,30 +615,60 @@
         "file": "05-image-card.en.png",
         "width": 1680,
         "height": 900
+      },
+      "dark-ru": {
+        "file": "05-image-card.dark.png",
+        "width": 1680,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "05-image-card.dark.en.png",
+        "width": 1680,
+        "height": 900
       }
     },
     "scripted/06-switch-button": {
       "light-ru": {
         "file": "06-switch-button.png",
         "width": 988,
-        "height": 699
+        "height": 1613
       },
       "light-en": {
         "file": "06-switch-button.en.png",
         "width": 988,
-        "height": 699
+        "height": 1601
+      },
+      "dark-ru": {
+        "file": "06-switch-button.dark.png",
+        "width": 988,
+        "height": 1613
+      },
+      "dark-en": {
+        "file": "06-switch-button.dark.en.png",
+        "width": 988,
+        "height": 1601
       }
     },
     "scripted/07-smoke-red": {
       "light-ru": {
         "file": "07-smoke-red.png",
         "width": 988,
-        "height": 920
+        "height": 1784
       },
       "light-en": {
         "file": "07-smoke-red.en.png",
         "width": 988,
-        "height": 862
+        "height": 1744
+      },
+      "dark-ru": {
+        "file": "07-smoke-red.dark.png",
+        "width": 988,
+        "height": 1784
+      },
+      "dark-en": {
+        "file": "07-smoke-red.dark.en.png",
+        "width": 988,
+        "height": 1744
       }
     }
   }

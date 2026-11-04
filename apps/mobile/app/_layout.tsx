@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { Stack, router } from 'expo-router';
+import { Stack, router, type Href } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -12,7 +12,7 @@ import { currentConnection, useConnection, loadConnection } from '../src/shared/
 import { forgetPanelData } from '../src/shared/api/panel-cache';
 import { resumeActive } from '../src/shared/lib/runs';
 import { useNotificationOpen } from '../src/shared/lib/notifications';
-import { notificationTarget } from '../src/entities/provider-chat/model';
+import { openNotification } from '../src/features/notification-open/openNotification';
 import { colors } from '../src/shared/config/theme';
 import { useT, loadLanguage } from '../src/shared/config/i18n';
 import { ensureChannel } from '../src/shared/lib/ensureChannel';
@@ -58,24 +58,18 @@ export default function RootLayout() {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const connection = useConnection();
 
-  // Нажатие на уведомление — в его разговор: чужой CLI открывается своим экраном,
-  // разговор Claude — обычным чатом своего проекта. Уведомление с другого
-  // компьютера сначала выбирает его: разговор живёт на той машине.
-  const openFromNotification = useCallback(async (data: unknown) => {
-    const target = notificationTarget(data);
-    if (!target) return;
-    const panel = panelForMachine((data as { machineId?: unknown } | null)?.machineId);
-    if (panel) await activatePanel(panel);
-    if (target.kind === 'foreign') {
-      router.push({
-        pathname: '/foreign-chat',
-        params: { provider: target.providerId, id: target.chatId },
-      });
-      return;
-    }
-    openChat(target.chatId, target.projectPath || undefined);
-    router.push('/chat');
-  }, []);
+  // Нажатие на уведомление — туда, о чём оно (`features/notification-open`): вопрос ядра —
+  // экран задачи, чужой CLI — свой экран, разговор Claude — чат своего проекта.
+  const openFromNotification = useCallback(
+    (data: unknown) =>
+      openNotification(data, {
+        panelForMachine,
+        activatePanel: activatePanel as (panel: never) => Promise<void>,
+        push: (href) => router.push(href as Href),
+        openChat,
+      }),
+    [],
+  );
   // Ждёт, пока смонтирован стек и показана заставка: раньше переходить некуда.
   const onNotification = useCallback(
     (data: unknown) => void openFromNotification(data),
@@ -154,6 +148,8 @@ export default function RootLayout() {
             <Stack.Screen name="test-run" options={{ title: t.tests.manual.title }} />
             <Stack.Screen name="test-runs" options={{ title: t.tests.runs.title }} />
             <Stack.Screen name="pair" options={{ title: t.pair.screenTitle }} />
+            <Stack.Screen name="core" options={{ title: t.coreTask.listTitle }} />
+            <Stack.Screen name="core-task" options={{ title: t.coreTask.taskTitle }} />
           </Stack>
           {greeted ? null : <AppSplash onDone={() => setGreeted(true)} />}
         </QueryClientProvider>

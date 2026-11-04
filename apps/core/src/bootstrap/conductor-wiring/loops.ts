@@ -42,6 +42,8 @@ export interface LoopsDeps {
   /** Экономика исполнителя ядра (этап 5): окно, продолжение, бриф и пакет ревью, бюджет. */
   economy?: RunEconomy;
   measureBase?: RoadPortDeps['measureBase'];
+  /** Значения окружения задачи (этап 10, F6): только память, имена — в `task.created.session`. */
+  taskEnv?: { get(taskId: string): Readonly<Record<string, string>> | undefined };
 }
 
 export interface Loops {
@@ -165,8 +167,32 @@ export function startLoops(deps: LoopsDeps): Loops {
   const watched = new Map<string, () => void>();
   const scenarios = new Map<string, Scenario>();
   const closer = createEndCloser({ hooks: deps.hooks, note: deps.note });
+  const released = new Set<string>();
   let stopped = false;
   let sweeping: Promise<void> | null = null;
+
+  /**
+   * Конец задачи дорогой сессии — после того как её сессии сняты: находки сессий, ресурсы ядра
+   * `task-end` (контейнеры сервисов, стенд) и аренды маршрутов (сервер модели-заглушки, локальная
+   * модель). Без этого вызова аренда и сервер маршрута переживали задачу (замер: задача «ask»,
+   * сервер заглушки жив после `done`). Раз на задачу за жизнь ядра; утечка названа в журнале
+   * ядра, следующая загрузка пробует её снова (подтверждённые строки не трогаются).
+   */
+  const releaseEnded = async (task: LiveTask): Promise<void> => {
+    if (released.has(task.taskId)) return;
+    released.add(task.taskId);
+    try {
+      const got = await deps.road.releaseTask(task);
+      if (got.leaks.length > 0 || got.unread.length > 0)
+        deps.note('loop.task-release-leaks', {
+          taskId: task.taskId,
+          leaks: got.leaks,
+          unread: got.unread,
+        });
+    } catch (error) {
+      deps.note('loop.task-release-failed', { taskId: task.taskId, reason: String(error) });
+    }
+  };
 
   const scenarioOf = (ref: ScenarioRef): Scenario | undefined =>
     presetOf(ref) ?? scenarios.get(keyOf(ref));
@@ -233,7 +259,12 @@ export function startLoops(deps: LoopsDeps): Loops {
       road: deps.road,
       adapterOf: (id) => deps.adapters.get(id),
       startOf: (s, sessionId) => {
-        const made = stepStart({ task, pin: pin(), ...pathPrefix() }, s, sessionId);
+        const env = deps.taskEnv?.get(task.taskId);
+        const made = stepStart(
+          { task, pin: pin(), ...pathPrefix(), ...(env ? { env } : {}) },
+          s,
+          sessionId,
+        );
         if (made.ok) return made.start;
         deps.note('loop.start-refused', {
           taskId: task.taskId,
@@ -299,6 +330,9 @@ export function startLoops(deps: LoopsDeps): Loops {
       if (task.state.ended !== null && !have?.run) {
         if (starting.has(id)) continue;
         await closer.close(task);
+        // Давно кончившаяся задача со всем снятым обход не будит: снимать нечего.
+        if (Object.values(task.state.resources).some((r) => r.status !== 'verified'))
+          await releaseEnded(task);
         watched.get(id)?.();
         watched.delete(id);
         continue;
@@ -339,6 +373,7 @@ export function startLoops(deps: LoopsDeps): Loops {
       await end(loop, live ? 'end' : 'keep').catch((error: unknown) =>
         deps.note('loop.stop-failed', { taskId: id, reason: String(error) }),
       );
+      if (live) await releaseEnded(live);
     }
   };
 

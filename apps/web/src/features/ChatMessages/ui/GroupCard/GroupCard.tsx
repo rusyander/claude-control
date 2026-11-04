@@ -1,31 +1,14 @@
 import { useTranslation } from 'react-i18next';
-import { Button } from '@shared/ui/button';
-import { Icon } from '@shared/ui/icon';
 import { StatusDot } from '@shared/ui/status-dot';
 import { cn } from '@shared/lib/cn';
-import { Typography } from '@shared/ui/typography';
-import { serverFieldList, serverFieldText } from '@shared/config/i18n';
-import { HubFold } from '../HubFold/HubFold';
-import { GroupCopyCleanup } from '../GroupCopyCleanup/GroupCopyCleanup';
-import { GroupControl } from '../GroupControl/GroupControl';
-import { GroupAcceptance } from '../GroupAcceptance/GroupAcceptance';
-import { GroupRecheck } from '../GroupRecheck/GroupRecheck';
-import { SplitTasksMove } from '../SplitTasksMove/SplitTasksMove';
-import { GroupAutoNotices } from '../GroupAutoNotices/GroupAutoNotices';
 import { GroupText } from '../GroupText/GroupText';
 import { GroupHead } from '../GroupText/GroupHead';
 import { GroupAsk } from '../GroupAsk/GroupAsk';
 import { GroupPermission } from '../GroupPermission/GroupPermission';
-import { GroupSignals } from '../GroupSignals/GroupSignals';
-import { GroupCoverage } from '../GroupCoverage/GroupCoverage';
-import { MergeOrderChip } from '../MergeOrderChip/MergeOrderChip';
 import type { GroupCardProps } from './GroupCard.types';
 import styles from './GroupCard.module.scss';
-import { isMrSettled } from '../../lib/isMrSettled';
 import { hubBucket } from '../../lib/hubBucket';
-import { deliveryStopOf } from '../../lib/deliveryStop';
 import { statusTone } from '../../lib/statusTone';
-import { HoldAnswer } from './HoldAnswer/HoldAnswer';
 import { GroupProgress } from '../GroupProgress/GroupProgress';
 import { GroupAgents } from '../GroupAgents/GroupAgents';
 import { RunInputs } from '../RunInputs/RunInputs';
@@ -36,82 +19,35 @@ import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
  * группы — в её же карточке, справа в ряду названия; тело — под этим рядом во
  * всю ширину (22.10.2026). Кнопками-соседями под
  * строкой они читались как кнопки следующей группы. Клик по карточке открывает
- * чат группы (растянутая кнопка под текстом), а MR — только своей кнопкой:
- * ссылка внутри кликабельной строки уводила то в MR, то в чат.
+ * чат группы (растянутая кнопка под текстом); кнопки ряда стоят над ней и
+ * нажимаются сами по себе.
  */
 export function GroupCard({
   group,
-  parentChatId,
   providerId,
   onOpen,
-  onAnswerHold,
-  holdBusy,
-  onRelease,
-  releaseBusy,
-  onResumeInterrupted,
-  resumeInterruptedBusy,
   questions,
   onAnswer,
   permissions,
   onPermissionDecide,
-  sectionsOpen = false,
 }: GroupCardProps) {
   const { t } = useTranslation();
   const chatId = group.chatId;
   const asks = chatId && onAnswer && questions?.length ? questions : undefined;
   const permits = chatId && onPermissionDecide && permissions?.length ? permissions : undefined;
   const openable = Boolean(chatId && onOpen);
-  const mrId = group.mr?.match(/(\d+)$/)?.[1] ?? '';
-  // PR GitHub — «PR #12», MR GitLab — «MR !12»: слово и знак своего форджа.
-  const mrLabel = /\/pull\/\d+$/.test(group.mr ?? '')
-    ? 'chat.cascade.hub.pr'
-    : 'chat.cascade.hub.mr';
-  const cleanup = group.copy && parentChatId ? group.copy : undefined;
-  const watchSignals = group.watchSignals?.length ? group.watchSignals : undefined;
-  // Охват сторожа — только неполный: полный поток со всеми источниками фишки не даёт.
-  const coverage =
-    group.watchCoverage &&
-    (group.watchCoverage.by !== 'stream' || group.watchCoverage.gaps.length > 0)
-      ? group.watchCoverage
-      : undefined;
-  // Чего не хватило до доставки по фактам git — пунктами, свёрнуто (владелец
-  // 22.10.2026): одной строкой через «;» список в десяток пунктов занимал пол-
-  // карточки. В подвале, а не в тексте: текст лежит внутри кнопки «открыть чат».
-  // Остановленная на доставке группа показывает те же пункты в теле
-  // (`DeliveryStop`) — второй раз свёрнутым разделом они не нужны.
-  const missing = deliveryStopOf(group) ? [] : serverFieldList(group, 'deliveryMissing');
-  const release =
-    !chatId && group.pending === 'waiting' && group.groupIndex !== undefined && onRelease;
-  const settled = isMrSettled(group) ? group.mrClosed : undefined;
-  // Принятая человеком — своим фоном (владелец 09.10.2026): «Принять» должно
-  // быть видно с первого взгляда, а не только по подписи кнопки. Влитый MR
-  // важнее: с ним группа кончена совсем, и красится она зелёным.
   const bucket = hubBucket(group);
-  const accepted = !settled && bucket === 'accepted';
-  // Ждёт человека или упала — своей полосой слева (владелец 22.10.2026: что
-  // требует меня, должно читаться с первого взгляда по ленте карточек).
-  // Ждёт решения по D-n — тоже человек, хоть остальная работа и сделана.
-  // Запрос прав или вопрос в карточке — тоже человек (владелец 23.10): прогон
-  // на запросе прав числится не «стоит», а полоса должна быть видна.
-  const needsHuman =
-    !settled && (bucket === 'ask' || bucket === 'deferred' || Boolean(permits || asks));
-  const failed = !settled && bucket === 'failed';
+  // Ждёт человека — своей полосой слева (владелец 22.10.2026: что требует меня,
+  // должно читаться с первого взгляда по ленте карточек). Запрос прав или
+  // вопрос в карточке — тоже человек (владелец 23.10): прогон на запросе прав
+  // числится не «стоит», а полоса должна быть видна.
+  const needsHuman = bucket === 'ask' || Boolean(permits || asks);
 
   return (
     <div
-      className={cn(
-        styles.group,
-        openable && styles.groupOpenable,
-        settled === 'merged' && styles.groupMerged,
-        settled === 'closed' && styles.groupClosed,
-        accepted && styles.groupAccepted,
-        needsHuman && styles.groupAsk,
-        failed && styles.groupFailed,
-      )}
-      data-hub-row={chatId ? 'chat' : group.pending}
+      className={cn(styles.group, openable && styles.groupOpenable, needsHuman && styles.groupAsk)}
+      data-hub-row="chat"
       data-hub-bucket={bucket}
-      {...(settled ? { 'data-hub-settled': settled } : {})}
-      {...(accepted ? { 'data-hub-accepted': '' } : {})}
     >
       {/* Верхний ряд: название с фишками слева, кнопки группы справа. Тело —
           под ним во всю ширину карточки (владелец 22.10.2026): колонка кнопок
@@ -147,68 +83,6 @@ export function GroupCard({
         </div>
 
         <div className={styles.groupActions}>
-          {cleanup && !cleanup.cleaned && parentChatId && (
-            <GroupCopyCleanup parentChatId={parentChatId} index={cleanup.index} />
-          )}
-          {/* Номер в очереди слияния — вплотную к кнопке MR и переносится с ней
-              одним куском (G3): оторванный, он читался бы про соседнюю кнопку. */}
-          {group.mr && (
-            <span className={styles.mrPair}>
-              {group.mergeOrder && <MergeOrderChip order={group.mergeOrder} />}
-              <Button
-                size="sm"
-                variant="secondary"
-                leftIcon={<Icon name="link" size={14} />}
-                title={t('chat.cascade.hub.mrOpenHint')}
-                data-hub-mr
-                onClick={() => window.open(group.mr, '_blank', 'noopener,noreferrer')}
-              >
-                {t(mrLabel, { id: mrId })}
-              </Button>
-            </span>
-          )}
-          {group.recheck && <GroupRecheck recheck={group.recheck} />}
-          {group.taskMove && parentChatId && (
-            <SplitTasksMove
-              parentChatId={parentChatId}
-              index={group.taskMove.index}
-              keys={group.taskMove.keys}
-              connected={group.taskMove.connected}
-            />
-          )}
-          {group.acceptance && <GroupAcceptance acceptance={group.acceptance} />}
-          {group.interrupted && onResumeInterrupted && (
-            <div className={styles.holdActions} data-resume-interrupted="group">
-              <Button
-                size="sm"
-                variant="secondary"
-                isLoading={resumeInterruptedBusy}
-                title={t('chat.cascade.hub.resumeInterruptedHint')}
-                onClick={() => onResumeInterrupted(group.interrupted?.index)}
-              >
-                {t('chat.cascade.hub.resumeInterrupted')}
-              </Button>
-            </div>
-          )}
-          {/* Группа ждёт предшественников — единственная кнопка, которой её
-              можно сдвинуть: цепочка предшественника могла не кончиться вовсе
-              (прогон остановили, чат удалили, панель перезапустили). Подпись
-              говорит, чем человек платит: копия всё равно отводится от ветки
-              предшественника, а в задании сказано, что та работа не закончена. */}
-          {release && (
-            <div className={styles.holdActions} data-release-group>
-              <Button
-                size="sm"
-                variant="secondary"
-                isLoading={releaseBusy}
-                title={t('chat.cascade.hub.releaseHint')}
-                onClick={() => onRelease(group.groupIndex ?? 0)}
-              >
-                {t('chat.cascade.hub.release')}
-              </Button>
-            </div>
-          )}
-          {group.control && <GroupControl control={group.control} />}
           {/* Что получил агент звена (U8) — у группы с чатом: у ждущей прогонов нет. */}
           {chatId && (
             <RunInputs inputKey={providerId ? foreignChatKey(providerId, chatId) : chatId} />
@@ -229,16 +103,9 @@ export function GroupCard({
       )}
 
       {/* Что под карточкой — во всю её ширину и над растянутой кнопкой:
-          форма ответа, отметка уборки копии, предупреждения панели. */}
+          форма ответа, предупреждения панели. */}
       {/* Пустой список сигналов — не повод для подвала: пустой блок дал бы лишний отступ. */}
-      {(permits ||
-        asks ||
-        cleanup?.cleaned ||
-        group.hold ||
-        group.autoNotices ||
-        watchSignals ||
-        coverage ||
-        missing.length > 0) && (
+      {(permits || asks) && (
         <div className={styles.groupFoot}>
           {/* Запрос прав — первым: на нём группа стоит, на вопросе — нет. */}
           {permits && onPermissionDecide && (
@@ -251,48 +118,6 @@ export function GroupCard({
           {asks && onAnswer && (
             <GroupAsk questions={asks} stage={group.stages.at(-1)} onAnswer={onAnswer} />
           )}
-          {missing.length > 0 && (
-            <div className={styles.missing} data-hub-delivery-missing={missing.length}>
-              <HubFold
-                title={t('chat.cascade.hub.deliveryMissing', { count: missing.length })}
-                hint={t('chat.cascade.hub.deliveryMissingHint')}
-                defaultExpanded={sectionsOpen}
-                tone="warning"
-              >
-                <ul className={styles.missingList}>
-                  {missing.map((line, index) => (
-                    <li key={index}>
-                      <Typography variant="caption" color="muted" as="span">
-                        {line}
-                      </Typography>
-                    </li>
-                  ))}
-                </ul>
-              </HubFold>
-            </div>
-          )}
-          {watchSignals && (
-            <GroupSignals
-              signals={watchSignals}
-              {...(onOpen ? { onOpen: (target: string) => onOpen(target) } : {})}
-            />
-          )}
-          {coverage && <GroupCoverage coverage={coverage} />}
-          {cleanup?.cleaned && parentChatId && (
-            <GroupCopyCleanup
-              parentChatId={parentChatId}
-              index={cleanup.index}
-              cleaned={cleanup.cleaned}
-            />
-          )}
-          {!chatId && group.pending === 'held' && group.hold && onAnswerHold && (
-            <HoldAnswer
-              question={serverFieldText(group.hold, 'question')}
-              busy={holdBusy}
-              onSend={(answer) => onAnswerHold(group.hold?.index ?? 0, answer)}
-            />
-          )}
-          {group.autoNotices && <GroupAutoNotices autoNotices={group.autoNotices} />}
         </div>
       )}
     </div>

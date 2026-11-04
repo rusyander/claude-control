@@ -1,0 +1,538 @@
+{
+  "title": {
+    "ru": "Чат, группы, агенты и вопросы к модели идут через ядро, панель сама его поднимает, прежние исполнители панели сняты",
+    "en": "Chat, groups, agents and model asks run through the core, the panel starts it itself, the panel's old executors are gone"
+  },
+  "summary": {
+    "ru": "Всё, что раньше запускала сама панель, теперь ведёт ядро исполнения задач: чаты любого CLI, группы, агенты блока «Тесты», песочница, агент панели и помощники, шлюз контура, локальные модели и защита данных. У каждого механизма одна копия — в ядре; прежние исполнители панели и то, что жило только ради них, удалены. Ядро поднимается вместе с приложением и перезапускается при падении.",
+    "en": "Everything the panel used to launch itself is now run by the task core: chats of every CLI, groups, «Tests» block agents, the sandbox, the panel agent and helpers, the contour gateway, local models and data protection. Each mechanism has one copy, in the core; the panel's old executors and everything that lived only for them are removed. The core starts with the app and restarts after a crash."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ядро запускается вместе с приложением — через `pnpm start` и `pnpm dev`: панель сама его поднимает, перезапускает при падении с паузами и показывает карточку «Ядро задач не запускается» с числом перезапусков, хвостом журнала без секретов и кнопкой «Перезапустить». Переключатель на карточке включает запуск ядра при входе в систему (Windows, Linux, macOS). Отдельный `pnpm core` остаётся для разработки.",
+        "en": "The core starts together with the app, under `pnpm start` and `pnpm dev`: the panel starts it, restarts it with back-off after a crash and shows a «The task core does not start» card with the restart count, the log tail without secrets and a «Restart» button. A toggle on the card starts the core at login (Windows, Linux, macOS). A separate `pnpm core` stays for development."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ядро убито посреди чата — тот же разговор отвечает на следующий ход: задачу умершего ядра новое забирает сразу, если смерть прежнего доказана, а не через 15 секунд тишины с сырыми 409 и 503 в чате. Вторая панель на той же папке подхватывает работающее ядро вместо ухода в сбой, а ядро автозапуска, проигравшее папку, больше не перезапускается без конца.",
+        "en": "When the core is killed mid-chat, the same conversation answers the next turn: a new core takes the dead core's task at once when the death is proven, instead of after 15 seconds of silence with raw 409 and 503 in the chat. A second panel on the same folder adopts the running core instead of going to the fault state, and an autostart core that lost the folder no longer restarts forever."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Новый чат любого CLI идёт задачей ядра в папке проекта: Claude и Qwen, а «Новый» в чате Codex, Gemini, Goose, OpenCode и Kimi Code открывает задачу ядра; перезапуск панели ход не теряет и не повторяет. Публикацию в Gemini CLI запрещает политика сеанса, в Kimi Code — хук ядра, во всех режимах прав. CLI без защиты ядра (Continue, Aider, пока не проверенный Cursor) получает на экране чата названный отказ. Прежние чаты чужих CLI в вебе и на телефоне только читаются.",
+        "en": "A new chat of any CLI runs as a core task in the project folder: Claude and Qwen, and «New» in the Codex, Gemini, Goose, OpenCode and Kimi Code chats opens a core task; a panel restart neither loses nor repeats a turn. Publishing is denied by the session policy in Gemini CLI and by the core hook in Kimi Code, in every permission mode. A CLI without core protection (Continue, Aider, Cursor until proven) gets a named refusal on the chat screen. Older foreign CLI chats are read-only on the web and the phone."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Разговор Claude Code, начатый в панели или терминале, продолжается через ядро: кнопка «Продолжить через ядро» в шапке чата проекта открывает чат ядра с той же историей. Ядро сначала проверяет, что разговор ведётся именно в этой папке, и иначе отказывает с причиной. Ядро продолжает и разговоры Codex, Goose, Kimi Code и Gemini: следующая сессия задачи видит прежний разговор, хранилище CLI на машине не меняется.",
+        "en": "A Claude Code conversation started in the panel or a terminal continues through the core: «Continue through the core» in the project chat header opens a core chat with the same history. The core first checks the conversation belongs to this folder and otherwise refuses with the reason. The core also resumes Codex, Goose, Kimi Code and Gemini conversations: the next session of a task sees the earlier conversation, and the CLI's store on the machine is not changed."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Страница «Группы» показывает задачи ядра: группа запускается задачей ядра, Path переносится в ядро кнопкой «В ядро», прежние группы и их запуски только читаются, а недоделанная прежняя группа отменяется при запуске панели. «Продолжить» сдавшуюся группу — решение человека: агент панели его не нажимает, задача, вставшая на потолке кругов, продолжается только ответом на её вопрос.",
+        "en": "The «Groups» page shows core tasks: a group starts as a core task, a Path moves into the core with «To the core», older groups and their runs are read-only, and an unfinished older group is cancelled when the panel starts. Continuing a group that gave up is the human's decision: the panel agent no longer presses it, and a task stopped at the round ceiling continues only by an answer to its question."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Агент панели, помощник формы, помощник структуры, вопросы групп и шаг проверки провайдера спрашивают модель разовым вопросом ядра без инструментов — с тем же маршрутом, контуром и защитой данных, что задачи ядра. Агенту панели можно отправить картинку: Claude её получает, Qwen — названный отказ. Gemini, Cursor, Aider и Continue в помощнике получают отказ до запуска; у Codex, Goose, OpenCode и Kimi Code встроенные инструменты сняты их собственными настройками.",
+        "en": "The panel agent, the form helper, the structure helper, group asks and the provider check step ask the model through a one-off core ask without tools, with the same route, contour and data protection as core tasks. The panel agent takes images: Claude receives them, Qwen gets a named refusal. Gemini, Cursor, Aider and Continue in the helper are refused before launch; Codex, Goose, OpenCode and Kimi Code have their built-in tools turned off by their own settings."
+      },
+      "area": {
+        "ru": "Агент панели",
+        "en": "Panel agent"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Агенты блока «Тесты» запускаются задачей ядра в папке проекта — одним путём для Claude, Qwen и Codex: вопрос о разрешении отклоняется и пишется в журнал, «Стоп» отменяет задачу, ссылка во вкладке «Запуски» ведёт в задачу ядра. Песочница снова работает — через ядро, со своим каталогом настроек, без правил проекта; агент тестов держится границ режима, доступы стенда идут окружением задачи, галочка контура «Агент тестов» ведёт прогон через контур.",
+        "en": "«Tests» block agents run as a core task in the project folder, one path for Claude, Qwen and Codex: a permission question is refused and logged, «Stop» cancels the task, and the link in the «Runs» tab opens the core task. The sandbox works again, through the core, with its own settings folder and without project rules; the tests agent keeps to its mode limits, stand credentials travel in the task environment, and the contour «Tests agent» box routes the run through the contour."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Шлюз контура для CLI переехал в ядро: адрес тот же, перезапуск панели его не обрывает; разделы, правила контура, список моделей и картинки работают там же. Контур своей модели идёт в локальный вход ядра без ключа, а клиенты OpenAI и Gemini на контуре с родным входом Anthropic больше не получают 400. Запрос помощника к своему адресу или по ключу поставщика идёт через ядро, ключ Google больше не попадает в адрес запроса; слишком большой запрос получает 413.",
+        "en": "The contour gateway for CLIs moved into the core: same address, and a panel restart no longer cuts it; sections, contour rules, the model list and images work there. An own-model contour goes to the core's local entry without a key, and OpenAI and Gemini clients on a contour with a native Anthropic entry no longer get 400. A helper request to an own endpoint or by a vendor key goes through the core, the Google key no longer travels in the request URL, and an oversized request gets 413."
+      },
+      "area": {
+        "ru": "Контур",
+        "en": "Contour"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Защита данных для собственных CLI (маскирование, обратная подстановка, журнал, переключатель) работает в ядре; правила по-прежнему сохраняются в панели.",
+        "en": "Data protection for your own CLIs (masking, restoring, the log, the switch) runs in the core; rules are still saved in the panel."
+      },
+      "area": {
+        "ru": "DLP",
+        "en": "DLP"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Локальные модели запускаются через ядро на прежнем адресе: слишком длинный промпт получает понятный отказ, max_tokens обрезается по окну, модели с меткой размера (например qwen3.8:27b) снова грузятся, а ответ несёт то имя модели, которое просил клиент.",
+        "en": "Local models run through the core at the same address: an over-long prompt gets a clear refusal, max_tokens is trimmed to the window, models with a size tag (e.g. qwen3.8:27b) load again, and the answer carries the model name the client asked for."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ревью чужого MR по ссылке на ядре: форма на экране запуска принимает ссылку на MR GitLab или PR GitHub и путь к репозиторию и открывает задачу ревью на ветке MR. После ревью ядро спрашивает в ленте, что делать с замечаниями: починить, отписать в MR одной итоговой заметкой, то и другое или ничего. Отказ открыть ревью называется с причиной.",
+        "en": "Review of someone else's MR by link, on the core: a form on the launch screen takes a GitLab MR or GitHub PR link and the repository path and opens a review task on the MR branch. After the review the core asks in the feed what to do with the findings: fix them, post one summary note to the MR, both, or nothing. A refusal to open the review names the reason."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка «MCP-серверы» на экране запуска задачи ядра: серверы выбираются по виду шага, чат по умолчанию берёт все предложенные, незнакомые помечены. Серверы из настроек Codex, Goose, OpenCode и Kimi Code тоже попадают в список; секреты уходят в хранилище ключей, в журнал — только имена.",
+        "en": "A «MCP servers» card on the core launch screen: servers are picked per step kind, chat takes every offered server by default, and unknown ones are marked. Servers from the Codex, Goose, OpenCode and Kimi Code settings join the list too; secrets go to the key store, and only names reach the log."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Вопросы ядра приходят на телефон и в Telegram, в том числе когда канал включили уже после вопроса; push открывает задачу ядра, а на телефоне есть экраны задач ядра. Кнопка «Перенести ключи в ядро» передаёт ключи привязанных устройств ядру.",
+        "en": "Core questions reach the phone and Telegram, including when a channel is turned on after the question; a push opens the core task, and the phone has core task screens. The «Move keys to the core» button hands the paired devices' keys to the core."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Карточка «Экономия ядра» в настройках пишет настройки экономии ядра; рычаги экономии для каждого CLI перенесены в ядро и включены по умолчанию, как было в панели.",
+        "en": "A «Core economy» card in settings writes the core's economy settings; the economy levers for each CLI moved into the core and are on by default, as they were in the panel."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сеанс задачи больше не может создать MR или комментарий через MCP-сервер GitLab или GitHub в обход публикации ядра: пишущие инструменты форжа запрещены, пропускается только чтение.",
+        "en": "A task session can no longer create an MR or a comment through a GitLab or GitHub MCP server, bypassing the core's publishing: the forge's writing tools are denied, and only reads pass."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат через ядро снова передаёт панели окно лимита подписки: доля лимита у разговора считается, после отказа лимита ход повторяется к сбросу окна, а предупреждение о лимите распознаётся и у новых версий Claude Code.",
+        "en": "A chat through the core passes the subscription limit window to the panel again: the conversation's limit share is counted, a turn refused by the limit is retried at the window reset, and the limit warning is recognised in newer Claude Code versions too."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Локальный слой проекта снова доходит до сеансов: инструкции, навыки, хуки, разрешения и переменные идут в сеанс ядра, и переключатель режима в карточке «Локальный слой» снова работает. В папке без доверия чат с включённым слоем ядро отклоняет: человек видит причину на своём языке и выход — доверить папку или выключить слой, а карточка предупреждает об этом ещё до отправки.",
+        "en": "The project's local layer reaches sessions again: instructions, skills, hooks, permissions and variables go into the core session, and the mode switch on the «Local layer» card works again. In an untrusted folder the core refuses a chat with the layer on: the person sees the reason in their language and the way out (trust the folder or turn the layer off), and the card warns before sending."
+      },
+      "area": {
+        "ru": "Проекты",
+        "en": "Projects"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Личный CLAUDE.md больше не попадает в модель как правила проекта, когда проект лежит в домашней папке, а личный слой выключен.",
+        "en": "The personal CLAUDE.md no longer reaches the model as project rules when the project sits in the home folder and the personal layer is off."
+      },
+      "area": {
+        "ru": "Проекты",
+        "en": "Projects"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат через ядро снова получает всё, что собирал запуск панели: набор, строку о тестах, флаги наших слоёв, промпт контура вместо длинного системного промпта CLI, а на локальной модели — её окно, сроки и пределы вывода. Помощники на Qwen Code и Codex снова получают набор панели; в проекте без отметки доверия чат начинается с набором, а отказ набора называет причину.",
+        "en": "A chat through the core again gets everything the panel launch used to assemble: the kit, the tests line, our layer flags, the contour prompt instead of the CLI's long system prompt, and on a local model its window, timeouts and output limits. Helpers on Qwen Code and Codex get the panel kit again; in an untrusted project the chat starts with the kit, and a kit refusal names the reason."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В чате ядра Claude приложенная картинка доходит до модели: ядро хранит копию вложения в своей папке этой задачи, задача читает только её, а запрет CLI на папку ядра не ослаблен.",
+        "en": "In a Claude core chat an attached image reaches the model: the core keeps a copy of the attachment in its own folder for that task, the task reads only that folder, and the CLI's ban on the core's folder is not loosened."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Чат через ядро работает и в папке без git, как раньше в панели, а несуществующая папка названа в ошибке. Отказ ядра в оценке запуска называет причину самого ядра вместо общей фразы.",
+        "en": "A chat through the core works in a folder without git, as it did in the panel, and a missing folder is named in the error. A core refusal at launch estimate names the core's own reason instead of a generic phrase."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Разрешить» на вопросе права в чате через ядро отвечает ядру прямо из окна, а тумблер автоподтверждения выдаёт задаче право правки на весь репозиторий, в том числе между ходами.",
+        "en": "«Allow» on a permission question in a core chat answers the core straight from the window, and the auto-approve toggle grants the task edit rights on the whole repository, between turns too."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Подхват чата больше не запускает второй CLI рядом с живым; CLI, вышедший сразу после старта, и сеанс со «слоем с потерями» больше не перезапускаются трижды; сеанс Codex, Goose, OpenCode, Kimi Code, Gemini и Cursor в ядре виден вместо ошибки 501.",
+        "en": "Resuming a chat no longer starts a second CLI next to the live one; a CLI that exits right after start and a session with a «lossy layer» are no longer restarted three times; Codex, Goose, OpenCode, Kimi Code, Gemini and Cursor sessions in the core are shown instead of a 501 error."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Goose больше не подмешивает навыки из домашней папки в запрос модели. Ядро писало в настройки Kimi Code недопустимый режим `default`, и CLI молча работал как manual; теперь пишется `manual`, а устаревшее значение панель показывает отказом с причиной.",
+        "en": "Goose no longer mixes skills from the home folder into the model request. The core wrote the invalid `default` mode into Kimi Code settings and the CLI silently ran as manual; now `manual` is written, and the panel shows a stale value as a refusal with the reason."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Названия сценариев и шагов, состояния задач и вопросы ядра (о кругах, сроке, токенах, маршруте, сверке после перезапуска) идут на языке панели, а не сырыми кодами; ответ на вопрос сверки теперь действительно исполняется.",
+        "en": "Scenario and step names, task states and core questions (rounds, deadline, tokens, route, the post-restart check) follow the panel language instead of raw codes; an answer to the post-restart check is now actually carried out."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Паспорт среды: битый файл настроек больше не роняет паспорт — непрочитанные разделы названы с путём и причиной без цитаты содержимого, остальные показаны; неизвестный тип MCP-сервера пропускается с причиной, а команда из ключа command OpenCode больше не переносит весь opencode.json. Фразы записей и причины пропусков показываются на языке интерфейса.",
+        "en": "Environment passport: a broken settings file no longer fails the passport; unread sections are named with the path and a reason that never quotes the content, and the rest is shown. An unknown MCP server type is skipped with a reason, and an OpenCode command from the command key no longer carries the whole opencode.json. Entry phrases and skip reasons follow the interface language."
+      },
+      "area": {
+        "ru": "Перенос окружения",
+        "en": "Portability"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Под английским интерфейсом профиль контура называется «Contour · …», журнал применения пишет «Panel assistant written», а мастер подключения показывает подробности проверки по-английски. Включение контура в мастере больше не падает с 403 «Контур выключен».",
+        "en": "In the English interface a contour profile is named «Contour · …», the apply journal says «Panel assistant written», and the connection wizard shows check details in English. Turning the contour on in the wizard no longer fails with 403 «Contour is off»."
+      },
+      "area": {
+        "ru": "Контур",
+        "en": "Contour"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Страница «Хуки» показывает описания хуков панели на языке интерфейса и на английской панели больше не открывается по-русски: язык из настроек применяется сразу после их загрузки. Настройки моделей сохраняются очередью — быстрые правки подряд не теряются и не откатываются устаревшим ответом.",
+        "en": "The «Hooks» page shows the panel's hook descriptions in the interface language and no longer opens in Russian on an English panel: the language from settings applies right after they load. Model settings save through a queue, so quick edits in a row are neither lost nor rolled back by a stale reply."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Список процессов в аналитике больше не падает на выводе PowerShell в кодировке OEM; метка маски вроде [КЛЮЧ_1] после «key:» больше не маскируется повторно, а журнал ядра больше не прячет имена переменных окружения и временных папок, принятые за ключи.",
+        "en": "The process list in analytics no longer fails on PowerShell output in the OEM code page; a mask label such as [КЛЮЧ_1] after «key:» is no longer masked again, and the core log no longer hides environment variable and temp folder names mistaken for keys."
+      },
+      "area": {
+        "ru": "Аналитика",
+        "en": "Analytics"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В окне «Агенты» ползунок громкости больше не налезает на подпись «Звук»: шапка в две строки. Ввод в поле «Любая модель» больше не перерисовывает сотни компонентов на каждую букву.",
+        "en": "In the «Agents» popover the volume slider no longer overlaps the «Sound» label: the header uses two rows. Typing in the «Any model» field no longer re-renders hundreds of components per keystroke."
+      },
+      "area": {
+        "ru": "Интерфейс",
+        "en": "Interface"
+      },
+      "images": ["agents-popover-before.png", "agents-popover-after.png"]
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Проверка сдачи одна — судья ядра: `tests delivery` стал тонким клиентом к нему с прежними кодами выхода, поэтому копию, которую ядро пропускает, проверка больше не отклоняет.",
+        "en": "There is one delivery check, the core's judge: `tests delivery` became a thin client to it with the same exit codes, so the check no longer rejects a copy the core accepts."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Набор: навык наблюдения за группами панели снят — «следи за группой» ведёт к сторожу ядра; хуки, нужные только разбиению, сняты, а подсказки навыков и обзор документации молчат в шагах задач ядра, кроме чата. Семейство глубокого ревью перенесено в набор целиком.",
+        "en": "Kit: the panel group watch skill is gone, and «watch the group» leads to the core's watchdog; hooks needed only by splitting are removed, and skill hints and the docs review stay silent in core task steps except chat. The deep-review family moved into the kit as a whole."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Набор: агенты ревью запускаются без вопроса до 100 за сессию вместо 40 — прежний предел останавливал ревью нескольких MR посреди прогона. Сто первый агент спрашивает разрешение, как и раньше; у каждой сессии свой счёт.",
+        "en": "Kit: review agents start without a question up to 100 per session instead of 40 — the old cap stopped a review of several MRs mid-run. The 101st agent asks for permission as before; each session keeps its own count."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Прежние исполнители панели удалены — запуск CLI для чата, групп, агентов и помощников, живой слой и подхват прогонов, шлюз панели, прежний DlpProxy, мост --permission-prompt-tool: каждый механизм теперь в ядре, и дубль вёл бы себя иначе. Вместе с ними ушла кнопка остановки отдельного субагента в дереве агентов: у задачи ядра такой команды нет, «Стоп» останавливает весь ход.",
+        "en": "The panel's old executors are removed — CLI launch for chat, groups, agents and helpers, the live layer and run re-attach, the panel gateway, the old DlpProxy, the --permission-prompt-tool bridge: each mechanism now lives in the core, and a duplicate would behave differently. The stop button for a single subagent in the agent tree went with them: a core task has no such command, and «Stop» stops the whole turn."
+      },
+      "area": {
+        "ru": "Ядро",
+        "en": "Core"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Фоновый наблюдатель панели снят: страница, значок в меню, значок на телефоне и раздел справки — за задачами следит наблюдатель ядра.",
+        "en": "The panel's background watcher is gone: the page, the menu badge, the phone badge and the help topic — the core's watcher follows tasks."
+      },
+      "area": {
+        "ru": "Наблюдатель",
+        "en": "Watcher"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Редактор групп и разбиение задач панели сняты: редактор Path, экран и узлы разбиения, «Сверить ветки», кнопки ревью дерева, карточки «Экономия групп разделения», «Сторож групп разделения», настройки групп по умолчанию и «Журнал проверок», настройки группы и эскалации чата на телефоне, реакции маскота на события групп. Группы и ревью ведёт ядро; передача чата стала обычным продолжением, а прежние записи по-прежнему читаются.",
+        "en": "The panel's group editor and task splitting are gone: the Path editor, the split screen and nodes, «Reconcile branches», the tree review buttons, the «Split group economy» and «Split group guard» cards, group defaults and the «Check log» card, the chat group and escalation settings on the phone, and the mascot's reactions to group events. The core runs groups and reviews; a chat handoff became a plain continuation, and old records are still read."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Из меню чата убраны переключатели «Подбирать модель под задачу» и «Ревью после работы», из настроек — автоодобрение по правилам и отложенный ответ на запрос разрешения: ядро их не читает, а сохранённое правило ничего бы не меняло. Старые сохранённые значения читаются без ошибки; ответы на ранее отложенные запросы принимаются, в том числе из Telegram.",
+        "en": "The chat menu loses the «Pick the model for the task» and «Review after work» toggles, and settings lose rule-based auto-approve and the deferred answer to a permission request: the core does not read them, so a saved rule would change nothing. Old saved values load without error, and answers to earlier deferred requests are still accepted, Telegram included."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Агент панели больше не знает 36 действий групп, сценариев, наблюдателя и разбиения, у которых не осталось исполнителя; пресет «chat» убран из списка сценариев формы запуска.",
+        "en": "The panel agent drops 36 group, scenario, watcher and split actions that no longer have an executor; the «chat» preset is removed from the launch form's scenario list."
+      },
+      "area": {
+        "ru": "Агент панели",
+        "en": "Panel agent"
+      }
+    },
+    {
+      "kind": "removed",
+      "text": {
+        "ru": "Импорт моделей из Ollama и живые стадии хода на странице «Локальные модели» убраны: локальные модели работают на llama.cpp через ядро, а стадии хода вернутся с лентой активности ядра.",
+        "en": "Model import from Ollama and live turn stages on the «Local models» page are removed: local models run on llama.cpp through the core, and turn stages will return with the core's activity feed."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Раздел контура «Группы разделения» называется «Группы»: через него идут задачи групп ядра. Новое имя — на карточке контура, в отказах шлюза, в настройке «Групп разом» и в справке; абзацы справки о переключателе «Доставка на Sonnet» и разделе «Токены» карточки группы убраны вместе с ними самими.",
+        "en": "The contour section «Split groups» is now «Groups»: core group tasks go through it. The new name shows on the contour card, in gateway refusals, in the «Groups at once» setting and in help; help paragraphs about the «Delivery on Sonnet» switch and the «Tokens» section of a group card are gone along with those controls."
+      },
+      "area": {
+        "ru": "Контур",
+        "en": "Contour"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка переписана под ядро: «Задачи ядра» (панель сама поднимает ядро, карточка сбоя, ревью по ссылке, MCP-серверы), «Группы», «Чат», «Агент панели», «Локальные модели», «DLP», «Тесты», «Проекты» и новый раздел «Песочница»; раздел «Наблюдатель» снят. Кадры справки пересняты в светлой и тёмной теме на обоих языках, на них закрыты пути и имя пользователя; инструкции по установке и устранению неполадок описывают автозапуск ядра.",
+        "en": "Help is rewritten for the core: «Core tasks» (the panel starts the core, the fault card, review by link, MCP servers), «Groups», «Chat», «Panel agent», «Local models», «DLP», «Tests», «Projects» and a new «Sandbox» topic; the «Watcher» topic is gone. Help frames are re-shot in light and dark themes in both languages with paths and the user name hidden; the setup and troubleshooting guides describe the core autostart."
+      },
+      "area": {
+        "ru": "Справка",
+        "en": "Help"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сообщение, отправленное в продолжение разговора, пока модель ещё отвечает, ведётся тем же ходом: кнопка «Остановить» видна, пока идёт ответ на него, и ответ приходит в ленту без перезагрузки. Раньше такой ход шёл незаметно — без ленты и без кнопки остановки.",
+        "en": "A message sent into a continued conversation while the model is still answering is followed by the same run: the «Stop» button stays while its answer runs, and the answer reaches the feed without a reload. Before, that turn ran unseen, with no feed and no stop button."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["chat-steer-before.png", "chat-steer-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ошибка хода снова несёт слова CLI — в чате и у агента блока «Тесты»: известные ошибки (переполненный контекст, устаревший CLI) объясняются словами панели, сырой текст CLI виден под объяснением. Раньше вместо них стояла общая фраза об ошибке хода.",
+        "en": "A failed turn carries the CLI words again, in chat and for the Tests block agent: known errors (context overflow, an outdated CLI) are explained in panel words, with the raw CLI text below. Before, a generic turn-error phrase replaced them."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["chat-error-words-before.png", "chat-error-words-after.png"]
+    }
+  ],
+  "images": [
+    {
+      "file": "agents-popover-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: ползунок громкости налезает на подпись «Звук»",
+        "en": "Before: the volume slider overlaps the «Sound» label"
+      }
+    },
+    {
+      "file": "agents-popover-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: шапка в две строки, подпись и ползунок раздельно",
+        "en": "After: a two-row header with the label and the slider apart"
+      }
+    },
+    {
+      "file": "chat-steer-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: сообщение, дописанное во время ответа, — ход считается законченным, кнопки «Остановить» нет",
+        "en": "Before: a message added during an answer — the turn counts as finished, no «Stop» button"
+      }
+    },
+    {
+      "file": "chat-steer-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: ответ идёт тем же ходом, кнопка «Остановить» видна, дописка передана агенту",
+        "en": "After: the answer runs in the same turn, the «Stop» button is shown, the added words are handed to the agent"
+      }
+    },
+    {
+      "file": "chat-error-words-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: вместо слов CLI — общая фраза об ошибке хода",
+        "en": "Before: a generic turn-error phrase instead of the CLI words"
+      }
+    },
+    {
+      "file": "chat-error-words-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: переполненный контекст объяснён словами панели, текст CLI под объяснением, кнопки по причине",
+        "en": "After: context overflow explained in panel words, the CLI text below, actions matching the cause"
+      }
+    }
+  ]
+}

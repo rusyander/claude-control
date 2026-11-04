@@ -56,9 +56,7 @@ const PARENTS: Record<string, string> = { 'group-chat': 'parent' };
 function itemsOf(chats: InboxChat[], deferred: ChatInbox['deferred'] = []): PendingAskItem[] {
   return collectPendingAsks({
     inbox: { generatedAt: '', chats, deferred },
-    foreign: [],
     defaultCli: 'Claude Code',
-    cliName: (id) => id,
     titleOf: (chatId) => TITLES[chatId],
     parentOf: (chatId) => PARENTS[chatId],
   });

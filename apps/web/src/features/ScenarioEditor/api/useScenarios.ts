@@ -16,12 +16,21 @@ import {
   useCoreCommand,
 } from '@entities/CoreTask';
 import { queryKeys } from '@shared/api/query-keys';
+import { toLanguage, type Language } from '@shared/config/i18n';
+import { useTranslation } from 'react-i18next';
 import { refText } from '../model/scenarioDraft';
 
+/** Язык панели для заголовков пресетов: ядро называет их на нём (`?lang=`), ключ его несёт. */
+function useCoreLang(): Language {
+  const { i18n } = useTranslation();
+  return toLanguage(i18n.language);
+}
+
 export function useScenarioList() {
+  const lang = useCoreLang();
   return useQuery({
-    queryKey: queryKeys.core.scenarios,
-    queryFn: () => coreGet<ScenariosReply>('/scenarios'),
+    queryKey: [...queryKeys.core.scenarios, lang],
+    queryFn: () => coreGet<ScenariosReply>('/scenarios', undefined, { lang }),
     retry: false,
   });
 }
@@ -32,9 +41,10 @@ export function useScenarioList() {
  */
 export function useScenarioRead(ref: ScenarioRef | undefined, keepPrevious = false) {
   const text = ref ? refText(ref) : '';
+  const lang = useCoreLang();
   return useQuery({
-    queryKey: queryKeys.core.scenario(text),
-    queryFn: () => coreGet<ScenarioReply>('/scenarios/:ref', { ref: text }),
+    queryKey: [...queryKeys.core.scenario(text), lang],
+    queryFn: () => coreGet<ScenarioReply>('/scenarios/:ref', { ref: text }, { lang }),
     enabled: Boolean(ref),
     retry: false,
     ...(keepPrevious ? { placeholderData: keepPreviousData } : {}),

@@ -198,8 +198,9 @@ const gatewayStatus = definePanelAction({
   section: 'contour',
   risk: 'read',
   description:
-    'Contour gateway (the local listener CLIs talk to): enabled in settings, running, address, ' +
-    'port actually bound vs requested, why it failed to start, requests and failures since start.',
+    'Contour gateway (the local listener CLIs talk to, run by the agentdeck core): enabled in ' +
+    'settings, listening, address, port actually bound vs requested, why the core could not bind ' +
+    'it, requests and failures.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: GATEWAY_URL }),
   shape: (_input, body) => gatewayView(body as PlatformGatewayInfo),
@@ -214,8 +215,9 @@ const startGateway = definePanelAction({
   risk: 'change',
   title: 'journal-start-gateway',
   description:
-    'Start the contour gateway when it is down: switches it on in settings and binds the saved ' +
-    'port. A running gateway is not touched. Needs the human’s confirmation.',
+    'Switch the contour gateway on in settings and check that the core’s gateway listens (the ' +
+    'core runs it; the panel binds nothing). Refused when it is already on and listening. Needs ' +
+    'the human’s confirmation.',
   input: z.object({}),
   route: () => ({ method: 'POST', url: `${GATEWAY_URL}/start` }),
   fingerprint: async (_input, inject) => {
@@ -224,7 +226,7 @@ const startGateway = definePanelAction({
   },
   preview: async (_input, inject) => {
     const info = await readGateway(inject);
-    if (info.status.running) {
+    if (info.status.running && info.settings.enabled) {
       throw new Error(`Nothing would change: the gateway already runs at ${info.status.address}.`);
     }
     return {
@@ -242,11 +244,11 @@ const startGateway = definePanelAction({
 const restartGateway = definePanelAction({
   name: 'restart_gateway',
   section: 'contour',
-  risk: 'danger',
+  risk: 'change',
   title: 'journal-restart-gateway',
   description:
-    'Restart the contour gateway with its saved settings (stops it when switched off in ' +
-    'settings). Requests in flight through it are cut. Needs the human’s confirmation.',
+    'Re-check the contour gateway with its saved settings: asks the core afresh whether its ' +
+    'gateway listens. Requests in flight are not cut. Needs the human’s confirmation.',
   input: z.object({}),
   route: () => ({ method: 'POST', url: `${GATEWAY_URL}/restart` }),
   fingerprint: async (_input, inject) => fingerprintOf((await readGateway(inject)).settings),

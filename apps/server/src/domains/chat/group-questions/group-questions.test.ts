@@ -3,99 +3,60 @@ import {
   AUTONOMOUS_PICK_MARKER,
   parseAutonomousPickMessage,
 } from '@agentdeck/contracts/chat-group-settings';
-import { GROUP_PLAN_FREE_ANSWER } from '@agentdeck/contracts/task-split';
-import type { SplitPlanRecord } from '../../../lib/app-store/app-store.types.ts';
 import { picksFor } from '../auto-pick/auto-pick.ts';
-import {
-  needsHuman,
-  planAnswerMessage,
-  planAnswers,
-  recommendedIndex,
-  recordGroupAnswerNotice,
-} from './group-questions.ts';
+import { needsHuman, recommendedIndex } from './group-questions.ts';
+
+/** Свободный ответ прежнего брокера (ушёл с разделением панели) — так он лежит в старых записях. */
+const GROUP_PLAN_FREE_ANSWER =
+  'Autonomous mode: the human will not answer. Decide yourself — the recommended option if it ' +
+  'needs no action from the human, otherwise the one that continues the work without the human; ' +
+  'record the decision and the reason in the MR description.';
 
 /**
- * Выбор ответа на вопрос группы «по плану»: рекомендованный (метка в подписи
- * или описании, ru/en, в любом месте), без метки — первый; вариант, который
- * зовёт человека или утверждает сделанное им, не берётся; не подошёл ни один —
- * свободный текст; у вызова с несколькими вопросами — ответ на каждый.
+ * Эвристики варианта, которые читает разбор прежнего автовыбора (`auto-pick.ts`):
+ * рекомендация (метка в подписи или описании, ru/en, без отрицания) и вариант,
+ * который зовёт человека или утверждает сделанное им. Сам ответ группы «по
+ * плану» (`planAnswers`) снят 02.11.2026: развилки групп решает ядро.
  */
 const ask = (...options: { label: string; description?: string }[]) => ({
   questions: [{ question: 'Что делать?', header: 'Доставка', options }],
 });
-const labels = (input: unknown): string[] => (planAnswers(input) ?? []).map((a) => a.label);
 
-describe('ответ на вопрос группы «по плану»', () => {
+describe('рекомендация и слово человека', () => {
   it('рекомендованный вариант — в любом месте списка, ru/en, без учёта регистра', () => {
-    expect(labels(ask({ label: 'Быстро' }, { label: 'Надёжно (Recommended)' }))).toEqual([
-      'Надёжно (Recommended)',
-    ]);
-    expect(labels(ask({ label: 'А' }, { label: 'Б (рекомендуется)' }))).toEqual([
-      'Б (рекомендуется)',
-    ]);
-    expect(labels(ask({ label: 'А' }, { label: 'Б (РЕКОМЕНДУЮ)' }))).toEqual(['Б (РЕКОМЕНДУЮ)']);
+    expect(recommendedIndex([{ label: 'Быстро' }, { label: 'Надёжно (Recommended)' }])).toBe(1);
+    expect(recommendedIndex([{ label: 'А' }, { label: 'Б (рекомендуется)' }])).toBe(1);
+    expect(recommendedIndex([{ label: 'А' }, { label: 'Б (РЕКОМЕНДУЮ)' }])).toBe(1);
     expect(
-      labels(ask({ label: 'А' }, { label: 'Б', description: 'Рекомендовано: так быстрее' })),
-    ).toEqual(['Б']);
+      recommendedIndex([{ label: 'А' }, { label: 'Б', description: 'Рекомендовано: так быстрее' }]),
+    ).toBe(1);
   });
 
-  it('отрицание рекомендацией не считается: «не рекомендуется» — нет метки, берётся первый', () => {
+  it('отрицание рекомендацией не считается: «не рекомендуется» — нет метки', () => {
     expect(
       recommendedIndex([{ label: 'А' }, { label: 'Б', description: 'Не рекомендуется' }]),
     ).toBe(-1);
-    expect(labels(ask({ label: 'А' }, { label: 'Б', description: 'Not recommended' }))).toEqual([
-      'А',
-    ]);
-  });
-
-  it('метки нет — первый вариант', () => {
-    expect(labels(ask({ label: 'Узко' }, { label: 'Широко' }))).toEqual(['Узко']);
-  });
-
-  it('вопрос владельца 23.10: «Сессия обновлена — продолжай» утверждает сделанное человеком', () => {
-    const answers = planAnswers(
-      ask({ label: 'Сессия обновлена — продолжай' }, { label: 'MR без живой проверки' }),
+    expect(recommendedIndex([{ label: 'А' }, { label: 'Б', description: 'Not recommended' }])).toBe(
+      -1,
     );
-    expect(answers?.map((a) => a.label)).toEqual(['MR без живой проверки']);
-    // Первый (без метки) звал человека — агенту сказано попробовать самому.
-    expect(answers?.[0]?.selfFirst).toBe('Сессия обновлена — продолжай');
   });
 
-  it('живой случай ревью-звена: «вошёл через qa:login» с описанием «я уже запустил» не берётся никогда', () => {
+  it('метки нет — нет рекомендации', () => {
+    expect(recommendedIndex([{ label: 'Узко' }, { label: 'Широко' }])).toBe(-1);
+  });
+
+  it('живой случай ревью-звена: «вошёл через qa:login» с описанием «я уже запустил» зовёт человека', () => {
     const logged = {
       label: 'Вошёл через qa:login, продолжай',
       description: 'Я уже запустил npm run qa:login -- --profile b-inst и вошёл на стенд.',
     };
-    const deliver = { label: 'Сдать без живой проверки (рекомендую)' };
-    expect(labels(ask(logged, deliver))).toEqual(['Сдать без живой проверки (рекомендую)']);
-    // Та же пара по-английски и без метки у второго — ложное «вошёл» всё равно не берётся.
     const en = {
       label: 'Logged in via qa:login, continue',
       description: 'The human already ran `npm run qa:login`.',
     };
-    expect(labels(ask(en, { label: 'Deliver without the live check' }))).toEqual([
-      'Deliver without the live check',
-    ]);
     expect(needsHuman(logged)).toBe(true);
     expect(needsHuman(en)).toBe(true);
-    expect(needsHuman(deliver)).toBe(false);
-  });
-
-  it('рекомендованное просит человека сделать то, что агент может сам: сперва сам, иначе вариант без человека', () => {
-    const answers = planAnswers(
-      ask(
-        { label: 'Войду через qa:login b-inst (рекомендую)' },
-        { label: 'MR без живой проверки' },
-      ),
-    );
-    expect(answers?.[0]).toMatchObject({
-      label: 'MR без живой проверки',
-      selfFirst: 'Войду через qa:login b-inst (рекомендую)',
-      free: false,
-    });
-    const message = planAnswerMessage(answers ?? []);
-    expect(message).toMatch(/one attempt, no retry/);
-    expect(message).toContain('"Войду через qa:login b-inst (рекомендую)"');
+    expect(needsHuman({ label: 'Сдать без живой проверки (рекомендую)' })).toBe(false);
   });
 
   it('повелительное агенту — действие агента, не человека', () => {
@@ -104,48 +65,19 @@ describe('ответ на вопрос группы «по плану»', () => 
     expect(needsHuman({ label: "I'll log in myself" })).toBe(true);
   });
 
-  it('не подошёл ни один — свободный текст; вариантов нет — тоже', () => {
-    const allHuman = planAnswers(ask({ label: 'Подожди меня' }, { label: 'Я сам обновлю сессию' }));
-    expect(allHuman?.[0]).toMatchObject({ label: GROUP_PLAN_FREE_ANSWER, free: true });
-    expect(allHuman?.[0]?.selfFirst).toBe('Подожди меня');
-    expect(planAnswers({ questions: [{ question: 'Как быть?', options: [] }] })?.[0]).toMatchObject(
-      {
-        label: GROUP_PLAN_FREE_ANSWER,
-        free: true,
-      },
-    );
-    expect(GROUP_PLAN_FREE_ANSWER).toMatch(/^Autonomous mode: the human will not answer/);
-  });
+  // Отказ брокера с ответами панель больше не пишет (развилки групп — у ядра),
+  // но прежние транскрипты его хранят: лента и реестр читают их по-прежнему.
+  // Текст — дословно в формате прежнего брокера.
+  const brokerMessage = (picks: readonly (readonly [string, string])[]): string =>
+    [
+      `${AUTONOMOUS_PICK_MARKER}: this split group decides its forks by plan.`,
+      ...picks.map(
+        ([question, label]) => `- ${JSON.stringify(question)} → ${JSON.stringify(label)}`,
+      ),
+      'For "x": the option "y" needs the human, who will not act.',
+    ].join('\n');
 
-  it('несколько вопросов — ответ на каждый, по порядку', () => {
-    const input = {
-      questions: [
-        { question: 'Путь?', options: [{ label: 'А' }, { label: 'Б (Recommended)' }] },
-        {
-          question: 'Когда?',
-          options: [{ label: 'Готово — продолжай' }, { label: 'Без проверки' }],
-        },
-        { question: 'Кто?', options: [{ label: 'Жди меня' }] },
-      ],
-    };
-    expect(labels(input)).toEqual(['Б (Recommended)', 'Без проверки', GROUP_PLAN_FREE_ANSWER]);
-  });
-
-  it('вызов без вопросов — не ответ (`null`)', () => {
-    expect(planAnswers({})).toBeNull();
-    expect(planAnswers({ questions: [] })).toBeNull();
-    expect(planAnswers(null)).toBeNull();
-  });
-
-  it('тот же вопрос дважды — тот же ответ дважды: состояния нет', () => {
-    const input = ask(
-      { label: 'Сессия обновлена — продолжай' },
-      { label: 'MR без живой проверки' },
-    );
-    expect(planAnswers(input)).toEqual(planAnswers(input));
-  });
-
-  it('отказ брокера разбирается обратно в ответы; строки «For …» выбором не считаются', () => {
+  it('прежний отказ брокера разбирается обратно в ответы; строки «For …» выбором не считаются', () => {
     const input = {
       questions: [
         {
@@ -156,8 +88,10 @@ describe('ответ на вопрос группы «по плану»', () => 
         { question: 'Второй?', options: [{ label: 'Да (Recommended)' }] },
       ],
     };
-    const message = planAnswerMessage(planAnswers(input) ?? []);
-    expect(message.startsWith(AUTONOMOUS_PICK_MARKER)).toBe(true);
+    const message = brokerMessage([
+      ['Путь "быстрый"?\nили нет', GROUP_PLAN_FREE_ANSWER],
+      ['Второй?', 'Да (Recommended)'],
+    ]);
     expect(parseAutonomousPickMessage(message)).toEqual([
       { question: 'Путь "быстрый"?\nили нет', label: GROUP_PLAN_FREE_ANSWER },
       { question: 'Второй?', label: 'Да (Recommended)' },
@@ -168,52 +102,21 @@ describe('ответ на вопрос группы «по плану»', () => 
 
   it('выбор по тексту главнее пересчёта по рекомендации: лента не подменяет ответ', () => {
     const input = ask({ label: 'Войду (Recommended)' }, { label: 'Без проверки' });
-    const message = planAnswerMessage(planAnswers(input) ?? []);
+    const message = brokerMessage([['Что делать?', 'Без проверки']]);
     expect(picksFor(input, message).map((pick) => pick.label)).toEqual(['Без проверки']);
-  });
-
-  it('отметка в записи разделения: «ответ», по одной на вопрос', () => {
-    const plan = {
-      parentChatId: 'p',
-      groups: [{ index: 0, autoNotices: [{ at: 'x', summary: 'git push' }] }],
-    } as unknown as SplitPlanRecord;
-    let saved: SplitPlanRecord | undefined;
-    recordGroupAnswerNotice(
-      { getSplitPlan: () => plan, setSplitPlan: (next) => void (saved = next) },
-      { parentChatId: 'p', groupIndex: 0 },
-      planAnswers({
-        questions: [
-          { question: 'A?', options: [{ label: 'Да (Recommended)' }] },
-          { question: 'B?', options: [] },
-        ],
-      }) ?? [],
-      () => new Date('2026-10-23T10:00:00Z'),
-    );
-    expect(saved?.groups[0]?.autoNotices).toEqual([
-      { at: 'x', summary: 'git push' },
-      { at: '2026-10-23T10:00:00.000Z', summary: 'Да (Recommended)', kind: 'answer' },
-      {
-        at: '2026-10-23T10:00:00.000Z',
-        summary: expect.stringMatching(/^Autonomous mode: .*…$/),
-        kind: 'answer',
-        free: true,
-      },
-    ]);
   });
 });
 
-// F-48: эвристики выбора брали не тот вариант — отрицание в описании не
-// читалось, английское «Session refreshed» не считалось словом человека, «i.e.»
-// и «Не ждать» — считались, а при рекомендованном «для человека» запасным
-// становился и разрушительный.
-describe('ответ на вопрос группы «по плану»: эвристики выбора (F-48)', () => {
-  it("«we don't recommend this» в описании — не рекомендация и не первый по умолчанию", () => {
+// F-48: эвристики брали не тот вариант — отрицание в описании не читалось,
+// английское «Session refreshed» не считалось словом человека, «i.e.» и «Не ждать»
+// — считались.
+describe('эвристики варианта (F-48)', () => {
+  it("«we don't recommend this» в описании — не рекомендация", () => {
     const input = ask(
       { label: 'Force-push now', description: "we don't recommend this" },
       { label: 'Stop' },
     );
     expect(recommendedIndex(input.questions[0]!.options)).toBe(-1);
-    expect(labels(input)).toEqual(['Stop']);
   });
 
   it('«Session refreshed — continue» утверждает сделанное человеком, как русская форма', () => {
@@ -227,21 +130,6 @@ describe('ответ на вопрос группы «по плану»: эвр�
     expect(needsHuman({ label: 'Не ждать — продолжать без стенда' })).toBe(false);
     expect(needsHuman({ label: "I'll log in myself" })).toBe(true);
   });
-
-  it('рекомендованное зовёт человека, а другой вариант разрушительный — свободный ответ, не он', () => {
-    const [answer] =
-      planAnswers(
-        ask(
-          { label: 'I will rotate the token (Recommended)' },
-          { label: 'Force-push over the remote branch' },
-        ),
-      ) ?? [];
-    expect(answer).toMatchObject({
-      label: GROUP_PLAN_FREE_ANSWER,
-      free: true,
-      selfFirst: 'I will rotate the token (Recommended)',
-    });
-  });
 });
 
 // RF-EF-01: форма «<слово> <причастие>» без артикля считалась утверждением
@@ -249,7 +137,7 @@ describe('ответ на вопрос группы «по плану»: эвр�
 // «Revert the change». Утверждение — только о том, что есть у человека (вход,
 // ключ, доступ, стенд), и только в начале фразы. Сетка — обе стороны: что
 // действительно зовёт человека и что нет.
-describe('ответ на вопрос группы «по плану»: причастие — не всегда слово человека (RF-EF-01)', () => {
+describe('причастие — не всегда слово человека (RF-EF-01)', () => {
   const human: readonly string[] = [
     'Session refreshed — continue',
     'Token renewed, go on',
@@ -290,32 +178,25 @@ describe('ответ на вопрос группы «по плану»: при�
   it.each(agent)('«%s» — работа агента, человек не нужен', (label) => {
     expect(needsHuman({ label })).toBe(false);
   });
-
-  it('пробы ревью: рекомендованный вариант с причастием берётся, а не откат', () => {
-    expect(
-      planAnswers(
-        ask({ label: 'Mark as fixed (Recommended)' }, { label: 'Revert the change' }),
-      )?.[0],
-    ).toEqual({
-      question: 'Что делать?',
-      label: 'Mark as fixed (Recommended)',
-      critical: false,
-      free: false,
-    });
-    expect(
-      labels(
-        ask(
-          { label: 'Continue with dependencies updated (Recommended)' },
-          { label: 'Roll back to the old lockfile' },
-        ),
-      ),
-    ).toEqual(['Continue with dependencies updated (Recommended)']);
+  it('пробы ревью: рекомендованный вариант с причастием — рекомендация и работа агента', () => {
+    const options = [{ label: 'Mark as fixed (Recommended)' }, { label: 'Revert the change' }];
+    expect(recommendedIndex(options)).toBe(0);
+    expect(needsHuman(options[0]!)).toBe(false);
+    const deps = [
+      { label: 'Continue with dependencies updated (Recommended)' },
+      { label: 'Roll back to the old lockfile' },
+    ];
+    expect(recommendedIndex(deps)).toBe(0);
+    expect(needsHuman(deps[0]!)).toBe(false);
   });
 
   it('противительный союз обрывает отрицание: «Not ideal but recommended» — рекомендация', () => {
     expect(
-      labels(ask({ label: 'Merge main in' }, { label: 'Not ideal but recommended: rebase' })),
-    ).toEqual(['Not ideal but recommended: rebase']);
+      recommendedIndex([
+        { label: 'Merge main in' },
+        { label: 'Not ideal but recommended: rebase' },
+      ]),
+    ).toBe(1);
     expect(recommendedIndex([{ label: 'А' }, { label: 'Не идеально но рекомендую' }])).toBe(1);
     expect(recommendedIndex([{ label: 'А' }, { label: 'not really recommended' }])).toBe(-1);
   });
@@ -334,36 +215,5 @@ describe('«I» — слово человека только заглавной,
   it("«i'll log in» строчными — первое лицо, как «I'll log in»", () => {
     expect(needsHuman({ label: "i'll log in" })).toBe(true);
     expect(needsHuman({ label: 'I’ll log in' })).toBe(true);
-  });
-});
-
-// F-46: ответы и отметки разрешений делили одно окно в 20 — двадцать
-// автоответов вытесняли отметку разрешения, которую человек обязан видеть.
-describe('отметки группы: ответы не вытесняют разрешения', () => {
-  it('1 разрешение + 21 ответ — разрешение на месте, ответов — последние 20', () => {
-    const plan = {
-      parentChatId: 'p',
-      groups: [
-        { index: 0, autoNotices: [{ at: '2026-10-23T09:00:00.000Z', summary: 'git push' }] },
-      ],
-    } as unknown as SplitPlanRecord;
-    const store = {
-      getSplitPlan: () => plan,
-      setSplitPlan: (next: SplitPlanRecord) => void Object.assign(plan, next),
-    };
-    for (let at = 0; at < 21; at += 1) {
-      recordGroupAnswerNotice(
-        store,
-        { parentChatId: 'p', groupIndex: 0 },
-        planAnswers({ questions: [{ question: `Q${at}?`, options: [{ label: `A${at}` }] }] }) ?? [],
-        () => new Date(Date.UTC(2026, 9, 23, 10, at)),
-      );
-    }
-    const notices = plan.groups[0]?.autoNotices ?? [];
-    expect(notices[0]).toEqual({ at: '2026-10-23T09:00:00.000Z', summary: 'git push' });
-    const answers = notices.filter((notice) => notice.kind === 'answer');
-    expect(answers).toHaveLength(20);
-    expect(answers[0]?.summary).toBe('A1');
-    expect(answers.at(-1)?.summary).toBe('A20');
   });
 });

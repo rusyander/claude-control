@@ -1,4 +1,3 @@
-import { PERMISSION_RULE_IDS, resolvePermissionRules } from '@agentdeck/contracts/permission-rules';
 import {
   GROUP_REQUEST_DEFAULTS,
   pickGroupPermissions,
@@ -8,8 +7,7 @@ import {
 
 /**
  * Рычаги — настройки, которые ослабляют права ВСЕХ будущих решений разом:
- * глобальный авторежим чатов, правила автоподтверждения, строки разрешений
- * групп. При включённом режиме подписи их ослабление отклоняется с любого
+ * глобальный авторежим чатов и строки разрешений групп. При включённом режиме подписи их ослабление отклоняется с любого
  * канала: телефон их не шлёт, а окно, которое могла переписать правка
  * фронтенда, доказать ничего не может. Ужесточение и всё, что прав не
  * касается, проходит как раньше.
@@ -34,29 +32,13 @@ export function groupLevelsLoosen(
 
 export interface SettingsLeverState {
   chatAutoMode: boolean;
-  autoApproveRules: Record<string, boolean> | undefined;
 }
 
-/**
- * `PATCH /api/settings`. Правила автоподтверждения сверяются в обоих прочтениях
- * патча — заменой (так их пишет хранилище) и слиянием: какое бы ни сработало,
- * включившееся правило заметно.
- */
+/** `PATCH /api/settings`: ослабляет только включение глобального авторежима. */
 export function settingsPatchLoosens(current: SettingsLeverState, patch: unknown): boolean {
   if (!patch || typeof patch !== 'object') return false;
   const body = patch as Record<string, unknown>;
-  if (body.chatAutoMode === true && current.chatAutoMode !== true) return true;
-  const rules = body.autoApproveRules;
-  if (rules && typeof rules === 'object') {
-    const was = resolvePermissionRules(current.autoApproveRules);
-    const replaced = resolvePermissionRules(rules as Record<string, boolean>);
-    const merged = resolvePermissionRules({
-      ...current.autoApproveRules,
-      ...(rules as Record<string, boolean>),
-    });
-    if (PERMISSION_RULE_IDS.some((id) => !was[id] && (replaced[id] || merged[id]))) return true;
-  }
-  return false;
+  return body.chatAutoMode === true && current.chatAutoMode !== true;
 }
 
 /**

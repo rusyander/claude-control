@@ -99,23 +99,23 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
   'dialect-bridge': {
     severity: 'workaround',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/pipeline/pipeline.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/bridge.ts'],
   },
   'vendor-sse-frames': {
     severity: 'workaround',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/frames/frames.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/frames/frames.ts'],
     uiHidden: true,
   },
   'status-451-bridge': {
     severity: 'workaround',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/frames/frames.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/frames/frames.ts'],
   },
   'gateway-required': {
     severity: 'risk',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/listener/listener.ts'],
+    codeAnchors: ['apps/server/src/domains/platform/gateway-view/gateway-view.ts'],
   },
   'cli-no-endpoint': {
     severity: 'limitation',
@@ -125,15 +125,15 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
   'nonstream-120s': {
     severity: 'limitation',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/upstream/upstream.ts'],
+    codeAnchors: ['apps/server/src/domains/platform/upstream/upstream.ts'],
     uiHidden: true,
   },
   'budget-manual': {
     severity: 'workaround',
     since: '2026-09-09',
-    // Счёт ведёт СЕРВЕР по постоянному учёту (Т8): счётчик живого шлюза
+    // Счёт ведёт звено ЯДРА по постоянному учёту (Т8, C3b): счётчик живого шлюза
     // обнуляется вместе с процессом, и клиент своей правды о бюджете не имеет.
-    codeAnchors: ['apps/server/src/domains/platform/spend/spend.ts'],
+    codeAnchors: ['apps/server/src/routes/platform-routes/platform-routes.ts'],
   },
   'pricing-local': {
     severity: 'workaround',
@@ -146,7 +146,7 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
   'telemetry-local': {
     severity: 'limitation',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/lib/app-store/platform-spend.ts'],
+    codeAnchors: ['apps/core/src/hop-host/contour-book/contour-book.ts'],
   },
   'kb-via-owner': {
     severity: 'limitation',
@@ -166,7 +166,7 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
   'context-managed': {
     severity: 'limitation',
     since: '2026-09-09',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/frames/frames.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/frames/frames.ts'],
   },
   // Подписано 10.09.2026, при Т7: план обещал брать список агентов из пробы, а
   // такого маршрута на публичной поверхности ключа нет вовсе.
@@ -185,14 +185,14 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
     severity: 'workaround',
     since: '2026-09-12',
     codeAnchors: [
-      'apps/server/src/domains/platform/gateway/pipeline/pipeline.ts',
-      'apps/server/src/domains/platform/gateway/frames/frames.ts',
+      'apps/core/src/hop-host/gateway/dialect/dialect.ts',
+      'apps/core/src/hop-host/gateway/frames/frames.ts',
     ],
   },
   'shim-no-cache': {
     severity: 'limitation',
     since: '2026-09-12',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/tool-shim/protocol.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/tool-shim/protocol.ts'],
   },
   'no-effort': {
     severity: 'limitation',
@@ -223,7 +223,7 @@ const REGISTRY: Record<CompromiseId, Omit<CompromiseEntry, 'id'>> = {
   'mask-unrestorable': {
     severity: 'risk',
     since: '2026-09-12',
-    codeAnchors: ['apps/server/src/domains/platform/gateway/frames/frames.ts'],
+    codeAnchors: ['apps/core/src/hop-host/gateway/frames/frames.ts'],
     // Остановка называется в самом вызове — сообщением чата и строкой следа
     // запроса; постоянного места на экране у неё нет.
     uiHidden: true,

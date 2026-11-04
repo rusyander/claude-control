@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-/**
+/** @description-code hook-description-tests
  * Хук блока «Тесты» для любого Claude Code над проектом — чат панели, VS Code,
- * терминал (решение владельца 15.10). Панель ставит его в
- * `<проект>/.claude/settings.local.json` (`domains/project-tests/turn-hooks`),
- * файл в git не уходит.
+ * терминал. Панель ставит его в .claude/settings.local.json проекта — файл в
+ * git не уходит.
  *
  *   node tools/tests-hook.mjs session   SessionStart: короткая строка о блоке
  *   node tools/tests-hook.mjs stop      Stop: правил код — кейс, прогон, запись

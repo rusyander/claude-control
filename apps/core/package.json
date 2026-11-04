@@ -21,6 +21,8 @@
     "@agentdeck/stub-forge": "workspace:*",
     "@agentdeck/stub-model": "workspace:*",
     "fastify": "^5.10.0",
+    "smol-toml": "^1.7.0",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

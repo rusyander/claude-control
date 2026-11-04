@@ -195,7 +195,6 @@ export async function shootDlpGate(browser, web, scenario, { panel }) {
       .click();
     await page.waitForTimeout(3500);
     await shotCard(scenario, page, '02-gate-on', GATE);
-
     // ── 03. Тот же хук в разделе «Хуки» ──────────────────────────────────────
     await openSection(page, web, '/hooks', 3000);
     await waitForTheme(page);

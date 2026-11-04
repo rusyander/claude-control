@@ -1,6 +1,7 @@
 import type { ForgePort } from '@agentdeck/contracts/core/forge';
 import type { FastifyInstance } from 'fastify';
 import type { AdapterRegistry } from '../../adapters/index.ts';
+import type { AskBridgeBook } from '../../conductor/ask/index.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { ActionFactReaders } from '../../conductor/reconcile.ts';
 import type { RunEconomy } from '../../conductor/run/run.types.ts';
@@ -40,6 +41,8 @@ export interface BootedCore {
    * запуск → прикрепление → поиск ресурсов на остановке → снятие в конце задачи.
    */
   road: SessionRoad;
+  /** Токены моста панели вопросов «ask» — только чтение: проверка «токен не пережил задачу». */
+  askBridges: Pick<AskBridgeBook, 'get' | 'size'>;
   /** Книга окон ядра (G7) — одна: её пишет кран потока, читают судьи, проверки и `/v1/health`. */
   windows: WindowBook;
   /** Экономика исполнителя (этап 5) — та, что каждый `runTask` ядра получает в `RunDeps`. */
@@ -69,6 +72,24 @@ export interface BootOptions {
    * Нет — `panelAppDataDir()`; `null` — без панели.
    */
   panelAppData?: string | null;
+  /**
+   * Постоянный адрес своей модели (этап 10, зона C): порт, на котором ядро пересылает запросы
+   * серверу удержания панели. Нет — адреса нет (тесты); запуск ядра командой берёт его из
+   * `AGENTDECK_LOCAL_FRONT_PORT`, по умолчанию `LOCAL_FRONT_PORT`.
+   */
+  localFront?: { port: number; retryMs?: number };
+  /**
+   * Шлюз человека на хосте звеньев (этап 10): порт адреса `/<контур>/v1/...` для CLI человека;
+   * `panel` — порт из настроек панели на каждом такте (5179 по умолчанию). Нет — ядро шлюз не
+   * настраивает; запуск командой решает по `userGatewayPlanOf` (окружение, дом ядра).
+   */
+  userGateway?: { port: number | 'panel'; intervalMs?: number };
+  /**
+   * Прокси защиты данных человека (C3c) по настройкам панели. Только настоящему ядру (`pnpm core`):
+   * тестовая загрузка не открывает порт, который человек вписал в свой CLI. Нет каталога панели —
+   * не настраивается.
+   */
+  dlpProxy?: { intervalMs?: number };
   /** Реестр переходников; по умолчанию — все переходники ядра с их настройками по умолчанию. */
   adapters?: AdapterRegistry;
   /** Сколько вопрос о праве ждёт запроса инструмента в потоке сессии (мс). */
@@ -84,6 +105,8 @@ export interface BootOptions {
   loginPath?: LoginPathReader;
   /** Читатели ресурсов сессии (порты, рабочие копии, контейнеры); шов для теста. */
   resourceReaders?: ResourceReaders;
+  /** Скрипт моста панели вопросов «ask»; шов для теста (по умолчанию `tools/mcp/panel.mjs`). */
+  panelBridgeScript?: string;
   /**
    * Исполнитель задач (`runTask` на каждую запущенную задачу); по умолчанию включён с пином из
    * окружения ядра. `false` — задачи ведёт вызывающий (сквозной прогон стенда).

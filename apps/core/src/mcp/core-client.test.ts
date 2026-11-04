@@ -3,8 +3,19 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import type { HttpJsonCall, HttpJsonOutcome } from '../platform/http-json.ts';
-import { PERMIT_TOOL } from '@agentdeck/contracts/core/model-tools';
-import { agentdeckHandlers, bridgeEnv, CORE_PROCS_VAR, permitHandlers } from './bridges.ts';
+import {
+  PERMIT_TOOL,
+  SESSION_STEP_KINDS,
+  sessionToolsFor,
+  toolPlanFor,
+} from '@agentdeck/contracts/core/model-tools';
+import {
+  agentdeckHandlers,
+  bridgeEnv,
+  CORE_PROCS_VAR,
+  LIST_PATIENCE_MS,
+  permitHandlers,
+} from './bridges.ts';
 import { createCoreClient } from './core-client.ts';
 import { coreSince, newestCore } from './main.ts';
 import type { CoreCheck } from './core-discovery.ts';
@@ -269,7 +280,7 @@ describe('newest core in procs.json', () => {
     ]);
   });
 
-  it('the bridge env carries the procs path when the launch gave it', () => {
+  it('the bridge env carries the procs path and the step kind when the launch gave them', () => {
     const env = { AGENTDECK_CORE_URL: 'http://a', AGENTDECK_SESSION_TOKEN: 't' };
     expect(bridgeEnv(env)).toEqual({ url: 'http://a', token: 't' });
     expect(bridgeEnv({ ...env, [CORE_PROCS_VAR]: '/h/procs.json' })).toEqual({
@@ -277,5 +288,62 @@ describe('newest core in procs.json', () => {
       token: 't',
       procs: '/h/procs.json',
     });
+    expect(bridgeEnv({ ...env, AGENTDECK_STEP_KIND: 'plan' })).toEqual({
+      url: 'http://a',
+      token: 't',
+      stepKind: 'plan',
+    });
+  });
+});
+
+// Ядро умерло на старте сессии: CLI спрашивает `tools/list`, пока перезапуск ещё идёт
+// (аренда 15 с + подъём), и ждёт меньше — без списка сеанс живёт без `step_done` (g13 p10).
+describe('tools/list while the core restarts', () => {
+  const kind = SESSION_STEP_KINDS.find((k) => toolPlanFor(k)?.modelTools.includes('step_done'))!;
+  const never = (): Promise<HttpJsonOutcome> => new Promise(() => undefined);
+  const clientOf = (get: () => Promise<HttpJsonOutcome>) => ({
+    get,
+    post: async () => ({ kind: 'reply', status: 200, body: {} }) as const,
+  });
+  let patience: number[] = [];
+  const sleep = async (ms: number) => {
+    patience.push(ms);
+  };
+
+  it('the core silent past the patience: the bridge serves the same list the core would', async () => {
+    patience = [];
+    const list = await agentdeckHandlers(clientOf(never), { stepKind: kind, sleep }).list();
+    expect(patience).toEqual([LIST_PATIENCE_MS]);
+    expect(list).toEqual(sessionToolsFor(kind));
+    expect((list as { name: string }[]).map((t) => t.name)).toContain('step_done');
+  });
+
+  it('the core answering in time wins, its refusal included', async () => {
+    const slow = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+    const ok = clientOf(async () => ({ kind: 'reply', status: 200, body: { tools: [] } }));
+    expect(await agentdeckHandlers(ok, { stepKind: kind, sleep: () => slow(200) }).list()).toEqual(
+      [],
+    );
+    const refused = clientOf(async () => ({
+      kind: 'reply',
+      status: 403,
+      body: { code: 'token-refused', error: 'no' },
+    }));
+    expect(
+      await agentdeckHandlers(refused, { stepKind: kind, sleep: () => slow(200) }).list(),
+    ).toEqual({ error: 'core refused (403): token-refused no' });
+  });
+
+  it('without a step kind the bridge waits for the core alone, as before', async () => {
+    patience = [];
+    const down = clientOf(async () => ({
+      kind: 'unreachable',
+      reason: 'ECONNREFUSED',
+      refused: true,
+    }));
+    expect(await agentdeckHandlers(down, { sleep }).list()).toEqual({
+      error: 'core unreachable: ECONNREFUSED',
+    });
+    expect(patience).toEqual([]);
   });
 });

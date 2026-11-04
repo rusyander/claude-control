@@ -12,6 +12,7 @@ import {
   stableToml,
   upsertCodexRootScalar,
 } from './codex-toml/codex-toml.ts';
+import { serverText } from './server-texts/server-texts.ts';
 
 /**
  * Права Kimi Code в `config.toml` — седьмая модель прав панели и вторая на TOML.
@@ -81,13 +82,33 @@ export interface KimiPermissionRule {
 /**
  * Прочитать режим аппрувов. Ключа нет → `undefined` (раздел «на дефолтах CLI»).
  * Ключ есть, но не строка → fail-closed: чужую форму не толкуем.
+ *
+ * Значение вне набора (`default` и `plan` — словарь ACP, не конфига) → отказ С ПРИЧИНОЙ:
+ * Kimi 2.4.1 такой ключ при запуске молча выбрасывает и работает в `manual`, а показать его
+ * `manual`-ом и переписать при сохранении значило бы тихо стереть чужое значение.
  */
-export function readKimiMode(text: string): string | undefined {
+export function readKimiMode(text: string): KimiMode | undefined {
   if (!text.trim()) return undefined;
   const value = parseCodexToml(text)[KIMI_MODE_KEY];
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string') throw new UnrecognizedFormatError();
-  return value.trim();
+  const mode = value.trim();
+  if (!(KIMI_MODES as readonly string[]).includes(mode)) {
+    throw new UnrecognizedFormatError(staleKimiModeReason(mode));
+  }
+  return mode as KimiMode;
+}
+
+/**
+ * Причина отказа на значении режима вне набора: что стоит, что допустимо, что делает Kimi.
+ * Текст по коду: раздел прав отдаёт его полем `error`, и код находится разбором строки.
+ */
+export function staleKimiModeReason(mode: string): string {
+  return serverText('kimi-mode-stale', {
+    key: KIMI_MODE_KEY,
+    mode,
+    allowed: KIMI_MODES.join(', '),
+  });
 }
 
 /**

@@ -15,7 +15,8 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { settings } from './chat-stubs.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5229);
@@ -143,12 +144,15 @@ writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
 seedGlobal(home);
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-kit' },
+  );
   started.push(
     spawn(
       process.execPath,
@@ -196,6 +200,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   try {
     const scenario = openScenario('kit', 'page');
     console.log('\nсценарий kit/page');
@@ -206,5 +211,6 @@ try {
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
 }

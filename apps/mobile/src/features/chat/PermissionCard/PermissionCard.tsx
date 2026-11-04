@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button, Mono, Row, Title } from '../../../shared/ui';
 import { space } from '../../../shared/config/theme';
 import { useT } from '../../../shared/config/i18n';
 import { decidePermission, type PendingPermission } from '../../../shared/lib/runs';
+import { corePermitQuestion, decideCorePermit } from '../../../entities/core-task';
 import { styles } from './PermissionCard.styles';
 
 /**
@@ -13,6 +14,10 @@ import { styles } from './PermissionCard.styles';
  * Вход инструмента показывается как есть, без сокращений и красивого разбора:
  * решение «пускать ли» принимается по тому, ЧТО именно будет сделано, и любая
  * попытка это упростить кончилась бы разрешением вслепую.
+ *
+ * Вопрос права задачи ядра («Вопрос ядра») — текстом вопроса ядра, а ответ уходит ядру
+ * подписанными командами (`decideCorePermit`): маршрут прогона панели его отвергает. Карточку
+ * снимает ответ, записанный ядром (событие `permissionResolved`), а не нажатие.
  */
 export function PermissionCard({
   chatId,
@@ -24,24 +29,37 @@ export function PermissionCard({
   const t = useT();
   const [busy, setBusy] = useState<'allow' | 'deny' | undefined>();
   const [failed, setFailed] = useState('');
+  const core = permission.core;
 
   const decide = (behavior: 'allow' | 'deny') => {
     setBusy(behavior);
     setFailed('');
-    void decidePermission(chatId, permission.toolUseId, behavior)
+    const sent = core
+      ? decideCorePermit(t, core, behavior).then((outcome) => {
+          if (!outcome.ok) setFailed(outcome.message ?? t.chat.permissionFailed);
+        })
+      : decidePermission(chatId, permission.toolUseId, behavior);
+    void sent
       .catch((error: unknown) =>
         setFailed(error instanceof Error ? error.message : t.chat.permissionFailed),
       )
       .finally(() => setBusy(undefined));
   };
 
-  const input = JSON.stringify(permission.input, null, 2);
-
   return (
     <View style={styles.card}>
-      <Title>{t.chat.permission}</Title>
-      <Mono style={styles.tool}>{permission.toolName}</Mono>
-      <Mono numberOfLines={12}>{input}</Mono>
+      <Title>{core ? t.coreTask.permitBadge : t.chat.permission}</Title>
+      {core ? (
+        <>
+          <Text style={styles.question}>{corePermitQuestion(permission.input)}</Text>
+          <Text style={styles.hint}>{t.coreTask.permitHint}</Text>
+        </>
+      ) : (
+        <>
+          <Mono style={styles.tool}>{permission.toolName}</Mono>
+          <Mono numberOfLines={12}>{JSON.stringify(permission.input, null, 2)}</Mono>
+        </>
+      )}
       {failed ? <Mono style={styles.failed}>{failed}</Mono> : null}
       <Row gap={space.sm}>
         <Button

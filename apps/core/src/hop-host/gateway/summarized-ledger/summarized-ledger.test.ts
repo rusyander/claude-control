@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   SUMMARIZED_CAP,
+  adoptPanelSummarized,
   noteSummarized,
   resetSummarizedCache,
   summarizedInRun,
@@ -80,5 +81,48 @@ describe('журнал сжатий истории', () => {
     resetSummarizedCache();
     writeFileSync(join(dir, 'platform-summarized.json'), JSON.stringify([{ messageId: 'x' }, 5]));
     expect(summarizedMessageIds(dir).size).toBe(0);
+  });
+
+  describe('переезд журнала панели (C3b)', () => {
+    let panel: string;
+    beforeEach(() => {
+      panel = mkdtempSync(join(tmpdir(), 'cc-summarized-panel-'));
+    });
+    afterEach(() => rmSync(panel, { recursive: true, force: true }));
+
+    const legacy = (records: unknown[]) =>
+      writeFileSync(join(panel, 'platform-summarized.json'), JSON.stringify(records));
+
+    it('первый запуск звена: подписи старых ответов переезжают на диск звена', () => {
+      legacy([
+        { at, platformId: 'c', path: '/c/v1/messages', messageId: 'msg_old' },
+        { at, platformId: 'c', path: '/c/r1/v1/chat', runTag: 'run-old' },
+        { junk: true },
+      ]);
+      adoptPanelSummarized(dir, panel);
+      resetSummarizedCache();
+      expect([...summarizedMessageIds(dir)]).toEqual(['msg_old']);
+      expect(summarizedInRun(dir, 'run-old')).toBe(true);
+      expect(JSON.parse(readFileSync(join(dir, 'platform-summarized.json'), 'utf8'))).toHaveLength(
+        2,
+      );
+    });
+
+    it('свой журнал уже есть — панель больше не читается', () => {
+      noteSummarized(dir, { at, platformId: 'c', path: '/c/v1/messages', messageId: 'msg_new' });
+      legacy([{ at, platformId: 'c', path: '/c/v1/messages', messageId: 'msg_old' }]);
+      resetSummarizedCache();
+      adoptPanelSummarized(dir, panel);
+      expect([...summarizedMessageIds(dir)]).toEqual(['msg_new']);
+    });
+
+    it('у панели журнала нет или он испорчен — звено начинает с чистого листа', () => {
+      adoptPanelSummarized(dir, panel);
+      adoptPanelSummarized(dir, undefined);
+      writeFileSync(join(panel, 'platform-summarized.json'), '{ не json');
+      adoptPanelSummarized(dir, panel);
+      expect(summarizedMessageIds(dir).size).toBe(0);
+      expect(existsSync(join(dir, 'platform-summarized.json'))).toBe(false);
+    });
   });
 });

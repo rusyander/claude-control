@@ -155,6 +155,15 @@ export interface FidelityVerdict {
 }
 
 /** Строка отчёта: приговор плюс то, о чём он вынесен. */
+/** Подстановки кода фразы — форма `EnvTextParams` канона; копия, потому что модуль без импортов. */
+interface FidelityTextMessage {
+  readonly messageCode: string;
+  readonly params?: FidelityTextParams;
+}
+type FidelityTextParams = {
+  readonly [name: string]: string | number | FidelityTextMessage | undefined;
+};
+
 export interface FidelityRow extends FidelityVerdict {
   /** Идентификатор записи канона (`skill:doc-hygiene`) — строка раскрывается до неё. */
   readonly itemId: string;
@@ -162,6 +171,9 @@ export interface FidelityRow extends FidelityVerdict {
   readonly kind: string;
   /** Одна фраза человеку: та же, что у записи канона. */
   readonly intent: string;
+  /** Код фразы и подстановки — те же, что у записи канона; интерфейс переводит по ним. */
+  readonly intentCode?: string;
+  readonly intentParams?: FidelityTextParams;
 }
 
 /** Сводка отчёта: сколько записей на каждом уровне. Считается, а не пишется рукой. */

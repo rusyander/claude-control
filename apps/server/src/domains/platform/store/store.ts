@@ -2,6 +2,7 @@ import type {
   OurRules,
   Platform,
   PlatformRules,
+  PlatformSpendRecord,
   PlatformStatus,
   PlatformThinkingMode,
   PlatformToolMode,
@@ -39,7 +40,7 @@ import { layerOn, runLayers } from '../layers/layers.ts';
 import { platformRuleRows, ruleConflicts } from '../rules-matrix/rules-matrix.ts';
 import { effectiveOurRules } from '../rules-apply/rules-apply.ts';
 import { HEADER_SAFE_KEY, invalidField, platformNotFound, notConnected } from '../errors.ts';
-import { budgetVerdict, daysSince, emptySpend, sumDays } from '../spend/spend.ts';
+import { budgetVerdict, daysSince, emptySpend, sumDays } from '@agentdeck/pricing/contour-spend';
 
 /** Пространство имён ключей контура в общем хранилище секретов панели. */
 const TOKEN_PREFIX = 'platform:';
@@ -410,10 +411,8 @@ export function removePlatform(store: AppStore, appDataDir: string, id: string):
   if (store.getSettings().activePlatformId === id) {
     store.updateSettings({ activePlatformId: '' });
   }
-  // Учёт расхода — тоже след контура: идентификатор человек вправе завести
-  // заново (переименование выглядит именно так), и оставленная запись
-  // приписала бы новому контуру чужой расход и чужой упёртый бюджет.
-  store.forgetPlatformSpend(id);
+  // Учёт расхода уходит с контуром сам: его ведёт звено ядра и выбрасывает записи
+  // контуров, которых в настройках больше нет (C3b).
   const next = readPlatforms(store).filter((platform) => platform.id !== id);
   store.updateSettings({ platforms: next });
   return next;
@@ -455,11 +454,6 @@ export function forgetOrphanPlatforms(store: AppStore, appDataDir: string): stri
     store.updateSettings({ activePlatformId: '' });
     gone.add(active);
   }
-  for (const id of Object.keys(store.getPlatformSpend())) {
-    if (alive.has(id)) continue;
-    store.forgetPlatformSpend(id);
-    gone.add(id);
-  }
   for (const key of Object.keys(readKeyStore(appDataDir))) {
     if (!key.startsWith(TOKEN_PREFIX)) continue;
     const id = key.slice(TOKEN_PREFIX.length);
@@ -480,10 +474,11 @@ export function describePlatform(
   store: AppStore,
   appDataDir: string,
   platform: Platform,
+  /** Дни расхода из учёта звена ядра (C3b); нет записи — контур ещё ничего не тратил. */
+  spend: PlatformSpendRecord = emptySpend(platform.id),
 ): PlatformStatus {
   const token = readToken(appDataDir, platform.id) ?? '';
   const health = store.getPlatformHealth()[platform.id];
-  const spend = store.getPlatformSpend()[platform.id] ?? emptySpend(platform.id);
   const smoke = store.getPlatformSmoke()[platform.id];
   const settings = store.getSettings();
   const driver = driverOf(platform);
@@ -527,6 +522,12 @@ export function describePlatform(
 }
 
 /** Все карточки — то, чем отвечает `GET /api/platforms`. */
-export function describePlatforms(store: AppStore, appDataDir: string): PlatformStatus[] {
-  return readPlatforms(store).map((platform) => describePlatform(store, appDataDir, platform));
+export function describePlatforms(
+  store: AppStore,
+  appDataDir: string,
+  spend: Record<string, PlatformSpendRecord> = {},
+): PlatformStatus[] {
+  return readPlatforms(store).map((platform) =>
+    describePlatform(store, appDataDir, platform, spend[platform.id]),
+  );
 }

@@ -58,6 +58,8 @@ await runOnStand(
   {
     label: 'agent-tests-case-walk',
     fakeCli: { claude: FAKE_PANEL_AGENT_TESTS_CASE_CLI_SOURCE },
+    // Чат Claude идёт через ядро (s10): без `core` ход отказывает «core is not running».
+    core: true,
     seed: ({ home }) => {
       seedGroup(home, ALPHA);
       seedGroup(home, BETA);

@@ -1,4 +1,3 @@
-import type { GroupEconomy } from '@agentdeck/contracts/group-economy';
 import type { AppState, ChatLink } from './app-store.types.ts';
 
 /**
@@ -149,29 +148,6 @@ export function carriedStageLink(link: ChatLink): ChatLink {
     ...rest
   } = carriedLink(link);
   return rest;
-}
-
-/**
- * Рычаги экономии разговора: закреплённые на его первом старте, а нет — текущие,
- * которые тут же закрепляются под всеми ключами разговора. Связи нет — текущие.
- */
-export function pinLinkEconomy(
-  state: AppState,
-  keys: readonly string[],
-  current: GroupEconomy,
-): { economy: GroupEconomy; pinned: boolean } {
-  const links = state.chatLinks ?? {};
-  const key = keys.find((candidate) => links[candidate]);
-  const link = key ? links[key] : undefined;
-  if (!key || !link) return { economy: current, pinned: false };
-  if (link.economy) return { economy: link.economy, pinned: false };
-  // Все ключи сразу: у старых связей без канонического ключа разговор узнаётся
-  // по одинаковому содержимому, и поле под одним ключом раздвоило бы дерево.
-  for (const same of conversationKeys(links, key)) {
-    const other = links[same];
-    if (other) other.economy = current;
-  }
-  return { economy: current, pinned: true };
 }
 
 /**

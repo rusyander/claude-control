@@ -100,7 +100,8 @@ describe('mustfail набора: режим графа vitest и память в
   }, 120_000);
 
   it('то же дерево — вердикты из памяти без прогона; правка файла — прогон заново', () => {
-    const again = mustfail();
+    // `--no-select`: здесь проверяется память режима графа; подбор тестов (по умолчанию для vitest) — ниже.
+    const again = mustfail('--no-select');
 
     expect(again.out).toContain('3 file(s) already proven at this very tree — no run');
     expect(again.out).not.toContain('baseline with graph');
@@ -108,7 +109,7 @@ describe('mustfail набора: режим графа vitest и память в
 
     put('src/b.js', 'export const mul = (x, y) => y * x;\n');
     try {
-      const changed = mustfail();
+      const changed = mustfail('--no-select');
 
       expect(changed.out).toContain('· baseline with graph: green');
       expect(changed.out).not.toContain('already proven');
@@ -132,17 +133,21 @@ describe('mustfail набора: режим графа vitest и память в
     const entry = join(bin, 'preload-locked.cjs').replace(/\\/g, '/');
     put('src/b.js', 'export const mul = (x, y) => (y * x);\n');
     try {
-      const r = spawnSync(process.execPath, [MUSTFAIL, '--base', 'HEAD~1', '--cmd', CMD], {
-        cwd: repo,
-        encoding: 'utf8',
-        // Окружение панели: замок стоит, журнал включён — mustfail обязан снять оба сам.
-        env: {
-          ...process.env,
-          NODE_OPTIONS: `--require "${entry}"`,
-          AGENTDECK_VERIFY_LEDGER_LOCK: '1',
-          AGENTDECK_VERIFY_LEDGER: 'on',
+      const r = spawnSync(
+        process.execPath,
+        [MUSTFAIL, '--base', 'HEAD~1', '--no-select', '--cmd', CMD],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          // Окружение панели: замок стоит, журнал включён — mustfail обязан снять оба сам.
+          env: {
+            ...process.env,
+            NODE_OPTIONS: `--require "${entry}"`,
+            AGENTDECK_VERIFY_LEDGER_LOCK: '1',
+            AGENTDECK_VERIFY_LEDGER: 'on',
+          },
         },
-      });
+      );
       const loads = readFileSync(log, 'utf8').trim().split('\n');
       expect(`${r.stdout}${r.stderr}`).toContain('· baseline with graph: green');
       // Только сам mustfail стартовал через вход с замком; каждый node прогона — через обычный,
@@ -159,7 +164,7 @@ describe('mustfail набора: режим графа vitest и память в
 
   it('свой тест рядом решает первым (g9): a.js — RED своим тестом, граф идёт только по b.js и c.js', () => {
     // g9 25.10: обход графа занял 105 с + 102 с на два файла, чьи тесты прямым прогоном идут ~10 с.
-    const { status, out } = mustfail('--fresh');
+    const { status, out } = mustfail('--fresh', '--no-select');
 
     expect(out).toContain('· own sibling tests: 2 file(s), baseline green');
     expect(out).toMatch(/\| src\/a\.js\s*\| RED .*own test src\/a\.test\.js/);
@@ -176,12 +181,39 @@ describe('mustfail набора: режим графа vitest и память в
     // g9 25.10: `vitest run {file}` по исходным файлам при passWithNoTests — «зелёная» база без тестов,
     // каждый файл «НЕ покрыт», ложный вердикт за 13 с.
     const run = CMD.replace('related {file} --run', 'run {file} --passWithNoTests');
-    const { status, out } = mustfailWith(run, '--fresh');
+    const { status, out } = mustfailWith(run, '--fresh', '--no-select');
 
     expect(status).toBe(2);
     expect(out).toContain('the check ran NO test at all');
     expect(out).toContain('vitest related {file} --run');
     expect(out).not.toMatch(/\| GREEN/);
+    expect(git('status', '--porcelain')).toBe('');
+  }, 120_000);
+
+  it('подбор тестов по умолчанию: каждый откат гоняет только свои тесты (свой тест рядом / каталог), не весь набор', () => {
+    // `vitest run` без {file}: раньше — общий откат всего набора; теперь каждый файл судят его тесты,
+    // подбор печатается до прогонов, лимит — бюджет пакета, а не число файлов.
+    const plain = CMD.replace('related {file} --run', 'run');
+    const { status, out } = mustfailWith(plain, '--fresh');
+
+    expect(out).toContain('· test selection: @covers + own test → directory tests → import graph');
+    expect(out).toContain('mustfail · critical files: 3 of 3 changed with behaviour');
+    expect(out).toMatch(/\| src\/a\.js\s*\| RED .*own test/);
+    expect(verdict(out, 'src/b.js')).toBe('GREEN');
+    expect(out).not.toContain('all files reverted at once');
+    expect(status).toBe(1);
+    expect(git('status', '--porcelain')).toBe('');
+  }, 120_000);
+
+  it('бюджет пакета исчерпан: файлы — UNCHECKED по имени, не GREEN; ничего не доказано — exit 2, дерево цело', () => {
+    const plain = CMD.replace('related {file} --run', 'run');
+    const { status, out } = mustfailWith(plain, '--fresh', '--budget', '0');
+
+    expect(verdict(out, 'src/a.js')).toBe('UNCHECKED');
+    expect(out).toContain('the time budget cut every judged file');
+    expect(out).not.toMatch(/\| (?:RED|GREEN) /);
+    // UNCHECKED не валит прогон как GREEN (exit 1): «ничего не доказано» — exit 2, повтор доберёт из памяти.
+    expect(status).toBe(2);
     expect(git('status', '--porcelain')).toBe('');
   }, 120_000);
 

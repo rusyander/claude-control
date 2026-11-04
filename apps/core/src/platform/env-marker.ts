@@ -1,6 +1,11 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { currentOs, hasValue, reasonOf, type Fact, type OsKind } from './os-kind.ts';
-import { osProcessTable, type ProcessIdentity, type ProcessTableSource } from './process-table.ts';
+import {
+  filetimeToMs,
+  osProcessTable,
+  type ProcessIdentity,
+  type ProcessTableSource,
+} from './process-table.ts';
 import { runTool, type ToolRun } from './run-tool.ts';
 import { runWinHelper, type HelperOp } from './win-helper.ts';
 
@@ -128,14 +133,14 @@ export function parseWinEnviron(text: string): WinEnvironScan | undefined {
  * Решение по фактам помощника (правило — в шапке модуля). Находка доказывает себя сама:
  * есть меченый процесс — ответ он, даже если рядом есть непрочитанные свои.
  */
-export function judgeWinEnviron(scan: WinEnvironScan): Fact<ProcessIdentity[]> {
+export function judgeWinEnviron(
+  scan: WinEnvironScan,
+  scope: MarkerSweepScope = {},
+): Fact<ProcessIdentity[]> {
   if (scan.hits.length > 0) return { value: scan.hits };
   // Ни одного прочитанного блока (а свой родитель помощника читается всегда) — сломано само чтение.
   if (scan.read === 0) return { unknown: 'env-marker sweep: no environment block was readable' };
-  const suspects = [
-    ...scan.unread,
-    ...scan.hidden.filter((h) => h.il <= scan.readerIl && !(h.protection > 0)),
-  ];
+  const suspects = winSuspects(scan, scope);
   if (suspects.length === 0) return { value: [] };
   const pids = suspects.map((s) => s.pid);
   return {
@@ -143,15 +148,58 @@ export function judgeWinEnviron(scan: WinEnvironScan): Fact<ProcessIdentity[]> {
   };
 }
 
+/**
+ * Свои непрочитанные, что могут нести метку. Старше корня (`scope`, время создания FILETIME с
+ * дескриптора) — метку не несёт, как на Linux; время не названо — младшим не исключить: остаётся.
+ */
+function winSuspects(scan: WinEnvironScan, scope: MarkerSweepScope): ProcessIdentity[] {
+  const after = scope.bornAfterMs === undefined ? undefined : scope.bornAfterMs - 1_000;
+  const young = (id: ProcessIdentity): boolean =>
+    after === undefined || !/^\d+$/.test(id.start) || !(filetimeToMs(BigInt(id.start)) < after);
+  return [
+    ...scan.unread,
+    ...scan.hidden.filter((h) => h.il <= scan.readerIl && !(h.protection > 0)),
+  ]
+    .filter(young)
+    .map(({ pid, start }) => ({ pid, start }));
+}
+
+async function winScan(
+  wanted: string,
+  helper: (op: HelperOp, plan: string) => Promise<ToolRun>,
+): Promise<WinEnvironScan | { unknown: string }> {
+  const run = await helper('environ', wanted);
+  if (!run.ok) return { unknown: `env-marker sweep: ${run.reason}` };
+  return (
+    parseWinEnviron(run.stdout) ?? { unknown: 'env-marker sweep: helper output is incomplete' }
+  );
+}
+
+/**
+ * Непрочитанный свой без находки — второй взгляд через `SETTLE_MS`, как на Linux (s10 p10): процесс
+ * в рождении (блок окружения ещё не построен) или в выходе отдаёт отказ чтения мгновение, а под
+ * параллельной нагрузкой соседних процессов того же пользователя такие есть всегда — остановка
+ * чистого дерева выходила «не доказанной» (stub route, `core:test:all` 03.11). Сомнением остаётся
+ * тот же процесс (номер + время создания), не прочитанный и во второй раз.
+ */
 async function windowsMarked(
   wanted: string,
   helper: (op: HelperOp, plan: string) => Promise<ToolRun>,
+  scope: MarkerSweepScope,
 ): Promise<Fact<ProcessIdentity[]>> {
-  const run = await helper('environ', wanted);
-  if (!run.ok) return { unknown: `env-marker sweep: ${run.reason}` };
-  const scan = parseWinEnviron(run.stdout);
-  if (!scan) return { unknown: 'env-marker sweep: helper output is incomplete' };
-  return judgeWinEnviron(scan);
+  const first = await winScan(wanted, helper);
+  if ('unknown' in first) return first;
+  const verdict = judgeWinEnviron(first, scope);
+  if (!('unknown' in verdict) || first.read === 0) return verdict;
+  await new Promise((done) => setTimeout(done, SETTLE_MS));
+  const second = await winScan(wanted, helper);
+  if ('unknown' in second) return verdict;
+  if (second.hits.length > 0 || second.read === 0) return judgeWinEnviron(second, scope);
+  const again = new Set(winSuspects(second, scope).map((s) => `${s.pid}:${s.start}`));
+  const left = winSuspects(first, scope).filter((s) => again.has(`${s.pid}:${s.start}`));
+  return left.length === 0
+    ? { value: [] }
+    : judgeWinEnviron({ ...second, unread: left, hidden: [] });
 }
 
 /** Чтения `/proc` для поиска на Linux (подменяются в тестах: EACCES своего процесса не поставить). */
@@ -273,7 +321,7 @@ export async function sweepMarker(
   scope: MarkerSweepScope = {},
 ): Promise<Fact<ProcessIdentity[]>> {
   // Личность находки Windows — с дескриптора, которым читалось окружение: таблица не нужна.
-  if (os === 'win32') return windowsMarked(`${name}=${value}`, helper);
+  if (os === 'win32') return windowsMarked(`${name}=${value}`, helper, scope);
   let pids: number[];
   if (os === 'linux') {
     try {

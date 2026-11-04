@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 1100,
-      "shotAt": "2026-10-18T10:56:27.242Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 только чтение C:/work/shop-front/.claude Скиллы, хуки и правила из самого репозитория. Claude Code загружает их вместе с вашими, а правятся они в репозитории — редактором и коммитом. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)",
+      "shotAt": "2026-11-03T16:47:08.228Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 только чтение C:/work/shop-front/.claude Скиллы, хуки и правила из самого репозитория. Claude Code загружает их вместе с вашими, а правятся они в репозитории — редактором и коммитом. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)",
       "en": {
         "file": "01-tab.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-10-18T10:56:54.202Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 read-only C:/work/shop-front/.claude Skills, hooks and rules from the repository itself. Claude Code loads them together with yours; they are edited in the repository — in an editor and with a commit. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:47:56.828Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 read-only C:/work/shop-front/.claude Skills, hooks and rules from the repository itself. Claude Code loads them together with yours; they are edited in the repository — in an editor and with a commit. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "753582b2f573af88",
+          "text": "6835bf73bb819e07"
+        }
       },
       "dark": {
         "file": "01-tab.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-10-18T10:57:09.938Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 только чтение C:/work/shop-front/.claude Скиллы, хуки и правила из самого репозитория. Claude Code загружает их вместе с вашими, а правятся они в репозитории — редактором и коммитом. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:48:55.472Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 0 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека всё спокойно Проекты — конфигурация Инструкции, MCP-серверы и права одного репозитория правятся здесь, его собственный .claude — только для чтения Добавить проект Что это Проектов: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front Внешние привязки Ничего не привязано Привязать Инструкции MCP-серверы 2 Права 3 Из проекта 6 — скиллов: 2, хуков: 2, правил: 2 только чтение C:/work/shop-front/.claude Скиллы, хуки и правила из самого репозитория. Claude Code загружает их вместе с вашими, а правятся они в репозитории — редактором и коммитом. Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда. Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs Правила 2 Витрина: правила фронтенда frontend.md Показать текст src/**/*.tsx Формат коммитов release/commits.md Показать текст Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "9b10b0208aff1ed8",
+          "text": "79c4c73029c02978"
+        }
       },
       "darkEn": {
         "file": "01-tab.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 1100,
-        "shotAt": "2026-10-18T10:57:26.073Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 read-only C:/work/shop-front/.claude Skills, hooks and rules from the repository itself. Claude Code loads them together with yours; they are edited in the repository — in an editor and with a commit. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:49:42.878Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 0 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky all quiet Projects — configuration One repository's instructions, MCP servers and permissions are edited here; its own .claude is read-only Add project What is this Projects: 2 Витрина магазина C:/work/shop-front Админка магазина C:/work/shop-admin Витрина магазина C:/work/shop-front External links Nothing linked Link Instructions MCP servers 2 Permissions 3 From the project 6 — skills: 2, hooks: 2, rules: 2 read-only C:/work/shop-front/.claude Skills, hooks and rules from the repository itself. Claude Code loads them together with yours; they are edited in the repository — in an editor and with a commit. Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда. Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs Rules 2 Витрина: правила фронтенда frontend.md Show text src/**/*.tsx Формат коммитов release/commits.md Show text Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "feb03fce205a9273",
+          "text": "6835bf73bb819e07"
+        }
+      },
+      "seal": {
+        "png": "4443625cbc79629f",
+        "text": "79c4c73029c02978"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 1072,
       "height": 438,
-      "shotAt": "2026-10-18T10:56:27.291Z",
+      "shotAt": "2026-11-03T16:47:08.288Z",
       "text": "Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда.",
       "en": {
         "file": "02-skills.en.png",
         "masked": 0,
         "width": 1072,
         "height": 438,
-        "shotAt": "2026-10-18T10:56:54.257Z",
-        "text": "Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда."
+        "shotAt": "2026-11-03T16:47:56.886Z",
+        "text": "Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда.",
+        "seal": {
+          "png": "df78b7643adfdcff",
+          "text": "adc2d76ac637447a"
+        }
       },
       "dark": {
         "file": "02-skills.dark.png",
         "masked": 0,
         "width": 1072,
         "height": 438,
-        "shotAt": "2026-10-18T10:57:09.989Z",
-        "text": "Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда."
+        "shotAt": "2026-11-03T16:48:55.534Z",
+        "text": "Скиллы 2 release-notes файлов: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import выключен Разбор старого формата прайса. Выключен до конца переезда.",
+        "seal": {
+          "png": "f25e80625c3936d0",
+          "text": "4d3e801443bec960"
+        }
       },
       "darkEn": {
         "file": "02-skills.dark.en.png",
         "masked": 0,
         "width": 1072,
         "height": 438,
-        "shotAt": "2026-10-18T10:57:26.123Z",
-        "text": "Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда."
+        "shotAt": "2026-11-03T16:49:42.931Z",
+        "text": "Skills 2 release-notes files: 2 Собирает заметки к релизу из закрытых задач витрины. legacy-import disabled Разбор старого формата прайса. Выключен до конца переезда.",
+        "seal": {
+          "png": "4da74a0eceb1e37e",
+          "text": "adc2d76ac637447a"
+        }
+      },
+      "seal": {
+        "png": "1cb4449fe3d1dd5c",
+        "text": "4d3e801443bec960"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1072,
       "height": 461,
-      "shotAt": "2026-10-18T10:56:27.340Z",
+      "shotAt": "2026-11-03T16:47:08.335Z",
       "text": "Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs",
       "en": {
         "file": "03-hooks.en.png",
         "masked": 0,
         "width": 1072,
         "height": 461,
-        "shotAt": "2026-10-18T10:56:54.304Z",
-        "text": "Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs"
+        "shotAt": "2026-11-03T16:47:56.933Z",
+        "text": "Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs",
+        "seal": {
+          "png": "c7c436357ec27b46",
+          "text": "d33525441271314b"
+        }
       },
       "dark": {
         "file": "03-hooks.dark.png",
         "masked": 0,
         "width": 1072,
         "height": 461,
-        "shotAt": "2026-10-18T10:57:10.039Z",
-        "text": "Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs"
+        "shotAt": "2026-11-03T16:48:55.580Z",
+        "text": "Хуки 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json скрипт не найден node .claude/hooks/notify-me.mjs",
+        "seal": {
+          "png": "89f02dee77485aee",
+          "text": "8abec3d31293c78a"
+        }
       },
       "darkEn": {
         "file": "03-hooks.dark.en.png",
         "masked": 0,
         "width": 1072,
         "height": 461,
-        "shotAt": "2026-10-18T10:57:26.170Z",
-        "text": "Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs"
+        "shotAt": "2026-11-03T16:49:42.979Z",
+        "text": "Hooks 2 PreToolUse Bash Страж разрушительных команд. node .claude/hooks/guard-destructive.mjs Stop settings.local.json script not found node .claude/hooks/notify-me.mjs",
+        "seal": {
+          "png": "640dad4804f51c4e",
+          "text": "d33525441271314b"
+        }
+      },
+      "seal": {
+        "png": "1bb11185d44b7a8e",
+        "text": "8abec3d31293c78a"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1072,
       "height": 537,
-      "shotAt": "2026-10-18T10:56:27.923Z",
+      "shotAt": "2026-11-03T16:47:08.918Z",
       "text": "Правила 2 Витрина: правила фронтенда frontend.md Свернуть текст src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Показать текст",
       "en": {
         "file": "04-rules.en.png",
         "masked": 0,
         "width": 1072,
         "height": 537,
-        "shotAt": "2026-10-18T10:56:54.871Z",
-        "text": "Rules 2 Витрина: правила фронтенда frontend.md Hide text src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Show text"
+        "shotAt": "2026-11-03T16:47:57.518Z",
+        "text": "Rules 2 Витрина: правила фронтенда frontend.md Hide text src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Show text",
+        "seal": {
+          "png": "ba7f209fd68670e9",
+          "text": "a1edffb56dcf380e"
+        }
       },
       "dark": {
         "file": "04-rules.dark.png",
         "masked": 0,
         "width": 1072,
         "height": 537,
-        "shotAt": "2026-10-18T10:57:10.623Z",
-        "text": "Правила 2 Витрина: правила фронтенда frontend.md Свернуть текст src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Показать текст"
+        "shotAt": "2026-11-03T16:48:56.180Z",
+        "text": "Правила 2 Витрина: правила фронтенда frontend.md Свернуть текст src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Показать текст",
+        "seal": {
+          "png": "8248ca3516f3b625",
+          "text": "7d11c568a06c4b5c"
+        }
       },
       "darkEn": {
         "file": "04-rules.dark.en.png",
         "masked": 0,
         "width": 1072,
         "height": 537,
-        "shotAt": "2026-10-18T10:57:26.737Z",
-        "text": "Rules 2 Витрина: правила фронтенда frontend.md Hide text src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Show text"
+        "shotAt": "2026-11-03T16:49:43.562Z",
+        "text": "Rules 2 Витрина: правила фронтенда frontend.md Hide text src/**/*.tsx # Витрина: правила фронтенда Один компонент — один файл. Радиус скругления числом, не токеном. Формат коммитов release/commits.md Show text",
+        "seal": {
+          "png": "8a746b9fce175f5f",
+          "text": "a1edffb56dcf380e"
+        }
+      },
+      "seal": {
+        "png": "bafb057391344c7c",
+        "text": "7d11c568a06c4b5c"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 840,
       "height": 542,
-      "shotAt": "2026-10-18T10:56:28.008Z",
+      "shotAt": "2026-11-03T16:47:09.021Z",
       "text": "Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)",
       "en": {
         "file": "05-layer.en.png",
         "masked": 0,
         "width": 840,
         "height": 524,
-        "shotAt": "2026-10-18T10:56:54.955Z",
-        "text": "Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:47:57.618Z",
+        "text": "Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "11514268f8707c10",
+          "text": "2a5d32173112750a"
+        }
       },
       "dark": {
         "file": "05-layer.dark.png",
         "masked": 0,
         "width": 840,
         "height": 542,
-        "shotAt": "2026-10-18T10:57:10.707Z",
-        "text": "Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:48:56.281Z",
+        "text": "Локальный слой подключён Командный слой проекта — CLAUDE.md, .claude/rules, хуки и права из .claude/settings.json, скиллы, серверы .mcp.json — собранный копией в .agent/local-layer/. Чаты панели подключают его вместо самих командных файлов: так можно работать на сжатых инструкциях или на ускоренных хуках из ещё не влитого MR, не трогая файлы репозитория. Сжатый кусок используется, только пока он сделан с текущего текста, замена хука — пока командный файл тот, что она улучшает; иначе едет командная версия. Режим «авто»: слою есть что дать, чаты идут на нём. Режим Авто — только когда есть выгода Всегда Выключен Инструкции: файлов 3, 18420 → 9310 знаков Сжато разделов: 9 из 14 Ждут нового сжатия — командный текст изменился, пока едут дословно: CLAUDE.md → ## Релизы Правил по путям и вложенных CLAUDE.md: 4 — приходят при первом касании подходящего файла Скиллы: release-notes, storefront-review MCP-серверы: tracker Хуков команды: 6 Замены хуков 4f2c9a1e7 scripts/lint_guard.mjs — действует (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "e248c606d90ec563",
+          "text": "b7741841c5683a59"
+        }
       },
       "darkEn": {
         "file": "05-layer.dark.en.png",
         "masked": 0,
         "width": 840,
         "height": 524,
-        "shotAt": "2026-10-18T10:57:26.821Z",
-        "text": "Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)"
+        "shotAt": "2026-11-03T16:49:43.647Z",
+        "text": "Local layer in use The project's team layer — CLAUDE.md, .claude/rules, hooks and permissions from .claude/settings.json, skills, .mcp.json servers — assembled as a copy in .agent/local-layer/. Panel chats load it instead of the team files themselves: you can work on compressed instructions or on faster hooks from a not-yet-merged MR without touching the repository. A compressed piece is used only while it was made from the current text, a hook replacement only while the team file is the one it improves; otherwise the team version goes. Auto mode: the layer has something to offer, chats run on it. Mode Auto — only when it pays off Always Off Instructions: 3 files, 18420 → 9310 characters Compressed sections: 9 of 14 Awaiting re-compression — the team text changed, sent verbatim for now: CLAUDE.md → ## Релизы Path rules and nested CLAUDE.md files: 4 — delivered on the first touch of a matching file Skills: release-notes, storefront-review MCP servers: tracker Team hooks: 6 Hook replacements 4f2c9a1e7 scripts/lint_guard.mjs — active (MR 214: кэш списка файлов)",
+        "seal": {
+          "png": "6d326ec5dbd69735",
+          "text": "2a5d32173112750a"
+        }
+      },
+      "seal": {
+        "png": "2d28ad8594ac9494",
+        "text": "b7741841c5683a59"
       }
     }
   ]

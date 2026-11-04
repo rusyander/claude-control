@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { EndpointProfile } from '@agentdeck/contracts';
 import { ENDPOINT_API_KINDS, ENDPOINT_BASE_URL_SAMPLE, newEndpointProfile } from './profile';
-import { replaceProfile } from './replaceProfile';
+import { mergeProfileEdit, sameProfile, shownProfile } from './replaceProfile';
 import { removeProfile } from './removeProfile';
 import { isProfileComplete } from './isProfileComplete';
 
@@ -46,14 +46,45 @@ describe('новый профиль', () => {
 describe('правка списка', () => {
   const list = [profileOf(), profileOf({ id: 'ep-2', name: 'Второй' })];
 
-  it('замена по id не трогает исходный массив', () => {
-    const next = replaceProfile(list, profileOf({ id: 'ep-2', name: 'Переименован' }));
+  it('правка по id не трогает исходный массив', () => {
+    const shown = list[1]!;
+    const next = mergeProfileEdit(list, shown, { ...shown, name: 'Переименован' });
     expect(next.map((item) => item.name)).toEqual(['Локальная модель', 'Переименован']);
     expect(list[1]?.name).toBe('Второй');
   });
 
-  it('замена несуществующего ничего не добавляет', () => {
-    expect(replaceProfile(list, profileOf({ id: 'нет-такого' }))).toEqual(list);
+  it('правка несуществующего ничего не добавляет', () => {
+    const ghost = profileOf({ id: 'нет-такого' });
+    expect(mergeProfileEdit(list, ghost, { ...ghost, name: 'x' })).toEqual(list);
+  });
+
+  // Две правки из одной отрисовки: вторая несёт прежнее имя, потому что форма
+  // собрала её из того же показанного профиля. Имя из первой правки должно выжить.
+  it('правка переносит только своё поле и не возвращает поле, поменянное раньше', () => {
+    const shown = list[0]!;
+    const afterFirst = mergeProfileEdit(list, shown, { ...shown, name: 'Шлюз' });
+    const afterSecond = mergeProfileEdit(afterFirst, shown, {
+      ...shown,
+      baseUrl: 'http://127.0.0.1:8080',
+    });
+    expect(afterSecond[0]).toMatchObject({ name: 'Шлюз', baseUrl: 'http://127.0.0.1:8080' });
+  });
+
+  // Набранное держится, пока кеш настроек не оповестил отрисовку; чужой профиль
+  // набранным не подменяется.
+  it('форма показывает набранное своего профиля и настройки — чужого', () => {
+    const typed = profileOf({ baseUrl: 'http://1' });
+    expect(shownProfile(profileOf(), typed)).toBe(typed);
+    expect(shownProfile(list[1], typed)).toBe(list[1]);
+    expect(shownProfile(profileOf(), null)).toEqual(profileOf());
+    expect(shownProfile(undefined, typed)).toBeUndefined();
+  });
+
+  it('настройки догнали набранное — профили равны, отстали на поле — нет', () => {
+    expect(sameProfile(profileOf({ name: 'a' }), profileOf({ name: 'a' }))).toBe(true);
+    expect(sameProfile(profileOf({ baseUrl: 'h' }), profileOf({ baseUrl: 'ht' }))).toBe(false);
+    const { imagesUrl: _dropped, ...withoutImages } = profileOf();
+    expect(sameProfile(profileOf(), withoutImages as EndpointProfile)).toBe(false);
   });
 
   it('удаление убирает ровно один и оставляет остальные', () => {

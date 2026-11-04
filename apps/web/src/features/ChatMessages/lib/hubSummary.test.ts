@@ -1,48 +1,73 @@
 import { describe, expect, it } from 'vitest';
 import type { ChildStageGroup } from '../ui/ChildStages.types';
 import { hubBucket } from './hubBucket';
+import { orderHubGroups } from './orderHubGroups';
 import { summarizeHub } from './summarizeHub';
 
-function row(extra: Partial<ChildStageGroup>): ChildStageGroup {
-  return { chatId: '', title: 'группа', stages: [], isRunning: false, ...extra };
+function row(title: string, extra: Partial<ChildStageGroup> = {}): ChildStageGroup {
+  return { chatId: `c-${title}`, title, stages: ['work'], isRunning: false, ...extra };
 }
 
-describe('hubBucket: строки без чата — в свои корзины', () => {
-  it('подготовка копии — «идёт»: место занято, прогон вот-вот пойдёт', () => {
-    expect(hubBucket(row({ pending: 'setup' }))).toBe('running');
+const titles = (groups: ChildStageGroup[]) => groups.map((group) => group.title);
+
+describe('hubBucket: у каждой строки хаба есть чат — корзин три', () => {
+  it('идущий прогон — «идёт», даже если прошлый ход кончился вопросом', () => {
+    expect(hubBucket(row('А', { isRunning: true }))).toBe('running');
+    expect(hubBucket(row('А', { isRunning: true, waitingFor: 'question' }))).toBe('running');
   });
 
-  it('оборвана до своего чата — «ждёт вас»: сама не продолжится', () => {
-    expect(hubBucket(row({ pending: 'interrupted' }))).toBe('ask');
+  it('вопрос человеку без прогона — «ждёт вас»', () => {
+    expect(hubBucket(row('А', { waitingFor: 'question' }))).toBe('ask');
   });
 
-  it('пауза без чата — не очередь, а остановленная', () => {
-    expect(hubBucket(row({ pending: 'paused' }))).toBe('idle');
+  it('ни прогона, ни вопроса — «стоит», в том числе на паузе дерева', () => {
+    expect(hubBucket(row('А'))).toBe('idle');
+    expect(hubBucket(row('А', { isPaused: true }))).toBe('idle');
   });
 
-  it('обычная очередь осталась очередью', () => {
-    expect(hubBucket(row({ pending: 'queued' }))).toBe('queued');
-  });
-
-  it('ждёт только записей D-n — своя корзина «ждёт решения», не «ждёт вас» и не «готово»', () => {
-    expect(hubBucket(row({ chatId: 'c', waitingFor: 'human-op', status: 'done' }))).toBe(
-      'deferred',
-    );
-    // Живой вопрос перевешивает: он держит группу, D-n — нет.
-    expect(hubBucket(row({ chatId: 'c', waitingFor: 'question' }))).toBe('ask');
-    const { counts } = summarizeHub([row({ chatId: 'c', waitingFor: 'human-op' })], 0);
-    expect(counts).toMatchObject({ deferred: 1, ask: 0, done: 0 });
-  });
-
-  it('N3: красный MR без правки — «ждёт вас», а не «готово»', () => {
-    expect(hubBucket(row({ chatId: 'c', waitingFor: 'mr-red', status: 'awaiting' }))).toBe('ask');
-  });
-
-  it('счётчики сводки — по тем же корзинам', () => {
+  it('счётчики сводки — по тем же корзинам; разбор и отброшенные не считаются', () => {
     const { counts } = summarizeHub(
-      [row({ pending: 'setup' }), row({ pending: 'interrupted' }), row({ pending: 'paused' })],
+      [
+        row('А', { isRunning: true }),
+        row('Б', { waitingFor: 'question' }),
+        row('В'),
+        row('разбор', { stages: ['triage'], isRunning: true }),
+        row('старая', { retired: true }),
+      ],
       0,
     );
-    expect(counts).toMatchObject({ running: 1, ask: 1, idle: 1, queued: 0 });
+    expect(counts).toEqual({ running: 1, ask: 1, idle: 1 });
+  });
+
+  it('время идёт до «сейчас», пока хоть что-то идёт, и до последней записи, когда всё стоит', () => {
+    const start = '2026-10-22T08:00:00.000Z';
+    const last = '2026-10-22T08:10:00.000Z';
+    const now = Date.parse('2026-10-22T09:00:00.000Z');
+    expect(summarizeHub([row('А', { startedAt: start, lastAt: last })], now).elapsedMs).toBe(
+      600_000,
+    );
+    expect(
+      summarizeHub([row('А', { startedAt: start, lastAt: last, isRunning: true })], now).elapsedMs,
+    ).toBe(3_600_000);
+  });
+});
+
+describe('orderHubGroups', () => {
+  it('строка разбора — первой, остальные в порядке плана', () => {
+    const groups = [
+      row('А', { isRunning: true }),
+      row('разбор', { stages: ['triage'] }),
+      row('Б', { waitingFor: 'question' }),
+      row('В'),
+    ];
+    expect(titles(orderHubGroups(groups))).toEqual(['разбор', 'А', 'Б', 'В']);
+  });
+
+  it('ничего не теряет и не дублирует; входной список не трогает', () => {
+    const groups = [row('А'), row('разбор', { stages: ['triage'] }), row('Б')];
+    const before = titles(groups);
+    const ordered = orderHubGroups(groups);
+    expect(titles(ordered).sort()).toEqual([...before].sort());
+    expect(titles(groups)).toEqual(before);
   });
 });

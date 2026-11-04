@@ -1,20 +1,26 @@
 import type { FastifyInstance } from 'fastify';
 import { commandIssues } from '@agentdeck/contracts/core/commands';
 import {
+  fromPathBodySchema,
   saveScenarioBodySchema,
+  type FromPathReply,
   type ScenarioSaveReply,
   type ScenariosReply,
 } from '@agentdeck/contracts/core/panel-api';
 import { scenarioProblems, scenarioRefSchema } from '@agentdeck/contracts/core/scenario';
 import {
+  fromPath,
   isPresetId,
   latestPresets,
   latestVersion,
   listLibrary,
+  localizePreset,
   presetOf,
   PRESETS,
   readLibraryScenario,
+  titleLangOf,
   writeLibraryScenario,
+  type TitleLang,
 } from '../conductor/scenario/index.ts';
 import { decideAuthority } from '../policy/authority/authority.ts';
 import { proofOfBody } from './body-proof.ts';
@@ -31,6 +37,11 @@ import type { RouteContext } from './route-context.types.ts';
  * `unknown` без подписи — отказ, токен сессии — `forged-authority` (у модели дороги в библиотеку
  * нет, иначе она написала бы себе сценарий без проверок). Запись однократная: версия, под которой
  * уже лежит другой текст, — 409, перезаписи нет никогда; тот же текст — 200 (повтор после обрыва).
+ *
+ * `POST /v1/scenarios/from-path` (этап 10, F1): «Путь» старой группы панели → сценарий той же
+ * миграцией `fromPath` (P100). Только перевод, без записи: сохраняет человек обычным `POST
+ * /v1/scenarios` под судом `save-scenario`, поэтому здесь хватает токена чтения. Проблемы перевода —
+ * 422 со списком: сценарий без части пути хуже отказа.
  */
 
 export const SAVE_SCENARIO_ROUTE = 'POST /v1/scenarios';
@@ -39,6 +50,13 @@ export const SAVE_SCENARIO_ROUTE = 'POST /v1/scenarios';
 function libraryDir(ctx: RouteContext): string {
   return ctx.env.layout.scenarios;
 }
+
+/**
+ * Язык заголовков пресетов — `?lang=` панели (этап 10, F4): русские данные пресета панель на
+ * английском показывала бы как есть. Чужой и пустой — русский, чтение из-за языка не падает.
+ */
+const langOf = (query: unknown): TitleLang =>
+  titleLangOf((query as { lang?: unknown } | undefined)?.lang);
 
 const REF = /^([a-z0-9][a-z0-9-]{0,63})@([1-9][0-9]{0,8})$/;
 
@@ -52,8 +70,9 @@ export function registerScenarios(app: FastifyInstance, ctx: RouteContext): void
         .send(
           apiError('library-unreadable', `Библиотека сценариев не читается: ${listing.unknown}`),
         );
+    const lang = langOf(request.query);
     const body: ScenariosReply = {
-      presets: PRESETS,
+      presets: PRESETS.map((p) => localizePreset(p, lang)),
       latestPresets: latestPresets().map((s) => ({ id: s.id, version: s.version })),
       library: listing.value.scenarios,
       problems: listing.value.problems,
@@ -72,7 +91,7 @@ export function registerScenarios(app: FastifyInstance, ctx: RouteContext): void
     if (isPresetId(ref.data.id)) {
       const preset = presetOf(ref.data);
       return preset
-        ? reply.send({ scenario: preset, source: 'preset' })
+        ? reply.send({ scenario: localizePreset(preset, langOf(request.query)), source: 'preset' })
         : reply.code(404).send(apiError('not-found', 'Нет такой версии пресета'));
     }
     const read = await readLibraryScenario(libraryDir(ctx), ref.data);
@@ -86,6 +105,20 @@ export function registerScenarios(app: FastifyInstance, ctx: RouteContext): void
     return reply
       .code(422)
       .send(apiError('invalid-scenario', `Файл сценария не по схеме: ${read.reason}`));
+  });
+
+  app.post('/v1/scenarios/from-path', async (request, reply) => {
+    if (!ctx.requireRead(request, reply)) return reply;
+    const parsed = fromPathBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.code(400).send(
+        apiError('bad-path', '«Путь» группы не прошёл разбор', {
+          issues: commandIssues(parsed.error.issues, '', request.body),
+        }),
+      );
+    }
+    const got: FromPathReply = fromPath(parsed.data);
+    return reply.code(got.scenario ? 200 : 422).send(got);
   });
 
   app.post('/v1/scenarios', async (request, reply) => {

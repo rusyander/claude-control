@@ -26,6 +26,12 @@ export interface ContourPolicy {
   mode: 'required' | 'best-effort';
   /** Доступность шлюза; `down` при `required` — отказ, никогда не облако вендора (P118). */
   gateway: 'up' | 'down' | 'unknown';
+  /**
+   * Модель контура по умолчанию (`defaultModel` карточки; пусто — нет). При `required` ею идёт
+   * шаг, которому никто не назвал модель (s10 G7): иначе маршрут с адресом отказал бы «needs a
+   * concrete model». Названную модель (правка, потолок задачи, модель шага) не заменяет.
+   */
+  model?: string;
 }
 
 export interface AllowedSetInput {

@@ -119,8 +119,18 @@ function narrow(
   return { next, applied, rejected };
 }
 
+/**
+ * `fill` — модель контура по умолчанию для шлюза (s10 G7): судья шага ставит её, только если
+ * выбрал этот шлюз с моделью CLI по умолчанию (`model: null`); названная модель остаётся.
+ */
 export type ContourNarrowing =
-  { ok: true; set: AllowedRoute[]; applied: AllowedSetEntry[] } | { ok: false; reason: string };
+  | {
+      ok: true;
+      set: AllowedRoute[];
+      applied: AllowedSetEntry[];
+      fill?: { routeId: string; model: string };
+    }
+  | { ok: false; reason: string };
 
 /**
  * Уровень 1 (06 §Precedence, 11 §Policy): активный контур `required` ведёт каждую тройку через
@@ -155,7 +165,13 @@ export function contourNarrow(
       };
     }),
   );
-  return { ok: true, set: next, applied };
+  const model = contour.model?.trim();
+  return {
+    ok: true,
+    set: next,
+    applied,
+    ...(model ? { fill: { routeId: gatewayId, model } } : {}),
+  };
 }
 
 export function resolveAllowedRoutes(input: AllowedSetInput): AllowedSetResolution {

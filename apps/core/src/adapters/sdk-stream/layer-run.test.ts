@@ -40,6 +40,22 @@ describe('resolveLayer — F-86 the trust of the source repo decides the repo la
     expect(p.asked).toEqual([]);
   });
 
+  it('F6: sources user (task session) → `on` stays `on`, no repo layer, no trust read even with a source repo', async () => {
+    const p = policy({ unknown: 'must not be read' });
+    const userOnly = {
+      ...spec('on', { sourceRepo: '/src', panelMark: true }),
+      layer: { hooks: 'on', sources: 'user' },
+    } as unknown as SessionSpec;
+    expect(await resolveLayer(userOnly, p)).toEqual({
+      asked: 'on',
+      ran: 'on',
+      repoLayer: false,
+      trust: 'none',
+      detail: 'user setting source only (task session)',
+    });
+    expect(p.asked).toEqual([]);
+  });
+
   it('F-86: the panel mark trusts without reading the CLI record', async () => {
     const p = policy({ unknown: 'must not be read' });
     expect(await resolveLayer(spec('on', { sourceRepo: '/src', panelMark: true }), p)).toEqual({

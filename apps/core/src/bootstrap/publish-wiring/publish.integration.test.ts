@@ -1,138 +1,24 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { StepDef } from '@agentdeck/contracts/core/scenario';
-import {
-  REVIEW_THREAD_BODIES,
-  startStubForge,
-  type StubForge,
-  type StubScenario,
-} from '@agentdeck/stub-forge';
+import { REVIEW_THREAD_BODIES } from '@agentdeck/stub-forge';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createForgePort } from '../../adapters/forge/index.ts';
-import type { StepCtx, UnitCtx } from '../../conductor/run/run.types.ts';
 import { presetOf } from '../../conductor/scenario/index.ts';
-import { CREATED, openFresh, SOLO_UNIT } from '../../journal/__fixtures__/journal-harness.ts';
-import { readJournalLines } from '../../journal/read-lines.ts';
-import type { LiveTask } from '../../journal/resume.ts';
+import { SOLO_UNIT } from '../../journal/__fixtures__/journal-harness.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
+import { REAL_PUBLISH_TIMEOUT_MS } from '../guard-wiring/__fixtures__/guard-stand.ts';
 import {
-  guardStand,
-  REAL_PUBLISH_TIMEOUT_MS,
-  type GuardStand,
-} from '../guard-wiring/__fixtures__/guard-stand.ts';
-import { createPublishWiring, type PublishWiring } from './index.ts';
+  closePublishStands,
+  composed,
+  publishStand as stand,
+} from './__fixtures__/publish-stand.ts';
 
-/**
- * Публикатор на настоящем пути: основной репозиторий, копия-worktree единицы, голый «сервер» во
- * временной папке и заглушка форжа на loopback (настоящий порт GitLab ядра). Ни настоящего
- * удалённого, ни настоящего форжа; слияния и одобрения нет нигде.
- */
+/** Стенд — `__fixtures__/publish-stand.ts` (общий с пробой сдачи). */
+
+afterEach(closePublishStands);
 
 const SCENARIO = { id: 'feature', version: 1 } as const;
-const PUBLISH = presetOf(SCENARIO)!.steps.find((s) => s.kind === 'publish') as StepDef;
-
-interface Stand {
-  st: GuardStand;
-  task: LiveTask;
-  stub: StubForge;
-  wiring: PublishWiring;
-  u: UnitCtx;
-  s: StepCtx;
-  lines(kind: string): Record<string, unknown>[];
-}
-
-const open: Stand[] = [];
-afterEach(async () => {
-  for (const one of open.splice(0)) {
-    one.task.close();
-    await one.stub.stop();
-    one.st.remove();
-  }
-});
-
-async function stand(scenario?: StubScenario, ciWait = false): Promise<Stand> {
-  const unitId = newId();
-  const branch = `agentdeck/${unitId.slice(0, 8)}`;
-  const st = guardStand(branch);
-  const stub = await startStubForge({ repo: st.bare, ...(scenario ? { scenario } : {}) });
-  const { task } = await openFresh();
-  task.append({
-    kind: 'task.created',
-    actor: 'core',
-    data: {
-      ...CREATED,
-      title: 'Add the feature file',
-      repos: [{ repoKey: 'r1', path: st.main, baseRef: 'main' }],
-      scenario: SCENARIO,
-      ciWait,
-    },
-  });
-  task.append({
-    kind: 'unit.created',
-    actor: 'core',
-    unitId,
-    data: { unitId, repoKey: 'r1', branch, ownedPaths: [], ...SOLO_UNIT },
-  });
-  task.append({
-    kind: 'resource.created',
-    actor: 'core',
-    unitId,
-    data: {
-      rid: newId(),
-      kind: 'copy',
-      owner: 'core',
-      release: 'unit-end',
-      ref: JSON.stringify({ worktree: st.copy, repo: st.main }),
-    },
-  });
-  const port = createForgePort({
-    project: { kind: 'gitlab', ref: '101', baseUrl: stub.url, pushUrl: st.bare },
-    token: stub.tokens['publisher']!,
-    fetch: globalThis.fetch,
-  });
-  const env = {
-    ...st.env,
-    GIT_AUTHOR_NAME: 't',
-    GIT_AUTHOR_EMAIL: 't@t',
-    GIT_COMMITTER_NAME: 't',
-    GIT_COMMITTER_EMAIL: 't@t',
-  };
-  const wiring = createPublishWiring(
-    {
-      registry: { live: (id: string) => (id === task.taskId ? task : undefined) } as never,
-      coreHome: join(st.root, 'core-home'),
-      scenariosDir: join(st.root, 'scenarios'),
-      note: () => undefined,
-    },
-    { git: { env }, forgeFor: () => ({ port, credential: null }) },
-  );
-  const u: UnitCtx = { taskId: task.taskId, unitId, repoKey: 'r1', copyDir: st.copy };
-  const s: StepCtx = { ...u, stepId: newId(), def: PUBLISH, round: 0, sessionId: null };
-  const one: Stand = {
-    st,
-    task,
-    stub,
-    wiring,
-    u,
-    s,
-    lines: (kind) =>
-      readJournalLines(task.dir, task.taskId)
-        .lines.filter((l) => l.kind === kind)
-        .map((l) => l.data as Record<string, unknown>),
-  };
-  open.push(one);
-  return one;
-}
 
 const OK = { verdict: { ok: true as const }, compositionId: null as string | null };
-
-async function composed(one: Stand): Promise<string> {
-  writeFileSync(join(one.st.copy, 'feature.txt'), 'feature\n');
-  const compositionId = newId();
-  const got = await one.wiring.hooks.onFinalGate!(one.u, { ...OK, compositionId });
-  expect(got).toEqual({ verdict: { ok: true }, compositionId });
-  return compositionId;
-}
 
 describe('publish wiring', { timeout: REAL_PUBLISH_TIMEOUT_MS }, () => {
   it('composes the gated worktree, pushes, takes the MR id from the forge, reads threads once', async () => {

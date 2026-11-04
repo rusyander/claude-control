@@ -45,10 +45,10 @@ describe('PermissionBroker', () => {
 
   it('list — висящие запросы с видом и моментом, решённый уходит из списка', () => {
     void broker.request(REQ());
-    void broker.request(REQ({ runId: 'c2', toolUseId: 'g1', kind: 'branchGate' }));
+    void broker.request(REQ({ runId: 'c2', toolUseId: 'g1', toolName: 'Edit' }));
     expect(broker.list()).toEqual([
       expect.objectContaining({ runId: 'c1', toolUseId: 'tool-1', toolName: 'Bash' }),
-      expect.objectContaining({ runId: 'c2', toolUseId: 'g1', kind: 'branchGate' }),
+      expect.objectContaining({ runId: 'c2', toolUseId: 'g1', toolName: 'Edit' }),
     ]);
     expect(Number.isNaN(Date.parse(broker.list()[0]?.askedAt ?? ''))).toBe(false);
     broker.decide('c1', 'tool-1', { behavior: 'allow' });

@@ -35,7 +35,6 @@ export const SIGNATURE_NONCE_TTL_MS = 10 * 60_000;
 export const SIGNED_DECISION_ROUTES = [
   'POST /api/chat/deferred/:id/decision',
   'POST /api/chat/:chatId/permission-decision',
-  'POST /api/chat/:chatId/branch-decision',
   'POST /api/chat/:chatId/auto-approve',
   'POST /api/outside/asks/:id/answer',
   'POST /api/provider-chat/chats/:id/permissions/:askId',
@@ -72,8 +71,6 @@ export function signatureClass(route: string, body: unknown): SignatureClass {
       return field(body, 'behavior') === 'deny' && field(body, 'answers') === undefined
         ? 'free'
         : 'signed';
-    case 'POST /api/chat/:chatId/branch-decision':
-      return field(body, 'choice') === 'stop' ? 'free' : 'signed';
     case 'POST /api/chat/:chatId/auto-approve':
       return field(body, 'enabled') === true ? 'signed' : 'free';
     case 'POST /api/provider-chat/chats/:id/permissions/:askId':

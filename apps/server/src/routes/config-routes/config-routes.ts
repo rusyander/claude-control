@@ -2,8 +2,6 @@ import { homedir } from 'node:os';
 import { existsSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import type { AppSettings, Overview, ProviderDetectResponse } from '@agentdeck/contracts';
-import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
-import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import {
   settingsPatchSchema,
   importStateSchema,
@@ -37,12 +35,12 @@ import {
 import { basename } from 'node:path';
 import { issuesOf } from '../../lib/request-body.ts';
 import { codeOf } from '../../lib/server-text/server-text.ts';
-import { runLegacyGroupMigrations } from '../../domains/groups/legacy-migrations.ts';
+import { cancelHalfRunPlans } from '../../domains/groups/legacy-runs/cancel-half-run.ts';
+import { deferredAsksOf } from '../chat/deferred-routes/deferred-store.ts';
 import { runLocalFullLayer } from '../../domains/local-models/full-layer.ts';
 import { migrateLegacyIntegrations } from '@agentdeck/contracts/integrations-legacy';
 import type { CredentialsLookup } from '../../lib/credentials/credentials.ts';
 import { machineId, machineName } from '../../lib/machine-identity/machine-identity.ts';
-import { compactWindowOf } from '../../domains/chat/group-profile/group-profile.ts';
 import { humanOnly } from '../chat/human-only/human-only.ts';
 import { humanOnlyDepsFor } from '../chat/human-only/human-only-deps.ts';
 
@@ -57,12 +55,13 @@ function credentialsReply(found: CredentialsLookup) {
 }
 
 /**
- * После смены каталога на лету: у нового каталога свой state.json, и перенос
- * старого «Порядка работы» в путь, который на старте делает onReady, нужен и ему.
+ * После смены каталога на лету: у нового каталога свой state.json, и разовая отмена
+ * недоведённых прежних групп, которую на старте делает сборка, нужна и ему.
  */
 function afterRelocate(app: FastifyInstance, ctx: ServerContext): void {
-  const deps = { paths: ctx.location.paths, store: ctx.store, backupDir: ctx.backupDir };
-  runLegacyGroupMigrations(deps, app.log);
+  const cancelled = cancelHalfRunPlans(ctx.store, new Date().toISOString(), deferredAsksOf(ctx));
+  if (cancelled.plans.length + cancelled.asks.length > 0)
+    app.log.warn({ cancelled }, 'legacy groups: half-run plans cancelled');
   // И перевод локального контура на полный набор (L6): отметка у каждого каталога своя.
   try {
     runLocalFullLayer(ctx.store, ctx.location.paths.appData, (outcome) =>
@@ -163,9 +162,6 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
     // узнаёт её по номеру, даже когда адрес сменился.
     machineName: machineName(),
     machineId: machineId(),
-    // Переменная панели сильнее рычага порога сжатия групп (F-19 ревью П1): без
-    // этого поля карточка показывала выбранный порог, а группы шли с другим.
-    groupCompactWindowEnv: compactWindowOf(process.env.AGENTDECK_GROUP_COMPACT_WINDOW) ?? null,
   }));
 
   // Настройки прав (авторежим, правила автоподтверждения, срок D-n) меняет
@@ -205,7 +201,7 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
         });
       }
 
-      const { claudeDirOverride, groupEconomy, groupWatch, ...rest } = parsed.data;
+      const { claudeDirOverride, ...rest } = parsed.data;
       const patch: Partial<AppSettings> = { ...rest };
       // Контур, приехавший с панели ДО Т3, поля потребителей не знает, а схема
       // подставила ему пустой список — то есть «никуда не подключён». Возвращаем
@@ -236,15 +232,6 @@ export function registerConfigRoutes(app: FastifyInstance, ctx: ServerContext): 
         }
         ctx.rememberDirOverride(claudeDirOverride);
         if (result.isValid) afterRelocate(app, ctx);
-      }
-      // Блоки экономии и сторожа групп приходят изменёнными ключами — сливаем с
-      // сохранённым. После переезда: сохранённое — в хранилище нового каталога.
-      const saved = ctx.store.getSettings();
-      if (groupEconomy) {
-        patch.groupEconomy = { ...GROUP_ECONOMY_DEFAULTS, ...saved.groupEconomy, ...groupEconomy };
-      }
-      if (groupWatch) {
-        patch.groupWatch = { ...GROUP_WATCH_DEFAULTS, ...saved.groupWatch, ...groupWatch };
       }
       const settings = ctx.store.updateSettings(patch);
       // Глубина ротации копий действует сразу для следующих записей.

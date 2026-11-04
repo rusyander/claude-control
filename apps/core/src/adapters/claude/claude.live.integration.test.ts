@@ -1,9 +1,10 @@
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { claudeRunFacts } from '@agentdeck/providers/claude';
+import { sessionStreamEventSchema } from '@agentdeck/contracts/core/session-stream';
 import { startStubModel, type StubModel } from '@agentdeck/stub-model';
 import { hasCli } from '../../stub-tasks/__fixtures__/e2e/stand.ts';
 import {
@@ -16,6 +17,8 @@ import {
   readJsonLines,
   type LiveRoot,
 } from '../conformance/__fixtures__/live.ts';
+import type { AdapterEvent } from '../adapter.types.ts';
+import { replaySession } from '../sdk-stream/stream-view.ts';
 import { CLAUDE_CHANNELS, createClaudeAdapter } from './claude.ts';
 import { claudeConfigDir } from './user-layer.ts';
 
@@ -47,28 +50,44 @@ async function oneTurn(
   baseUrl: string,
   pinExtra: Record<string, string> = {},
 ): Promise<string> {
+  return (await oneTurnRun(live, baseUrl, pinExtra)).text;
+}
+
+/**
+ * Тот же ход — с каталогом сеанса (`stdout.log` для вида сеанса) и событиями насоса.
+ * `subscription` — дорога подписки: адрес не привязан, CLI входит своей учёткой из окружения.
+ */
+async function oneTurnRun(
+  live: LiveRoot,
+  baseUrl: string,
+  pinExtra: Record<string, string> = {},
+  subscription = false,
+): Promise<{ text: string; dir: string; seen: readonly AdapterEvent[] }> {
   const adapter = createClaudeAdapter();
-  const launched = await adapter.launch(
-    liveSpec(live, {
-      endpoint: {
-        channel: CLAUDE_CHANNELS[0]!,
-        endpoint: {
-          baseUrl,
-          dialect: 'anthropic-messages',
-          model: 'stub-model',
-          key: 'BOUND-ROUTE-TOKEN',
-        },
-      },
-      coreHook: hookCommand('core', live.logs.core),
-      env: { pin: livePin(live, pinExtra) },
-    }),
-  );
+  const spec = liveSpec(live, {
+    ...(subscription
+      ? {}
+      : {
+          endpoint: {
+            channel: CLAUDE_CHANNELS[0]!,
+            endpoint: {
+              baseUrl,
+              dialect: 'anthropic-messages',
+              model: 'stub-model',
+              key: 'BOUND-ROUTE-TOKEN',
+            },
+          },
+        }),
+    coreHook: hookCommand('core', live.logs.core),
+    env: { pin: livePin(live, pinExtra) },
+  });
+  const launched = await adapter.launch(spec);
   if (!launched.ok) throw new Error(launched.reason);
   const tap = new EventTap(adapter, launched.handle);
   try {
     await adapter.send(launched.handle, 'run the probe', 'cmd-live-1');
     const ended = await tap.until((e) => e.type === 'turn.ended', 120_000);
-    return ended.type === 'turn.ended' ? ended.text : '';
+    return { text: ended.type === 'turn.ended' ? ended.text : '', dir: spec.dir, seen: tap.seen };
   } finally {
     await adapter.stop(launched.handle, 'soft');
   }
@@ -110,6 +129,59 @@ describe.skipIf(!present)('claude adapter on the real CLI — the binding holds 
     // CLI хранит своё там же, где ядро ищет слой человека и ставит запрет правки (claudeConfigDir).
     expect(existsSync(join(claudeConfigDir(pin), 'projects'))).toBe(true);
     expect(existsSync(join(otherHome, '.claude'))).toBe(false);
+  }, 180_000);
+
+  // Проход 8: окно подписки шло только судье экономии ядра, вид сеанса его ронял — доля лимита
+  // у чата панели (`limit-journal`) для хода ядра не росла. Заголовки окна ставит заглушка, строку
+  // `rate_limit_event` пишет сам CLI, вид читает её из `stdout.log` нормализатором переходника.
+  it('the subscription window the CLI reports reaches the session view as a typed window event', async () => {
+    const live = liveRoot('claude-window-');
+    roots.push(live);
+    const resetsAt = Math.floor(Date.now() / 1000) + 3600;
+    const stub = await startStubModel({
+      script: () => ({
+        text: 'WINDOW_MARKER',
+        window: { utilization: 0.92, resetsAt, status: 'allowed_warning', claim: 'five_hour' },
+      }),
+    });
+    stubs.push(stub);
+    const run = await oneTurnRun(
+      live,
+      stub.baseUrl,
+      {
+        // Окно подписки CLI пишет только входу подписки: учётка — метка, адрес — заглушка,
+        // всё мимо петли — в мёртвый прокси (метка не уходит наружу).
+        CLAUDE_CODE_OAUTH_TOKEN: 'FAKE-VENDOR-OAUTH',
+        ANTHROPIC_BASE_URL: stub.baseUrl,
+        ANTHROPIC_MODEL: 'stub-model',
+        HTTPS_PROXY: 'http://127.0.0.1:9',
+        HTTP_PROXY: 'http://127.0.0.1:9',
+        NO_PROXY: '127.0.0.1,localhost',
+      },
+      true,
+    );
+    expect(run.text).toBe('WINDOW_MARKER');
+    const page = replaySession(run.dir, createClaudeAdapter().streamNormaliser!(run.dir), 0);
+    const windows = page.events.filter((e) => e.kind === 'window');
+    const said = readFileSync(join(run.dir, 'stdout.log'), 'utf8')
+      .split('\n')
+      .filter((l) => l.includes('"rate_limit_event"'));
+    // CLI сказал окно (строка в выводе) — и вид её не уронил: событий окна столько же.
+    expect(said.length, page.events.map((e) => e.kind).join(',')).toBeGreaterThan(0);
+    expect(windows, said.join('\n')).toHaveLength(said.length);
+    for (const event of windows) {
+      expect(sessionStreamEventSchema.parse(event)).toEqual(event);
+      expect(event.data).toEqual({
+        limitKind: 'window',
+        usedPct: 92,
+        resetAt: resetsAt * 1000,
+        status: 'allowed_warning',
+        window: 'five_hour',
+        windows: { five_hour: { usedPct: 92, resetAt: resetsAt * 1000 } },
+      });
+    }
+    // Живой насос отдал ядру то же окно — вид не выдумывает его сам.
+    expect(run.seen.some((e) => e.type === 'window' && e.usedPct === 92)).toBe(true);
   }, 180_000);
 
   it('F-07: env in the repo settings cannot move the session to its own endpoint', async () => {

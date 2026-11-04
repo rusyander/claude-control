@@ -9,7 +9,7 @@ import type { PermitContext } from './permit.types.ts';
 
 /**
  * Чтение и поиск (06 §Session permissions; область чтения — решение владельца 28.10, F-87).
- * Порядок: несводимое → свой временный каталог → путь платформы и его предок → источник адреса →
+ * Порядок: несводимое → свой временный каталог и копии вложений задачи → путь платформы и его предок → источник адреса →
  * учётные данные CLI и их предок → область (копия, корни платформы и слоя, список человека) →
  * иначе `outside-copy`. Запреты стоят раньше области: путь платформы или файл учётных данных
  * внутри разрешённого каталога остаётся закрытым. Сравнение — по ключам пути (`isInside`):
@@ -26,6 +26,17 @@ function insideOwnTemp(paths: FoldedPaths, abs: string, searched: string): boole
   const temp = paths.ownTemp;
   if (temp === undefined || ancestorOfAny(temp, paths.platformPaths)) return false;
   return isInside(temp, abs) && isInside(temp, searched);
+}
+
+/**
+ * Копии вложений задачи (s10 G11): каталог этой задачи рядом с домом ядра (`attachmentsHome`,
+ * `agentdeck-attachments/<имя дома>/<taskId>/`, вне запрета оверлея CLI). Открыт на условиях своего временного каталога — только
+ * если в нём нет ни одного пути платформы, и только под ним самим: соседняя задача — вне области.
+ */
+function insideAttachments(paths: FoldedPaths, abs: string, searched: string): boolean {
+  const root = paths.attachments;
+  if (root === undefined || ancestorOfAny(root, paths.platformPaths)) return false;
+  return isInside(root, abs) && isInside(root, searched);
 }
 
 function inScope(roots: readonly string[], abs: string, searched: string): boolean {
@@ -62,6 +73,13 @@ function judgePath(paths: FoldedPaths, abs: string, searched: string): ReadVerdi
   // Свой временный каталог сеанса (TMPDIR CLI) — в доме ядра, но токенов в нём нет.
   if (insideOwnTemp(paths, abs, searched)) {
     return { allow: true, signal: null, reason: 'read inside the session temp dir' };
+  }
+  if (insideAttachments(paths, abs, searched)) {
+    return {
+      allow: true,
+      signal: null,
+      reason: "read of the human's attachment copy of this task",
+    };
   }
   if (underAny(abs, paths.platformPaths) || underAny(searched, paths.platformPaths)) {
     return deny('platform-path', 'core home and token files are never readable', null);

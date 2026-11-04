@@ -1,4 +1,4 @@
-import type { HopUpstreamAuth } from '@agentdeck/contracts/core/hops';
+import type { HopRequestRules, HopUpstreamAuth } from '@agentdeck/contracts/core/hops';
 import type { Dialect, KeyRef, Route, RouteEndpoint } from '@agentdeck/contracts/core/routes';
 import {
   platformDeclaresAnonymization,
@@ -27,6 +27,7 @@ import {
   gatewayRouteId,
 } from '../routes/gateway/gateway.ts';
 import { vendorProfiles } from '../routes/api-key/vendor-profiles.ts';
+import { contourRequestRules } from '../routes/gateway/contour-rules.ts';
 import type { GatewayProfile } from '../routes/gateway/gateway.types.ts';
 import { hopStatus, probeRoute } from '../routes/hops/hops.ts';
 import type { KeyPresencePort } from './economy-wiring/r.ts';
@@ -63,6 +64,8 @@ export interface RouteHopFacts {
   upstreamRooted: boolean;
   /** Пресет ⊕ карточка (`HopRegisterSpec.manifest`); `null` — маршрут не контура. */
   manifest: PlatformManifestOverrides | null;
+  /** Управляемые правила контура в полях провода (`contourRequestRules`); `null` — не контур. */
+  requestRules: HopRequestRules | null;
 }
 
 const storeRef = (storeId: string): KeyRef => ({ kind: 'panel-store', name: storeId });
@@ -91,7 +94,10 @@ const origin = (baseUrl: string): string => baseUrl.trim().replace(/\/+$/, '');
  * Корень API контура тем же правилом, что у панели (`platformRequestUrl`: версия `auto`/`as-is`),
  * без строки запроса: параметры адреса и настройки звено ставит само (`upstreamQuery`).
  */
-function contourRoot(contour: GatewayProfile): { root: string; query: Record<string, string> } {
+export function contourRoot(contour: GatewayProfile): {
+  root: string;
+  query: Record<string, string>;
+} {
   const built = platformRequestUrl(contour.baseUrl, { ...contour.transport, query: '' }, '');
   if (built === undefined) return { root: origin(contour.baseUrl), query: {} };
   const url = new URL(built);
@@ -206,6 +212,7 @@ export function routeHopFacts(profiles: PanelProfiles, routeId: string): RouteHo
       upstreamQuery: contourRoot(contour).query,
       upstreamRooted: true,
       manifest: contourManifest(contour),
+      requestRules: contourRequestRules(contour, profiles.forceStream),
     };
   }
   const endpoint = [...vendorProfiles(), ...profiles.endpoints].find((e) => e.routeId === routeId);
@@ -218,5 +225,6 @@ export function routeHopFacts(profiles: PanelProfiles, routeId: string): RouteHo
     // `openai-compat` профиля — адрес вместе с версией (`endpointProfileSchema.baseUrl`).
     upstreamRooted: endpoint?.apiKind === 'openai-compat',
     manifest: null,
+    requestRules: null,
   };
 }

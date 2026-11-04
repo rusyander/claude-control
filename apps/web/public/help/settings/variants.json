@@ -317,18 +317,18 @@
       },
       "light-en": {
         "file": "03-chat.en.png",
-        "width": 584,
-        "height": 248
+        "width": 563,
+        "height": 186
       },
       "dark-ru": {
         "file": "03-chat.dark.png",
         "width": 584,
-        "height": 248
+        "height": 229
       },
       "dark-en": {
         "file": "03-chat.dark.en.png",
-        "width": 563,
-        "height": 186
+        "width": 584,
+        "height": 248
       }
     },
     "mascot/04-settings": {
@@ -401,22 +401,22 @@
       "light-ru": {
         "file": "02-backups.png",
         "width": 1116,
-        "height": 304
+        "height": 350
       },
       "light-en": {
         "file": "02-backups.en.png",
         "width": 1116,
-        "height": 284
+        "height": 330
       },
       "dark-ru": {
         "file": "02-backups.dark.png",
         "width": 1116,
-        "height": 304
+        "height": 350
       },
       "dark-en": {
         "file": "02-backups.dark.en.png",
         "width": 1116,
-        "height": 284
+        "height": 330
       }
     },
     "safety/03-encrypt": {

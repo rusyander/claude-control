@@ -3,15 +3,13 @@
  *
  * Человек спрашивал «на каком этапе группа, работает ли она» и открывал каждый
  * чат. Теперь у карточки группы: состояние и сколько оно длится (работает /
- * ждёт очередь / ждёт разрешения / стоит / закончила), полоса «сделано из
- * скольких» с процентом и вызов, которым группа занята, с его временем.
+ * ждёт разрешения / стоит), полоса «сделано из скольких» с процентом и вызов,
+ * которым группа занята, с его временем.
  *
- * Пять групп — по одной на состояние:
+ * Три группы — по одной на состояние:
  * 1. «Вход» идёт: файл шагов 8 из 14 → полоса 7 из 14 · 50 %, вызов Bash виден.
- * 2. «Отчёты» идёт, но её тяжёлая команда стоит в очереди: «ждёт очередь · впереди 2».
- * 3. «Схема» стоит на запросе прав (кадр `permission` в потоке прогона).
- * 4. «Импорт» не идёт и не доставлена: «стоит», вызов НЕ показан.
- * 5. «Доки» доставлена: «закончила», полоса 14 из 14 · 100 %.
+ * 2. «Схема» стоит на запросе прав (кадр `permission` в потоке прогона).
+ * 3. «Импорт» не идёт: «стоит», вызов НЕ показан.
  *
  * Данные подменяются целиком: ни копий, ни прогонов проверка не заводит.
  *
@@ -35,7 +33,6 @@ const GROUPS = [
     index: 0,
     title: 'Вход',
     branch: 'feature/login',
-    status: 'started',
     run: 'running',
     progress: {
       tasks: [],
@@ -45,24 +42,9 @@ const GROUPS = [
     },
   },
   {
-    index: 1,
-    title: 'Отчёты',
-    branch: 'feature/reports',
-    status: 'started',
-    run: 'running',
-    progress: {
-      tasks: [],
-      agents: [],
-      steps: { current: 3, total: 10, title: 'Сборка' },
-      activeTool: { name: 'Bash', summary: 'pnpm build', startedAt: ago(1.5 * MIN) },
-      heavyQueue: { since: ago(1.5 * MIN), ahead: 2, command: 'pnpm build' },
-    },
-  },
-  {
     index: 2,
     title: 'Схема',
     branch: 'feature/schema',
-    status: 'started',
     run: 'permission',
     progress: {
       tasks: [],
@@ -75,7 +57,6 @@ const GROUPS = [
     index: 3,
     title: 'Импорт',
     branch: 'feature/import',
-    status: 'awaiting',
     progress: {
       tasks: [
         { text: 'Разбор', status: 'completed' },
@@ -89,19 +70,10 @@ const GROUPS = [
       activeTool: { name: 'Bash', summary: 'sleep 600', startedAt: ago(30 * MIN) },
     },
   },
-  {
-    index: 4,
-    title: 'Доки',
-    branch: 'feature/docs',
-    status: 'done',
-    mr: 14,
-    progress: { tasks: [], agents: [], steps: { current: 14, total: 14, title: 'Готово' } },
-  },
 ];
 
 const chatIdOf = (group) => `qa-progress-${group.index}`;
 const copyOf = (group) => `${PROJECT.path}-worktrees/${group.branch.replace(/\//g, '-')}`;
-const mrOf = (id) => `https://gitlab.example.com/proj/app/-/merge_requests/${id}`;
 
 const chat = (id, extra) => ({
   id,
@@ -134,34 +106,6 @@ const chats = [
     }),
   ),
 ];
-
-const split = () => ({
-  parentChatId: PARENT,
-  order: GROUPS.map((group) => group.index),
-  groups: GROUPS.map((group) => ({
-    index: group.index,
-    title: group.title,
-    branch: group.branch,
-    after: [],
-    chatId: chatIdOf(group),
-    path: copyOf(group),
-    seated: true,
-    deliver: true,
-    status: group.status,
-    ...(group.mr ? { mr: mrOf(group.mr) } : {}),
-    ...(group.status === 'done' ? { result: { kind: 'pushed', commits: 1 } } : {}),
-    // Отметки «с отметкой» стоящей группы: повторы и вызовы MCP (карточка 28, 20.10).
-    ...(group.title === 'Импорт'
-      ? {
-          autoNotices: [
-            ...[1, 2, 3].map(() => notice('mcp__tracker__jira_assign_issue')),
-            notice('pnpm build'),
-          ],
-        }
-      : {}),
-  })),
-});
-const notice = (summary) => ({ at: ago(5 * MIN), summary });
 
 const browser = await chromium.launch();
 const page = await browser.newPage({
@@ -217,7 +161,6 @@ await page.route('**/api/chat/*/tree', (route) =>
     json: {
       root: PARENT,
       running: 0,
-      split: split(),
       nodes: chats
         .filter((item) => item.parentId)
         .map((item) => ({
@@ -237,7 +180,7 @@ await page.route('**/api/chats/*/messages*', (route) =>
         {
           id: 'm-1',
           role: 'assistant',
-          blocks: [{ type: 'text', text: 'Разделил задачи на пять групп.' }],
+          blocks: [{ type: 'text', text: 'Разделил задачи на три группы.' }],
           timestamp: ago(40 * MIN),
         },
       ],
@@ -253,7 +196,7 @@ await page.route('**/api/chat/*/progress*', (route) => {
   return route.fulfill({ json: group?.progress ?? { tasks: [], agents: [] } });
 });
 await page.route('**/api/chat/*/artifacts*', (route) => route.fulfill({ json: [] }));
-// Идут три группы; одна из них стоит на запросе прав — его несёт поток прогона.
+// Идут две группы; одна из них стоит на запросе прав — его несёт поток прогона.
 const live = GROUPS.filter((group) => group.run);
 await page.route('**/api/chat/active', (route) =>
   route.fulfill({
@@ -351,11 +294,8 @@ const expectations = [
     // С начала хода (10 мин), а не с заведения чата (42 мин) — карточка 29, 20.10.
     [/работает · 10м \d\dс/, /7 из 14 · 50 %/, /Bash: pnpm test · 3м \d\dс/],
   ],
-  ['Отчёты', 'queued', '20', [/ждёт очередь · 1м \d\dс · впереди 2/, /2 из 10 · 20 %/]],
   ['Схема', 'permission', '79', [/ждёт разрешения · 4м \d\dс/, /Bash: git push origin main/]],
   ['Импорт', 'stalled', '50', [/стоит · 2м \d\dс/, /3 из 6 · 50 %/]],
-  // Закончившей — «2 мин назад», без тикающих секунд (владелец 20.10).
-  ['Доки', 'finished', '100', [/закончила · 2 мин назад/, /14 из 14 · 100 %/]],
 ];
 for (const [title, state, bar, texts] of expectations) {
   const seen = await stateOf(title);
@@ -369,10 +309,6 @@ for (const [title, state, bar, texts] of expectations) {
 }
 const imports = await textIn('Импорт');
 check(!imports.includes('sleep 600'), 'у стоящей группы незакрытый вызов не показан');
-check(
-  imports.includes('Разрешено автоматически: tracker: jira_assign_issue ×3; pnpm build'),
-  `«Импорт»: отметки сведены в «×N» под сервером MCP — «${imports.slice(0, 240)}»`,
-);
 
 check(errors.length === 0, errors.length === 0 ? 'ошибок консоли нет' : errors.join(' | '));
 await browser.close();

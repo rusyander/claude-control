@@ -9,31 +9,47 @@
       "masked": 1,
       "width": 988,
       "height": 745,
-      "shotAt": "2026-11-01T17:06:50.504Z",
+      "shotAt": "2026-11-03T18:55:12.117Z",
       "text": "Задача Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Оценить",
       "en": {
         "file": "01-form.en.png",
         "masked": 1,
         "width": 988,
         "height": 745,
-        "shotAt": "2026-11-01T17:07:21.186Z",
-        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate"
+        "shotAt": "2026-11-03T18:55:45.313Z",
+        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Bug fix New feature Refactoring Review only Tracker ticket Reviewer replies A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate",
+        "seal": {
+          "png": "3e1382c0d82ba7a5",
+          "text": "e97d8b9bdf8f1a5f"
+        }
       },
       "dark": {
         "file": "01-form.dark.png",
         "masked": 1,
         "width": 988,
         "height": 745,
-        "shotAt": "2026-11-01T17:08:02.502Z",
-        "text": "Задача Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Оценить"
+        "shotAt": "2026-11-03T18:56:24.433Z",
+        "text": "Задача Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Оценить",
+        "seal": {
+          "png": "e1d281c7d30354f0",
+          "text": "0d2020d656094ecc"
+        }
       },
       "darkEn": {
         "file": "01-form.dark.en.png",
         "masked": 1,
         "width": 988,
         "height": 745,
-        "shotAt": "2026-11-01T17:08:38.725Z",
-        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate"
+        "shotAt": "2026-11-03T18:57:12.163Z",
+        "text": "Task Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Bug fix New feature Refactoring Review only Tracker ticket Reviewer replies A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Estimate",
+        "seal": {
+          "png": "2aa67fececcac4a9",
+          "text": "e97d8b9bdf8f1a5f"
+        }
+      },
+      "seal": {
+        "png": "6f6dff290c0f1288",
+        "text": "0d2020d656094ecc"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 5,
       "width": 988,
       "height": 208,
-      "shotAt": "2026-11-01T17:06:55.056Z",
-      "text": "Оценка Оценивается Задача 01a19814-0800-7000-bf65-7ef3ada8e68c Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает",
+      "shotAt": "2026-11-03T18:55:18.158Z",
+      "text": "Оценка Оценивается Задача 01a1a2c3-f9a8-7000-a8d1-e503d4093d75 Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает",
       "en": {
         "file": "02-estimate.en.png",
         "masked": 5,
         "width": 988,
         "height": 208,
-        "shotAt": "2026-11-01T17:07:31.873Z",
-        "text": "Estimate Estimating Task 01a19814-82e5-7000-a1b3-55770682632e Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers"
+        "shotAt": "2026-11-03T18:55:52.938Z",
+        "text": "Estimate Estimating Task 01a1a2c4-780f-7000-bf5f-d3697da794b8 Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers",
+        "seal": {
+          "png": "82626fb9d8148d17",
+          "text": "e059aa9b0498ad0c"
+        }
       },
       "dark": {
         "file": "02-estimate.dark.png",
         "masked": 5,
         "width": 988,
         "height": 208,
-        "shotAt": "2026-11-01T17:08:14.887Z",
-        "text": "Оценка Оценивается Задача 01a19815-24b2-7000-ac2c-2773e0d90f26 Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает"
+        "shotAt": "2026-11-03T18:56:32.573Z",
+        "text": "Оценка Оценивается Задача 01a1a2c5-119e-7000-a68c-95f74e28928e Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает",
+        "seal": {
+          "png": "2e05889b3e1891bb",
+          "text": "13a8572dbe61277e"
+        }
       },
       "darkEn": {
         "file": "02-estimate.dark.en.png",
         "masked": 5,
         "width": 988,
         "height": 208,
-        "shotAt": "2026-11-01T17:08:47.403Z",
-        "text": "Estimate Estimating Task 01a19815-b141-7000-841f-e64482698235 Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers"
+        "shotAt": "2026-11-03T18:57:19.786Z",
+        "text": "Estimate Estimating Task 01a1a2c5-cce1-7000-ada6-e3449f5cf0f3 Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers",
+        "seal": {
+          "png": "55708036a84dfe87",
+          "text": "c37cf6c7387fb429"
+        }
+      },
+      "seal": {
+        "png": "d05897baa1b955ba",
+        "text": "bdcc14089aa9b826"
       }
     },
     {
@@ -77,65 +109,97 @@
       "masked": 1,
       "width": 988,
       "height": 1209,
-      "shotAt": "2026-11-01T17:06:55.662Z",
-      "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload ••••••••••••, endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 1022.0 GB ram в порядке free memory 20.3 GB ports в порядке loopback bind ok (61335) repo-access в порядке ok git-version в порядке git 2.55.0",
+      "shotAt": "2026-11-03T18:55:18.784Z",
+      "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload •••••••••••• endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 995.6 GB ram в порядке free memory 29.0 GB ports в порядке loopback bind ok (62352) repo-access в порядке ok git-version в порядке git 2.55.0",
       "en": {
         "file": "03-roads.en.png",
         "masked": 1,
         "width": 988,
         "height": 1209,
-        "shotAt": "2026-11-01T17:07:32.492Z",
-        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload ••••••••••••, endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 1022.0 GB ram fine free memory 18.6 GB ports fine loopback bind ok (62661) repo-access fine ok git-version fine git 2.55.0"
+        "shotAt": "2026-11-03T18:55:53.553Z",
+        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload •••••••••••• endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 995.6 GB ram fine free memory 29.1 GB ports fine loopback bind ok (60441) repo-access fine ok git-version fine git 2.55.0",
+        "seal": {
+          "png": "0ca677fcd020e8ef",
+          "text": "d89ae7688b1ae423"
+        }
       },
       "dark": {
         "file": "03-roads.dark.png",
         "masked": 1,
         "width": 988,
         "height": 1209,
-        "shotAt": "2026-11-01T17:08:15.505Z",
-        "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload ••••••••••••, endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 1021.9 GB ram в порядке free memory 20.2 GB ports в порядке loopback bind ok (53422) repo-access в порядке ok git-version в порядке git 2.55.0"
+        "shotAt": "2026-11-03T18:56:33.197Z",
+        "text": "Проверка дорог cli в порядке claude найден •••••••••••• qwen найден •••••••••••• route в порядке cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp в порядке •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture в порядке preload •••••••••••• endpoint registered push-closure не проверялась arrives with publish (05) ls-remote в порядке task has no remotes forge-read не проверялась arrives with publish (05) container-engine не проверялась profile needs no services disk в порядке free disk 995.6 GB ram в порядке free memory 29.0 GB ports в порядке loopback bind ok (65170) repo-access в порядке ok git-version в порядке git 2.55.0",
+        "seal": {
+          "png": "0e94087443d7455f",
+          "text": "76c60d0ab76cc309"
+        }
       },
       "darkEn": {
         "file": "03-roads.dark.en.png",
         "masked": 1,
         "width": 988,
         "height": 1209,
-        "shotAt": "2026-11-01T17:08:48.034Z",
-        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload ••••••••••••, endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 1021.9 GB ram fine free memory 22.1 GB ports fine loopback bind ok (52386) repo-access fine ok git-version fine git 2.55.0"
+        "shotAt": "2026-11-03T18:57:20.386Z",
+        "text": "Road check cli fine claude found •••••••••••• qwen found •••••••••••• route fine cli-login:claude (cli-login); cli-login:qwen (cli-login) core-mcp fine •••••••••••• --experimental-strip-types --no-warnings •••••••••••• agentdeck capture fine preload •••••••••••• endpoint registered push-closure not checked arrives with publish (05) ls-remote fine task has no remotes forge-read not checked arrives with publish (05) container-engine not checked profile needs no services disk fine free disk 995.6 GB ram fine free memory 28.9 GB ports fine loopback bind ok (53678) repo-access fine ok git-version fine git 2.55.0",
+        "seal": {
+          "png": "8d5b4afe896142cb",
+          "text": "0a9a79df97b72bd7"
+        }
+      },
+      "seal": {
+        "png": "5cfd28bb1b494b9e",
+        "text": "6dbb68dea4bd0a14"
       }
     },
     {
       "id": "04-rejected",
       "side": "panel",
       "file": "04-rejected.png",
-      "masked": 1,
+      "masked": 0,
       "width": 988,
       "height": 219,
-      "shotAt": "2026-11-01T17:06:56.240Z",
-      "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
+      "shotAt": "2026-11-03T18:55:19.407Z",
+      "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-a115562e: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
       "en": {
         "file": "04-rejected.en.png",
-        "masked": 1,
+        "masked": 0,
         "width": 988,
         "height": 201,
-        "shotAt": "2026-11-01T17:07:33.077Z",
-        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+        "shotAt": "2026-11-03T18:55:54.138Z",
+        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-a115562e: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
+        "seal": {
+          "png": "7c2ae55f831ea765",
+          "text": "d35df49df9180ebc"
+        }
       },
       "dark": {
         "file": "04-rejected.dark.png",
         "masked": 1,
         "width": 988,
         "height": 219,
-        "shotAt": "2026-11-01T17:08:16.103Z",
-        "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+        "shotAt": "2026-11-03T18:56:33.823Z",
+        "text": "Отвергнутые правки сценария Репозиторий не может расширить то, что задали вы или ядро: эти значения не применены. Уровень 4 ciWait = true repo-a115562e: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
+        "seal": {
+          "png": "e8525ba1a6866399",
+          "text": "7c0f06041a9fc614"
+        }
       },
       "darkEn": {
         "file": "04-rejected.dark.en.png",
         "masked": 0,
         "width": 988,
         "height": 201,
-        "shotAt": "2026-11-01T17:08:48.617Z",
-        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-23492b73: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's"
+        "shotAt": "2026-11-03T18:57:20.967Z",
+        "text": "Rejected scenario edits A repository cannot widen what you or the core set: these values were not applied. Level 4 ciWait = true repo-a115562e: .agentdeck/scenario.json: CI wait is the user's live decision for this task (R:S1-09), never a file's",
+        "seal": {
+          "png": "ea8a432d754f03f3",
+          "text": "d35df49df9180ebc"
+        }
+      },
+      "seal": {
+        "png": "1c6e5a1a68885123",
+        "text": "7c0f06041a9fc614"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 1,
       "width": 988,
       "height": 477,
-      "shotAt": "2026-11-01T17:07:14.080Z",
-      "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-23492b73 Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление",
+      "shotAt": "2026-11-03T18:55:36.763Z",
+      "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-a115562e Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление",
       "en": {
         "file": "05-split.en.png",
         "masked": 1,
         "width": 988,
         "height": 477,
-        "shotAt": "2026-11-01T17:07:58.112Z",
-        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-23492b73 Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split"
+        "shotAt": "2026-11-03T18:56:17.607Z",
+        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-a115562e Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split",
+        "seal": {
+          "png": "4c9af6a3028f63e7",
+          "text": "a3fb1f57f1e02084"
+        }
       },
       "dark": {
         "file": "05-split.dark.png",
         "masked": 1,
         "width": 988,
         "height": 477,
-        "shotAt": "2026-11-01T17:08:34.973Z",
-        "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-23492b73 Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление"
+        "shotAt": "2026-11-03T18:57:02.510Z",
+        "text": "Деление на части предложил план проверка приняла Часть 1 Имя Репозиторий repo-a115562e Свои пути По одному пути или маске в строке. Меняет контракт Оценка части: неизвестно, неизвестно Добавить часть Сохранить деление",
+        "seal": {
+          "png": "7b518604e6afaba6",
+          "text": "bf6d70c1174b7c75"
+        }
       },
       "darkEn": {
         "file": "05-split.dark.en.png",
         "masked": 1,
         "width": 988,
         "height": 477,
-        "shotAt": "2026-11-01T17:09:11.555Z",
-        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-23492b73 Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split"
+        "shotAt": "2026-11-03T18:57:51.123Z",
+        "text": "Split into parts proposed by the plan accepted by the check Part 1 Name Repository repo-a115562e Owned paths One path or mask per line. Changes a contract Part estimate: unknown, unknown Add part Save split",
+        "seal": {
+          "png": "45a4383646940672",
+          "text": "a3fb1f57f1e02084"
+        }
+      },
+      "seal": {
+        "png": "10033c3d856126cb",
+        "text": "bf6d70c1174b7c75"
       }
     },
     {
@@ -179,31 +259,147 @@
       "masked": 1,
       "width": 988,
       "height": 137,
-      "shotAt": "2026-11-01T17:07:14.673Z",
+      "shotAt": "2026-11-03T18:55:37.371Z",
       "text": "Запуск Запустить",
       "en": {
         "file": "06-launch.en.png",
         "masked": 1,
         "width": 988,
         "height": 137,
-        "shotAt": "2026-11-01T17:07:58.685Z",
-        "text": "Launch Launch"
+        "shotAt": "2026-11-03T18:56:18.184Z",
+        "text": "Launch Launch",
+        "seal": {
+          "png": "435394e0944134c7",
+          "text": "bad9944097c86649"
+        }
       },
       "dark": {
         "file": "06-launch.dark.png",
-        "masked": 0,
+        "masked": 1,
         "width": 988,
         "height": 137,
-        "shotAt": "2026-11-01T17:08:35.551Z",
-        "text": "Запуск Запустить"
+        "shotAt": "2026-11-03T18:57:03.135Z",
+        "text": "Запуск Запустить",
+        "seal": {
+          "png": "7fd332d7ac057415",
+          "text": "b9c3dbdb800f97ff"
+        }
       },
       "darkEn": {
         "file": "06-launch.dark.en.png",
         "masked": 1,
         "width": 988,
         "height": 137,
-        "shotAt": "2026-11-01T17:09:12.130Z",
-        "text": "Launch Launch"
+        "shotAt": "2026-11-03T18:57:51.715Z",
+        "text": "Launch Launch",
+        "seal": {
+          "png": "8e4e33bdb092fcc9",
+          "text": "bad9944097c86649"
+        }
+      },
+      "seal": {
+        "png": "731b8f3c2c04350d",
+        "text": "b9c3dbdb800f97ff"
+      }
+    },
+    {
+      "id": "07-review-link",
+      "side": "panel",
+      "file": "07-review-link.png",
+      "masked": 2,
+      "width": 988,
+      "height": 452,
+      "shotAt": "2026-11-03T18:55:41.941Z",
+      "text": "Ревью MR по ссылке Ядро читает MR у форжа, проводит ревью его изменений в копии ветки MR и затем спрашивает, что делать с замечаниями: починить в копии, отписать в MR, и то и другое или ничего. Без вашего ответа ничего не отправляется. Ссылка на MR или PR GitLab …/-/merge_requests/N или GitHub …/pull/N. Путь к репозиторию Основная папка проекта MR: по её remote ядро выбирает форж и проект. У этого remote нет API форжа (только пуш и ссылка): MR не прочесть. https://tracker.example/group/app.git: no forge API for this remote (push + link only) Открыть ревью",
+      "en": {
+        "file": "07-review-link.en.png",
+        "masked": 2,
+        "width": 988,
+        "height": 452,
+        "shotAt": "2026-11-03T18:56:21.207Z",
+        "text": "Review an MR by link The core reads the MR from the forge, reviews its changes in a copy of the MR branch and then asks what to do with the findings: fix in the copy, post to the MR, both or nothing. Nothing is pushed without your answer. MR or PR link GitLab …/-/merge_requests/N or GitHub …/pull/N. Repository path The main checkout of the MR project: the core picks the forge and the project by its remote. No forge API for this remote (push and link only): the MR cannot be read. https://tracker.example/group/app.git: no forge API for this remote (push + link only) Open the review",
+        "seal": {
+          "png": "e2a9837d48ab9a2e",
+          "text": "b5c051a75c51ca35"
+        }
+      },
+      "dark": {
+        "file": "07-review-link.dark.png",
+        "masked": 2,
+        "width": 988,
+        "height": 452,
+        "shotAt": "2026-11-03T18:57:06.689Z",
+        "text": "Ревью MR по ссылке Ядро читает MR у форжа, проводит ревью его изменений в копии ветки MR и затем спрашивает, что делать с замечаниями: починить в копии, отписать в MR, и то и другое или ничего. Без вашего ответа ничего не отправляется. Ссылка на MR или PR GitLab …/-/merge_requests/N или GitHub …/pull/N. Путь к репозиторию Основная папка проекта MR: по её remote ядро выбирает форж и проект. У этого remote нет API форжа (только пуш и ссылка): MR не прочесть. https://tracker.example/group/app.git: no forge API for this remote (push + link only) Открыть ревью",
+        "seal": {
+          "png": "274e058ee38aae8d",
+          "text": "d0d580e53301a328"
+        }
+      },
+      "darkEn": {
+        "file": "07-review-link.dark.en.png",
+        "masked": 2,
+        "width": 988,
+        "height": 452,
+        "shotAt": "2026-11-03T18:57:56.807Z",
+        "text": "Review an MR by link The core reads the MR from the forge, reviews its changes in a copy of the MR branch and then asks what to do with the findings: fix in the copy, post to the MR, both or nothing. Nothing is pushed without your answer. MR or PR link GitLab …/-/merge_requests/N or GitHub …/pull/N. Repository path The main checkout of the MR project: the core picks the forge and the project by its remote. No forge API for this remote (push and link only): the MR cannot be read. https://tracker.example/group/app.git: no forge API for this remote (push + link only) Open the review",
+        "seal": {
+          "png": "987015be2f6360f9",
+          "text": "b5c051a75c51ca35"
+        }
+      },
+      "seal": {
+        "png": "203adad9e8c1c955",
+        "text": "d0d580e53301a328"
+      }
+    },
+    {
+      "id": "08-mcp-picks",
+      "side": "panel",
+      "file": "08-mcp-picks.png",
+      "masked": 0,
+      "width": 988,
+      "height": 559,
+      "shotAt": "2026-11-03T18:55:42.528Z",
+      "text": "Серверы MCP для задач ядра Свои серверы MCP из конфига каждого CLI. Отметка отдаёт сервер виду шага во всех следующих задачах; без отметки шаг видит только серверы ядра. Сервер Работа Правки Ответы ревьюерам Свой шаг Чат все предложенные docs claude: пользователь, адрес old-tracker ни один CLI не предлагает Выбран в настройке, но в конфигах CLI его нет: ядро выбросит его при запуске и назовёт причину в журнале задачи. orders claude: пользователь, процесс Виды только чтения (Разбор запроса, План, Исследование, Деление, Ревью, Отчёт) серверы человека не берут: их инструменты не прочитаны. Без чтения конфига MCP: qwen, aider, continue, gemini, cursor — их сеанс получает только серверы ядра. Здесь слой пользователя. Серверы из файлов проекта ядро предлагает при запуске, если репозиторию доверяют, — их видно в журнале задачи. Сохранить выбор",
+      "en": {
+        "file": "08-mcp-picks.en.png",
+        "masked": 2,
+        "width": 988,
+        "height": 559,
+        "shotAt": "2026-11-03T18:56:21.794Z",
+        "text": "MCP servers for core tasks Your own MCP servers from each CLI's config. A tick gives the server to that step kind in every following task; without one the step sees only the core servers. Server Work Fixes Answer reviewers Custom step Chat all offered docs claude: user, URL old-tracker offered by no CLI Picked in the settings but absent from every CLI config: the core drops it at launch and names the reason in the task journal. orders claude: user, process Read-only kinds (Intake, Plan, Research, Split, Review, Report) take no human servers: their tools are unread. No MCP config reader: qwen, aider, continue, gemini, cursor — their session gets only the core servers. This is the user layer. Servers from project files are offered by the core at launch when the repository is trusted — the task journal shows them. Save picks",
+        "seal": {
+          "png": "85e7f4eeccb87101",
+          "text": "81a001237c6aff77"
+        }
+      },
+      "dark": {
+        "file": "08-mcp-picks.dark.png",
+        "masked": 2,
+        "width": 988,
+        "height": 559,
+        "shotAt": "2026-11-03T18:57:07.279Z",
+        "text": "Серверы MCP для задач ядра Свои серверы MCP из конфига каждого CLI. Отметка отдаёт сервер виду шага во всех следующих задачах; без отметки шаг видит только серверы ядра. Сервер Работа Правки Ответы ревьюерам Свой шаг Чат все предложенные docs claude: пользователь, адрес old-tracker ни один CLI не предлагает Выбран в настройке, но в конфигах CLI его нет: ядро выбросит его при запуске и назовёт причину в журнале задачи. orders claude: пользователь, процесс Виды только чтения (Разбор запроса, План, Исследование, Деление, Ревью, Отчёт) серверы человека не берут: их инструменты не прочитаны. Без чтения конфига MCP: qwen, aider, continue, gemini, cursor — их сеанс получает только серверы ядра. Здесь слой пользователя. Серверы из файлов проекта ядро предлагает при запуске, если репозиторию доверяют, — их видно в журнале задачи. Сохранить выбор",
+        "seal": {
+          "png": "3dd6b7ffd1c1af5d",
+          "text": "9d2c87529e825ebe"
+        }
+      },
+      "darkEn": {
+        "file": "08-mcp-picks.dark.en.png",
+        "masked": 2,
+        "width": 988,
+        "height": 559,
+        "shotAt": "2026-11-03T18:57:57.388Z",
+        "text": "MCP servers for core tasks Your own MCP servers from each CLI's config. A tick gives the server to that step kind in every following task; without one the step sees only the core servers. Server Work Fixes Answer reviewers Custom step Chat all offered docs claude: user, URL old-tracker offered by no CLI Picked in the settings but absent from every CLI config: the core drops it at launch and names the reason in the task journal. orders claude: user, process Read-only kinds (Intake, Plan, Research, Split, Review, Report) take no human servers: their tools are unread. No MCP config reader: qwen, aider, continue, gemini, cursor — their session gets only the core servers. This is the user layer. Servers from project files are offered by the core at launch when the repository is trusted — the task journal shows them. Save picks",
+        "seal": {
+          "png": "9624af0580945a78",
+          "text": "81a001237c6aff77"
+        }
+      },
+      "seal": {
+        "png": "5d2c2f15dd14a2bf",
+        "text": "9d2c87529e825ebe"
       }
     }
   ]

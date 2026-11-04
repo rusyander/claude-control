@@ -1,58 +1,36 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { SplitPlanView } from '@agentdeck/contracts/chat-handoff';
 import { i18n } from '@shared/config/i18n';
-import { mergeSplitGroups } from '../../lib/mergeSplitGroups';
 import type { ChildStageGroup } from '../ChildStages.types';
 import { ChildBlocks } from './ChildBlocks';
-import { splitGroupKey } from '../../lib/splitGroupKey';
-
-type Group = SplitPlanView['groups'][number];
 
 /**
- * Хаб родителя настоящей карточкой: полоса запросов детей стоит НАД строками
- * групп (аудит 25.09, L153 — под хабом из десятка групп карточку права не
- * находили), а отметки «разрешено автоматически» строки «с отметкой» видны в
- * строке своей группы (L51).
+ * Хаб родителя настоящей карточкой: полоса запросов детей, у которых нет своей
+ * карточки, стоит НАД строками групп (аудит 25.09, L153 — под хабом из десятка
+ * групп карточку права не находили).
  */
 
-const group = (index: number, extra: Partial<Group> = {}): Group => ({
-  index,
+const group = (index: number): ChildStageGroup => ({
+  chatId: `c${index}`,
   title: `Группа ${index}`,
   branch: `agent/g${index}`,
-  after: [],
-  status: 'started',
-  ...extra,
+  stages: ['work'],
+  isRunning: true,
 });
 
-function render(groups: Group[], withAsk: boolean): string {
-  // Строки идущих групп — как их собирает хаб из чатов детей.
-  const rows = new Map<string, ChildStageGroup>(
-    groups
-      .filter((item) => item.chatId)
-      .map((item) => [
-        splitGroupKey({ groupIndex: item.index, id: '' }),
-        { chatId: item.chatId ?? '', title: item.title, stages: ['work'], isRunning: true },
-      ]),
-  );
-  const stages = mergeSplitGroups(rows, {
-    parentChatId: 'parent',
-    triage: { at: '2026-09-25T10:00:00.000Z', received: true, repairs: [], conflicts: [] },
-    order: groups.map((item) => item.index),
-    groups,
-  });
+function render(groups: ChildStageGroup[], withAsk: boolean): string {
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
       <ChildBlocks
-        stages={stages}
+        stages={groups}
         onOpenChild={() => {}}
         {...(withAsk
           ? {
               permissions: [
                 {
-                  chatId: 'g1',
-                  title: 'Группа 1',
+                  chatId: 'manual-1',
+                  title: 'Ручной чат',
                   permissions: [
                     { toolUseId: 'tu-1', toolName: 'Bash', input: { command: 'git push -f' } },
                   ],
@@ -81,45 +59,5 @@ describe('хаб родителя: порядок и отметки', () => {
 
   it('без запросов полосы нет вовсе', () => {
     expect(render([group(0)], false)).not.toContain('data-child-asks');
-  });
-
-  it('отметки «разрешено автоматически» — в строке своей группы, с кнопкой «Убрать»', () => {
-    const html = render(
-      [
-        group(0, {
-          chatId: 'c0',
-          autoNotices: [
-            { at: '2026-09-25T10:01:00.000Z', summary: 'pnpm build' },
-            { at: '2026-09-25T10:02:00.000Z', summary: 'git commit -m fix' },
-          ],
-        }),
-        group(1, { chatId: 'c1' }),
-      ],
-      false,
-    );
-    expect(html).toContain('data-auto-notices="2"');
-    expect(html).toContain('Разрешено автоматически: pnpm build; git commit -m fix');
-    expect(html).toContain('Убрать');
-    expect(html.split('data-auto-notices').length - 1).toBe(1);
-  });
-
-  /** Живой прогон 20.10, карточка 28: шесть одинаковых вызовов MCP занимали пол-карточки. */
-  it('повторы сведены в «×N» под меткой сервера MCP, полный список — в подсказке', () => {
-    const notice = (summary: string) => ({ at: '2026-10-20T19:00:00.000Z', summary });
-    const html = render(
-      [
-        group(0, {
-          chatId: 'c0',
-          autoNotices: [
-            ...Array.from({ length: 3 }, () => notice('mcp__tracker__jira_assign_issue')),
-            notice('pnpm build'),
-          ],
-        }),
-      ],
-      false,
-    );
-    expect(html).toContain('data-auto-notices="4"');
-    expect(html).toContain('Разрешено автоматически: tracker: jira_assign_issue ×3; pnpm build');
-    expect(html).toContain('title="mcp__tracker__jira_assign_issue');
   });
 });

@@ -1,7 +1,7 @@
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { decidePermit } from '../../policy/permit/permit.ts';
-import { judgeWithGrants, raisePermitPoint } from '../human/permit-point.ts';
+import { judgePermitCall, raisePermitPoint } from '../human/permit-point.ts';
 import type { PermitCallDeps, SessionBinding } from './model-tools.types.ts';
 
 /**
@@ -46,7 +46,7 @@ export async function answerPermitCall(
   if (!claim.pending) return forged(`permit:${read.toolUseId}`, claim.reason);
 
   const ask = deps.mapPermission(read.call);
-  const { decision, ledger } = judgeWithGrants(task, b, deps.context, (ctx) =>
+  const { decision, ledger } = judgePermitCall(task, b, ask, deps.context, (ctx) =>
     decidePermit(ask, ctx, b.stepKind),
   );
   const decided = task.append({

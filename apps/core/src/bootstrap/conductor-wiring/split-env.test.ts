@@ -12,6 +12,8 @@ import type { SessionRoad } from '../session-road.ts';
 import { buildVerifierWiring } from '../verifier-wiring/index.ts';
 import type { ConductorWiringDeps } from './conductor-wiring.types.ts';
 import { startConductor } from './index.ts';
+import { publishWiringFor } from './publish.ts';
+import { reviewLinkWiringFor } from './review-link.ts';
 import { splitEnvFor } from './split.ts';
 
 /**
@@ -38,6 +40,10 @@ describe('conductor split env', () => {
       expect(splitEnvFor(deps)).toBe(splitEnvFor(deps));
       expect(conductor.split.libraryDir).toBe(layout.scenarios);
       expect(splitEnvFor({ ...deps })).not.toBe(conductor.split);
+      // Крючки публикатора и ревью по ссылке — из тех же проводок, что ручка отдаёт API и командам.
+      expect(conductor.hooks).toContain(publishWiringFor(deps).hooks);
+      expect(conductor.hooks).toContain(conductor.reviewLink.hooks);
+      expect(conductor.reviewLink).toBe(reviewLinkWiringFor(deps));
       await conductor.stop();
     } finally {
       registry.closeAll();

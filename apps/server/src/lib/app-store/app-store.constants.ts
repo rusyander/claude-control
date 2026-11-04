@@ -1,5 +1,3 @@
-import { GROUP_ECONOMY_DEFAULTS } from '@agentdeck/contracts/group-economy';
-import { GROUP_WATCH_DEFAULTS } from '@agentdeck/contracts/group-watch';
 import type { AppState } from './app-store.types.ts';
 
 export const DEFAULT_STATE: AppState = {
@@ -16,11 +14,6 @@ export const DEFAULT_STATE: AppState = {
   providerChecks: {},
   mcpHealth: {},
   projectCodeViews: {},
-  // Пусто — подбор модели под задачу включён везде: сюда пишутся только проекты,
-  // где человек его ВЫКЛЮЧИЛ.
-  projectCascade: {},
-  // Пусто — ревью после работы группы включено везде (тот же принцип).
-  projectReviewAfterWork: {},
   chatLinks: {},
   // Пусто — ни одно дерево разговоров не стоит на паузе.
   treePause: {},
@@ -66,24 +59,14 @@ export const DEFAULT_STATE: AppState = {
     mcpAutoCheck: false,
     chatModel: '',
     chatEffort: 'xhigh',
-    // Пусто — правила прав как из коробки (contracts/permission-rules.ts):
-    // записи разрешены, снос спрашивает. Сюда пишутся только СВОИ положения.
-    autoApproveRules: {},
     // Авторежим прав в чатах — из коробки включён (владелец, 24.09.2026).
     chatAutoMode: true,
     // Облегчённый набор инструментов в чатах — из коробки включён (владелец, 18.10.2026).
     chatLeanTools: true,
-    // Карточка одиночного чата становится D-n через 10 минут; запись ждёт неделю.
-    deferAfterMinutes: 10,
+    // Прежняя запись D-n ждёт ответа неделю.
     deferredTtlDays: 7,
-    // Рычаги экономии групп — из коробки включены (владелец, 21.10.2026), срок
-    // кэша решает CLI: пять минут дороже при долгих паузах групп (замер 20.10).
-    groupEconomy: { ...GROUP_ECONOMY_DEFAULTS },
-    // Сторож групп — из коробки включён (владелец, 21.10.2026).
-    groupWatch: { ...GROUP_WATCH_DEFAULTS },
     modelPricing: {},
     encryptSecretBackups: false,
-    taskSplitInitiative: true,
     handoffInitiative: true,
     handoffContextLimit: 0,
     handoffAutoDefault: true,
@@ -138,7 +121,7 @@ export const DEFAULT_STATE: AppState = {
       telegram: {
         enabled: false,
         chatId: '',
-        events: ['runError', 'testFailed', 'budget', 'groupSignal'],
+        events: ['runError', 'testFailed', 'budget'],
       },
       zephyr: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
       xray: { enabled: false, baseUrl: '', projectKey: '', groupId: '' },
@@ -147,7 +130,7 @@ export const DEFAULT_STATE: AppState = {
       webhook: {
         enabled: false,
         url: '',
-        events: ['runError', 'testFailed', 'budget', 'groupSignal'],
+        events: ['runError', 'testFailed', 'budget'],
       },
     },
   },

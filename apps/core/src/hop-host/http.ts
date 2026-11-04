@@ -28,6 +28,20 @@ export async function readBody(request: IncomingMessage): Promise<Buffer | undef
   return Buffer.concat(chunks);
 }
 
+/**
+ * Тело больше потолка не дочитывается, но отказ 413 с причиной обязан дойти: ответ уходит с
+ * `connection: close`, а приём рвётся ПОСЛЕ него. Разрыв до ответа (прежний `request.destroy()`
+ * перед отказом) клиент видел обрывом связи вместо «тело больше 32 МБ».
+ */
+export function closeAfterReply(request: IncomingMessage, response: ServerResponse): void {
+  if (!response.headersSent) response.setHeader('connection', 'close');
+  const drop = (): void => {
+    request.destroy();
+  };
+  response.once('finish', drop);
+  response.once('close', drop);
+}
+
 export function respondJson(response: ServerResponse, status: number, payload: unknown): void {
   if (response.headersSent || response.destroyed) return;
   response.writeHead(status, { 'content-type': 'application/json' });

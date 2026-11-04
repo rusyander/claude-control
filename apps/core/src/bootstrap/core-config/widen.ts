@@ -57,5 +57,13 @@ export function configWidenings(before: CoreConfig, after: CoreConfig): ConfigWa
   for (const [adapter, path] of Object.entries(after.cliPaths ?? {})) {
     if (paths[adapter] !== path) out.push({ section: 'cliPaths', detail: `${adapter} -> ${path}` });
   }
+  // Сервер человека, отданный виду шага, — новые инструменты модели в каждой следующей сессии.
+  const picked = (doc: CoreConfig): string[] =>
+    Object.entries(doc.mcpPicks ?? {}).flatMap(([kind, ids]) =>
+      (ids ?? []).map((id) => `${kind}:${id}`),
+    );
+  for (const row of missing(picked(after), picked(before))) {
+    out.push({ section: 'mcpPicks', detail: `added ${row}` });
+  }
   return out;
 }

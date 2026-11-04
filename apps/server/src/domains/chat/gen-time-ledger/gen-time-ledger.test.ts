@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ChatRunRegistry, type RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
-import type { ChatEvent, RawEvent, RunOptions } from '../ChatRunner/ChatRunner.ts';
+import type { RunOptions } from '../run-options/run-options.ts';
+import type { ChatEvent, RawEvent } from '../chat-events.ts';
 import { TurnTracker } from '../stream-usage/stream-usage.ts';
 import { readChatMessages } from '../ChatHistory/ChatHistory.ts';
 import { genTimeSink, genTimesById } from './gen-time-ledger.ts';

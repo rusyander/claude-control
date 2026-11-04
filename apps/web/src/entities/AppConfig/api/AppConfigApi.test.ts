@@ -147,9 +147,10 @@ function deferred(): { promise: Promise<AppSettings>; resolve: (value: AppSettin
   return { promise, resolve };
 }
 
-describe('sendSettingsPatch — ответы двух быстрых правок (F-28)', () => {
-  it('ответ первой правки, пришедший последним, не затирает вторую', async () => {
+describe('sendSettingsPatch — очередь быстрых правок (F-28)', () => {
+  it('вторая правка уходит только после ответа на первую, в кеше — последний ответ', async () => {
     const client = seed();
+    client.setQueryData(queryKeys.settings, settings({}));
     const first = deferred();
     const second = deferred();
     const replies = [first.promise, second.promise];
@@ -158,15 +159,79 @@ describe('sendSettingsPatch — ответы двух быстрых право�
 
     const a = sendSettingsPatch(client, { theme: 'dark' }, send);
     const b = sendSettingsPatch(client, { language: 'en' }, send);
-    second.resolve(both);
-    await b;
+    await Promise.resolve();
+    expect(send).toHaveBeenCalledTimes(1);
+    // Правка видна сразу, до ответа сервера.
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)).toMatchObject({
+      theme: 'dark',
+      language: 'en',
+    });
     first.resolve(settings({ theme: 'dark' }));
     await a;
+    await new Promise((done) => setTimeout(done, 0));
+    expect(send).toHaveBeenCalledTimes(2);
+    // Промежуточный ответ не знает о второй правке и не откатывает её на экране.
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.language).toBe('en');
+    second.resolve(both);
+    await b;
 
-    expect(client.getQueryData(queryKeys.settings)).toBe(both);
+    expect(client.getQueryData(queryKeys.settings)).toEqual(both);
   });
 
-  it('устаревший ответ всё равно сбрасывает разделы прошлого провайдера', async () => {
+  // Набор адреса по букве на медленном сервере: пока первый запрос в пути,
+  // остальные буквы копятся в один следующий, а не в хвост из десятков PATCH.
+  it('правки, сделанные пока запрос в пути, уходят одним запросом', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({}));
+    const first = deferred();
+    const send = vi
+      .fn<(patch: AppSettingsPatch) => Promise<AppSettings>>()
+      .mockReturnValueOnce(first.promise)
+      .mockImplementation(async (patch) => settings({ ...patch }));
+
+    const a = sendSettingsPatch(client, { theme: 'dark' }, send);
+    const b = sendSettingsPatch(client, { language: 'en' }, send);
+    const c = sendSettingsPatch(client, { theme: 'light', backupKeep: 3 }, send);
+    expect(send).toHaveBeenCalledTimes(1);
+    first.resolve(settings({ theme: 'dark' }));
+    const [, second, third] = await Promise.all([a, b, c]);
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith({ language: 'en', theme: 'light', backupKeep: 3 });
+    expect(second).toBe(third);
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)).toMatchObject({
+      theme: 'light',
+      language: 'en',
+      backupKeep: 3,
+    });
+  });
+
+  it('правка после ухода слитого запроса не теряется, а уходит своим', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({}));
+    const first = deferred();
+    const second = deferred();
+    const send = vi
+      .fn<(patch: AppSettingsPatch) => Promise<AppSettings>>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise)
+      .mockImplementation(async (patch) => settings({ ...patch }));
+
+    const a = sendSettingsPatch(client, { theme: 'dark' }, send);
+    const b = sendSettingsPatch(client, { language: 'en' }, send);
+    first.resolve(settings({ theme: 'dark' }));
+    await a;
+    await new Promise((done) => setTimeout(done, 0));
+    expect(send).toHaveBeenCalledTimes(2);
+    // Второй запрос уже в пути: новая правка в него не дописывается.
+    const c = sendSettingsPatch(client, { backupKeep: 3 }, send);
+    second.resolve(settings({ theme: 'dark', language: 'en' }));
+    await Promise.all([b, c]);
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(send).toHaveBeenLastCalledWith({ backupKeep: 3 });
+  });
+
+  it('промежуточный ответ всё равно сбрасывает разделы прошлого провайдера', async () => {
     const client = seed();
     const first = deferred();
     const second = deferred();
@@ -175,29 +240,98 @@ describe('sendSettingsPatch — ответы двух быстрых право�
 
     const a = sendSettingsPatch(client, { provider: 'codex' }, send);
     const b = sendSettingsPatch(client, { theme: 'dark' }, send);
-    second.resolve(settings({ provider: 'codex', theme: 'dark' }));
-    await b;
-    client.setQueryData(queryKeys.providerRules, ['cursor rule']);
     first.resolve(settings({ provider: 'codex' }));
     await a;
-
     expect(client.getQueryData(queryKeys.providerRules)).toBeUndefined();
+    second.resolve(settings({ provider: 'codex', theme: 'dark' }));
+    await b;
   });
 
-  it('после правок внахлёст настройки перечитываются, одиночная правка — нет', async () => {
+  it('отказ последней правки перечитывает настройки, следующая правка всё равно уходит', async () => {
     const client = seed();
     client.setQueryData(queryKeys.settings, settings({}));
-    const send = vi.fn(async (patch: AppSettingsPatch) => settings({ theme: patch.theme }));
+    const send = vi
+      .fn<(patch: AppSettingsPatch) => Promise<AppSettings>>()
+      .mockRejectedValueOnce(new Error('400'))
+      .mockImplementation(async (patch) => settings({ theme: patch.theme }));
 
-    await sendSettingsPatch(client, { theme: 'dark' }, send);
-    expect(client.getQueryState(queryKeys.settings)?.isInvalidated).toBe(false);
-
-    await Promise.all([
-      sendSettingsPatch(client, { theme: 'light' }, send),
-      sendSettingsPatch(client, { language: 'en' }, send),
-    ]);
-    // Сервер мог применить их не в том порядке, в каком они ушли, — правду знает он.
+    await expect(sendSettingsPatch(client, { theme: 'dark' }, send)).rejects.toThrow('400');
     expect(client.getQueryState(queryKeys.settings)?.isInvalidated).toBe(true);
+
+    await sendSettingsPatch(client, { theme: 'light' }, send);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.theme).toBe('light');
+  });
+});
+
+/**
+ * Сервер-подделка с поверхностным слиянием, как `store.updateSettings`: поле из
+ * патча заменяется целиком. Ответы отпускает тест — в любом порядке.
+ */
+function shallowServer(initial: AppSettings) {
+  let state = initial;
+  const replies: Array<() => void> = [];
+  const seen: AppSettingsPatch[] = [];
+  const send = (patch: AppSettingsPatch): Promise<AppSettings> => {
+    seen.push(patch);
+    state = { ...state, ...patch };
+    const snapshot = state;
+    return new Promise((resolve) => replies.push(() => resolve(snapshot)));
+  };
+  return { send, seen, replies, state: () => state };
+}
+
+const endpoint = (id: string, patch: Partial<AppSettings['endpointProfiles'][number]> = {}) => ({
+  id,
+  name: id,
+  baseUrl: 'http://127.0.0.1:11434/v1',
+  apiKind: 'openai-compat' as const,
+  model: '',
+  writeToken: false,
+  imagesUrl: '',
+  ownerPlatformId: '',
+  ...patch,
+});
+
+/** Правка, как её собирает карточка эндпоинта: список из кеша в момент правки. */
+function editProfiles(
+  client: QueryClient,
+  edit: (list: AppSettings['endpointProfiles']) => AppSettings['endpointProfiles'],
+  send: (patch: AppSettingsPatch) => Promise<AppSettings>,
+): Promise<AppSettings> {
+  const list = client.getQueryData<AppSettings>(queryKeys.settings)?.endpointProfiles ?? [];
+  return sendSettingsPatch(client, { endpointProfiles: edit(list) }, send);
+}
+
+describe('sendSettingsPatch — правки внахлёст одного поля-списка', () => {
+  // Имя, затем адрес профиля — до ответа на первую правку. Сервер заменяет
+  // `endpointProfiles` целиком: вторая правка из кеша без первой стирала имя.
+  it('две быстрые правки профиля эндпоинта обе доходят до сервера и до кеша', async () => {
+    const client = seed();
+    const start = settings({ endpointProfiles: [endpoint('ep-1')] });
+    client.setQueryData(queryKeys.settings, start);
+    const server = shallowServer(start);
+    const rename = (list: AppSettings['endpointProfiles']) =>
+      list.map((item) => (item.id === 'ep-1' ? { ...item, name: 'Шлюз' } : item));
+    const readdress = (list: AppSettings['endpointProfiles']) =>
+      list.map((item) =>
+        item.id === 'ep-1' ? { ...item, baseUrl: 'http://127.0.0.1:8080' } : item,
+      );
+
+    const a = editProfiles(client, rename, server.send);
+    const b = editProfiles(client, readdress, server.send);
+    // Обе правки сделаны до первого ответа; ответы отпускаются по одному.
+    for (let i = 0; i < 10; i += 1) {
+      server.replies.shift()?.();
+      await new Promise((done) => setTimeout(done, 0));
+    }
+    await Promise.all([a, b]);
+
+    const want = { name: 'Шлюз', baseUrl: 'http://127.0.0.1:8080' };
+    expect(server.state().endpointProfiles[0]).toMatchObject(want);
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.endpointProfiles[0]).toMatchObject(
+      want,
+    );
   });
 });
 
@@ -228,6 +362,87 @@ describe('настройки, сменённые снаружи (соседня�
     const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: structuredClone(same) });
     await refreshSettingsFromServer(client);
     expect(client.getQueryData(queryKeys.providerRules)).toEqual(['cursor rule']);
+    get.mockRestore();
+  });
+
+  /**
+   * Каждый PATCH сервер отражает в поток событий, и панель перечитывает
+   * настройки. Эхо, пришедшее, пока правки ещё в пути, несёт промежуточное
+   * состояние сервера: положенное в кеш, оно стирало буквы поля адреса прямо
+   * под пальцами (живой прогон: «http://…» превращался в «ttp://127»).
+   */
+  it('эхо, пришедшее пока свои правки в пути, не откатывает набранное', async () => {
+    const client = seed();
+    const start = settings({ endpointProfiles: [endpoint('ep-1', { baseUrl: '' })] });
+    client.setQueryData(queryKeys.settings, start);
+    const server = shallowServer(start);
+    const type = (value: string) =>
+      editProfiles(
+        client,
+        (list) => list.map((item) => ({ ...item, baseUrl: value })),
+        server.send,
+      );
+
+    const a = type('h');
+    // Эхо первой правки: сервер уже записал «h», вторая буква ещё не ушла.
+    const get = vi.spyOn(apiClient, 'get').mockImplementation(async () => {
+      void type('ht');
+      await new Promise((done) => setTimeout(done, 0));
+      return { data: { ...start, endpointProfiles: [endpoint('ep-1', { baseUrl: 'h' })] } };
+    });
+    await refreshSettingsFromServer(client);
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.endpointProfiles[0]?.baseUrl).toBe(
+      'ht',
+    );
+    for (let i = 0; i < 10; i += 1) {
+      server.replies.shift()?.();
+      await new Promise((done) => setTimeout(done, 0));
+    }
+    await a;
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.endpointProfiles[0]?.baseUrl).toBe(
+      'ht',
+    );
+    get.mockRestore();
+  });
+
+  it('отброшенное эхо не раскладывает разницу: разделы сбросит ответ своей правки', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({ provider: 'cursor' }));
+    let release: (value: { data: AppSettings }) => void = () => {};
+    const get = vi
+      .spyOn(apiClient, 'get')
+      .mockImplementation(() => new Promise((done) => (release = done)));
+    // Перечитывание началось до правки, сервер ответил до её записи.
+    const refresh = refreshSettingsFromServer(client);
+    let reply: (value: AppSettings) => void = () => {};
+    const edit = sendSettingsPatch(
+      client,
+      { provider: 'claude' },
+      () => new Promise((done) => (reply = done)),
+    );
+    release({ data: settings({ provider: 'cursor' }) });
+    await refresh;
+    // Сервер ещё не ответил: сбрасывать разделы прошлого CLI рано — перечитаны
+    // они были бы с сервера, который ещё на нём.
+    expect(client.getQueryData(queryKeys.providerRules)).toEqual(['cursor rule']);
+    reply(settings({ provider: 'claude' }));
+    await edit;
+    expect(client.getQueryData(queryKeys.providerRules)).toBeUndefined();
+    get.mockRestore();
+  });
+
+  it('чтение, начатое до правки и пришедшее после её ответа, правку не откатывает', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({ theme: 'light' }));
+    let release: (value: { data: AppSettings }) => void = () => {};
+    const get = vi
+      .spyOn(apiClient, 'get')
+      .mockImplementation(() => new Promise((done) => (release = done)));
+    const refresh = refreshSettingsFromServer(client);
+    await sendSettingsPatch(client, { theme: 'dark' }, async () => settings({ theme: 'dark' }));
+    release({ data: settings({ theme: 'light' }) });
+    await refresh;
+    expect(client.getQueryData<AppSettings>(queryKeys.settings)?.theme).toBe('dark');
     get.mockRestore();
   });
 });

@@ -99,8 +99,9 @@ outside its copy); a force-push beyond the delivery's lease; a DB migration, DDL
 Everything else (a live check that cannot run, a red that predates the branch, a missing MR, a stale
 stand session, a conflict) the group resolves itself or waives with the reason as a note in the MR
 description. Outside a split group the session's own rules stand (git writes per-op approved).
-A split group's self-check (`tests-cli delivery`) exiting 0 is the evidence for the MR description
-and reviewer threads — quote its MR line, never re-read them through the forge. A fact re-read
+A split group's self-check (`tests-cli delivery`) is the core's own publish verdict on the copy:
+exit 0 — nothing left before publication, exit 1 — the lines the publish step would refuse with;
+never second-guess it by re-reading the MR through the forge. A fact re-read
 before that (pipeline, threads, sha) that a sieve row cites updates the row in the same step; the
 self-check runs once, after the last row edit (g1 26.10: a stale row cost a third run).
 

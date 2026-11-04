@@ -70,21 +70,20 @@ describe('текст карточки агента на телефоне', () =>
 });
 
 /**
- * Двуязычные данные карточки (заголовки шагов группы и сценария) — стороной языка
+ * Двуязычные данные карточки (параметры сводки, поля, дифф) — стороной языка
  * телефона. Кадр справки 27.09: английская карточка сценария шла с русскими
  * заголовками шагов, потому что сервер клал в `value` только ru.
  */
 describe('двуязычные данные карточки на телефоне', () => {
   const bilingual = {
     preview: {
-      summary: 'Добавить шаг «Скриншоты» в путь группы «Путь»',
-      summaryCode: 'summary-group-step-add',
-      summaryParams: { name: 'Путь', title: 'Скриншоты' },
-      summaryParamsEn: { name: 'Путь', title: 'Screenshots' },
+      summary: 'Переименовать скилл «Ревью» в «Скриншоты»',
+      summaryCode: 'summary-rename-skill',
+      summaryParams: { from: 'Ревью', to: 'Скриншоты' },
+      summaryParamsEn: { from: 'Ревью', to: 'Screenshots' },
       fields: [
         {
           label: 'Шаги сценария',
-          labelCode: 'label-scenario-steps',
           value: '1. Скриншоты',
           valueEn: '1. Screenshots',
         },
@@ -118,7 +117,7 @@ describe('двуязычные данные карточки на телефон
 
   it('английский телефон — английская сторона в сводке, поле и диффе', () => {
     expect(view(bilingual, 'en')).toEqual({
-      summary: 'Add step “Screenshots” to the path of group “Путь”',
+      summary: 'Rename skill «Ревью» to «Screenshots»',
       value: '1. Screenshots',
       diff: '+  "review #1: Screenshots"',
     });
@@ -126,7 +125,7 @@ describe('двуязычные данные карточки на телефон
 
   it('русский телефон — русская сторона', () => {
     expect(view(bilingual, 'ru')).toEqual({
-      summary: 'Добавить шаг «Скриншоты» в путь группы «Путь»',
+      summary: 'Переименовать скилл «Ревью» в «Скриншоты»',
       value: '1. Скриншоты',
       diff: '+  "review #1: Скриншоты"',
     });
@@ -134,7 +133,7 @@ describe('двуязычные данные карточки на телефон
 
   it('старая запись без английской стороны — как пришла', () => {
     expect(view(legacy, 'en')).toEqual({
-      summary: 'Add step “Скриншоты” to the path of group “Путь”',
+      summary: 'Rename skill «Ревью» to «Скриншоты»',
       value: '1. Скриншоты',
       diff: '+  "review #1: Скриншоты"',
     });

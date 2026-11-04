@@ -16,7 +16,7 @@ import type { ProcessIdentity } from '../../platform/process-table.ts';
 import {
   releasePort,
   releaseProcess,
-  releaseTmp,
+  releaseTmpSettled,
   releaseWorktree,
   type ReleaseResult,
 } from '../../platform/resource-release.ts';
@@ -51,6 +51,8 @@ export interface ReleaseDeps {
   health?: (url: string) => Promise<Fact<number>>;
   /** Реестр стендов: снятый стенд снимается и с наблюдения (эпоха ключа сдвигается). */
   stands?: Pick<StandRegistry, 'detach'>;
+  /** Срок, за который каталог, бывший cwd сессии, отпускают потомки CLI (по умолчанию `TMP_SETTLE_MS`). */
+  tmpSettleMs?: number;
 }
 
 export type ReleaseOutcome =
@@ -178,7 +180,7 @@ export async function releaseByKind(
   deps: ReleaseDeps = {},
 ): Promise<ReleaseResult> {
   try {
-    if (row.kind === 'tmpdir') return releaseTmp(row.ref);
+    if (row.kind === 'tmpdir') return await releaseTmpSettled(row.ref, deps.tmpSettleMs);
     const v = parseRef(row.ref);
     if (!v) return { leak: `ref of ${row.kind} is not JSON` };
     switch (row.kind) {

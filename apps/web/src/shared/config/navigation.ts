@@ -24,9 +24,9 @@ export interface NavItem {
    */
   capability?: Capability;
   /**
-   * `false` — боковая панель пункт не рисует: там его место уже занимает своя
-   * строка (наблюдатель — строка-индикатор). Палитра, подпись страницы в окне
-   * агента и справка пункт видят: без него `/watcher` подписывался бы сырым адресом.
+   * `false` — боковая панель пункт не рисует: страница открывается из своего
+   * раздела (запуск и сценарии — из задач ядра). Палитра, подпись страницы в окне
+   * агента и справка пункт видят: без него адрес подписывался бы сырым путём.
    */
   inSidebar?: false;
 }
@@ -136,7 +136,6 @@ export const NAV_SECTIONS: NavSection[] = [
       // ДРУГОЙ установленный CLI, а не только на активного.
       { path: '/portability', label: 'nav.portability', icon: 'file', key: 'portability' },
       { path: '/settings', label: 'nav.settings', icon: 'settings', key: 'settings' },
-      { path: '/watcher', label: 'nav.watcher', icon: 'eye', key: 'watcher', inSidebar: false },
       // Панель-level, без `capability`: прокси стоит между ЛЮБЫМ CLI и моделью.
       // Именно поэтому он здесь, а не среди интеграций: там всё гейтится по
       // возможностям провайдера, и вечный пункт мешал бы секции исчезать
@@ -153,6 +152,8 @@ export const NAV_SECTIONS: NavSection[] = [
       // Ядро задач — свой процесс рядом с панелью, панель-level: задачи ведутся любым CLI.
       // Запуск и сценарии открываются из раздела задач; палитра и окно агента их видят.
       { path: '/core', label: 'nav.coreTasks', icon: 'layers', key: 'coreTasks' },
+      // Чат через ядро (этап 10): разговор с CLI — задача ядра, панель его только показывает.
+      { path: '/core/chat', label: 'nav.coreChat', icon: 'chat', key: 'coreChat' },
       {
         path: '/core/launch',
         label: 'nav.coreLaunch',

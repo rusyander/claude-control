@@ -10,7 +10,7 @@ import { catalogChatModels, catalogDefaultModel } from '@agentdeck/contracts/pla
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { managedModel } from '../apply/profile.ts';
 import { driverOf } from '../drivers/index.ts';
-import { chooseToolRoute } from '../gateway/dialect/dialect.ts';
+import { chooseToolRoute } from '../tool-route/tool-route.ts';
 import { effectivePlatformRules } from '../rules-apply/rules-apply.ts';
 
 /**

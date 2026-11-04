@@ -14,7 +14,8 @@ import {
 import type { KitMode } from '@agentdeck/contracts/local-models';
 import { readJsonFile, writeJsonFile, writeTextFile } from '../../lib/safe-io/safe-io.ts';
 import { diffLines, tooBig } from '../history/diff.ts';
-import { buildCodexOverlay, CODEX_KIT_ENV, writeCodexOverlay } from './codex.ts';
+import { SESSION_APPEND_MAX } from '@agentdeck/contracts/core/session-carry';
+import { codexKitAppend } from './codex.ts';
 import { composeKit, composeQwenHome } from './compose.ts';
 import {
   exportToGlobal as exportTwin,
@@ -37,6 +38,9 @@ import { describe, kitFiles, readText, type KitFile } from './items.ts';
  */
 
 export const KIT_VARIANT_ENV = 'AGENTDECK_KIT_VARIANT';
+
+/** Набор Codex в дописке сеанса ядра: запас под строку о тестах в том же поле. */
+export const CODEX_APPEND_MAX = SESSION_APPEND_MAX - 4_000;
 
 /** Каталог плагина в приложении — версия набора едет вместе с панелью. */
 export function builtinKitDir(): string {
@@ -72,8 +76,7 @@ const LOCAL_CLAUDE_ENV = { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' };
  * Стражи набора, которые Claude получает в ЛЮБОМ режиме, — элемент → имя его
  * двойника в `<claudeDir>/hooks/lib/`. Поведение «чтение свободно, запись в git
  * и на хостинг — с согласия, слияние — только человеку, удаление и секреты — под
- * охраной, Node машины `nvm use` не переключают, CI не ждут, рекомендованный
- * ответ в автономном чате выбирается сам»
+ * охраной, Node машины `nvm use` не переключают, CI не ждут»
  * держат брокер панели и эти хуки; брокер есть не всегда (полный доступ), а
  * хуки при «Только ваши» не подключались вовсе. Машина со своим `~/.claude`,
  * но без этих стражей, получала в автономном прогоне git-записи без согласия.
@@ -83,7 +86,6 @@ const LOCAL_CLAUDE_ENV = { CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY: '1' };
  * Выключенный на странице набора страж не едет нигде.
  */
 export const GUARD_TWINS: Readonly<Record<string, string>> = {
-  'hooks/autonomous-pick.mjs': 'autonomous-pick',
   'hooks/git-guard.mjs': 'git-guard',
   'hooks/forge-merge-guard.mjs': 'forge-merge-guard',
   'hooks/destructive-consent.mjs': 'destructive-guard',
@@ -101,7 +103,7 @@ export const GUARD_HOOKS = {
   // Инструменты, которые судят стражи `GUARD_TWINS` (тест сверяет с их `PRE_TOOLS`):
   // `Read` и прочие чтения сюда не входят — им страж не нужен, а запуск node стоит.
   preMatcher:
-    'Bash|PowerShell|Write|Edit|NotebookEdit|AskUserQuestion|mcp__.*(gitlab|github|atlassian|jira|confluence).*',
+    'Bash|PowerShell|Write|Edit|NotebookEdit|mcp__.*(gitlab|github|atlassian|jira|confluence).*',
 } as const;
 
 export const OURS_CLAUDE_CAPS = {
@@ -591,14 +593,15 @@ export class KitService {
     }
     if (input.provider === 'codex' && mode === 'hybrid') {
       // Весь набор («Наши»), а не уступки «оба набора» у Claude: одноимённые
-      // навыки Claude лежат в ~/.claude, которого Codex не читает.
-      const overlay = buildCodexOverlay({
+      // навыки Claude лежат в ~/.claude, которого Codex не читает. Разговор Codex —
+      // задача ядра (G6): набор едет текстом после брифа ядра, а не файлом наложения
+      // в переменной `AGENTDECK_*` — такие ядро держит само и сеансу не пропускает.
+      const append = codexKitAppend({
         kitDir: this.composed('ours'),
         local: input.local,
-        codexHome: this.deps.codexHome?.(),
+        max: CODEX_APPEND_MAX,
       });
-      const file = join(this.root, 'codex', `overlay-${input.local ? 'local' : 'standard'}.json`);
-      return { args: [], env: { [CODEX_KIT_ENV]: writeCodexOverlay(file, overlay) } };
+      return append ? { args: [], env: {}, append } : { args: [], env: {} };
     }
     return { args: [], env: {} };
   }

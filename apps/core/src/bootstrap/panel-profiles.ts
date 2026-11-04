@@ -1,7 +1,13 @@
 import { join } from 'node:path';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '@agentdeck/contracts/brand';
 import { endpointProfileSchema } from '@agentdeck/contracts/endpoints';
-import { platformSchema } from '@agentdeck/contracts/platform';
+import { HOP_USER_GATEWAY_PORT } from '@agentdeck/contracts/core/hops';
+import { dlpSettingsSchema, type DlpSettings } from '@agentdeck/contracts/dlp';
+import { platformGatewaySettingsSchema, platformSchema } from '@agentdeck/contracts/platform';
+import {
+  PLATFORM_ASSISTANT_CONSUMER,
+  PLATFORM_TERMINAL_CONSUMER,
+} from '@agentdeck/contracts/platform-consumers';
 import { homeDir } from '../platform/os-kind.ts';
 import { pathExists, readBytesSync } from '../platform/safe-io/files.ts';
 import { apiKeyRouteId } from '../routes/api-key/api-key.ts';
@@ -55,6 +61,11 @@ export interface PanelProfiles {
    * сервера): id контура из `contours`, иначе `null` — не выбран или его запись не прочиталась.
    */
   activeContourId: string | null;
+  /**
+   * Перевод верха контура в поток (`settings.platformGateway.forceStream`, по умолчанию да) —
+   * в правила тела звена (`HopRequestRules.forceStream`).
+   */
+  forceStream: boolean;
   /** Записи, которые не прочитались: названы, а не пропали молча. */
   problems: string[];
 }
@@ -90,6 +101,20 @@ function endpointOf(raw: unknown, at: string, problems: string[]): ApiKeyProfile
   };
 }
 
+/**
+ * Разделы контура — то же правило, что `consumersOf` панели: запись до Т3 (поля в СЫРОМ теле нет
+ * вовсе; схема подставила бы пустой список) получает ассистента, если он был целью, и терминал,
+ * если выбрана хоть одна файловая цель. Пустой список — законный выбор «никуда не подключён».
+ */
+function consumersOf(raw: unknown, consumers: string[], targets: string[]): string[] {
+  if (isObj(raw) && Array.isArray(raw.consumers)) return consumers;
+  const legacy: string[] = [];
+  if (targets.includes(PLATFORM_ASSISTANT_CONSUMER)) legacy.push(PLATFORM_ASSISTANT_CONSUMER);
+  if (targets.some((target) => target !== PLATFORM_ASSISTANT_CONSUMER))
+    legacy.push(PLATFORM_TERMINAL_CONSUMER);
+  return legacy;
+}
+
 function contourOf(raw: unknown, at: string, problems: string[]): GatewayProfile | undefined {
   const parsed = platformSchema.safeParse(raw);
   if (!parsed.success) {
@@ -114,6 +139,48 @@ function contourOf(raw: unknown, at: string, problems: string[]): GatewayProfile
     ...(p.manifest ? { manifest: p.manifest } : {}),
     toolShim: p.toolShim,
     rules: p.rules,
+    consumers: consumersOf(raw, p.consumers, p.targets),
+  };
+}
+
+/**
+ * Настройки панели, по которым ядро держит слушатели человека на хосте звеньев (C3c): прокси
+ * защиты данных (`settings.dlp` по схеме панели + профили эндпоинта для адреса наверх) и шлюз
+ * контуров (`settings.platformGateway` + `platformGatewayPort` — порт, который шлюз панели занял
+ * на самом деле и который уже вписан в конфиги CLI). Файла нет или он не читается — умолчания.
+ */
+export interface PanelListenerSettings {
+  dlp: DlpSettings;
+  endpointProfiles: unknown[];
+  gateway: { enabled: boolean; port: number; live: number | null };
+  language: 'ru' | 'en';
+}
+
+export function readPanelListenerSettings(appData: string): PanelListenerSettings {
+  const bytes = readBytesSync(join(appData, 'state.json'));
+  let doc: unknown = {};
+  if ('value' in bytes) {
+    try {
+      doc = JSON.parse(bytes.value.toString('utf8'));
+    } catch {
+      doc = {};
+    }
+  }
+  const settings = isObj(doc) && isObj(doc.settings) ? doc.settings : {};
+  const dlp = dlpSettingsSchema.safeParse(isObj(settings.dlp) ? settings.dlp : {});
+  const gateway = platformGatewaySettingsSchema.safeParse(
+    isObj(settings.platformGateway) ? settings.platformGateway : {},
+  );
+  const live = isObj(doc) ? doc.platformGatewayPort : undefined;
+  return {
+    dlp: dlp.success ? dlp.data : dlpSettingsSchema.parse({}),
+    endpointProfiles: Array.isArray(settings.endpointProfiles) ? settings.endpointProfiles : [],
+    gateway: {
+      enabled: gateway.success && gateway.data.enabled,
+      port: gateway.success ? gateway.data.port : HOP_USER_GATEWAY_PORT,
+      live: typeof live === 'number' && Number.isInteger(live) && live > 0 ? live : null,
+    },
+    language: settings.language === 'en' ? 'en' : 'ru',
   };
 }
 
@@ -125,6 +192,7 @@ export function readPanelProfiles(appData: string): PanelProfiles {
     dlpOn: false,
     contourMask: {},
     activeContourId: null,
+    forceStream: true,
     problems: [],
   };
   const file = join(appData, 'state.json');
@@ -143,6 +211,9 @@ export function readPanelProfiles(appData: string): PanelProfiles {
   }
   const settings = isObj(doc) && isObj(doc.settings) ? doc.settings : {};
   out.dlpOn = isObj(settings.dlp) && settings.dlp.enabled === true;
+  out.forceStream = !(
+    isObj(settings.platformGateway) && settings.platformGateway.forceStream === false
+  );
   const endpoints = Array.isArray(settings.endpointProfiles) ? settings.endpointProfiles : [];
   endpoints.forEach((raw, i) => {
     const profile = endpointOf(raw, `endpointProfiles[${i}]`, out.problems);

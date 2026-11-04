@@ -73,12 +73,30 @@ export interface RoadStart {
    * годятся, — с фактами, прочитанными дорогой, а не догадкой.
    */
   alternatives?: readonly { adapterId: string; routeId: string; model: string | null }[];
+  /**
+   * Вопрос «ask» (этап 10, F2): мост панели (адрес и разговор; токен — из книги в памяти, не
+   * отсюда) и потребитель контура. Нет — обычная сессия шага.
+   */
+  ask?: {
+    bridge: { url: string; conversation?: string } | null;
+    consumer?: string;
+    /** Сколько картинок едет с первым словом: CLI без `caps.images` получает отказ до запуска. */
+    images?: number;
+  };
 }
 
 export interface RoadResume {
   conversationId: string;
   of?: string;
+  /** Каталог сессии `of` (как его назвал журнал): там дом CLI со своим домом у каждого сеанса. */
+  from?: string;
   cacheAgeMs?: number | null;
+  /**
+   * Разговор начат не ядром (оценка `resume`, этап 10 F2): id — просьба панели. Дорога продолжит
+   * его, только если переходник `adapter` — тот же CLI сессии и сам подтвердил транскрипт для её
+   * корня (`adoptRefusal`); иначе отказ `resume_*` до аренды и процесса.
+   */
+  adopt?: { adapter: string };
 }
 
 export interface Prepared {

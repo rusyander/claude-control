@@ -1,5 +1,4 @@
 import type { AppSettings, EndpointProfile, EndpointsInfo } from '@agentdeck/contracts';
-import type { AssistantEndpoint } from '../assistant-runner/assistant-runner.ts';
 import {
   clearStoredKey,
   getStoredKey,
@@ -80,32 +79,6 @@ function findEndpointProfile(
     if (exact) return exact;
   }
   return profiles[0];
-}
-
-/**
- * Свой эндпоинт для ассистента САМОЙ панели — или `undefined`, когда он не
- * выбран (тогда всё как раньше: облако вендора и порядок «CLI → ключ»).
- *
- * Выбор именной: настройка хранит id профиля, а не «включено». Профиль удалили
- * — ассистент возвращается в облако, а не молча уезжает на соседний адрес.
- */
-export function resolveAssistantEndpoint(
-  store: EndpointSettingsSource,
-  appDataDir: string,
-): AssistantEndpoint | undefined {
-  const settings = store.getSettings();
-  const id = settings.assistantEndpointId;
-  if (!id) return undefined;
-
-  const profile = settings.endpointProfiles.find((item) => item.id === id);
-  if (!profile) return undefined;
-
-  return {
-    baseUrl: profile.baseUrl,
-    apiKind: profile.apiKind,
-    model: profile.model,
-    token: readEndpointToken(appDataDir, profile.id),
-  };
 }
 
 interface EndpointSettingsSource {

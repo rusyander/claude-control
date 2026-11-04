@@ -9,6 +9,10 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The configuration file format is not recognized — writing is disabled (the section is read-only).',
   'hook-event-unspecified': 'No hook event specified',
   'hook-direction-unspecified': 'No direction specified',
+  'hook-description-outside-relay':
+    'Panel hook for terminal and VS Code sessions — control from the phone. PermissionRequest — an agent question or a permission request also goes to the phone; the window on the computer shows it at the same time, the first decision wins. PostToolUse, Stop — a message written from the phone mid-turn reaches the agent after the next step or instead of stopping. Any failure exits without a decision: the CLI behaves as with no hook. The hook must neither crash nor hang the session. Arguments: --url <panel address> --token-file <token file>',
+  'hook-description-tests':
+    'Hook of the «Tests» block for any Claude Code over the project — panel chat, VS Code, terminal. The panel puts it into the project’s .claude/settings.local.json — that file does not go to git. node tools/tests-hook.mjs session   SessionStart: a short line about the block node tools/tests-hook.mjs stop      Stop: code was edited — case, run, record Economy is the main requirement: a turn without edits exits without reading the domain (one node start, zero tokens); a gap is raised at most once per turn (`stop_hook_active`), and each gap carries a ready command, so the extra turn is just one.',
   'mcp-server-not-found': 'Server not found',
   'instructions-global-missing': 'The active provider has no global instructions section.',
   'rule-not-found': 'Rule not found',
@@ -43,12 +47,8 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The project already has its own {{file}} — the panel does not overwrite it',
   'group-override-claude-only': 'Project override exists for Claude only',
   'group-project-missing': 'Project directory not found',
-  'group-discovery-not-found': 'Finding not found — run discovery again',
-  'group-discovery-provider-source':
-    'A bundle from provider directories cannot be imported — it is already global',
   'group-promote-invalid': 'Resource not created: {{detail}}',
   'group-copy-target-unknown': 'Provider “{{provider}}” is unknown to the panel',
-  'resource-not-found': 'Resource not found',
   'config-format-unrecognized':
     'The configuration file format is not recognized — writing is disabled.',
   'plugin-unspecified': 'No plugin specified',
@@ -90,7 +90,6 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The write failed, and so did the rollback: some files stayed changed. The copies are in the backups folder.',
   'portability-transfer-not-found':
     'There is nothing to undo: the panel has not transferred anything to this target.',
-  'portability-subscription-unknown': 'There is no subscription for this target.',
   'portability-subscription-layer-unknown': 'The canon has no such layer.',
   'portability-subscription-held':
     'The rebuild is on hold: either the projection was built by another canon version, or no layer is subscribed.',
@@ -105,6 +104,154 @@ export const configEn: Record<ConfigMessageCode, string> = {
   'portability-drift-nothing-to-do':
     'This outcome produces no edit at all: look at the plan again.',
   'portability-carry-nothing-chosen': 'No conversation is selected: there is nothing to carry.',
+  'portability-needs-instructions':
+    'the model reads the instructions text; it needs no runtime facts',
+  'portability-needs-skill':
+    'the model picks the skill by its description; it needs no runtime facts',
+  'portability-needs-command': 'the command expands into ready text and takes no arguments',
+  'portability-needs-subagent': 'the subagent gets its task as text; it needs no runtime facts',
+  'portability-needs-secret': 'the key serves the whole process; it needs no conversation facts',
+  'portability-needs-env':
+    'the environment variable always applies and needs no conversation facts',
+  'portability-needs-mcp': 'the MCP server starts with the CLI and needs no conversation facts',
+  'portability-needs-permission-mode':
+    'the approval mode applies to the whole CLI and does not inspect call arguments',
+  'portability-needs-probe-server':
+    "the server answers the model's request and needs no conversation facts",
+  'portability-needs-hook-none': 'neither the event nor the script text names any runtime fact',
+  'portability-needs-event-unknown':
+    'event «{{event}}» is described by no known format: its payload is unknown',
+  'portability-needs-plugin':
+    "the plugin's contents are analysed separately: its requirements are not known yet",
+  'portability-needs-unparsed-entry':
+    'not even its own source parses this entry: what it reads is unknown',
+  'portability-needs-script-computed-key': 'the script reads the payload by a computed key',
+  'portability-needs-script-calls-script':
+    "the script calls another script — that script's payload is not visible from here",
+  'portability-needs-script-reads-transcript':
+    'the script reads the transcript, so it can read anything from the conversation',
+  'portability-needs-script-evals': 'the script executes computed code',
+  'portability-needs-script-unread': 'script {{path}} was not read: {{detail}}',
+  'portability-intent-instructions':
+    'instructions file {{name}}: the model reads its text in every conversation',
+  'portability-intent-skill': 'skill {{name}}: {{description}}{{subtree}}',
+  'portability-intent-skill-account-only':
+    'skill {{name}}: the source is the account, there is no file on disk{{subtree}}',
+  'portability-intent-skill-account-synced':
+    'skill {{name}}: synced with the account, the account owns the entry{{subtree}}',
+  'portability-intent-subtree-attached': ' (attachments: {{count}})',
+  'portability-intent-subtree-skipped': ' (not transferred: {{count}})',
+  'portability-intent-subtree-both': ' (attachments: {{attached}}, not transferred: {{skipped}})',
+  'portability-intent-no-description': 'no description',
+  'portability-intent-command': 'command {{command}}: {{description}}',
+  'portability-intent-subagent': 'subagent {{name}}: {{description}}',
+  'portability-intent-plugin': 'plugin {{name}}',
+  'portability-intent-secret':
+    'key {{key}}: the value stays with its holder and is not transferred',
+  'portability-intent-env': 'environment variable {{key}}',
+  'portability-intent-hook': 'on {{event}} runs: {{command}}',
+  'portability-intent-hook-matcher': 'on {{event}} with filter {{matcher}} runs: {{command}}',
+  'portability-intent-hook-preserved': 'entry {{key}}, whose shape its source does not parse',
+  'portability-intent-mcp-sdk':
+    '{{name}}: the server lives inside the SDK process: the host application registers it at start, not a configuration file{{off}}',
+  'portability-intent-mcp-stdio': 'tool server {{name}}: started by the command {{command}}{{off}}',
+  'portability-intent-mcp-url': 'tool server {{name}}: {{url}}{{off}}',
+  'portability-intent-mcp-off': ' — off',
+  'portability-intent-mode-policy': '{{cli}} approval policy: {{mode}}{{defaults}}',
+  'portability-intent-mode-approval': '{{cli}} approval mode: {{mode}}{{defaults}}',
+  'portability-intent-mode-plain': '{{cli}} mode: {{mode}}{{defaults}}',
+  'portability-intent-mode-default': ' (CLI default, the key is not in the file)',
+  'portability-intent-tool-allowed': 'tool allowed: {{rule}}',
+  'portability-intent-tool-denied': 'tool denied: {{rule}}',
+  'portability-intent-rule-allowed': 'allowed: {{rule}}',
+  'portability-intent-rule-ask': 'ask: {{rule}}',
+  'portability-intent-rule-denied': 'denied: {{rule}}',
+  'portability-intent-rule-unavailable': 'unavailable: {{rule}}',
+  'portability-intent-claude-rule-off':
+    '{{decision}}: {{rule}} — turned off by the panel, not in the settings file',
+  'portability-intent-probe-hook': 'Probe: the hook must stop the agreed forbidden call.',
+  'portability-intent-probe-skill': 'Probe: the skill must reach the model with the agreed word.',
+  'portability-intent-probe-command': 'Probe: the command must expand into the agreed text.',
+  'portability-intent-probe-permission':
+    'Probe: the permission must refuse reading the agreed file.',
+  'portability-intent-probe-mcp': 'Probe: the MCP tool must appear in the model’s list.',
+  'portability-intent-probe-env': 'Probe: the environment variable must reach the tool process.',
+  'portability-skip-no-section-project': '{{provider}} has no such section at the project level',
+  'portability-skip-no-section': '{{provider}} has no such section',
+  'portability-skip-project-undocumented':
+    '{{provider}} documents no project-level settings — there is nowhere to carry them',
+  'portability-skip-file-missing': 'file {{path}} does not exist',
+  'portability-skip-file-absent': '{{path}}: the file is not on disk',
+  'portability-skip-rule-extension': '{{path}}: this CLI does not read files with this extension',
+  'portability-skip-section-unreadable': '{{where}}: section not read — {{cause}}',
+  'portability-cause-not-json': 'the file is not valid JSON',
+  'portability-cause-unparsed': 'the file content cannot be parsed',
+  'portability-skip-mcp-block': '{{path}}: {{reason}}',
+  'mcp-block-unparsed':
+    'The block file does not fit the panel’s model (for example, an entry without a name or a `uses:` reference) — the panel neither shows nor edits it.',
+  'mcp-block-duplicate':
+    'The MCP server name from this file is already taken by another file — the panel cannot address the entry unambiguously and leaves the file alone.',
+  'portability-section-hooks-off':
+    '{{path}}: the disableAllHooks key switches off the whole section',
+  'portability-skip-no-skill-file': '{{name}}: the folder has no SKILL.md',
+  'portability-skip-command-body-config': '{{command}}: the command body is not in a file',
+  'portability-skip-no-records': '{{where}}: no entries',
+  'portability-skip-import-problem': '{{file}}: {{problem}}',
+  'portability-import-cycle': 'import cycle: {{path}} is already included above',
+  'portability-import-depth': 'import depth exceeded ({{depth}}): {{path}}',
+  'portability-import-unread': 'import not read: {{path}}',
+  'portability-skip-mcp-transport':
+    '{{name}}: transport “{{transport}}” is not described by any CLI',
+  'portability-skip-mcp-sdk':
+    '{{name}}: the server lives inside the SDK process: the host application registers it at start, not a config file',
+  'portability-skip-hook-event':
+    'event “{{event}}” is not described by any known format: its payload and meaning must not be invented',
+  'portability-skip-hook-script-missing': '{{id}}: script {{path}} is not on disk',
+  'portability-skip-codex-sandbox':
+    'sandbox_mode = {{mode}}: the CLIs have different sandbox models, there is no mapping (the source CLI refuses too)',
+  'portability-skip-permission-preserved':
+    'the panel does not manage permission.{{key}}: the key’s shape is not documented',
+  'portability-skip-codex-approval':
+    'approval_policy = {{value}}: the panel does not parse this value and it does not go into the passport — showing the default instead would describe an environment that does not exist',
+  'portability-skip-codex-agents':
+    'the [agents] key in config.toml: the panel does not parse Codex subagents yet, although the CLI’s own one-way importer carries them',
+  'portability-skip-codex-skills':
+    'the [[skills.config]] key in config.toml: the panel does not parse turning Codex skills on and off yet, although the CLI’s own one-way importer carries it',
+  'portability-skip-codex-prompts':
+    'the ~/.codex/prompts folder: the panel does not parse Codex commands yet, although the CLI’s own one-way importer carries them',
+  'portability-skip-plugin-registry-missing': '{{path}}: there is no plugin registry',
+  'portability-skip-plugin-registry-version':
+    '{{path}}: registry version {{version}}, Claude Code reads only version {{expected}} — these plugins are not in effect',
+  'plugin-registry-no-version': 'without a number',
+  'portability-skip-plugin-no-install': '{{id}}: the registry has no install path',
+  'portability-skip-plugin-dir-missing': '{{id}}: folder {{path}} is not on disk',
+  'portability-skip-plugin-disabled':
+    '{{id}}: the plugin is off, its entries are not in effect and are not carried',
+  'portability-skip-plugins-home-only':
+    'the CLI installs plugins at home level: they have no project level',
+  'portability-skip-secrets-home-only':
+    'the panel’s secrets file (.mcp-secrets.env) exists only at home level: a project has none of its own',
+  'portability-skip-subagent-problem': '{{path}}: {{problem}}',
+  'portability-subagent-not-file': 'this is not a regular file',
+  'portability-subagent-too-big': 'the file is too large to parse',
+  'portability-subagent-no-frontmatter': 'no header block — this is not a subagent',
+  'portability-subagent-empty-name': 'the subagent name is empty',
+  'portability-skip-project-missing': 'project folder {{path}} is not on disk',
+  'portability-skip-project-instructions-key':
+    'the projectInstructions key is outdated: the CLI reads it with a warning, the current key is instructionFiles (mode {{mode}}, default {{default}})',
+  'instruction-files-settings-unread':
+    'the settings file was not parsed; the default mode {{mode}} is used',
+  'instruction-files-value-unknown':
+    'value “{{value}}” of key {{key}} is not recognised; the default mode {{mode}} is used',
+  'instruction-files-managed-only':
+    'managed-only mode: the CLI reads none of its own instruction files, only the ones managed by the organisation remain',
+  'instruction-files-claude-md':
+    'claude-md mode: {{files}} is right here, but the CLI does not read it',
+  'instruction-files-claude-or-agents':
+    'claude-md-or-agents-md mode: CLAUDE.md is right here, so the CLI does not read {{files}}',
+  'commands-plugin-registry-version':
+    'Plugin registry installed_plugins.json is version {{version}}: Claude Code reads only version {{expected}}, the commands of these plugins do not reach the palette.',
+  'commands-plugin-dir-missing': 'Plugin “{{id}}”: install folder not found ({{path}}).',
   'resource-file-unspecified': 'No file specified',
   'resource-template-not-found': 'Template not found',
   'resource-kind-unknown': 'Unknown resource kind',
@@ -342,7 +489,6 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The file hooks/{{name}} already exists. Give another file name or leave the field empty and set a command.',
   'permission-rule-exists': 'The rule «{{pattern}}» with this decision already exists',
   'permission-not-found': 'The permission «{{id}}» was not found',
-  'script-not-found': 'The script «{{id}}» was not found',
   'provider-declared-only':
     'The provider «{{id}}» is only declared at this phase: the file adapter is not implemented, reading and writing are refused.',
   'provider-no-model-api':
@@ -359,40 +505,6 @@ export const configEn: Record<ConfigMessageCode, string> = {
     'The answer is not JSON — what answers at this address is not a model API.',
   'endpoint-probe-status': 'The address answered {{status}}{{detail}}',
   'instructions-section-unsupported': 'The active CLI does not support global instructions.',
-  'group-layer-permission':
-    "Group permissions are not carried to {{cli}}: it has its own permission model, and a blind translation could grant rights nobody asked for. Set them in {{cli}}'s Permissions section.",
-  'group-layer-mcp-sse': 'MCP "{{id}}" uses SSE, a transport Codex does not support.',
-  'group-layer-mcp-name':
-    'MCP name "{{id}}" contains a dot, which Codex reads as a nested settings key.',
-  'group-layer-mcp-secret-header':
-    'MCP "{{id}}" headers carry a secret that could only reach Codex on the command line; the panel will not do that.',
-  'group-layer-mcp-shape':
-    'The entry of MCP "{{id}}" in Claude\'s files has an unknown shape; nothing to carry.',
-  'group-layer-skill-name':
-    'Skill name "{{id}}" is longer than 64 characters; Codex will not load it.',
-  'group-layer-hook-event':
-    'A hook on {{event}} does not fire in {{cli}}: the panel plays only session start, prompt submit and stop.',
-  'group-layer-hook-event-native':
-    'A hook on {{event}} does not fire in {{cli}}: {{cli}} has no such event.',
-  'group-layer-missing': 'Member "{{id}}" was not found in Claude\'s files; nothing to carry.',
-  'group-layer-duplicate':
-    '"{{id}}" already rides with group "{{group}}"; the second copy is not delivered.',
-  'group-layer-none':
-    "{{cli}} does not read Claude's files and the panel has no group layer for it; the group does not apply to this run.",
-  'group-layer-too-large':
-    "Group and kit rules together exceed Codex's limit ({{limit}} chars); the run was refused, nothing was truncated.",
-  'group-layer-notice': 'Groups on this {{cli}} run: {{groups}}.',
-  'group-layer-notice-delivered': 'Delivered to the run as a layer — {{members}}.',
-  'group-layer-notice-nothing': 'No member reached the run.',
-  'group-layer-notice-refused': 'Not delivered:',
-  'foreign-shell-denied':
-    'The panel refused the command `{{command}}`. The agent was told: {{reason}}',
-  'group-layer-kind-rule': 'rules: {{names}}',
-  'group-layer-kind-skill': 'skills: {{names}}',
-  'group-layer-kind-mcp': 'MCP: {{names}}',
-  'group-layer-kind-hook': 'hooks: {{names}}',
-  'group-layer-kind-env': 'variables: {{names}}',
-  'group-layer-enabled-for':
-    "The group is on for {{cli}} runs — it rides as a layer on each, Claude's files did not change.",
-  'group-layer-disabled-for': "The group is off for {{cli}} runs; Claude's files did not change.",
+  'kimi-mode-stale':
+    'Kimi Code does not accept {{key}} = "{{mode}}" (allowed: {{allowed}}) and silently drops it at launch, running in manual. The section is read-only: fix the value in the file (kimi doctor config shows the error), and editing opens again.',
 };

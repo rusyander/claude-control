@@ -6,8 +6,8 @@ import { foreignTail as tail, redactSecrets } from '../redact/redact.ts';
 import { driverOf } from '../drivers/index.ts';
 import { contourHeaders, contourUrl } from '../transport/transport.ts';
 import { catalogItems, type PlatformDriver } from '../drivers/driver.ts';
-import { bridgeUpstreamStatus } from '../gateway/status/status.ts';
-import { retryAfterSeconds } from '../gateway/upstream/upstream.ts';
+import { bridgeUpstreamStatus } from '../status/status.ts';
+import { retryAfterSeconds } from '../upstream/upstream.ts';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**

@@ -458,22 +458,6 @@ describe('уборка сирот: секрет без владельца не �
     expect(readToken(dir, 'company-prod') ?? '').toBe('');
   });
 
-  it('учёт расхода — тоже след контура и уходит вместе с ним', () => {
-    writePlatform(store, PLATFORM);
-    store.savePlatformSpend({
-      platformId: PLATFORM.id,
-      days: [],
-      exhaustedAt: '2026-09-10T10:00:00.000Z',
-    });
-
-    // Идентификатор человек вправе завести заново (переименование выглядит
-    // именно так) — оставленная запись приписала бы новому контуру чужой расход
-    // и чужой упёртый бюджет.
-    store.updateSettings({ platforms: [] });
-    expect(forgetOrphanPlatforms(store, dir)).toEqual([PLATFORM.id]);
-    expect(store.getPlatformSpend()[PLATFORM.id]).toBeUndefined();
-  });
-
   /**
    * §8 №21: два контура, настроенные одновременно. Модель данных — список, и
    * это не «на будущее»: у каждого свой ключ под своим пространством имён и

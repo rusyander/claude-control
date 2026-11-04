@@ -444,7 +444,9 @@ async function run(model, home) {
   // Первый критерий приёмки Т12 требует не «шлюз отвечает», а «контур
   // ОБСЛУЖИВАЕТ АССИСТЕНТА». Это другой путь: применение заводит управляемый
   // профиль эндпоинта, и `/api/assistant/run` идёт по нему, а не в облако
-  // вендора и не через подписочный CLI.
+  // вендора. Прямой дороги в API вендора у ассистента больше нет: ход идёт
+  // задачей ядра через CLI (`mode: 'cli'`), а CLI — в эндпоинт контура; учёт
+  // контура ниже доказывает, что запрос прошёл именно через него.
   const applied = await api(`/platforms/${encodeURIComponent(CONTOUR)}/apply`, {
     method: 'POST',
     body: JSON.stringify({ targets: ['assistant'], model }),
@@ -461,7 +463,7 @@ async function run(model, home) {
   });
   check(
     'ассистент панели ответил через чужой контур',
-    asked.body?.ok === true && asked.body?.mode === 'api' && asked.body.reply.trim().length > 0,
+    asked.body?.ok === true && asked.body?.mode === 'cli' && asked.body.reply.trim().length > 0,
     JSON.stringify(asked.body)?.slice(0, 300),
   );
 

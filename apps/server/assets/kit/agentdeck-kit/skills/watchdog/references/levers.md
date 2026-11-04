@@ -4,7 +4,7 @@
 
 | unit runs as | pause | resume | restart after a fix |
 |---|---|---|---|
-| AgentDeck split group | `agentdeck-watchdog` `group-control.mjs pause` (kills the running turn) or `--pause-at-safe` | `group-control.mjs resume` | dev-watch restarts the server once no run is live |
+| AgentDeck core task step | the human pauses the task (core command `pause`; the core observer stops waste itself) | core command `resume` | — |
 | a subagent this session spawned | none mid-turn — it ends on its own | a fresh spawn with the ledger row as its brief | — |
 | a background Bash task | TaskStop (its work is lost) | re-run it | — |
 | a CLI session the user drives | none from here — the user's | the user's | the fix reaches its next turn |

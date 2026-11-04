@@ -1,14 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import {
-  mkdtempSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-  existsSync,
-  statSync,
-} from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -17,21 +9,21 @@ import type { LocalJob, LocalModelsInfo, LocalQuantsInfo } from '@agentdeck/cont
 import type { ServerContext } from '../../context.ts';
 import { createLocalModels, loadCatalog } from '../../domains/local-models/service.ts';
 import { localPaths, readState, updateState } from '../../domains/local-models/paths.ts';
-import { manifestPathOf, blobPathOf } from '../../domains/local-models/store.ts';
 import { modelFilePath } from '../../domains/local-models/hf.ts';
 import { loadRelease } from '../../domains/local-models/runtime.ts';
 import { LOCAL_PLATFORM_ID } from '../../domains/local-models/connect.ts';
 import { KitService } from '../../domains/kit/service.ts';
 import { platformSchema } from '../../providers/settings-validation/settings-validation.ts';
 import { registerLocalModelsRoutes } from './local-models-routes.ts';
+import { fakeCoreHold } from '../../domains/local-models/__fixtures__/fake-core-hold.ts';
 
 /**
  * Весь путь раздела «Локальные модели» поверх настоящего сокета: настоящие
  * маршруты и сервис, вместо llama-server — заглушка `tools/qa/stub-llama.mjs`
  * (то же HTTP-лицо), вместо Hugging Face и GitHub — `fakeNet` с теми же ответами
  * (дерево, Range, digest). Ни гигабайтов, ни сети, ни видеокарты: железо
- * подставлено строкой nvidia-smi, процесс сервера — подменой запуска, которая
- * поднимает заглушку на порту из аргументов; снятие процесса закрывает её.
+ * подставлено строкой nvidia-smi, удержание ядра — подменой, которая поднимает заглушку на
+ * постоянном порту (как фронт ядра); освобождение закрывает её.
  */
 
 interface StubLlama {
@@ -50,8 +42,6 @@ interface Stubs {
 
 const REPO = resolve(import.meta.dirname, '..', '..', '..', '..', '..');
 const TAG = 'qwen3.5:9b';
-const IMPORT_TAG = 'qwen3.5:4b';
-const BROKEN_TAG = 'broken:1b';
 
 let stubs: Stubs;
 let root: string;
@@ -106,28 +96,6 @@ async function freeTcpPort(): Promise<number> {
   });
 }
 
-/** Системное хранилище Ollama с одной моделью: слой — GGUF под именем sha256-<хеш>. */
-function writeOllamaModel(store: string, tag: string, blob: Buffer, digest: string): void {
-  const manifest = manifestPathOf(store, tag);
-  mkdirSync(join(manifest, '..'), { recursive: true });
-  mkdirSync(join(store, 'blobs'), { recursive: true });
-  writeFileSync(blobPathOf(store, `sha256:cfg-${digest}`), '{}');
-  writeFileSync(blobPathOf(store, `sha256:${digest}`), blob);
-  writeFileSync(
-    manifest,
-    JSON.stringify({
-      config: { digest: `sha256:cfg-${digest}`, size: 2 },
-      layers: [
-        {
-          mediaType: 'application/vnd.ollama.image.model',
-          digest: `sha256:${digest}`,
-          size: blob.length,
-        },
-      ],
-    }),
-  );
-}
-
 beforeAll(async () => {
   stubs = (await import(pathToFileURL(join(REPO, 'tools', 'qa', 'stub-llama.mjs')).href)) as Stubs;
   root = mkdtempSync(join(tmpdir(), 'cc-local-routes-'));
@@ -157,14 +125,8 @@ beforeAll(async () => {
     },
   });
 
-  // Системная папка Ollama: одна модель открывается, одна — нет.
-  const system = join(root, 'system-models');
-  writeOllamaModel(system, IMPORT_TAG, stubs.ggufBuffer({ nextn: 1, padBytes: 256 }), 'w4');
-  writeOllamaModel(system, BROKEN_TAG, stubs.ggufBuffer({ arch: 'exotic' }), 'wb');
-
   const env: NodeJS.ProcessEnv = {
     AGENTDECK_LOCAL_MODELS_DIR: lm,
-    OLLAMA_MODELS: system,
     PATH: '',
     LOCALAPPDATA: join(root, 'appdata'),
     ProgramFiles: join(root, 'programs'),
@@ -185,30 +147,19 @@ beforeAll(async () => {
       if (cmd === 'nvidia-smi') return 'NVIDIA GeForce RTX 4090, 24564, 20000\n';
       throw new Error(`no ${cmd}`);
     },
-    spawnServer: ((_binary: string, args: string[], options: { env: NodeJS.ProcessEnv }) => {
-      spawned.push({ args, env: options.env });
-      void stubs
-        .startStubLlama({ port: Number(args[args.indexOf('--port') + 1]), tokensPerSec: 42 })
-        .then((started) => {
-          server = started;
-        });
-      return {
-        pid: 999_000 + spawned.length,
-        once: () => undefined,
-        on: () => undefined,
-        unref: () => undefined,
-      };
-    }) as unknown as Parameters<typeof createLocalModels>[0]['spawnServer'],
-    kill: (pid) => {
-      killed.push(pid);
-      void server?.close();
-      server = undefined;
-    },
-    // Пробная загрузка: «экзотическую» архитектуру llama.cpp не открывает.
-    testLoad: async (file) =>
-      readFileSync(file).includes(Buffer.from('exotic'))
-        ? { ok: false, reason: 'unknown model architecture' }
-        : { ok: true },
+    hold: fakeCoreHold({
+      hold: async ({ flags, env: serverEnv }) => {
+        spawned.push({ args: flags, env: serverEnv });
+        server = await stubs.startStubLlama({ port, tokensPerSec: 42 });
+        return 999_000 + spawned.length;
+      },
+      release: async (pid) => {
+        killed.push(pid);
+        const old = server;
+        server = undefined;
+        await old?.close();
+      },
+    }),
     claude: {
       settingsPath: () => join(root, 'claude', 'settings.json'),
       backupDir: () => undefined,
@@ -269,14 +220,13 @@ afterAll(async () => {
 });
 
 describe('раздел «Локальные модели» по настоящему сокету', () => {
-  it('снимок: карта, своя сборка, сервера нет, модели Ollama предлагаются к переносу', async () => {
+  it('снимок: карта, своя сборка, сервера нет, установленных нет', async () => {
     const { status, body } = await api<LocalModelsInfo>('GET', '/api/local-models');
     expect(status).toBe(200);
     expect(body.hardware.gpus[0]).toMatchObject({ name: 'NVIDIA GeForce RTX 4090', vramGb: 24 });
     expect(body.runtime).toMatchObject({ source: 'panel', version: 'b11583', outdated: false });
     expect(body.server).toMatchObject({ running: false, port });
     expect(body.installed).toEqual([]);
-    expect(body.importable.map((item) => item.tag)).toEqual([BROKEN_TAG, IMPORT_TAG]);
     expect(body.connect).toEqual({ configured: false, active: false, model: '' });
     expect(body.catalog.models.every((model) => model.repo && model.quants.length > 0)).toBe(true);
   });
@@ -334,9 +284,10 @@ describe('раздел «Локальные модели» по настояще
     const args = spawned[0]?.args ?? [];
     expect(args[args.indexOf('-m') + 1]).toBe(file);
     expect(args[args.indexOf('--alias') + 1]).toBe(TAG);
-    expect(args).toContain('--jinja');
     expect(args).not.toContain('--spec-type');
-    expect(args[args.indexOf('--port') + 1]).toBe(String(port));
+    // Адрес, порт и Jinja — дело маршрутизатора ядра: в пресет модели не идут.
+    expect(args).not.toContain('--port');
+    expect(args).not.toContain('--jinja');
 
     // Два PUT: первый с прогонами панели, второй ещё и с Qwen Code (контур его
     // принял), затем включение. Чужой CLI, которому контур отказал, не добавлен.
@@ -419,34 +370,6 @@ describe('раздел «Локальные модели» по настояще
       setDevice('gpu', JSON.parse(record).offload);
       writeFileSync(paths().pidFile, record);
     }
-  });
-
-  it('перенос из системного Ollama — без второй копии на диске, MTP из заголовка', async () => {
-    const started = await api<LocalJob>('POST', '/api/local-models/import', { tag: IMPORT_TAG });
-    const job = await finished(started.body.id);
-    expect(job.state).toBe('done');
-    const target = join(paths().ollamaImport, 'qwen3.5-4b.gguf');
-    expect(statSync(target).nlink).toBeGreaterThanOrEqual(2);
-    const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
-    expect(body.installed.find((item) => item.tag === IMPORT_TAG)).toMatchObject({
-      quant: 'Ollama',
-      source: 'ollama',
-    });
-    expect(body.importable.map((item) => item.tag)).toEqual([BROKEN_TAG]);
-    expect(readState(paths()).imported[IMPORT_TAG]?.mtp).toBe(true);
-  });
-
-  it('модель, которую llama.cpp не открыл, — не в установленных, причина показана, предложение скачать заново', async () => {
-    const started = await api<LocalJob>('POST', '/api/local-models/import', { tag: BROKEN_TAG });
-    const job = await finished(started.body.id);
-    expect(job).toMatchObject({ state: 'failed', errorCode: 'local-load-failed' });
-    expect(existsSync(join(paths().ollamaImport, 'broken-1b.gguf'))).toBe(false);
-    const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
-    expect(body.installed.map((item) => item.tag)).not.toContain(BROKEN_TAG);
-    expect(body.importable).toEqual([]);
-    expect(body.importFailed).toEqual([
-      { tag: BROKEN_TAG, reason: expect.stringContaining('unknown model architecture') },
-    ]);
   });
 
   it('Claude Code на модели: галочка пишет settings.json, выключение возвращает прежнее', async () => {
@@ -577,17 +500,9 @@ describe('раздел «Локальные модели» по настояще
     expect(status).toBe(200);
     expect(killed.length).toBe(before + 1);
     expect(existsSync(file)).toBe(false);
-    expect(existsSync(join(paths().ollamaImport, 'qwen3.5-4b.gguf'))).toBe(true);
     const { body } = await api<LocalModelsInfo>('GET', '/api/local-models');
     expect(body.server.running).toBe(false);
-    expect(body.installed.map((item) => item.tag)).toEqual([IMPORT_TAG]);
-    // Перенесённую из Ollama снимает то же удаление: ссылка уходит, слой Ollama — цел.
-    expect(
-      (await api('DELETE', `/api/local-models/models/${encodeURIComponent(IMPORT_TAG)}`)).status,
-    ).toBe(200);
-    expect(existsSync(join(paths().ollamaImport, 'qwen3.5-4b.gguf'))).toBe(false);
-    expect(existsSync(blobPathOf(join(root, 'system-models'), 'sha256:w4'))).toBe(true);
-    expect(readState(paths()).imported[IMPORT_TAG]).toBeUndefined();
+    expect(body.installed).toEqual([]);
   });
 
   // С В2 режим набора хранит страница «Набор панели»; маршрут раздела — её отражение.

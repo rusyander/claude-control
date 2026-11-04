@@ -18,6 +18,13 @@
  * `?project=…` — каталог проекта для раздела тестов: с ним приходят агент
  * панели и история кейса из окна тестов чата. Раздел выбирает проект и снимает
  * параметр; держать его здесь нужно, чтобы переход по ссылке его не терял.
+ *
+ * `?cli=…` — CLI нового чата ядра (`/core/chat`): с ним приходит «Новый чат» из чата
+ * чужого CLI, и форма начинает с того CLI, чей чат человек открыл.
+ *
+ * `?resume=…` — id разговора CLI, который чат ядра продолжает («Продолжить через ядро» из чата
+ * панели). Строка как есть: форму id проверяет форма чата и называет негодный, а владение
+ * разговором — переходник ядра.
  */
 /**
  * Непустая строка или `undefined`. Число (`?tab=1` роутер разбирает числом)
@@ -36,6 +43,8 @@ export function validateSearch(search: Record<string, unknown>): {
   tab?: string;
   run?: string;
   project?: string;
+  cli?: string;
+  resume?: string;
   create?: boolean;
 } {
   const id = text(search.id);
@@ -43,12 +52,16 @@ export function validateSearch(search: Record<string, unknown>): {
   const tab = text(search.tab);
   const run = text(search.run);
   const project = text(search.project);
+  const cli = text(search.cli);
+  const resume = text(search.resume);
   return {
     ...(id ? { id } : {}),
     ...(topic ? { topic } : {}),
     ...(tab ? { tab } : {}),
     ...(run ? { run } : {}),
     ...(project ? { project } : {}),
+    ...(cli ? { cli } : {}),
+    ...(resume ? { resume } : {}),
     // `?create=1` — быстрое действие «Добавить» с обзора: раздел открывает свою
     // форму создания (см. useCreateParam). Держим булевым флагом, а не строкой.
     ...(search.create ? { create: true } : {}),

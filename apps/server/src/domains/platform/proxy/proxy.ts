@@ -1,7 +1,7 @@
 import { request as httpRequest } from 'node:http';
 import { Agent as HttpsAgent } from 'node:https';
 import { connect as tlsConnect, type TLSSocket } from 'node:tls';
-import type { Socket } from 'node:net';
+import type { LookupFunction, Socket } from 'node:net';
 import { serverText } from '../../../lib/server-texts/server-texts.ts';
 
 /**
@@ -83,6 +83,24 @@ function isLoopback(hostname: string): boolean {
     /^127\./.test(host)
   );
 }
+
+/**
+ * Имя под `.localhost` (`api.localhost` локального стенда в k8s) — петля по RFC 6761 §6.3. Браузер и
+ * curl отвечают на него сами, а Node спрашивает ОС, и резолвер Windows такого имени не знает: проба
+ * видела «адрес недоступен» там, где браузер открывал страницу (живой стенд 03.11).
+ */
+export function isLocalhostName(hostname: string): boolean {
+  return hostname.toLowerCase().replace(/\.$/, '').endsWith('.localhost');
+}
+
+/** `lookup` для `node:http`: имя под `.localhost` — сразу 127.0.0.1, без вопроса к ОС. */
+export const loopbackLookup: LookupFunction = (_hostname, options, callback) => {
+  if (options.all) {
+    callback(null, [{ address: '127.0.0.1', family: 4 }]);
+    return;
+  }
+  callback(null, '127.0.0.1', 4);
+};
 
 function targetPort(target: URL): string {
   if (target.port) return target.port;

@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KitMode } from '@agentdeck/contracts/local-models';
-import { CODEX_KIT_ENV } from './codex.ts';
+import { SESSION_APPEND_MAX } from '@agentdeck/contracts/core/session-carry';
 import {
   GUARD_HOOKS,
   GUARD_TWINS,
@@ -600,7 +600,7 @@ describe('runExtras: что получает прогон', () => {
         session_id: 'guards-overlay',
       }),
       encoding: 'utf8',
-      env: { ...process.env, AGENTDECK_SPLIT_CHILD: '' },
+      env: { ...process.env, AGENTDECK_STEP_KIND: '' },
       timeout: 15_000,
     });
     const verdict = JSON.parse(out.stdout) as {
@@ -676,20 +676,20 @@ describe('runExtras: что получает прогон', () => {
     expect(extras('qwen', true)).toEqual({ args: [], env: {} });
   });
 
-  it('Codex «оба» — путь к наложению в окружении, файл с правилами и навыками набора', () => {
+  it('Codex «оба» — правила и навыки набора текстом дописки сеанса ядра (G6), без переменной AGENTDECK_*', () => {
     service().setMode('codex', 'hybrid');
     const result = extras('codex');
     expect(result.args).toEqual([]);
-    const file = result.env[CODEX_KIT_ENV] ?? '';
-    expect(file).toBe(join(appData, 'kit', 'codex', 'overlay-standard.json'));
-    const overlay = JSON.parse(readFileSync(file, 'utf8')) as Record<string, string>;
-    expect(overlay.appServer).toContain('# agentdeck kit rules');
-    expect(overlay.exec).toContain('verify-by-running');
-    // Весь набор, а не сборка «оба» Claude: ~/.claude Codex не читает.
-    expect(overlay.skillsDir).toBe(join(effective('ours'), 'skills'));
-    expect(extras('codex', true).env[CODEX_KIT_ENV]).toBe(
-      join(appData, 'kit', 'codex', 'overlay-local.json'),
-    );
+    // Переменные `AGENTDECK_*` ядро держит само — файл наложения в окружении сеанс не увидел бы.
+    expect(result.env).toEqual({});
+    const append = result.append ?? '';
+    expect(append).toContain('# agentdeck kit rules');
+    expect(append).toContain('verify-by-running');
+    // Предел дописки ядра минус место под строки о тестах и профиле.
+    expect(append.length).toBeLessThanOrEqual(SESSION_APPEND_MAX - 4_000);
+    const local = extras('codex', true);
+    expect(local.env).toEqual({});
+    expect(local.append).toContain('# agentdeck kit rules');
   });
 
   it('Codex — ничего, даже с режимом, записанным в state.json руками', () => {

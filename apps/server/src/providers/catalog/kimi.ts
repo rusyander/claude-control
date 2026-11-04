@@ -125,11 +125,6 @@ export const kimiProvider: ConfigProvider = {
       bashOutputChars: { support: 'impossible', note: 'economy-note-hardcoded-limit' },
       cacheTtl: { support: 'impossible', note: 'economy-note-cache-implicit' },
       detachIde: { support: 'meaningless', note: 'economy-note-no-ide' },
-      sonnetDeliver: { support: 'impossible', note: 'economy-note-no-model-ladder' },
-      // Провайдер и цена кэша — в config.toml человека (Moonshot лишь по умолчанию):
-      // ни паузу «кэш остыл», ни окупаемость пинга панель не посчитает — одна причина обоим.
-      freshOnColdResume: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
-      keepWarm: { support: 'disproportionate', note: 'economy-note-provider-unknown' },
       workHabits: { support: 'emulated' },
     },
   },

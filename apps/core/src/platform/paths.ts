@@ -28,6 +28,11 @@ function api(os: OsKind): typeof path.posix {
   return os === 'win32' ? path.win32 : path.posix;
 }
 
+/** Модуль путей ОС `os` — расчёт путей чужой ОС выше platform/ (личная память Claude, её тесты). */
+export function pathFlavour(os: OsKind = currentOs()): typeof path.posix {
+  return api(os);
+}
+
 /** `\\?\C:\…` → `C:\…`, `\\?\UNC\srv\share` → `\\srv\share`. */
 export function stripLongPrefix(value: string): string {
   if (/^\\\\\?\\UNC\\/i.test(value)) return `\\\\${value.slice(8)}`;

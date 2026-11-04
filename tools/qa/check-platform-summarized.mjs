@@ -11,13 +11,10 @@
  *      транскрипт, и подпись о сжатии стоит в ленте у ТОГО ответа, где контур
  *      прислал кадр, — у второго, а у первого нет (сопоставление по id
  *      сообщения, который шлюз выдал клиенту сам);
- *   2. чат чужого CLI (фальшивый `qwen` на PATH, но запрос он шлёт настоящим
- *      сокетом в адрес из СВОЕГО окружения) получает подпись только на ответе,
- *      чей прогон сжатие видел, — даже когда в то же время через тот же контур
- *      шёл посторонний сжатый запрос (сопоставление по метке прогона в адресе,
- *      а не по окну времени);
- *   3. раздел «Контур» показывает случаи сжатия и говорит, к чему каждый
- *      привязан.
+ *   2. раздел «Контур» показывает случай сжатия и говорит, к чему он привязан.
+ *
+ * Часть про чат чужого CLI (фальшивый `qwen` прежним исполнителем панели) снята на этапе 10
+ * (F2c): чат чужого CLI — задача ядра, разговор панели не заводится (410 `provider-chat-core`).
  *
  * Снимки: `.agent/screenshots/before-after/summarizing-caption/<SHOT_PHASE>-*.png`.
  *
@@ -25,13 +22,22 @@
  * нужен и не трогается; порты SUM_PANEL_PORT/SUM_WEB_PORT/SUM_GATEWAY_PORT,
  * по умолчанию 5262/8972/5263). Нужен установленный `claude` (или CLAUDE_CLI).
  */
-import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium } from 'playwright';
 import { startStubPlatform } from './stub-platform.mjs';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
+import { reapCoreSessions } from './throwaway-stand.mjs';
 
 const REPO = resolve(import.meta.dirname, '../..');
 const PANEL_PORT = Number(process.env.SUM_PANEL_PORT ?? 5262);
@@ -45,10 +51,16 @@ const SHOTS = join(REPO, '.agent/screenshots/before-after/summarizing-caption');
 /** Заглушки вместо ключей: собраны из кусков, чтобы не походить на секрет. */
 const KEY = ['squeeze', 'stub', 'key'].join('-');
 const ROUTE_TOKEN = ['panel', 'contour', 'no', 'key', 'needed'].join('-');
-/** Метка в задании чужому CLI: по ней фальшивый CLI просит сценарий сжатия. */
-const SQUEEZE = 'SQUEEZE-NOW';
 
 let failures = 0;
+let panelLog = '';
+const readJsonQuiet = (file) => {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return undefined;
+  }
+};
 const check = (name, condition, detail = '') => {
   if (condition) console.log(`  ✓ ${name}`);
   else {
@@ -92,72 +104,6 @@ async function api(path, init = {}) {
     return { status: res.status, body: text ? JSON.parse(text) : undefined };
   } catch {
     return { status: res.status, body: text };
-  }
-}
-
-/**
- * Фальшивый чужой CLI: ответ он берёт у шлюза НАСТОЯЩИМ запросом по адресу из
- * своего окружения, ровно как это делает CLI, которому панель выдала маршрут.
- * Задание с меткой просит модель со сжатием; без метки — обычную, и после
- * ответа ждёт полторы секунды, чтобы посторонний запрос успел попасть в окно
- * его прогона.
- */
-function writeFakeQwen(bin) {
-  const script = join(bin, 'fake-qwen.mjs');
-  writeFileSync(
-    script,
-    `const args = process.env.FAKE_QWEN_ARGS ?? process.argv.slice(2).join(' ');
-const squeeze = args.includes('${SQUEEZE}');
-const base = process.env.OPENAI_BASE_URL ?? '';
-const model = squeeze ? 'stub-summarizing' : (process.env.OPENAI_MODEL || 'stub-chat');
-const res = await fetch(base.replace(/\\/+$/, '') + '/chat/completions', {
-  method: 'POST',
-  headers: { 'content-type': 'application/json', authorization: 'Bearer ' + (process.env.OPENAI_API_KEY ?? '') },
-  body: JSON.stringify({ model, stream: true, messages: [{ role: 'user', content: args.slice(-400) }] }),
-});
-const text = await res.text();
-let out = '';
-for (const line of text.split('\\n')) {
-  if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
-  try { out += JSON.parse(line.slice(6)).choices?.[0]?.delta?.content ?? ''; } catch {}
-}
-process.stdout.write((out || 'пусто: ' + res.status) + (squeeze ? ' [сжатый]' : ' [обычный]'));
-if (!squeeze) await new Promise((done) => setTimeout(done, 1500));
-`,
-    'utf8',
-  );
-  if (process.platform === 'win32') {
-    // Нативный исполняемый файл, а не `.cmd`: через обёртку панель многострочный
-    // запрос не отдаёт вовсе (`cli-spawn.ts`), а второй ход несёт историю
-    // строками. Аргументы уходят скрипту переменной — без второго разбора кавычек.
-    const csc = join(
-      process.env.WINDIR ?? 'C:\\Windows',
-      'Microsoft.NET',
-      'Framework64',
-      'v4.0.30319',
-      'csc.exe',
-    );
-    if (!existsSync(csc)) throw new NotChecked(`нет ${csc} — нечем собрать фальшивый qwen.exe.`);
-    const source = join(bin, 'fake-qwen.cs');
-    writeFileSync(
-      source,
-      `using System; using System.Diagnostics;
-class FakeQwen { static int Main(string[] args) {
-  var info = new ProcessStartInfo(@"${process.execPath}", "\\"" + @"${script}" + "\\"");
-  info.UseShellExecute = false;
-  info.EnvironmentVariables["FAKE_QWEN_ARGS"] = string.Join(" ", args);
-  var child = Process.Start(info); child.WaitForExit(); return child.ExitCode; } }
-`,
-      'utf8',
-    );
-    const built = spawnSync(csc, ['/nologo', `/out:${join(bin, 'qwen.exe')}`, source], {
-      encoding: 'utf8',
-    });
-    if (built.status !== 0) throw new NotChecked(`фальшивый qwen.exe не собрался: ${built.stdout}`);
-  } else {
-    writeFileSync(join(bin, 'qwen'), `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, {
-      mode: 0o755,
-    });
   }
 }
 
@@ -214,15 +160,7 @@ async function main() {
   const cfg = join(home, '.claude');
   const bin = join(root, 'bin');
   const work = join(root, 'work');
-  const foreignDir = join(root, 'foreign');
-  for (const dir of [
-    cfg,
-    bin,
-    work,
-    foreignDir,
-    join(home, 'AppData/Roaming'),
-    join(home, 'AppData/Local'),
-  ]) {
+  for (const dir of [cfg, bin, work, join(home, 'AppData/Roaming'), join(home, 'AppData/Local')]) {
     mkdirSync(dir, { recursive: true });
   }
   writeFileSync(join(cfg, 'settings.json'), '{}\n', 'utf8');
@@ -234,7 +172,6 @@ async function main() {
     }),
     'utf8',
   );
-  writeFakeQwen(bin);
 
   const homeEnv = {
     HOME: home,
@@ -259,10 +196,14 @@ async function main() {
     {
       cwd: join(REPO, 'apps/server'),
       env: { ...base, ...homeEnv, PATH, PORT: String(PANEL_PORT), WEB_PORT: String(WEB_PORT) },
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     },
   );
+  // Строки учёта контуров (`contours: …`) — в отчёт провала: учёт ведёт звено ядра (C3b), и
+  // отказ записи иначе не виден нигде.
+  panel.stdout.on('data', (chunk) => (panelLog += chunk));
+  panel.stderr.on('data', (chunk) => (panelLog += chunk));
   children.push(panel);
   const web = spawn(
     process.execPath,
@@ -290,14 +231,29 @@ async function main() {
     console.log(
       `CLI: ${exe}\nСтаб-контур: ${stub.url}\nПанель: ${PANEL}  фронт: ${WEB}  фаза снимков: ${PHASE}\n`,
     );
-    await run({ exe, stub, cfg, work, foreignDir });
+    await run({ exe, stub, cfg, work });
   } finally {
     for (const child of children) child.kill();
+    // Ядро панель поднимает сама (надзор) отвязанным — снятие панели его не уносит; хост звеньев
+    // и хосты сессий ядро держит и после себя. Снимаются по записям дома ядра, не по имени.
+    const coreHome = join(home, '.agentdeck', 'core');
+    for (const core of readJsonQuiet(join(coreHome, 'procs.json'))?.cores ?? []) {
+      try {
+        if (Number.isInteger(core?.pid) && core.pid > 0) process.kill(core.pid);
+      } catch {
+        // уже вышло
+      }
+    }
+    reapCoreSessions(coreHome);
     await stub.close();
     await wait(500);
     rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
   }
 
+  if (failures > 0) {
+    const lines = panelLog.split('\n').filter((line) => line.includes('contours:'));
+    if (lines.length > 0) console.log(`\nУчёт контуров в журнале панели:\n${lines.join('\n')}`);
+  }
   console.log(failures === 0 ? '\nВсё сходится.' : `\nПровалов: ${failures}`);
   process.exit(failures === 0 ? 0 : 1);
 }
@@ -317,7 +273,7 @@ async function openContour(stub) {
         budgetSince: '',
         capabilities: [],
         targets: [],
-        consumers: ['chat', 'foreign:qwen'],
+        consumers: ['chat'],
         defaultModel: 'stub-chat',
         projectPaths: [],
         agents: [],
@@ -346,12 +302,11 @@ async function gatewayEvents() {
   return (await api('/platforms/gateway')).body?.status?.events ?? [];
 }
 
-async function run({ exe, stub, cfg, work, foreignDir }) {
+async function run({ exe, stub, cfg, work }) {
   await openContour(stub);
   const browser = await chromium.launch();
   try {
     await claudePart({ exe, cfg, work, browser });
-    await foreignPart({ foreignDir, browser });
     await platformPart({ browser });
   } finally {
     await browser.close();
@@ -456,92 +411,13 @@ async function claudePart({ exe, cfg, work, browser }) {
   await page.close();
 }
 
-// ── 2. Чат чужого CLI ──────────────────────────────────────────────────────
-async function foreignPart({ foreignDir, browser }) {
-  console.log('Чат чужого CLI: обычный ответ при постороннем сжатом запросе, затем сжатый…');
-  await api('/settings', { method: 'PATCH', body: JSON.stringify({ provider: 'qwen' }) });
-  const created = await api('/provider-chat/chats', {
-    method: 'POST',
-    body: JSON.stringify({ title: 'Сжатие через контур', workdir: foreignDir }),
-  });
-  const chatId = created.body?.id;
-  check('разговор чужого CLI заведён', Boolean(chatId), JSON.stringify(created.body));
-  if (!chatId) return;
-
-  const waitIdle = async () => {
-    for (let i = 0; i < 120; i += 1) {
-      const status = await api(`/provider-chat/chats/${chatId}/status`);
-      if (status.body && status.body.isRunning === false) return;
-      await wait(250);
-    }
-  };
-
-  const sent = await api(`/provider-chat/chats/${chatId}/send`, {
-    method: 'POST',
-    body: JSON.stringify({ text: 'Первый вопрос чужому CLI' }),
-  });
-  check('первое сообщение принято', sent.status === 200, JSON.stringify(sent.body));
-  // Посторонний сжатый запрос в окне первого прогона: без метки прогона в адресе.
-  await wait(400);
-  const stray = await fetch(`http://127.0.0.1:${GATEWAY_PORT}/${CONTOUR}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      model: 'stub-summarizing',
-      stream: true,
-      messages: [{ role: 'user', content: 'посторонний' }],
-    }),
-  });
-  await stray.text();
-  await waitIdle();
-
-  const second = await api(`/provider-chat/chats/${chatId}/send`, {
-    method: 'POST',
-    body: JSON.stringify({ text: `Второй вопрос ${SQUEEZE}` }),
-  });
-  check('второе сообщение принято', second.status === 200, JSON.stringify(second.body));
-  await waitIdle();
-
-  const chat = await api(`/provider-chat/chats/${chatId}`);
-  const replies = (chat.body?.messages ?? []).filter((message) => message.role === 'assistant');
-  check(
-    'чужой CLI: подпись у сжатого ответа, у обычного нет — посторонний запрос не прилип',
-    replies.length === 2 && !replies[0].contextSummarized && replies[1].contextSummarized === true,
-    JSON.stringify(
-      replies.map((message) => ({ text: message.content, summarized: message.contextSummarized })),
-    ),
-  );
-
-  const page = await newPage(browser, { provider: 'qwen' });
-  await page.goto(`${WEB}/chat`, { waitUntil: 'domcontentloaded' });
-  await page
-    .getByText('Сжатие через контур')
-    .first()
-    .click({ timeout: 30_000 })
-    .catch(() => undefined);
-  await page
-    .getByText('[сжатый]')
-    .first()
-    .waitFor({ timeout: 20_000 })
-    .catch(() => undefined);
-  await wait(1000);
-  const count = await page.locator('[data-context-summarized]').count();
-  check('экран чата чужого CLI: ровно одна подпись', count === 1, `подписей: ${count}`);
-  await page.screenshot({ path: join(SHOTS, `${PHASE}-chat-foreign.png`) });
-  await page.close();
-  await api('/settings', { method: 'PATCH', body: JSON.stringify({ provider: 'claude' }) });
-}
-
-// ── 3. Раздел «Контур» ─────────────────────────────────────────────────────
+// ── 2. Раздел «Контур» ─────────────────────────────────────────────────────
 async function platformPart({ browser }) {
   const status = (await api('/platforms/gateway')).body?.status ?? {};
   const report = status.summarized;
   check(
-    'сводка сжатий в состоянии шлюза: три случая, привязки названы',
-    report?.total >= 3 &&
-      ['message', 'run', 'none'].every((link) =>
-        (report.recent ?? []).some((item) => item.link === link),
-      ),
+    'сводка сжатий в состоянии шлюза: случай чата Claude привязан к сообщению',
+    report?.total >= 1 && (report.recent ?? []).some((item) => item.link === 'message'),
     JSON.stringify(report),
   );
   const page = await newPage(browser, { provider: 'claude' });
@@ -554,7 +430,7 @@ async function platformPart({ browser }) {
   const rows = await page.locator('[data-contour-summarized-row]').count();
   check(
     'раздел «Контур»: карточка сжатий со строкой на каждый случай',
-    rows >= 3,
+    rows >= 1,
     `строк: ${rows}`,
   );
   if (rows > 0) await card.first().scrollIntoViewIfNeeded();

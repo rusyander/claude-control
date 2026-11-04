@@ -16,6 +16,8 @@
  *                     с диском после чужой записи.
  *   claudeMd/layers — почему правило не сработало: те же инструкции уровнем
  *                     проекта и собственный `.claude` репозитория.
+ *   sandbox/conversation — правило проверяется разговором в песочнице: состав,
+ *                     ожидание со «Стоп», ответ, отказ ядра.
  *
  * ПАНЕЛЬ ОДНОРАЗОВАЯ, и для этой пачки это не формальность: её предмет —
  * файлы конфигурации. `CLAUDE_CONFIG_DIR` уводится во временную папку, туда же
@@ -35,12 +37,14 @@ import { spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage, shotHome } from './kit.mjs';
+import { openScenario, applyShotLanguage, shotHome, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import { makeHome, makeProject, dropProject, PROJECT_DIR } from './rules-fixture.mjs';
 import { shootFirst } from './rules-first.mjs';
 import { shootLiving } from './rules-living.mjs';
 import { shootFile } from './claudemd-file.mjs';
 import { shootLayers } from './claudemd-layers.mjs';
+import { shootSandbox } from './sandbox-conversation.mjs';
 
 const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5191);
 const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8901);
@@ -68,12 +72,15 @@ makeProject();
 makeHome(home, { projects: [{ id: 'orders', name: 'Панель заказов', path: PROJECT_DIR }] });
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: home,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+    },
+    { label: 'help-rules' },
+  );
 
   started.push(
     spawn(
@@ -115,6 +122,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех четырёх.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -133,11 +141,13 @@ try {
     await run('rules', 'living', shootLiving);
     await run('claudeMd', 'file', shootFile);
     await run('claudeMd', 'layers', shootLayers);
+    await run('sandbox', 'conversation', shootSandbox);
   } finally {
     await browser.close();
   }
 } finally {
   for (const child of started) child.kill();
+  reapPanelCores();
   rmSync(home, { recursive: true, force: true });
   dropProject();
 }

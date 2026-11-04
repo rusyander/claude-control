@@ -106,18 +106,19 @@ describe('config-routes: каталог через настройки и руч�
     expect(store.getSettings().claudeDirOverride).toBe('');
   });
 
-  it('переезд вместе с порогом сторожа сливает порог с настройками нового каталога', async () => {
-    store.updateSettings({ groupWatch: { ...store.getSettings().groupWatch, askMinutes: 40 } });
-    other.updateSettings({ groupWatch: { ...other.getSettings().groupWatch, stallMinutes: 60 } });
+  it('переезд вместе с правкой пишет правку в настройки нового каталога', async () => {
+    store.updateSettings({ backupKeep: 40 });
+    other.updateSettings({ backupKeep: 60, theme: 'light' });
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/settings',
-      payload: { claudeDirOverride: 'C:/swap/.claude', groupWatch: { burnPerHour: 9 } },
+      payload: { claudeDirOverride: 'C:/swap/.claude', theme: 'dark' },
     });
     expect(res.statusCode).toBe(200);
-    const watch = other.getSettings().groupWatch;
-    // Своё нового каталога осталось, старое сюда не переехало.
-    expect([watch.stallMinutes, watch.askMinutes, watch.burnPerHour]).toEqual([60, 15, 9]);
+    // Своё нового каталога осталось, старое сюда не переехало, правка легла сюда.
+    const moved = other.getSettings();
+    expect([moved.backupKeep, moved.theme]).toEqual([60, 'dark']);
+    expect(store.getSettings().theme).not.toBe('dark');
   });
 
   it('пустая строка — возврат к автоопределению, всегда принимается', async () => {

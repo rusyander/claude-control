@@ -1,12 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { envItemKinds } from '@agentdeck/contracts/portable-env';
-import type {
-  EnvItem,
-  EnvItemKind,
-  EnvSkip,
-  McpTransport,
-} from '@agentdeck/contracts/portable-env';
+import type { EnvItem, EnvItemKind, EnvSkip } from '@agentdeck/contracts/portable-env';
 import { detectClaudeLocation } from '../../../lib/claude-paths/claude-paths.ts';
 import { readJsonFile, readTextFile } from '../../../lib/safe-io/safe-io.ts';
 import { readClaudeCommands } from '../../commands/claude.ts';
@@ -18,7 +13,9 @@ import { parseRules } from '../../rules/rules.ts';
 import { splitFrontmatter } from '../../skills/frontmatter.ts';
 import { disabledSkillsDir } from '../../skills/paths.ts';
 import { readSkills } from '../../skills/read.ts';
+import { isServerMessageCode } from '@agentdeck/contracts/server-messages';
 import { envSkip } from '../canon.ts';
+import { nested } from '../intent-codes.ts';
 import {
   DEFAULT_INSTRUCTION_FILES_MODE,
   readInstructionFilesChoice,
@@ -42,6 +39,7 @@ import {
   ProjectRootRequiredError,
   type ClaudeLevelPaths,
 } from '../project/project.ts';
+import { guardSection } from '../section-guard.ts';
 import { readSubagentsDir } from '../subagents.ts';
 import type { ImportDeps, ImportResult } from '../types.ts';
 import { importStore } from './store-view.ts';
@@ -76,7 +74,11 @@ export function importClaudeEnvironment(deps: ImportDeps): ImportResult {
     // человеку «ничего нет» вместо «прочитать не удалось».
     return {
       items: [],
-      skipped: CLAUDE_KINDS.map((kind) => envSkip(kind, 'not_readable', level.why)),
+      skipped: CLAUDE_KINDS.map((kind) =>
+        isServerMessageCode(level.whyCode)
+          ? envSkip(kind, 'not_readable', level.why, level.whyCode, level.whyParams)
+          : envSkip(kind, 'not_readable', level.why),
+      ),
     };
   }
 
@@ -85,18 +87,22 @@ export function importClaudeEnvironment(deps: ImportDeps): ImportResult {
   const items: EnvItem[] = [];
   const skipped: EnvSkip[] = [];
 
-  for (const stage of [
-    readInstructionsAndRules,
-    readSubagents,
-    readClaudeSkills,
-    readCommands,
-    readHooks,
-    readClaudePermissions,
-    readMcp,
-    readEnv,
-    readPlugins,
-  ]) {
-    const result = stage({ deps, paths, store });
+  // Раздел, который бросил, называет свои виды непрочитанными; остальные
+  // разделы паспорта остаются (битый settings.json не прячет CLAUDE.md и скиллы).
+  for (const [stage, kinds] of [
+    [readInstructionsAndRules, ['instructions']],
+    [readSubagents, ['subagent']],
+    [readClaudeSkills, ['skill']],
+    [readCommands, ['command']],
+    [readHooks, ['hook']],
+    [readClaudePermissions, ['permission']],
+    [readMcp, ['mcpServer']],
+    [readEnv, ['envVar', 'secret']],
+    [readPlugins, ['plugin']],
+  ] as const) {
+    const result = guardSection(kinds, whereLooked(kinds[0], paths), () =>
+      stage({ deps, paths, store }),
+    );
     items.push(...result.items);
     skipped.push(...result.skipped);
   }
@@ -108,7 +114,17 @@ export function importClaudeEnvironment(deps: ImportDeps): ImportResult {
   const spoken = new Set([...items.map((item) => item.kind), ...skipped.map((skip) => skip.kind)]);
   for (const kind of CLAUDE_KINDS) {
     if (!spoken.has(kind))
-      skipped.push(envSkip(kind, 'empty', `${whereLooked(kind, paths)}: записей нет`));
+      skipped.push(
+        envSkip(
+          kind,
+          'empty',
+          `${whereLooked(kind, paths)}: записей нет`,
+          'portability-skip-no-records',
+          {
+            where: whereLooked(kind, paths),
+          },
+        ),
+      );
   }
 
   return { items, skipped };
@@ -157,11 +173,20 @@ function whereLooked(kind: EnvItemKind, paths: ClaudeLevelPaths): string {
  * а не повод уйти в дом. Уйти в дом значило бы отдать глобальный паспорт за
  * проектный (П2.5, критерий 3).
  */
-function claudeLevel(deps: ImportDeps): { paths: ClaudeLevelPaths } | { why: string } {
+function claudeLevel(
+  deps: ImportDeps,
+):
+  | { paths: ClaudeLevelPaths }
+  | { why: string; whyCode?: string; whyParams?: Record<string, string> } {
   if (deps.scope !== 'project') {
     const location = detectClaudeLocation(deps.override);
+    // Каждая ветка «не подходит» у `detectClaudeLocation` называет причину с кодом.
     if (!location.isValid) {
-      return { why: location.problem ?? `каталог ${location.paths.root} не прочитан` };
+      return {
+        why: location.problem ?? '',
+        whyCode: location.problemCode,
+        whyParams: location.problemParams as Record<string, string> | undefined,
+      };
     }
     // У дома каталог конфигурации и есть корень поиска инструкций.
     return { paths: { ...location.paths, instructionsRoot: location.paths.root } };
@@ -169,7 +194,11 @@ function claudeLevel(deps: ImportDeps): { paths: ClaudeLevelPaths } | { why: str
 
   if (!deps.projectRoot) throw new ProjectRootRequiredError();
   if (!existsSync(deps.projectRoot)) {
-    return { why: `каталога проекта ${deps.projectRoot} нет на диске` };
+    return {
+      why: `каталога проекта ${deps.projectRoot} нет на диске`,
+      whyCode: 'portability-skip-project-missing',
+      whyParams: { path: deps.projectRoot },
+    };
   }
   return { paths: claudeProjectPaths(deps.projectRoot) };
 }
@@ -213,7 +242,7 @@ function readInstructionsAndRules(stage: Stage): ImportResult {
 
   const items: EnvItem[] = [];
   const skipped: EnvSkip[] = resolved.skips.map((skip) =>
-    envSkip('instructions', 'no_section', skip.detail),
+    envSkip('instructions', 'no_section', skip.detail, skip.detailCode, skip.detailParams),
   );
   if (choice.source === 'projectInstructions') {
     skipped.push(
@@ -221,6 +250,8 @@ function readInstructionsAndRules(stage: Stage): ImportResult {
         'instructions',
         'unsupported_format',
         `ключ projectInstructions устарел: CLI читает его с предупреждением, актуальный ключ — instructionFiles (режим ${choice.mode}, умолчание ${DEFAULT_INSTRUCTION_FILES_MODE})`,
+        'portability-skip-project-instructions-key',
+        { mode: choice.mode, default: DEFAULT_INSTRUCTION_FILES_MODE },
       ),
     );
   }
@@ -300,7 +331,16 @@ function readSubagents(stage: Stage): ImportResult {
   return {
     items: scan.subagents.map((parsed) => subagentItem(source, parsed)),
     skipped: scan.problems.map((problem) =>
-      envSkip('subagent', 'unsupported_format', `${problem.filePath}: ${problem.detail}`),
+      envSkip(
+        'subagent',
+        'unsupported_format',
+        `${problem.filePath}: ${problem.detail}`,
+        'portability-skip-subagent-problem',
+        {
+          path: problem.filePath,
+          problem: problem.detailCode ? nested(problem.detailCode) : problem.detail,
+        },
+      ),
     ),
   };
 }
@@ -354,7 +394,15 @@ function readSyncedSkills(dir: string, source: ReturnType<typeof sourceFactory>)
   for (const name of names) {
     const skillFile = join(dir, name, 'SKILL.md');
     if (!existsSync(skillFile)) {
-      skipped.push(envSkip('skill', 'unsupported_format', `${name}: в каталоге нет SKILL.md`));
+      skipped.push(
+        envSkip(
+          'skill',
+          'unsupported_format',
+          `${name}: в каталоге нет SKILL.md`,
+          'portability-skip-no-skill-file',
+          { name },
+        ),
+      );
       continue;
     }
     const raw = readTextFile(skillFile);
@@ -384,17 +432,28 @@ function readSyncedSkills(dir: string, source: ReturnType<typeof sourceFactory>)
  */
 function readCommands(stage: Stage): ImportResult {
   const { paths, deps, store } = stage;
-  const { commands, notes } = readClaudeCommands(paths, store);
+  const { commands, notes, notesCodes } = readClaudeCommands(paths, store);
   const source = sourceFactory(deps.provider.id, deps.scope, join(paths.root, 'commands'));
 
   const items: EnvItem[] = [];
-  const skipped: EnvSkip[] = notes.map((note) => envSkip('command', 'not_readable', note));
+  const skipped: EnvSkip[] = notes.map((note, index) => {
+    const code = notesCodes[index];
+    return code
+      ? envSkip('command', 'not_readable', note, code.messageCode, code.params)
+      : envSkip('command', 'not_readable', note);
+  });
 
   for (const command of commands) {
     if (command.source !== 'command') continue;
     if (!command.path) {
       skipped.push(
-        envSkip('command', 'unsupported_format', `${command.invocation}: тела команды нет в файле`),
+        envSkip(
+          'command',
+          'unsupported_format',
+          `${command.invocation}: тело команды не в файле`,
+          'portability-skip-command-body-config',
+          { command: command.invocation },
+        ),
       );
       continue;
     }
@@ -431,7 +490,13 @@ function readHooks(stage: Stage): ImportResult {
     // который нечем исполнить, хуже, чем не перенести его вовсе.
     if (hook.scriptPath && hook.scriptExists === false) {
       skipped.push(
-        envSkip('hook', 'not_readable', `${hook.id}: скрипт ${hook.scriptPath} не найден на диске`),
+        envSkip(
+          'hook',
+          'not_readable',
+          `${hook.id}: скрипт ${hook.scriptPath} не найден на диске`,
+          'portability-skip-hook-script-missing',
+          { id: hook.id, path: hook.scriptPath },
+        ),
       );
     }
     return {
@@ -510,10 +575,19 @@ function readMcp(stage: Stage): ImportResult {
   return { items: normalized.items, skipped: [...skipped, ...normalized.skipped] };
 }
 
-function rawTransport(config: RawMcpConfig, name: string): McpTransport | undefined {
+/**
+ * Транспорт из сырого ключа `type`. `sdk` и НЕЗНАКОМОЕ значение берутся как
+ * есть: читатель панели сводит незнакомый тип к stdio/http, а паспорт обязан
+ * назвать его пропуском (`normalizeMcpServers` не угадывает транспорт).
+ */
+function rawTransport(config: RawMcpConfig, name: string): string | undefined {
   const type = config.mcpServers?.[name]?.type;
-  return type === 'sdk' ? 'sdk' : undefined;
+  if (typeof type !== 'string') return undefined;
+  return READER_TRANSPORTS.has(type.trim().toLowerCase()) ? undefined : type;
 }
+
+/** Типы, которые читатель панели понимает сам; `streamable-http` — синоним `http`. */
+const READER_TRANSPORTS = new Set(['stdio', 'http', 'sse', 'streamable-http']);
 
 /**
  * Переменные окружения и секреты обоих файлов настроек плюс файл секретов.
@@ -551,6 +625,7 @@ function readEnv(stage: Stage): ImportResult {
             'secret',
             'no_section',
             'файл секретов панели (.mcp-secrets.env) есть только у дома: у проекта своего нет',
+            'portability-skip-secrets-home-only',
           ),
         ],
   };
@@ -571,7 +646,12 @@ function readPlugins(stage: Stage): ImportResult {
     return {
       items: [],
       skipped: [
-        envSkip('plugin', 'no_section', 'плагины CLI ставит домом: уровня проекта у них нет'),
+        envSkip(
+          'plugin',
+          'no_section',
+          'плагины CLI ставит домом: уровня проекта у них нет',
+          'portability-skip-plugins-home-only',
+        ),
       ],
     };
   }

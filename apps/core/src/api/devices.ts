@@ -24,7 +24,10 @@ export const ADOPT_DEVICES_ROUTE = 'POST /v1/devices/adopt';
 
 /** Запись списка и журнал ядра (`devices.adopted` / `devices.refused`) — у загрузки. */
 export interface DevicesPort {
-  adopt(devices: readonly SigningDevice[], meta: { cmdId: string; by: string }): { digest: string };
+  adopt(
+    devices: readonly SigningDevice[],
+    meta: { cmdId: string; by: string; machineId: string },
+  ): { digest: string };
   refused(cmdId: string, code: string): void;
 }
 
@@ -76,9 +79,14 @@ export function registerDevices(
       publicKey: device.publicKey,
       ...(device.revokedAt ? { revokedAt: device.revokedAt } : {}),
     }));
-    const { digest } = devices.adopt(list, { cmdId: body.cmdId, by: authority.by });
+    const { digest } = devices.adopt(list, {
+      cmdId: body.cmdId,
+      by: authority.by,
+      machineId: body.machineId,
+    });
     const out: AdoptDevicesReply = {
       cmdId: body.cmdId,
+      machineId: body.machineId,
       adopted: list.map((device) => device.id),
       digest,
     };

@@ -1,6 +1,8 @@
 /**
  * Какие разделы интерфейса перечитать после записи СОБСТВЕННОГО состояния
- * панели — настроек, групп, выбора группы у чата и у проекта.
+ * панели — настроек и групп. Записи групп, выбора стороны пары и группы чата
+ * ушли вместе со своими маршрутами (этап 10, ядро ведёт задачи): их правил
+ * здесь нет, остались только живые писатели раздела `groups`.
  *
  * Поток `/api/events` раньше нёс только изменения файлов конфигурации
  * (`config-watcher`): `state.json` и `group-sources.json` на нём не появлялись.
@@ -30,18 +32,9 @@ const RULES: ReadonlyArray<{ test: (path: string) => boolean; domains: string[] 
   // Импорт снимка и смена каталога заменяют состояние целиком.
   { test: (path) => path === '/api/settings/import', domains: EVERYTHING },
   { test: (path) => path === '/api/location', domains: EVERYTHING },
-  {
-    test: (path) => path === '/api/groups' || path.startsWith('/api/groups/'),
-    domains: [APP_STATE_DOMAINS.groups],
-  },
-  { test: (path) => path === '/api/projects/group-choice', domains: [APP_STATE_DOMAINS.groups] },
   // Защита бэкенда заводит и убирает свою проектную группу.
   {
     test: (path) => path === '/api/backend-guard/install' || path === '/api/backend-guard/remove',
-    domains: [APP_STATE_DOMAINS.groups],
-  },
-  {
-    test: (path) => /^\/api\/chat\/[^/]+\/group-settings$/.test(path),
     domains: [APP_STATE_DOMAINS.groups],
   },
 ];

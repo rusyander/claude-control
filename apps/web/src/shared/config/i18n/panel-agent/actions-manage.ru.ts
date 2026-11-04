@@ -5,12 +5,8 @@
  * `actions` правят несколько задач разом, этот набор вносится одной строкой-спредом.
  */
 export const panelActionsManageRu = {
-  read_split_defaults: 'Общие правила групп разделения',
-  save_split_defaults: 'Изменить общие правила групп',
   read_sieves: 'Сита перед MR',
   delete_learned_sieve: 'Убрать выученное сито',
-  watcher_status: 'Состояние наблюдателя',
-  set_watcher: 'Включить или выключить наблюдатель',
   list_models: 'Каталог моделей',
   format_check: 'Сверка форматов CLI',
   read_account: 'Учётная запись CLI',

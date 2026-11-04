@@ -47,7 +47,8 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { openScenario, applyShotLanguage } from './kit.mjs';
+import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
+import { panelEnv, reapPanelCores } from './panel-core.mjs';
 import {
   CONFIG_DIR,
   HOME_DIR,
@@ -92,19 +93,22 @@ makeStand();
 const upstream = fakeUpstream(UPSTREAM_PORT);
 
 try {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: CONFIG_DIR,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-    // Bot API Telegram — тот же выдуманный верх на петле: проверка и
-    // подключение по /start идут к нему, настоящий Telegram стенд не трогает.
-    AGENTDECK_TELEGRAM_API: UPSTREAM,
-    // Домашний каталог виден в путях, которые панель показывает целиком:
-    // скрипт гейта, файл чужого CLI, каталог резервных копий.
-    HOME: HOME_DIR,
-    USERPROFILE: HOME_DIR,
-  };
+  const env = await panelEnv(
+    {
+      ...process.env,
+      CLAUDE_CONFIG_DIR: CONFIG_DIR,
+      PORT: String(PANEL_PORT),
+      WEB_PORT: String(WEB_PORT),
+      // Bot API Telegram — тот же выдуманный верх на петле: проверка и
+      // подключение по /start идут к нему, настоящий Telegram стенд не трогает.
+      AGENTDECK_TELEGRAM_API: UPSTREAM,
+      // Домашний каталог виден в путях, которые панель показывает целиком:
+      // скрипт гейта, файл чужого CLI, каталог резервных копий.
+      HOME: HOME_DIR,
+      USERPROFILE: HOME_DIR,
+    },
+    { label: 'help-access-providers' },
+  );
 
   started.push(
     spawn(
@@ -147,6 +151,7 @@ try {
   console.log(`фронт на ${WEB}`);
 
   const browser = await chromium.launch();
+  await warmFront(browser, WEB);
   // GUIDE_ONLY сужает съёмку до одного сценария: правка селектора в конце пути
   // иначе проверяется полным прогоном всех восьми.
   const only = process.env.GUIDE_ONLY ?? '';
@@ -168,11 +173,14 @@ try {
     // в справку настоящий адрес машины, на которой шла съёмка.
     try {
       await shoot(browser, WEB, maskedScenario(scenario), context);
+      scenario.finish();
     } catch (error) {
       broken.push(`${topic}/${name}: ${error instanceof Error ? error.message : String(error)}`);
       console.log(`  ОТКАЗ: ${error instanceof Error ? error.message : String(error)}`);
+      // Не снятые из-за отказа кадры не устарели: обычный `finish()` снял бы их с учёта
+      // вместе с файлами всех вариантов (03.11.2026 так пропали dlp/first 05–07).
+      scenario.finish({ keepUnshot: true });
     }
-    scenario.finish();
   };
 
   try {
@@ -199,5 +207,6 @@ try {
 } finally {
   upstream.close();
   for (const child of started) child.kill();
+  reapPanelCores();
   dropStand();
 }

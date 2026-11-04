@@ -34,7 +34,7 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     description:
       'Panel settings by tab; open_page focus = tab key: general (theme, language), access (remote, token), ' +
       'phone (build/install the phone APK, questions from the computer to the phone), ' +
-      'providers (active CLI), models (endpoint profiles, chat model), prompts, groups (split groups), ' +
+      'providers (active CLI), models (endpoint profiles, chat model), prompts, groups (group tasks run by the core), ' +
       'globalLayer (panel vs ~/.claude copies of one mechanism), ' +
       'integrations (tracker, messenger, webhook), spend, safety (backups, file watch), transfer',
     tabs: [
@@ -51,12 +51,6 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
       'safety',
       'transfer',
     ],
-  },
-  {
-    route: '/watcher',
-    title: 'Watcher',
-    description:
-      'Background watcher: start/stop, spend, bug described in words checked against the code, WATCH-REPORT.md by section',
   },
   { route: '/dlp', title: 'Data protection', description: 'Local DLP proxy and its rules' },
   {
@@ -81,7 +75,29 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
   {
     route: '/chat',
     title: 'Chat',
-    description: 'CLI chats per project, runs, splits; open_page focus = chat id to open that chat',
+    description:
+      'CLI chats per project and their runs; open_page focus = chat id to open that chat',
+  },
+  {
+    route: '/core',
+    title: 'Core tasks',
+    description:
+      'Tasks of the execution core: state, step feed with reasons, journal, questions to the human',
+  },
+  {
+    route: '/core/launch',
+    title: 'Launch a core task',
+    description: 'Start a task in the core with an estimate first; MR review by link',
+  },
+  {
+    route: '/core/scenarios',
+    title: 'Core scenarios',
+    description: 'Scenarios (presets) the core runs a task by, and their steps',
+  },
+  {
+    route: '/core/chat',
+    title: 'Chat through the core',
+    description: 'A CLI chat run as a core task: session feed, asks and permits judged by the core',
   },
   { route: '/rules', title: 'Rules', description: 'Rule files of the active CLI' },
   { route: '/claude-md', title: 'Global instructions', description: 'User-level CLAUDE.md' },

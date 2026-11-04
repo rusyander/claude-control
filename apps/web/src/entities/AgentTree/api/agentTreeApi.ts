@@ -1,7 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@shared/api/client';
-import { chatKeys } from '@entities/Chat';
-import type { AgentExtensions, AgentStopResult, AgentTranscript } from '@agentdeck/contracts';
+import type { AgentExtensions, AgentTranscript } from '@agentdeck/contracts';
 import { MAIN_AGENT_ID, type AgentHistory } from '@agentdeck/contracts/agent-history';
 
 /** Окно шагов: последние `limit` (`start` нет) или `limit` с номера шага `start`. */
@@ -116,25 +115,5 @@ export function useAgentExtensions(
     enabled: enabled && Boolean(chatId),
     refetchInterval: enabled && isRunning ? RUNNING_POLL_MS : false,
     meta: { silentError: true },
-  });
-}
-
-/**
- * «Остановить» субагента: `stop_task` живому процессу CLI. Ответ `requested` —
- * CLI принял запрос, а снят ли агент, скажет его итог в транскрипте, — поэтому
- * сразу перечитываем прогресс разговора.
- */
-export function useStopAgent(chatId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (agentId: string) => {
-      const { data } = await apiClient.post<AgentStopResult>(
-        `/chat/${encodeURIComponent(chatId)}/agents/${encodeURIComponent(agentId)}/stop`,
-      );
-      return data;
-    },
-    // Итог пишет сам узел строкой рядом с кнопкой — общий тост дал бы второй.
-    meta: { silentError: true },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: chatKeys.progress(chatId) }),
   });
 }

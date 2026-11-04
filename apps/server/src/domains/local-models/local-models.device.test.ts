@@ -244,10 +244,10 @@ describe('счёт на процессоре', () => {
   });
 
   it('сервер на процессоре прячет карты всех движков; на видеокарте — не прячет', () => {
-    const cpu = serverEnv('cpu', {});
+    const cpu = serverEnv('cpu');
     for (const [key, value] of Object.entries(CPU_ONLY_ENV)) expect(cpu[key]).toBe(value);
     expect(CPU_ONLY_ENV.CUDA_VISIBLE_DEVICES).toBe('-1');
-    const gpu = serverEnv('gpu', {});
+    const gpu = serverEnv('gpu');
     for (const key of Object.keys(CPU_ONLY_ENV)) expect(gpu[key]).toBeUndefined();
   });
 });

@@ -48,16 +48,6 @@ export const mascotEn: typeof mascotRu = {
       'The turn in “{{name}}” failed. The reason is in the chat.',
       '“{{name}}” tripped over an error. See what happened.',
     ],
-    groupFailed: [
-      'Group “{{name}}” failed — details on its hub card.',
-      'Group “{{name}}” broke down. The hub shows why.',
-      'Group “{{name}}” did not get to the end — check the hub.',
-    ],
-    groupStopped: [
-      'Group “{{name}}” has been stopped.',
-      'Group “{{name}}” is standing — you can resume it from the hub.',
-      '“{{name}}” is paused, its queue slot went to others.',
-    ],
     limitHit: [
       'We hit the subscription limit — the turn waits for the window to reset.',
       'The subscription limit is used up. We carry on after the reset.',
@@ -67,11 +57,6 @@ export const mascotEn: typeof mascotRu = {
       'The long turn in “{{name}}” is finished — ready to look at.',
       '“{{name}}” is finally done. It took a while, but it is ready.',
       'Done: “{{name}}” got to the end of a long turn.',
-    ],
-    groupDelivered: [
-      'Group “{{name}}” delivered!',
-      'Group “{{name}}” is finished — the result is in the hub.',
-      '“{{name}}” delivered. Ready to check and accept.',
     ],
   },
   panel: {

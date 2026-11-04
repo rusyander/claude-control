@@ -1,12 +1,10 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { DiscoveredGroup, DiscoveryView } from '@agentdeck/contracts';
 import { i18n } from '@shared/config/i18n';
 import { Typography } from '@shared/ui/typography';
+import type { GroupListItem } from '@entities/Group';
 import { GroupsTabs } from './GroupsTabs/GroupsTabs';
-import { GroupViewTabs } from './GroupViewTabs/GroupViewTabs';
-import { DiscoveryProgress } from './DiscoveryProgress/DiscoveryProgress';
-import { FoundTile } from './FoundTile/FoundTile';
+import { GroupTile } from './GroupTile/GroupTile';
 
 beforeAll(async () => {
   await i18n.changeLanguage('ru');
@@ -25,75 +23,70 @@ function colorClass(color: 'muted' | 'subtle'): string {
   return classes.split(' ').find((name) => name.includes('color-')) ?? '';
 }
 
+function group(patch: Partial<GroupListItem> = {}): GroupListItem {
+  return {
+    id: 'g1',
+    name: 'Набор',
+    description: '',
+    color: 'accent',
+    icon: 'folder',
+    members: [],
+    env: {},
+    isEnabled: true,
+    order: 0,
+    ...patch,
+  };
+}
+
+const PATH = {
+  steps: [
+    { id: 's1', title: { ru: 'Сборка', en: 'Build' } },
+    { id: 's2', title: { ru: 'Ревью', en: 'Review' } },
+  ],
+} as unknown as GroupListItem['path'];
+
 describe('вкладки групп: aria-controls только у открытой (F-215)', () => {
-  it('полоса страницы: панель в разметке одна — на неё и ссылается одна вкладка', () => {
+  it('полоса страницы: две вкладки, панель в разметке одна — на неё и ссылается одна вкладка', () => {
     const html = renderToStaticMarkup(
       <GroupsTabs
         active="project"
-        counts={{ global: count, project: count, found: count, discovery: count }}
+        counts={{ global: count, project: count }}
         onSelect={() => undefined}
       />,
     );
+    expect(html.match(/role="tab"/g)?.length).toBe(2);
     expect(html.match(/aria-controls=/g)?.length).toBe(1);
     expect(html).toContain('aria-controls="groups-panel-project"');
   });
+});
 
-  it('вкладки окна группы — то же', () => {
+// Этап 10, F1: прежний исполнитель групп снят — карточка только для чтения.
+describe('карточка прежней группы: только для чтения', () => {
+  it('единственная кнопка — «В ядро»; ни тумблера, ни копии, имя не кнопка', () => {
     const html = renderToStaticMarkup(
-      <GroupViewTabs idBase="group-g" active="members" onSelect={() => undefined} />,
+      <GroupTile group={group({ path: PATH })} onCore={() => undefined} />,
     );
-    expect(html.match(/aria-controls=/g)?.length).toBe(1);
-    expect(html).toContain('aria-controls="group-g-panel-members"');
-  });
-});
-
-describe('журнал обнаружения: «ошибок нет» только когда всё прочитано (F-210)', () => {
-  const view = (states: DiscoveryView['sources'][number]['state'][]): DiscoveryView => ({
-    groups: [],
-    running: states.includes('running'),
-    sources: states.map((state, index) => ({ source: `C:/work/p${index}`, state, found: 0 })),
-  });
-  const allGood = () => i18n.t('groupsPage.discovery.allGood');
-
-  it('источник ещё читается — строки «ошибок нет» нет', () => {
-    expect(
-      renderToStaticMarkup(<DiscoveryProgress view={view(['running', 'done'])} />),
-    ).not.toContain(allGood());
+    expect(html.match(/<button/g)?.length).toBe(1);
+    expect(html).toContain('data-group-core-import');
+    expect(html).not.toContain('role="switch"');
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain('Сборка');
+    expect(html).toContain('Ревью');
   });
 
-  it('всё прочитано без сбоев — строка есть; сбой — нет', () => {
-    expect(renderToStaticMarkup(<DiscoveryProgress view={view(['done', 'cached'])} />)).toContain(
-      allGood(),
-    );
-    expect(renderToStaticMarkup(<DiscoveryProgress view={view(['failed'])} />)).not.toContain(
-      allGood(),
-    );
+  it('шагов нет — переводить нечего, кнопки «В ядро» нет', () => {
+    const html = renderToStaticMarkup(<GroupTile group={group()} onCore={() => undefined} />);
+    expect(html).not.toContain('<button');
   });
-});
 
-describe('карточка: пустое «Когда» приглушено (F-237)', () => {
-  const found = (when: string): DiscoveredGroup => ({
-    key: 'k',
-    name: 'Набор',
-    when,
-    why: '',
-    foundIn: 'C:/work/shop',
-    usedIn: [],
-    members: [],
-    steps: [],
-    inventoryHash: 'h',
-    status: 'new',
-  });
   const whenLine = (html: string): string =>
     /<p class="([^"]*)"[^>]*><span[^>]*>Когда: <\/span>/.exec(html)?.[1] ?? '';
 
-  it('пусто — запасной текст цветом `subtle`, заполнено — `muted`', () => {
-    const empty = renderToStaticMarkup(<FoundTile found={found('')} onOpen={() => undefined} />);
+  it('пустое «Когда» — запасной текст цветом `subtle`, заполненное — `muted` (F-237)', () => {
+    const empty = renderToStaticMarkup(<GroupTile group={group()} />);
     expect(empty).toContain(i18n.t('groupSources.whenEmpty'));
     expect(whenLine(empty).split(' ')).toContain(colorClass('subtle'));
-    const filled = renderToStaticMarkup(
-      <FoundTile found={found('задача с тикетом')} onOpen={() => undefined} />,
-    );
+    const filled = renderToStaticMarkup(<GroupTile group={group({ when: 'задача с тикетом' })} />);
     expect(whenLine(filled).split(' ')).toContain(colorClass('muted'));
   });
 });

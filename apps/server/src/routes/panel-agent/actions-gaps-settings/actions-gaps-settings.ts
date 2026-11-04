@@ -6,10 +6,8 @@ import type {
   ProviderChecksResponse,
   ProvidersResponse,
 } from '@agentdeck/contracts';
-import type { ResourceSummary } from '@agentdeck/contracts/group-path';
 import type { FidelityAnswer } from '@agentdeck/contracts/portable-fidelity';
 import { encode, readRoute } from '../action-kit/action-kit.ts';
-import { findProject } from '../actions-projects/actions-projects.ts';
 import {
   definePanelAction,
   fingerprintOf,
@@ -17,13 +15,13 @@ import {
   type InjectRoute,
 } from '../registry.ts';
 import { maskResult } from '../result-net/result-net.ts';
-import { dataField, summaryText, textField } from '../texts/texts.ts';
+import { summaryText, textField } from '../texts/texts.ts';
 
 /**
- * Настройки, провайдер, интеграции, перенос и группы — то, чего агенту не
- * хватало (дорожка A, 28.09): прайс моделей, редакторы, доступ Claude Code к
- * аккаунту, обзор папок для выбора проекта, провайдеры и их проверка, переходы
- * задачи Jira, верность переноса среды и краткое описание ресурса.
+ * Настройки, провайдер, интеграции и перенос — то, чего агенту не хватало
+ * (дорожка A, 28.09): прайс моделей, редакторы, доступ Claude Code к аккаунту,
+ * обзор папок для выбора проекта, провайдеры и их проверка, переходы задачи
+ * Jira, верность переноса среды.
  *
  * Ничего из этого не читает и не пишет секрет: маршрут доступа отдаёт только
  * источник, маршрут прайса вызывается без `refresh` (сеть трогает только
@@ -353,62 +351,7 @@ const portabilityFidelity = definePanelAction({
   summary: 'journal-portability-fidelity',
 });
 
-// ── groups: краткое описание ресурса ──────────────────────────────────────
-
-const summaryInput = z.object({
-  type: z.enum(['skill', 'hook', 'rule']).describe('Kind of resource'),
-  id: z.string().trim().min(1).max(300).describe('Resource id as the lists give it'),
-  project: z
-    .string()
-    .trim()
-    .min(1)
-    .optional()
-    .describe('Registered project id or path for a project resource; omit = global'),
-});
-type SummaryInput = z.infer<typeof summaryInput>;
-
-const projectDirOf = async (inject: InjectRoute, input: SummaryInput) =>
-  input.project ? (await findProject(inject, input.project)).path : undefined;
-
-const summarizeResource = definePanelAction({
-  name: 'summarize_resource',
-  section: 'groups',
-  risk: 'change',
-  title: 'journal-summarize-resource',
-  description:
-    'Short description (ru + en) of one skill, hook or rule — the one the groups page shows. ' +
-    'Cached per content; on a cache miss the panel makes one cheap model call (spends the ' +
-    'subscription) and remembers the answer. Needs the human’s confirmation.',
-  input: summaryInput,
-  route: async (input, inject) => {
-    const path = await projectDirOf(inject, input);
-    const query = new URLSearchParams({
-      type: input.type,
-      id: input.id,
-      ...(path ? { path } : {}),
-    });
-    return { method: 'GET', url: `/api/resources/summary?${query.toString()}` };
-  },
-  fingerprint: async (input, inject) =>
-    fingerprintOf({ type: input.type, id: input.id, path: await projectDirOf(inject, input) }),
-  preview: async (input, inject) => {
-    const path = await projectDirOf(inject, input);
-    return {
-      ...summaryText('summary-summarize-resource', { name: input.id }),
-      fields: [
-        dataField('label-resource-kind', input.type),
-        ...(path ? [dataField('label-project', path)] : []),
-        textField('label-what-happens', 'value-summarize-resource-effect'),
-      ],
-    };
-  },
-  shape: (_input, body) => {
-    const summary = body as ResourceSummary;
-    return maskResult({ ru: summary.ru, en: summary.en });
-  },
-});
-
-/** Действия настроек, провайдера, интеграций, переноса и групп дорожки A. */
+/** Действия настроек, провайдера, интеграций и переноса дорожки A. */
 export const GAPS_SETTINGS_ACTIONS: readonly AnyPanelAction[] = [
   readModelPricing,
   listEditors,
@@ -419,5 +362,4 @@ export const GAPS_SETTINGS_ACTIONS: readonly AnyPanelAction[] = [
   runProviderCheck,
   jiraTransitions,
   portabilityFidelity,
-  summarizeResource,
 ];

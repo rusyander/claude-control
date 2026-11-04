@@ -3,7 +3,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { conflictsWith } from '../../chat/main-sync/main-sync.ts';
 import {
   parseZeroContextDiff,
   readSieveFacts,
@@ -27,7 +26,9 @@ const AFTER = '2026-03-01T10:00:00Z';
 
 const dirs: string[] = [];
 afterEach(() => {
-  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  // Windows держит каталог, только что закрытый git-процессом (EBUSY), — повторы вместо красного.
+  for (const dir of dirs.splice(0))
+    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 });
 
 function git(cwd: string, args: string[], date = BEFORE): string {
@@ -236,23 +237,20 @@ describe('механика сит на настоящем git', () => {
   });
 });
 
-describe('сито «интеграция» и страж догона судят конфликт одинаково', () => {
-  // Живой прогон 23.10 (g0 d9869abf): сверка доставки нашла конфликт и велела
-  // rebase, а страж догона (тогда `merge-tree --quiet`: git 2.55 даёт 0 при
-  // конфликте) пять раз отказал «конфликта нет» — группа крутилась между двумя
-  // ответами панели, пока не сдалась. Два чтения одного вопроса — одна правда.
+describe('сито «интеграция» видит конфликт с основной', () => {
+  // Живой прогон 23.10 (g0 d9869abf): `merge-tree --quiet` (git 2.55 даёт 0 при
+  // конфликте) отвечал «конфликта нет». Страж догона панели ушёл вместе с мостом прав
+  // (этап 10, G14); сито осталось и обязано различать оба случая.
   it.each([
     ['конфликт с основной', true],
     ['основная ушла вперёд без конфликта', false],
-  ])('%s — оба отвечают одно', async (_name, conflicting) => {
+  ])('%s', async (_name, conflicting) => {
     const { main, work } = repo({ 'a.txt': 'one\ntwo\n', 'b.txt': 'b\n' });
     commit(work, { 'a.txt': 'ONE-branch\ntwo\n' }, STARTED);
     landOnMain(main, conflicting ? { 'a.txt': 'ONE-main\ntwo\n' } : { 'b.txt': 'b-main\n' });
 
     const facts = await readSieveFacts({ cwd: work, startedAt: STARTED });
-    const guard = await conflictsWith(work, 'origin/main');
     expect((facts.mechanics.conflicts ?? []).length > 0).toBe(conflicting);
-    expect(guard).toBe(conflicting);
   });
 });
 

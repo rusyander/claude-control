@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { CORE_MCP_SERVER, PERMIT_MCP_SERVER } from '@agentdeck/contracts/core/model-tools';
-import type { McpServerEntry } from '../adapters/adapter.types.ts';
-import { agentdeckHandlers, bridgeEnv, permitHandlers } from './bridges.ts';
+import type { McpStdioEntry } from '../adapters/adapter.types.ts';
+import { agentdeckHandlers, bridgeEnv, permitHandlers, type BridgeEnv } from './bridges.ts';
 import { coreCheck, coreSince, newestCore } from './core-discovery.ts';
 import { createCoreClient, type CoreClient } from './core-client.ts';
 import { runHookProcess } from './hook.ts';
@@ -20,7 +20,7 @@ import { serveStdio } from './stdio-server.ts';
 export const MCP_RUN = fileURLToPath(new URL('./run.ts', import.meta.url));
 
 /** Записи `mcpServers` шага для дороги сессии: какой node и с какими флагами — решает она. */
-export function coreMcpServers(nodeArgv: readonly string[]): Record<string, McpServerEntry> {
+export function coreMcpServers(nodeArgv: readonly string[]): Record<string, McpStdioEntry> {
   const [command = process.execPath, ...flags] = nodeArgv;
   return {
     [CORE_MCP_SERVER]: { command, args: [...flags, MCP_RUN, 'agentdeck'] },
@@ -37,8 +37,15 @@ export const RECORDER_MODE = 'recorder';
 /** Режим `run.ts` команды `agentdeck state` (этап 7). */
 export const STATE_MODE = 'state';
 
-const BRIDGES: Record<string, { name: string; handlers(client: CoreClient): McpHandlers }> = {
-  agentdeck: { name: CORE_MCP_SERVER, handlers: agentdeckHandlers },
+const BRIDGES: Record<
+  string,
+  { name: string; handlers(client: CoreClient, env: BridgeEnv): McpHandlers }
+> = {
+  agentdeck: {
+    name: CORE_MCP_SERVER,
+    handlers: (client, env) =>
+      agentdeckHandlers(client, env.stepKind ? { stepKind: env.stepKind } : {}),
+  },
   permit: { name: PERMIT_MCP_SERVER, handlers: permitHandlers },
 };
 
@@ -49,7 +56,7 @@ export { coreSince, newestCore } from './core-discovery.ts';
 const PROGRESS_MS = 20_000;
 
 export async function runBridge(which: string | undefined): Promise<number> {
-  if (which === HOOK_MODE) return runHookProcess();
+  if (which === HOOK_MODE) return runHookProcess(process.argv.slice(3));
   if (which === CONTAINER_MODE) {
     // Лениво: мосты MCP не грузят обёртку, обёртка — мосты не стартует.
     const { runContainerWrapper } = await import('./container-wrap.ts');
@@ -92,7 +99,7 @@ export async function runBridge(which: string | undefined): Promise<number> {
   await serveStdio({
     name: bridge.name,
     version: '1.0.0',
-    handlers: bridge.handlers(client),
+    handlers: bridge.handlers(client, env),
     input: process.stdin,
     write: (line) => void process.stdout.write(line),
     progressMs: PROGRESS_MS,

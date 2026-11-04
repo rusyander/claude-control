@@ -7,9 +7,9 @@ import { builtinKitDir } from './service.ts';
 
 /**
  * Аудит g5 26.10, L5: `PostToolUse:Write` на отчёте звена (58 КБ) вписал группе разделения весь
- * список ревизии агентских доков копии — группа с ним ничего сделать не может. В прогоне группы
- * панели (`AGENTDECK_GROUP_STAGE`) ревизия молчит, и дневная отметка остаётся нетронутой: следующая
- * сессия человека её получит. Через настоящий диспетчер `run.mjs post-edit`.
+ * список ревизии агентских доков копии — группа с ним ничего сделать не может. В сессии шага ядра
+ * (`AGENTDECK_STEP_KIND`, кроме `chat` — там за панелью человек) ревизия молчит, и дневная отметка
+ * остаётся нетронутой: следующая сессия человека её получит. Через настоящий диспетчер `run.mjs post-edit`.
  */
 
 const DISPATCH = join(builtinKitDir(), 'hooks', 'lib', 'run.mjs');
@@ -32,7 +32,7 @@ function postWrite(cwd: string, env: Record<string, string> = {}): string {
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_GROUP_STAGE: '',
+      AGENTDECK_STEP_KIND: '',
       AGENTDECK_KIT_STATE: join(dir, 'state'),
       ...env,
     },
@@ -48,12 +48,19 @@ function postWrite(cwd: string, env: Record<string, string> = {}): string {
   return `${r.stdout}${r.stderr}`;
 }
 
-describe('doc-daily-review: молчит в прогоне группы панели (g5 L5)', () => {
-  it('группа — без ревизии; та же запись вне группы — ревизия на месте (отметка не потрачена)', () => {
+describe('doc-daily-review: молчит в сессии шага ядра (g5 L5)', () => {
+  it('шаг ядра — без ревизии; та же запись вне ядра — ревизия на месте (отметка не потрачена)', () => {
     const root = project('group');
-    expect(postWrite(root, { AGENTDECK_GROUP_STAGE: 'deliver' })).not.toContain(
+    for (const kind of ['implement', 'review', 'fix'])
+      expect(postWrite(root, { AGENTDECK_STEP_KIND: kind }), kind).not.toContain(
+        '[doc-daily-review]',
+      );
+    expect(postWrite(root)).toContain('[doc-daily-review]');
+  });
+
+  it('чат ядра — человек за панелью: ревизия звучит', () => {
+    expect(postWrite(project('chat'), { AGENTDECK_STEP_KIND: 'chat' })).toContain(
       '[doc-daily-review]',
     );
-    expect(postWrite(root)).toContain('[doc-daily-review]');
   });
 });

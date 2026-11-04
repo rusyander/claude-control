@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { CarryApplyAnswer, CarryPlan } from '@agentdeck/contracts/portable-carry';
 import { foreignChatKey } from '@agentdeck/contracts/foreign-chat-key';
+import type { CommandOutcome } from '@agentdeck/contracts/core/commands';
+import type { EstimateFields } from '@agentdeck/contracts/core/estimate';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import type { ServerContext } from '../../context.ts';
 import { HandoffChains } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
@@ -35,7 +37,8 @@ vi.mock('../../domains/provider-chat/store/store.ts', async (importOriginal) => 
  *
  * Хранилища НАСТОЯЩИЕ: разговоры чужих CLI лежат в своих `jsonl`, транскрипт
  * Claude — в каталоге проектов, файл-опора — на диске. Подменены ровно две вещи,
- * которых у теста быть не может: запуск прогона Claude и отправка в чужой CLI.
+ * которых у теста быть не может: запуск прогона Claude и ядро задач, которое
+ * заводит разговор у чужого CLI (своего исполнителя чужих CLI у панели нет).
  *
  * Проверяется не «200 в ответе», а последствия: исходный разговор остаётся
  * целым, у нового CLI появляется разговор с опорой, обе ленты об этом сказали, а
@@ -50,9 +53,10 @@ describe('portability-carry: перенос незакрытой работы', 
   let store: AppStore;
   let chains: HandoffChains;
   let app: FastifyInstance;
-  let sent: { providerId: string; chatId: string; text: string }[];
-  /** Отправка в чужой CLI: единственное, что тест вправе сломать сам. */
-  let sendOk: boolean;
+  /** Ручки ядра: чем сервер заводит разговор у чужого CLI. */
+  let core: { estimates: EstimateFields[]; commands: Array<[string, Record<string, unknown>]> };
+  /** Ответ ядра на оценку: единственное, что тест вправе сломать сам. */
+  let coreOk: boolean;
   let started: { chatId: string; prompt: string; cwd: string }[];
   let emitted: { chatId: string; text: string }[];
 
@@ -68,10 +72,10 @@ describe('portability-carry: перенос незакрытой работы', 
 
     store = new AppStore(appData);
     chains = new HandoffChains();
-    sent = [];
+    core = { estimates: [], commands: [] };
     started = [];
     emitted = [];
-    sendOk = true;
+    coreOk = true;
   });
 
   afterEach(async () => {
@@ -103,7 +107,6 @@ describe('portability-carry: перенос незакрытой работы', 
             started.push({ chatId, prompt: options.prompt, cwd: options.cwd });
             return true;
           },
-          isSplitMuted: () => false,
           // Заметка ложится только в ИДУЩИЙ прогон; у закрытого разговора
           // Claude прогона нет, и реестр отвечает «сказать некуда».
           emitExternal: (chatId: string, event: { text: string }) => {
@@ -112,10 +115,19 @@ describe('portability-carry: перенос незакрытой работы', 
           },
         },
         session: { inherit: () => {}, autoModeOverride: () => undefined },
-        providerChats: {
-          send: (_data: string, providerId: string, chatId: string, ask: { text: string }) => {
-            sent.push({ providerId, chatId, text: ask.text });
-            return sendOk ? { ok: true } : { ok: false, error: 'CLI не ответил' };
+        coreChats: {
+          estimate: async (fields: EstimateFields) => {
+            core.estimates.push(fields);
+            return coreOk
+              ? {
+                  ok: true,
+                  taskId: `01890000-0000-7000-8000-${String(core.estimates.length).padStart(12, '0')}`,
+                }
+              : { ok: false, code: 'adapter-missing', message: 'у CLI нет переходника ядра' };
+          },
+          command: async (_taskId: string, kind: string, fields: Record<string, unknown>) => {
+            core.commands.push([kind, fields]);
+            return { cmdId: 'c', status: 'applied', seq: 1 } as CommandOutcome;
           },
         },
       } as never,
@@ -246,12 +258,20 @@ describe('portability-carry: перенос незакрытой работы', 
     const answer = await apply([foreignChatKey('codex', codex)]);
 
     expect(answer.outcomes[0]).toMatchObject({ carried: true, chainDepth: 1, noticedSource: true });
-    // У цели — новый разговор с понятным именем и заданием по опоре.
-    const target = listChats(appData, 'gemini');
-    expect(target).toHaveLength(1);
-    expect(target[0]?.title).toBe('Переименование · продолжение');
-    expect(sent[0]?.text).toContain('.agent/PROGRESS.md');
-    expect(sent[0]?.text).toContain('переименуй foo в bar');
+    // У цели — задача ядра с этим CLI, понятным именем и заданием по опоре.
+    expect(answer.outcomes[0]?.chatId).toBe('01890000-0000-7000-8000-000000000001');
+    expect(core.estimates).toHaveLength(1);
+    expect(core.estimates[0]).toMatchObject({
+      title: 'Переименование · продолжение',
+      scenario: { preset: 'chat' },
+      repos: [{ path: project, baseRef: null }],
+    });
+    expect(core.commands.map(([kind]) => kind)).toEqual(['set-cli', 'launch']);
+    expect(core.commands[0]?.[1]).toMatchObject({ adapter: 'gemini' });
+    // Панель свой разговор у цели не заводит: лента разговора — журнал задачи ядра.
+    expect(listChats(appData, 'gemini')).toHaveLength(0);
+    expect(core.estimates[0]?.request).toContain('.agent/PROGRESS.md');
+    expect(core.estimates[0]?.request).toContain('переименуй foo в bar');
     // Источник не закрыт и не изменён: реплика человека на месте, сверху легла
     // заметка о том, куда ушла работа.
     const source = readChat(appData, 'codex', codex);
@@ -268,8 +288,8 @@ describe('portability-carry: перенос незакрытой работы', 
     const answer = await apply([foreignChatKey('codex', codex)]);
 
     expect(answer.outcomes[0]).toMatchObject({ carried: false, reason: 'checkpoint_unchanged' });
-    // Разговора у цели не прибавилось — отказ случился ДО хранилища.
-    expect(listChats(appData, 'gemini')).toHaveLength(1);
+    // Задачи у цели не прибавилось — отказ случился ДО ядра.
+    expect(core.estimates).toHaveLength(1);
   });
 
   it('разговор Claude переносится, но заметке в его ленту лечь некуда', async () => {
@@ -280,7 +300,7 @@ describe('portability-carry: перенос незакрытой работы', 
 
     expect(answer.outcomes[0]).toMatchObject({ carried: true, noticedSource: false });
     expect(emitted.map((event) => event.chatId)).toEqual(['s-7']);
-    expect(listChats(appData, 'gemini')).toHaveLength(1);
+    expect(core.commands.filter(([kind]) => kind === 'launch')).toHaveLength(1);
   });
 
   it('корневая задача разговора Claude уезжает вместе с опорой', async () => {
@@ -292,11 +312,10 @@ describe('portability-carry: перенос незакрытой работы', 
 
     await apply(['s-9']);
 
-    expect(sent[0]?.text).toContain('почини выгрузку счетов');
+    expect(core.estimates[0]?.request).toContain('почини выгрузку счетов');
     // И цепочка помнит то же задание: следующее звено получит тот же текст, а
     // не прочитает транскрипт заново.
-    const carried = listChats(appData, 'gemini')[0];
-    expect(chains.rootTaskOf([foreignChatKey('gemini', carried?.id as string)])).toBe(
+    expect(chains.rootTaskOf(['01890000-0000-7000-8000-000000000001'])).toBe(
       'почини выгрузку счетов',
     );
   });
@@ -314,21 +333,19 @@ describe('portability-carry: перенос незакрытой работы', 
     expect(answer.outcomes[0]?.chatId).toBe(started[0]?.chatId);
   });
 
-  it('задание не ушло — пустой разговор у цели не остаётся', async () => {
-    // Хранилище завело разговор, а CLI задание не принял. Задание машинное
-    // (опора плюс корневая задача), руками человек его не повторит — значит
-    // пустой разговор не «место, где можно отправить снова», а мусор в списке
-    // цели. Отказ назван, разговор убран, источник цел.
+  it('ядро отказало — перенос не случился, у цели ничего не запущено', async () => {
+    // Ядро не завело задачу (у CLI нет переходника, ядро не запущено). Отказ
+    // назван человеку, задача не запускалась, источник цел.
     const codex = foreignChat('codex', 'Переименование', 'переименуй foo в bar');
     await serve('gemini');
-    sendOk = false;
+    coreOk = false;
 
     const answer = await apply([foreignChatKey('codex', codex)]);
 
-    expect(answer.outcomes[0]).toMatchObject({ carried: false, failure: 'send_failed' });
-    // Отправку пробовали — и после её отказа у цели пусто.
-    expect(sent).toHaveLength(1);
-    expect(listChats(appData, 'gemini')).toHaveLength(0);
+    expect(answer.outcomes[0]).toMatchObject({ carried: false, failure: 'run_not_started' });
+    // Оценку просили — и после её отказа ни одной команды задаче.
+    expect(core.estimates).toHaveLength(1);
+    expect(core.commands).toEqual([]);
     // Источник не тронут: заметки о переносе, которого не было, в нём нет.
     expect(readChat(appData, 'codex', codex)?.messages).toHaveLength(1);
   });

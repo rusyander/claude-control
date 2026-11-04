@@ -37,35 +37,55 @@ export const coreEn: typeof coreRu = {
 
     mapTitle: 'How pages reach the core',
     mapCaption:
-      'The panel and the core are two processes. Pages go only through the panel proxy `/api/core/*`.',
+      'The panel and the core are two processes. Pages reach the core only through the panel: the ' +
+      'proxy `/api/core/*` and the chat start route.',
     pathTextTitle: 'The same path in words',
     pathTextText:
       'A page sends a request to the panel. The proxy finds the running core by its record, ' +
       'checks that the port really belongs to it and forwards the request with the core’s access ' +
-      'key. The event stream comes back unbuffered. The core accepts human commands from the ' +
-      'panel process that is recorded to it as a hop; starting the panel makes that record.',
+      'key. The event stream comes back unbuffered. If the core is just starting, the request waits ' +
+      'for it up to 15 s. A new chat is started not through the proxy but through the panel route ' +
+      '`/api/chat/core-start`: the panel adds its own layer to the estimate (the Tests block line, ' +
+      'the kit, the flags of its own layers) and forwards it to the core with the same page proof. ' +
+      'A body signed with the phone key goes through the proxy as is: the additions would break ' +
+      'the signature. The core accepts human commands from the panel process recorded to it ' +
+      'as a hop, or with a phone key signature.',
 
     startTitle: 'Starting the core',
-    startCaption: '`pnpm dev` starts the panel but not the core: the core has its own command.',
-    startRun: 'Start the core',
+    startCaption: 'The panel starts the core itself: no separate command is needed.',
+    startRun: 'The panel starts the core and watches it',
     startRunText:
-      'In the repository root, in a separate terminal: `pnpm core`. The core runs while that ' +
-      'terminal is open; the panel finds it on its own.',
+      'On start the panel finds a live core on this machine — started by `pnpm core`, by OS ' +
+      'autostart or by a previous panel — and takes it under supervision; with no core it starts ' +
+      'its own. The core is a separate process and outlives a panel restart. If it crashes, the ' +
+      'panel starts it again after a pause of 1 to 60 s, and started tasks carry on with their ' +
+      'sessions. A second panel on the same machine starts no second core: both work with one. The «Start the core at sign-in» toggle ' +
+      'above the task list sets up autostart (Windows Task Scheduler, systemd, macOS LaunchAgent).',
     startOpen: 'Open «Core tasks»',
     startOpenText:
       'A sidebar entry. The list shows the core’s tasks: whether a task is running now, its state ' +
       'and a link to its timeline. The header buttons lead to the launch screen and to scenarios.',
-    startAbsent: 'Core not running — a card, not an error',
+    startFault: 'The core does not start — a fault card',
+    startFaultText:
+      'While the core is starting, the list is replaced by the «The task core is starting» card; ' +
+      'the page refreshes itself once the core answers. Five crashes within 10 minutes and the ' +
+      'panel stops starting the core and shows the «The task core does not start» card: the last ' +
+      'exit code, the tail of the core log (secrets hidden) and a «Restart» button that resets ' +
+      'the failure count.',
+    startAbsent: 'Supervision off — the «not running» card',
     startAbsentText:
-      'Without a core the list is replaced by the «The task core is not running» card naming ' +
-      '`pnpm core`. Start the core and refresh the page.',
+      'The «The task core is not running» card appears only for a panel with supervision off ' +
+      '(`AGENTDECK_CORE_SUPERVISE=0` — QA stands with their own core): whoever turned supervision ' +
+      'off starts the core, for example with `pnpm core`.',
     cmdHeader: 'Command',
     cmdWhat: 'What it does',
     cmdCore: 'pnpm core',
-    cmdCoreText: 'Starts the task core. Without it the section only shows the «not running» card.',
+    cmdCoreText:
+      'Starts the core by hand — the developer’s way. The panel finds such a core and takes it ' +
+      'under supervision instead of starting a second one.',
     cmdDev: 'pnpm dev',
     cmdDevText:
-      'Starts the panel and records its processes to the core as hops. Does not start the core.',
+      'Starts the panel; the panel starts the core itself and records its processes to it as hops.',
     cmdKeepalive: 'pnpm keepalive',
     cmdKeepaliveText:
       'Keeps the panel running and restarts it after a crash; also records hops to the core.',
@@ -77,7 +97,16 @@ export const coreEn: typeof coreRu = {
     launchForm: 'Fill in the form',
     launchFormText:
       'Title, the full requirements, repository path and scenario. «Wait for CI after publishing» ' +
-      'is off: the core does not wait for the pipeline unless you ask for this task. Press «Estimate».',
+      'is off: the core does not wait for the pipeline unless you ask for this task. The work runs ' +
+      'in a copy of the repository: the core changes the main project folder only in a chat you ' +
+      'started yourself — starting the chat is your permission. Press «Estimate».',
+    launchReview: 'Review an MR by link',
+    launchReviewText:
+      'Paste a GitLab MR or GitHub PR link and the path of the repository it lives in, then «Open the ' +
+      'review». The core matches the link against the repository remote and opens a task on the MR ' +
+      'branch: a review, then a question in the feed — fix, post one summary note to the MR, both, or ' +
+      'nothing. A refusal is named on a plate: not an MR link, an MR of another project, a closed MR, ' +
+      'a remote with no forge API (the last one is in the shot).',
     launchEstimate: 'Estimate',
     launchEstimateText:
       'Time, tokens and spread — from run history. With no history it says «unknown»: the core ' +
@@ -99,20 +128,35 @@ export const coreEn: typeof coreRu = {
     launchGoText:
       '«Launch» accepts the split and the task starts working. While access is unconfirmed or the ' +
       'split is not ready, the button is closed and the reason is written below it.',
+    launchMcp: 'MCP servers for steps',
+    launchMcpText:
+      'Below the routes — your own MCP servers from each CLI config (the user layer). A tick gives ' +
+      'the server to a step kind in every following task; without a tick the step sees only the ' +
+      'core servers. Chat takes every offered server by default. A server no CLI offers is marked: ' +
+      'the core drops it at launch and names the reason in the journal. Read-only kinds take no ' +
+      'human servers. Two CLIs do not get the ticked servers, and the journal names it as a loss ' +
+      'by name: Gemini CLI starts no MCP in an untrusted folder, and the step copy is not trusted ' +
+      'for it; for Cursor, starting a server without a prompt is not proven live. Saving writes ' +
+      'the whole core config; if it changed meanwhile, the core ' +
+      'refuses and the card shows why.',
     launchDiagramTitle: 'From form to steps',
 
     askTitle: 'Answering the core’s questions',
     askCaption:
       'Open questions sit above the task timeline. An answer is one click; a second click does ' +
-      'not send a second command.',
+      'not send a second command. An open question also arrives as a notification — on the phone ' +
+      'and in Telegram, with a link to the task; you can answer in the panel timeline or on the ' +
+      'phone, where the answer is signed with the phone key.',
     askLaunch: 'The launch question',
     askLaunchText:
       'If a task was estimated but not launched from the launch screen, the core asks here: ' +
       '«Approve the split» launches the task; editing the split is done on the launch screen.',
     askCap: 'A step ran out of rounds',
     askCapText:
-      'The step failed as many times as the scenario allows. The answer options come from the ' +
-      'core; under the card — the core’s reply: «accepted» or its words on why not.',
+      'The step failed as many times as the scenario allows. The question and its answer options ' +
+      'come from the core, in the language of the panel the task was launched from (the same goes ' +
+      'for the step time and budget questions); under the card — the core’s reply: «accepted» or ' +
+      'its words on why not.',
     askKindsHeader: 'Question',
     askKindsWhat: 'What the core waits for',
     askKindLaunch: 'launch',
@@ -182,25 +226,19 @@ export const coreEn: typeof coreRu = {
       'Means: the panel process is not recorded to the core, and it will not accept commands from the panel.',
     hopsWhat: 'What happened',
     hopsWhatText:
-      'The core accepts human commands — answers, launch, saving a scenario — only from a panel ' +
-      'process recorded to it as a hop. Starting the panel with `pnpm dev` or `pnpm keepalive` ' +
-      'makes that record. If the panel was started otherwise or the record did not arrive, pages ' +
-      'show this notice and commands are refused with `signature-required`.',
+      'The core accepts human commands — answers, launch, saving a scenario — from a panel process ' +
+      'recorded to it as a hop, or with a phone key signature. The hop is recorded by the launch ' +
+      'watchdog (`pnpm dev`, `pnpm keepalive`) or, without one, by the panel’s own supervision, ' +
+      'for every new core. If the record did not arrive, pages show this notice and commands ' +
+      'without a phone signature are refused with `signature-required`.',
     hopsDo: 'What to do',
     hopsDoText:
-      'Restart the panel with `pnpm dev` or `pnpm keepalive`. The core does not need a restart: ' +
-      'the new record replaces the old one and the notice goes away. Reading — the list, the ' +
-      'timeline, the report — works without a record.',
+      'Wait a minute: the panel records itself to the core on its own. If the notice stays, ' +
+      'restart the panel (`pnpm dev` or `pnpm keepalive`). The core does not need a restart: the ' +
+      'new record replaces the old one. Reading — the list, the timeline, the report — works ' +
+      'without a record.',
 
     limitsTitle: 'What the section cannot do yet',
-    limitPhoneTitle: 'Core questions do not reach the phone or Telegram',
-    limitPhoneText:
-      'You can answer only in the task timeline in the panel. Relaying core questions to the ' +
-      'phone and Telegram is the next stage.',
-    limitSignTitle: 'Phone signatures for core commands',
-    limitSignText:
-      'The core does not verify the panel’s phone signatures yet, so human commands go only ' +
-      'through a recorded hop.',
     limitEnglishTitle: 'Decision reasons are in English',
     limitEnglishText:
       'The core writes its reasons as English prose and the timeline shows them verbatim: a ' +
@@ -218,8 +256,12 @@ export const coreEn: typeof coreRu = {
       '02-hops':
         'The «The core does not know this panel yet» notice: the panel process is not recorded',
     },
+    fault: {
+      '01-fault':
+        'The core does not start: the last exit code, the log tail and a «Restart» button',
+    },
     absent: {
-      '01-card': 'Core not running: a card naming pnpm core instead of the list',
+      '01-card': 'Supervision off: the «The task core is not running» card instead of the list',
     },
     launch: {
       '01-form': 'Launch form: title, requirements, repository, scenario; no CI wait',
@@ -228,6 +270,10 @@ export const coreEn: typeof coreRu = {
       '04-rejected': 'A rejected edit: the repository file tried to turn on the CI wait',
       '05-split': 'Splitting into parts: part, repository, own paths; the core check mark',
       '06-launch': 'The «Launch» button is open: the split is ready, no unconfirmed access',
+      '07-review-link':
+        'Review by link: the remote has no forge API — the core names the reason before launch',
+      '08-mcp-picks':
+        'MCP servers for steps: one ticked for fixes, chat «every offered», a pick nobody offers',
     },
     ask: {
       '01-launch':

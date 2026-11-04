@@ -21,7 +21,7 @@
  */
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
-import { installGroupStubs, makeGroupState } from './group-stubs.mjs';
+import { installLegacyGroupsStub } from './legacy-groups-stub.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const onlyAt = process.argv.indexOf('--only');
@@ -120,7 +120,7 @@ await page.route('**/api/**', (route) => {
     .catch(() => undefined);
 });
 await bypassOnboarding(page);
-await installGroupStubs(page, makeGroupState());
+await installLegacyGroupsStub(page);
 await page.route('**/api/agent/**', (route) => {
   const path = new URL(route.request().url()).pathname;
   if (path.endsWith('/run')) {

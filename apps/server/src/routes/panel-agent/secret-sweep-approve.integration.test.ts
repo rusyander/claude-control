@@ -12,6 +12,7 @@ import {
   type PanelPendingAction,
 } from '@agentdeck/contracts/panel-agent';
 import type { AnyPanelAction } from './registry.ts';
+import type { MemoryContours } from '../../domains/platform/contours/__fixtures__/memory-contours.ts';
 import {
   CONTOUR,
   idOf,
@@ -20,6 +21,7 @@ import {
   pathWithoutAgentClis,
   ROWS,
   seedFiles,
+  seedLegacyGroup,
   seedThroughPanel,
   STORES,
   write,
@@ -52,9 +54,9 @@ const LAST = ['switch_provider', 'delete_project'];
 /** Выключают контур — после всех, кто с ним говорит (`reset_contour_agent_session`…). */
 const CONTOUR_OFF = ['disable_contour', 'deactivate_contour', 'delete_contour'];
 /**
- * Подготовка человеком перед строкой. Активация контура уже подняла шлюз, и
- * `start_gateway` честно отказал бы «ничего не изменится» — гасим его, как это
- * сделал бы человек, чтобы одобрение исполнило настоящий подъём.
+ * Подготовка человеком перед строкой. Активация контура уже включила шлюз, а шлюз ядра слушает, и
+ * `start_gateway` честно отказал бы «ничего не изменится» — выключаем его в настройках, как это
+ * сделал бы человек, чтобы одобрение исполнило настоящее включение.
  */
 const PREPARE: Readonly<Record<string, () => Promise<unknown>>> = {
   start_gateway: async () => {
@@ -66,7 +68,6 @@ const PREPARE: Readonly<Record<string, () => Promise<unknown>>> = {
       url: '/api/settings',
       payload: { platformGateway: { ...settings.platformGateway, enabled: false } },
     });
-    await human({ method: 'POST', url: '/api/platforms/gateway/restart', payload: {} });
   },
   // Снимать нечего, пока контур нигде не применён: применяем к ассистенту (его потребитель).
   disable_contour: async () => {
@@ -79,17 +80,10 @@ const PREPARE: Readonly<Record<string, () => Promise<unknown>>> = {
     ).json() as { applied: unknown[]; skipped: unknown[] };
     if (!result.applied.length) throw new Error(`apply skipped: ${JSON.stringify(result.skipped)}`);
   },
-  // «Исчерпан» ставит сам шлюз, получив 402 бюджета ключа от контура (сценарий стаба).
+  // «Исчерпан» ставит звено ядра, получив 402 бюджета от контура (этап 10, C3d) — записываем
+  // отметку в его учёт; путь «402 → отметка» — тест ядра `user-gateway.parity.integration.test.ts`.
   clear_contour_exhausted: async () => {
-    const response = await realFetch(
-      `http://127.0.0.1:${gatewayPort}/${CONTOUR}/v1/chat/completions`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'stub-402', messages: [{ role: 'user', content: 'hi' }] }),
-      },
-    );
-    if (response.status !== 402) throw new Error(`gateway 402 expected, got ${response.status}`);
+    contours?.record({ platformId: CONTOUR, exhausted: { at: new Date().toISOString() } });
   },
 };
 /** Сетевые и установочные инструменты: заглушка отказывает с кодом 1. */
@@ -140,7 +134,8 @@ let stub: {
 };
 let actions: readonly AnyPanelAction[] = [];
 let home = '';
-let gatewayPort = 0;
+/** Учёт контуров ядра (`memoryContours`): шлюз человека «слушает» на свободном порту, трафика нет. */
+let contours: MemoryContours | undefined;
 const realFetch = globalThis.fetch;
 const observed: Observed[] = [];
 const extraTexts: { where: string; text: string }[] = [];
@@ -299,6 +294,8 @@ beforeAll(async () => {
   const { default: Fastify } = await import('fastify');
   const { ServerContext } = await import('../../context.ts');
   const { createRuntime } = await import('../../bootstrap/runtime/runtime.ts');
+  const { listeningGateway, memoryContours } =
+    await import('../../domains/platform/contours/__fixtures__/memory-contours.ts');
   const { buildRouteTable } = await import('../../bootstrap/route-table.ts');
   const { registerAccessGate } = await import('../../lib/access-gate/access-gate.ts');
   const { registerEmptyBodyGuard } = await import('../../lib/empty-body.ts');
@@ -316,25 +313,17 @@ beforeAll(async () => {
   registerAccessGate(instance, access);
   registerEmptyBodyGuard(instance);
   registerCodedErrors(instance);
-  const runtime = createRuntime(ctx, 'http://127.0.0.1:1');
+  // Порт шлюза — свободный, не 5179: случайный запрос не должен дойти до живого ядра на машине.
+  contours = memoryContours();
+  contours.setUserGateway(listeningGateway(await freePort()));
+  const runtime = createRuntime(ctx, 'http://127.0.0.1:1', { contours });
   shutdown = () => runtime.shutdown();
   for (const register of buildRouteTable(runtime, access)) register(instance, ctx);
   await instance.ready();
   app = instance;
 
-  // Шлюз — на своём свободном порту: 5179 по умолчанию занят живой панелью.
-  await human({
-    method: 'PATCH',
-    url: '/api/settings',
-    payload: {
-      platformGateway: {
-        enabled: false,
-        port: (gatewayPort = await freePort()),
-        forceStream: true,
-      },
-    },
-  });
-  const group = await seedThroughPanel(human, project, {
+  seedLegacyGroup(ctx.store);
+  await seedThroughPanel(human, project, {
     baseUrl: stub.url,
     enabled: true,
     agents: [{ id: 'helper', title: 'Helper' }],
@@ -346,7 +335,6 @@ beforeAll(async () => {
   let seeded: Seeded = {
     home,
     project,
-    group,
     rule: '',
     hook: '',
     skill: '',

@@ -1,12 +1,11 @@
 import type { ChildStageGroup } from '../ui/ChildStages.types';
 
 /**
- * React-ключ карточки хаба. У группы без чата `chatId` — пустая строка, не
- * `undefined`: `chatId ?? title` давал двум ждущим группам один ключ `""`
- * (наблюдатель WR-9, 54 повтора), и React волен был потерять или задвоить
- * карточку. Без чата ключом служит номер группы, без номера — её имя.
+ * React-ключ карточки хаба. У каждой строки хаба есть свой чат — им и ключ;
+ * пустой `chatId` (страховка) заменяет имя группы, а не общая пустая строка:
+ * `""` у двух карточек позволял React потерять или задвоить одну из них
+ * (наблюдатель WR-9).
  */
 export function hubCardKey(group: ChildStageGroup): string {
-  if (group.chatId) return group.chatId;
-  return typeof group.groupIndex === 'number' ? `#${group.groupIndex}` : group.title;
+  return group.chatId || group.title;
 }

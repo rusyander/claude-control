@@ -271,7 +271,7 @@ describe('поддельный CLI на PATH исполняет вариант �
         AGENTDECK_KIT_STATE: join(home, 'kit-state'),
         AGENTDECK_KIT_CLI: '',
         AGENTDECK_KIT_VARIANT: '',
-        AGENTDECK_HEAVY_QUEUE_DIR: '',
+        AGENTDECK_STEP_KIND: '',
       },
     });
     const line = res.stdout.trim().split('\n').pop() ?? '';

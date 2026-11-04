@@ -10,9 +10,7 @@ import { pageTabsEn } from './page-tabs/en.ts';
 import { changelogEn } from './changelog/en.ts';
 import { panelUpdateEn } from './panel-update/en.ts';
 import { chatProjectsEn } from './chat-projects/en.ts';
-import { watcherEn } from './watcher/en.ts';
 import { mascotEn } from './mascot/en.ts';
-import { groupWatchEn } from './group-watch/en.ts';
 import { usageLimitsEn } from './usage-limits/en.ts';
 import { devRestartEn } from './dev-restart/en.ts';
 import { environmentEn } from './environment/en.ts';
@@ -22,6 +20,7 @@ import { contourConfigEn } from './contour-config/en.ts';
 import { presetsEn } from './presets/en.ts';
 import { localModelsEn } from './local-models/en.ts';
 import { kitEn } from './kit/en.ts';
+import { sandboxPromptsEn } from './sandbox-prompts/en.ts';
 import { telegramAnswersEn } from './telegram-answers/en.ts';
 import { telegramCardEn } from './telegram-card/en.ts';
 import { deferredAsksEn } from './deferred-asks/en.ts';
@@ -31,6 +30,7 @@ import { agentTreeEn } from './agent-tree/en.ts';
 import { coreTimelineEn } from './core-timeline/en.ts';
 import { coreLaunchEn } from './core-launch/en.ts';
 import { coreScenarioEn } from './core-scenario/en.ts';
+import { coreChatEn } from './core-chat/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -38,6 +38,7 @@ export const en: TranslationSchema = {
   localModels: localModelsEn,
   /** Страница «Набор панели» (В2) — `kit/en.ts`. */
   kit: kitEn,
+  sandboxPrompts: sandboxPromptsEn,
   panelAgent: panelAgentEn,
   attach: attachEn,
   groupPath: groupPathEn,
@@ -51,11 +52,9 @@ export const en: TranslationSchema = {
   panelUpdate: panelUpdateEn,
   /** Проекты чата и страница «Проекты» — `chat-projects/en.ts`. */
   chatProjects: chatProjectsEn,
-  watcher: watcherEn,
   mascot: mascotEn,
   telegramAnswers: telegramAnswersEn,
   telegramCard: telegramCardEn,
-  groupWatch: groupWatchEn,
   usageLimits: usageLimitsEn,
   devRestart: devRestartEn,
   deferredAsks: deferredAsksEn,
@@ -65,6 +64,7 @@ export const en: TranslationSchema = {
   coreTimeline: coreTimelineEn,
   coreLaunch: coreLaunchEn,
   coreScenario: coreScenarioEn,
+  coreChat: coreChatEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -165,7 +165,6 @@ export const en: TranslationSchema = {
     compare: 'Comparison',
     portability: 'Environment passport',
     settings: 'Settings',
-    watcher: 'Watcher',
     dlp: 'Data protection',
     platform: 'Contour',
     localModels: 'Local models',
@@ -173,6 +172,7 @@ export const en: TranslationSchema = {
     coreTasks: 'Core tasks',
     coreLaunch: 'Launch a core task',
     coreScenarios: 'Core scenarios',
+    coreChat: 'Chat through the core',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Agent behaviour',
@@ -313,9 +313,6 @@ export const en: TranslationSchema = {
       /** The safeguards let it through and the target did not open a conversation. */
       failure: {
         run_not_started: 'The run at the new CLI never started — no conversation was opened.',
-        chat_not_created: "The panel's storage did not create a conversation for the new CLI.",
-        send_failed:
-          'The task never reached the new CLI — the empty conversation it opened was removed. Fix the CLI and carry again.',
       },
     },
     subscription: {
@@ -834,19 +831,17 @@ export const en: TranslationSchema = {
       buttonOff: 'To MR: off',
       buttonNoRemote: 'To MR: nowhere',
       buttonHint: 'Delivering this project’s tasks to a ready MR',
-      groupHint:
-        'The split plan’s choice for this group. The setting inside applies to the project’s next tasks',
       title: 'Delivery to MR — this project',
       deliver: 'Take tasks to a ready MR',
       deliverHint:
-        'Plain chat: the agent takes a code-change task to an MR — branch, review, live check, checks once, commit, push, MR, description; questions and reviews without edits open no MR. Split: each group is one branch and one MR, its link shows in the group summary',
+        'Plain chat: the agent takes a code-change task to an MR — branch, review, live check, checks once, commit, push, MR, description; questions and reviews without edits open no MR. Group: one branch and one MR, its link shows in the group task timeline',
       noRemote:
         'The repository has no remote (git remote) — there is nowhere to open an MR, delivery is off',
       skill:
         'Delivery follows the general `ticket-delivery-2`; the project skill `{{name}}` is a source of project facts',
       skillNone:
         'Delivery follows the general `ticket-delivery-2`; the project has no delivery skill of its own',
-      parallel: 'Split groups at once',
+      parallel: 'Groups at once',
       parallelHint: 'Set by hand. The rest wait in a queue: 1 to {{max}}',
       parallelAuto:
         'From the shared rules (Settings → Groups): {{reason}}. The rest wait in a queue; your own number — 1 to {{max}}',
@@ -918,8 +913,6 @@ export const en: TranslationSchema = {
         'driver-none': 'This contour does not draw: its driver declares no such capability',
         'no-model': 'The key catalog holds no model with image generation',
         'endpoint-no-url': 'The endpoint profile has no image generation address',
-        'gateway-off': 'The panel gateway is off, and the contour request goes through it',
-        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'This API kind has no separate images endpoint',
         'no-agent': 'Neither a raster route nor a conversation whose agent could be asked',
       },
@@ -928,16 +921,12 @@ export const en: TranslationSchema = {
         'driver-none': 'no raster: this contour does not draw images',
         'no-model': 'no raster: the key catalog holds no image model',
         'endpoint-no-url': 'no raster: the endpoint profile has no generation address',
-        'gateway-off': 'no raster: the panel gateway is off',
-        'gateway-failed': 'no raster: the panel gateway did not come up',
         'endpoint-api-kind': 'no raster: this API kind has no images endpoint',
         'no-agent': 'no raster: nothing to draw with',
       },
       noDeck: {
         'no-route': 'No agent conversation, no contour, no endpoint of your own',
         'no-model': 'The contour is active, but no model is named for the request',
-        'gateway-off': 'The panel gateway is off, and the contour request goes through it',
-        'gateway-failed': 'The panel gateway is on but did not come up',
         'endpoint-api-kind': 'Only an OpenAI-kind endpoint can hold this conversation',
       },
       noPdf: {
@@ -979,8 +968,6 @@ export const en: TranslationSchema = {
           'driver-none': 'this contour does not draw images',
           'no-model': 'the key catalog holds no model with image generation',
           'endpoint-no-url': 'the endpoint profile has no generation address',
-          'gateway-off': 'the panel gateway is off',
-          'gateway-failed': 'the panel gateway did not come up',
           'endpoint-api-kind': 'this API kind has no images endpoint',
           'no-agent': 'nothing to draw with',
           'draw-failed': 'the drawing endpoint refused',
@@ -1002,61 +989,17 @@ export const en: TranslationSchema = {
     },
     split: {
       title: 'Split the tasks: {{count}} groups',
-      apply: 'Split into {{count}} chats',
       mrReview: 'review, no edits',
       mrWork: 'edits in the MR',
-      keepHere: 'Do it here, one by one',
-      keepHerePrompt: 'Do not split — do everything here, one task at a time.',
-      createOnly: 'Only create the chats, do not start the agents',
-      ask: 'Split the tasks across chats',
-      askFailed: 'Could not ask for a split',
-      done: 'Chats created: {{count}}',
-      alreadyDone: 'Already split: {{done}} of {{count}} groups became chats',
       droppedGroups:
         'Groups over the limit will not start: {{count}} — ask the agent to merge groups',
       droppedTasks: 'Tasks dropped over the per-group limit: {{count}}',
-      failed: '“{{title}}” was not created: {{message}}',
-      failedAll: 'The split failed: {{message}}',
       notParsed:
         'The panel could not read this split proposal — the block is left above as it came, ' +
         'so there are no buttons. Ask the agent to propose the split again.',
       cascade: {
-        kind: {
-          mechanical: 'mechanical',
-          implementation: 'implementation',
-          tests: 'tests',
-          investigation: 'investigation',
-          design: 'design',
-          review: 'review',
-        },
-        kindUnknown: 'kind not stated',
-        model: 'Model for the “{{title}}” group',
-        effort: 'Thinking depth for the “{{title}}” group',
         lowered: 'below the ceiling',
-        loweredHint:
-          'A model weaker than this conversation’s ceiling: the group is told where the bar is — ' +
-          'run the project checks and match the result against the task point by point. ' +
-          'When it is done, the panel opens a review at the ceiling over the same diff, ' +
-          'and turns any findings into a fix run back on this model.',
-        cost: 'Chats: {{chats}} · runs right now: {{runs}}',
-        loweredCount: 'below the ceiling: {{count}}',
-        pipeline: 'up to {{total}} runs with reviews',
-        pipelinePlanned: 'up to {{total}} runs: triage, plans, work and reviews',
-        sonnetDeliver: 'Delivery on Sonnet',
-        sonnetDeliverLabel: 'Deliver the “{{title}}” group on Sonnet',
-        sonnetDeliverHint:
-          'This group’s commit, push, MR and sieves run on Sonnet. Work, review and fixes ' +
-          'stay on the group’s own model. Clear it for a group whose delivery its own model ' +
-          'should do; the default follows Settings → Split group economy.',
-        sonnetDeliverRouted: 'Delivery on Sonnet — {{model}} by the contour map',
-        sonnetDeliverHintRouted:
-          'Through the "{{title}}" contour, delivery follows the model map’s "sonnet" row — ' +
-          'onto {{model}}. This group’s commit, push, MR and sieves run on it; work, review and ' +
-          'fixes stay on the group’s own model. Without that row the lever has no effect ' +
-          'through the contour.',
       },
-      triageStarted: 'Split triage started — the groups start on its verdict',
-      triageDeferred: 'Tree paused — the triage is created, it starts on “Resume all”',
     },
     /** Продолжение в чистой сессии: карточка, кнопка и отказы автопродолжения. */
     handoff: {
@@ -1146,25 +1089,13 @@ export const en: TranslationSchema = {
         progress: {
           state: {
             working: 'working',
-            queued: 'waiting in queue',
             permission: 'waiting for permission',
             stalled: 'stopped',
-            finished: 'finished',
           },
-          ahead: '{{count}} ahead',
           count: '{{done}} of {{total}} · {{percent}} %',
           bar: 'Group steps done',
         },
-        triageRunningFor: 'triage in progress · {{time}}',
         summary: {
-          accepted_one: 'accepted: {{count}}',
-          accepted_few: 'accepted: {{count}}',
-          accepted_many: 'accepted: {{count}}',
-          accepted_other: 'accepted: {{count}}',
-          done_one: 'done: {{count}}',
-          done_few: 'done: {{count}}',
-          done_many: 'done: {{count}}',
-          done_other: 'done: {{count}}',
           running_one: 'running: {{count}}',
           running_few: 'running: {{count}}',
           running_many: 'running: {{count}}',
@@ -1173,297 +1104,30 @@ export const en: TranslationSchema = {
           ask_few: 'waiting for you: {{count}}',
           ask_many: 'waiting for you: {{count}}',
           ask_other: 'waiting for you: {{count}}',
-          deferred_one: 'awaiting decision: {{count}}',
-          deferred_few: 'awaiting decision: {{count}}',
-          deferred_many: 'awaiting decision: {{count}}',
-          deferred_other: 'awaiting decision: {{count}}',
-          queued_one: 'queued: {{count}}',
-          queued_few: 'queued: {{count}}',
-          queued_many: 'queued: {{count}}',
-          queued_other: 'queued: {{count}}',
-          failed_one: 'failed: {{count}}',
-          failed_few: 'failed: {{count}}',
-          failed_many: 'failed: {{count}}',
-          failed_other: 'failed: {{count}}',
-          cancelled_one: 'cancelled: {{count}}',
-          cancelled_few: 'cancelled: {{count}}',
-          cancelled_many: 'cancelled: {{count}}',
-          cancelled_other: 'cancelled: {{count}}',
           idle_one: 'stopped: {{count}}',
           idle_few: 'stopped: {{count}}',
           idle_many: 'stopped: {{count}}',
           idle_other: 'stopped: {{count}}',
           elapsed: 'elapsed {{time}}',
-          keepWarmSaved: 'cache warming: saved ≈ {{tokens}} tokens',
-          keepWarmLost: 'cache warming: overpaid ≈ {{tokens}} tokens',
-          keepWarmHint:
-            'Sum of cache-warming results over groups whose wait is settled (groups: {{count}}), in tokens at input price. Waits without a result are not counted',
           idleHint:
-            'No run and no outcome: waiting on background work, a retry or delivery, stopped, or paused before its chat',
+            'No run and no question: the group is stopped or paused — continuing is your call',
         },
         inactive: 'Inactive: {{count}}',
         inactiveHint: 'Chats of groups discarded by a split relaunch: their work does not continue',
-        triageRunning: 'triage in progress',
-        triageStopped: 'triage not running',
-        triageApplied: 'triage applied',
-        triageMissing: 'no triage received — the groups went as proposed',
-        triageInterrupted: 'triage interrupted by a restart — the groups await your answer',
-        repairs: 'repaired by the panel: {{count}}',
-        pending: 'waiting for the triage',
-        queued: 'queued — starts when a slot frees up',
-        /** Started, no chat yet: copy and dependency install (live run 29.09). */
-        setup: 'preparing the copy — branch and dependency install, this takes minutes',
-        pausedNoChat: 'paused',
-        interruptedNoChat: 'cut before its chat existed — nothing to resume',
         mr: 'MR !{{id}}',
-        pr: 'PR #{{id}}',
-        mrOpenHint: 'Open the group’s MR in a new tab',
-        mrClosed: { merged: 'MR merged', closed: 'MR closed' },
-        mergeOrder: 'merge {{ordinal}} of {{total}}',
-        mergeOrderAfter: 'Merge the MRs of these groups first: {{names}}',
-        mergeOrderFree: 'Depends on no other MR: its place follows the plan order',
-        mergeOrderName: '“{{name}}”',
         openHint: 'Open the group’s chat',
         askFrom: 'The agent asks · {{stage}} · chat {{chat}}',
         askFromNoStage: 'The agent asks · chat {{chat}}',
         permissionFrom: 'The agent waits for permission · {{stage}} · chat {{chat}}',
         permissionFromNoStage: 'The agent waits for permission · chat {{chat}}',
-        waiting: 'waiting for: {{names}}',
-        held: 'waiting for your answer',
-        holdAnswered: 'answered',
-        retries: 'turn retried by the panel: {{count}}',
-        result: {
-          reviewed: 'checked, nothing changed',
-          changed: 'changes made',
-          unchanged: 'no changes in the copy',
-          pushed: 'changes pushed',
-          nothing: 'nothing to deliver: no own changes, no MR needed',
-          commits: 'commits: {{count}}',
-        },
         waitingFor: {
           question: 'waiting for your answer',
-          decision: 'waiting for a review decision',
-          'review-missing': 'review without a result',
-          'review-follow-up': 'panel is finishing the review',
-          background: 'waiting for background work',
-          retry: 'waiting for a retry',
-          delivery: 'panel is checking delivery',
-          interrupted: 'interrupted',
-          limit: 'subscription limit',
-          'human-op': 'awaiting decision: D-n',
-          'mr-red': 'MR red, no fix',
         },
-        failed: 'did not start: {{message}}',
-        stopped: 'stopped: {{message}}',
-        deliveryStop: {
-          stopped_one: 'Delivery stopped — {{count}} item',
-          stopped_few: 'Delivery stopped — {{count}} items',
-          stopped_many: 'Delivery stopped — {{count}} items',
-          stopped_other: 'Delivery stopped — {{count}} items',
-          action: {
-            stalled:
-              'A reminder moved nothing and the panel no longer reminds. See what holds the group and continue it with a word in its chat — the agent closes the items.',
-            nudgeCap:
-              'Reminder cap reached: the group was moving but did not finish, and the panel no longer reminds. Continue it with a word in its chat — the agent closes the items.',
-            escalationStalled:
-              'The diagnosis on a stronger model moved nothing either — a human is needed. Look at the items and continue the group with a word in its chat.',
-            retryCap:
-              'The panel retried delivery on its own up to its cap and did not finish. Look at the items and continue the group with a word in its chat — the agent closes them.',
-            stopped:
-              'The group has stopped and will not resume by itself. Continue it with a word in its chat — the agent closes the items.',
-          },
-          humanOnly_one: 'Delivery is waiting for you — {{count}} item',
-          humanOnly_few: 'Delivery is waiting for you — {{count}} items',
-          humanOnly_many: 'Delivery is waiting for you — {{count}} items',
-          humanOnly_other: 'Delivery is waiting for you — {{count}} items',
-          needMerge: 'Merge of {{mr}} is needed',
-          need: {
-            merge: 'Merge needed: {{action}}',
-            destructive: 'Confirmation needed: {{action}}',
-            credentials: 'Access needed: {{action}}',
-            'corrupt-store':
-              'The git object store of the copy is corrupt — run git fsck --full in it, restore the objects or recreate the copy, then continue the group: {{action}}',
-          },
-          todo: 'to do: {{text}}',
-          more_one: '{{count}} more item',
-          more_few: '{{count}} more items',
-          more_many: '{{count}} more items',
-          more_other: '{{count}} more items',
-          less: 'collapse',
-        },
-        deliveryMissing: 'Missing for the MR: {{count}}',
-        deliveryMissingHint: 'What delivery checks found missing, by git and forge facts',
         stageNow: 'now',
         stageLast: 'last stage',
         stageRepeat: '×{{count}}',
-        deliveryNudges: 'delivery reminders: {{count}}',
-        testsVerdict: 'Tests block: {{passed}} of {{count}} green',
-        testsNone: 'Tests block: the diff touched no automated cases',
-        tokens: {
-          title: 'Tokens',
-          rowUsage: 'Sessions',
-          rowKeepWarm: 'Warming',
-          metric: {
-            coldStart: 'First request',
-            avgCtx: 'Average window',
-            cache: 'From cache',
-            instructions: 'Instructions in window',
-            turns: 'Turns',
-            compactions: 'Compactions',
-            sessions: 'Sessions',
-            pings: 'Pings',
-            hits: 'Cache hits',
-            misses: 'Misses',
-            read: 'Read',
-            write: 'Written',
-          },
-          percent: '{{value}}%',
-          median: 'project median {{median}}',
-          duplicates: 'same instruction text under different paths: {{list}}',
-          keepWarmSaved: 'saved ≈ {{tokens}} tokens at input price',
-          keepWarmLost: 'overpaid ≈ {{tokens}} tokens at input price',
-          keepWarmPending:
-            'the current wait costs ≈ {{tokens}} tokens at input price; whether it paid off shows when the group resumes',
-          flag: {
-            'cold-start': 'start heavier than usual for the project',
-            compactions: 'many compactions',
-            instructions: 'instructions take over a quarter of the context',
-            duplicate: 'instructions loaded twice',
-          },
-        },
-        reviewClose: {
-          dirt: 'a review must not edit, yet files changed in the copy: {{count}} — {{list}}',
-          more: ' and {{count}} more',
-          scratchRemoved: 'the group scratch copy was removed: {{path}}',
-          scratchKept: 'a scratch copy was left: {{path}} ({{why}})',
-          standRemoved: 'the throwaway review database was removed',
-        },
-        interruptedAt: 'process cut short at {{time}}',
-        interruptResumes: 'resumed by the panel: {{count}}',
-        autoNotices: 'Allowed automatically: {{list}}',
-        autoAnswers: 'Answered automatically: {{list}}',
-        autoAnswerFree: 'free answer — decide yourself',
-        autoNoticesDismiss: 'Dismiss',
-        resumeInterrupted: 'Resume',
-        resumeAllInterrupted: 'Resume interrupted ({{count}})',
-        resumeInterruptedHint:
-          'Resume from where it stopped in the same session: the agent first rebuilds its state from git and the transcript, then continues',
-        resumeInterruptedDone: 'Groups resumed: {{count}}',
-        resumeInterruptedRefused:
-          'Could not resume: {{count}} — the group has no session or copy; relaunch it',
-        resumeInterruptedFailed: 'Resume failed: {{message}}',
-        control: {
-          pause: 'Pause',
-          pauseHint:
-            'Stop the group or hold it in the queue. A running group keeps its slot: pausing does not move the queue, and groups waiting for it keep waiting',
-          resume: 'Resume',
-          resumeHint:
-            'Resume the group where it stopped, in the same session (one paused during preparation starts in its copy, or from scratch if the copy does not exist yet); its slot is already held',
-          requeueHint: 'Put the group back in the queue: it starts when its turn and a slot come',
-          start: 'Start now',
-          startHint: 'Start the group without waiting for the queue',
-          restart: 'Start again',
-          restartHint:
-            'Start the group again in its copy (preparation repeats); no copy — in a new one. The previous start was cut before the chat',
-          continue: 'Continue',
-          continueHint:
-            'The group’s work is unfinished (a failure, retries ran out, no review verdict). The same session continues it: the agent first checks the state against git, the MR and the transcript, then finishes and delivers',
-          drop: 'Remove',
-          dropHint:
-            'Close the group: groups waiting for it move on, its slot goes to the queue; the copy can be removed separately afterwards',
-          dropConfirm:
-            'Remove the group? It closes for good: groups waiting for it no longer wait, and if it held a slot, the slot goes to the queue',
-          dropYes: 'Yes, remove',
-          paused: 'Group paused',
-          requeued: 'Group is back in the queue',
-          restarted: 'Group is starting again',
-          continued: 'The group continues its work',
-          dropped: 'Group removed',
-          resumed: 'Group resumed',
-          resumeQueued: 'The resume goes out after the group’s current turn',
-          resumeRestored: 'Pause lifted — the group is waiting for your answer again',
-          started: 'Group started',
-          limitUntil: 'waits for the limit until {{time}}',
-          consent: '{{reason}}. Go anyway?',
-          force: 'Yes, start',
-          cancel: 'Cancel',
-          failed: 'Failed: {{message}}',
-        },
-        base: 'from branch {{branch}}',
-        holdPlaceholder: 'The answer goes into the group’s plan and task',
-        holdSend: 'Answer',
-        holdStarted: 'Answer accepted — “{{title}}” is starting',
-        holdQueued: 'Answer accepted — the group starts once its predecessors finish',
-        holdFailed: 'Answer not accepted: {{message}}',
-        release: 'Release',
-        releaseHint:
-          'Start now without waiting for the predecessors: the copy is still branched off the predecessor’s branch, and the task says that work is unfinished',
-        releaseStarted: 'Group released — “{{title}}” is starting',
-        releaseQueued: 'Group released, but it has not started yet — check its row',
-        releaseFailed: 'Release failed: {{message}}',
-        cleanup: 'Remove the copy',
-        cleanupHint:
-          'The group is closed. The copy leaves the disk; the branch only if it is empty. A branch with its own work and an MR branch stay, and git will not give up uncommitted changes',
-        cleanupFailed: 'Could not remove the copy: {{message}}',
-        statusAsk: {
-          label: 'Ask about group progress',
-          placeholder: 'For example: how are the tests of the “Reports” group?',
-          send: 'Ask',
-          hint: 'A new light chat answers from the group summary — the parent with its long history is not spent. To write to the parent itself, use the input below',
-          failed: 'Could not ask: {{message}}',
-        },
-        cancelPlan: {
-          action: 'Cancel plan',
-          hint: 'Stop every group of this split and close the plan. Chats, copies and branches stay — after cancelling you can split again',
-          confirm: 'Stop all groups and close the plan?',
-          yes: 'Yes, cancel the plan',
-          no: 'No',
-          done: 'Plan cancelled: {{cancelled}} groups closed, {{stopped}} runs stopped',
-          failed: 'Could not cancel the plan: {{message}}',
-          offerTitle: 'The split is still running',
-          offer: 'Click to go to “Cancel plan”.',
-        },
-        cleaned: {
-          deleted: 'Copy removed, the empty branch deleted',
-          kept: 'Copy removed, the branch with work kept',
-          mr: 'Copy removed, the panel leaves the MR branch alone',
-          none: 'Copy removed',
-        },
         accept: {
-          action: 'Accept',
-          hint: 'Mark the group accepted: you reviewed the delivery and agree. Only you set this mark — the panel never infers it from facts',
-          undo: 'Remove mark',
-          undoHint: 'Remove the «accepted» mark from the group',
           marker: 'accepted',
-          markDone: 'Mark done',
-          markDoneHint:
-            'Close the group yourself: it becomes «done» and accepted, moves to the bottom of the list, and groups waiting for it start. «Remove mark» returns it to its previous state',
-          markedUndoHint: 'Return the group to the state it was in before the mark',
-          markedMarker: 'done by hand',
-          failed: 'Failed: {{message}}',
-        },
-        recheck: {
-          action: 'Recheck MR',
-          hint: 'The group checks its MR: conflicts with the target branch, reviewer comments, the pipeline and whether every task is done. Finds something — fixes it and delivers again; finds nothing — touches nothing',
-          pending: 'Rechecking…',
-          pendingHint:
-            'The group is rechecking its MR; the button turns green once the turn ends in a delivery',
-          checked: 'MR checked',
-          checkedAt: 'checked {{time}}',
-          checkedHint: 'The last recheck ended in a delivery. Click to recheck again',
-          sent: 'The group is rechecking its MR',
-          queued: 'The recheck goes out once a slot frees up',
-          merged: 'The MR is already merged — the group is finished',
-          closed: 'The MR is closed — nothing to recheck',
-          failed: 'Failed: {{message}}',
-          note: 'Note',
-          noteHint:
-            'Add your own note to the recheck — for example, a review remark that is not in the MR',
-          noteLabel: 'Note for the group',
-          notePlaceholder: 'What to check or finish — the group gets the text verbatim',
-          noteFieldHint:
-            'Every request in the note is a point of the recheck: the group does it in the branch or answers why not',
-          noteTooLong: 'At most {{max}} characters',
         },
         received: {
           button: 'What the agent got',
@@ -1487,208 +1151,6 @@ export const en: TranslationSchema = {
           chars: '{{count}} characters',
           close: 'Close',
         },
-        moveTasks: {
-          action_one: 'Move the task',
-          action_few: 'Move {{count}} tasks',
-          action_many: 'Move {{count}} tasks',
-          action_other: 'Move {{count}} tasks',
-          actionAll: 'Move group tasks',
-          hint: 'Move the tracker tasks of this group to another Jira status. The panel moves them itself — pressing «Move» in the dialog is the consent',
-          hintAll:
-            'Move the tracker tasks of every group — and of splits the groups made themselves — to another Jira status',
-          title: 'Move tasks in Jira',
-          loading: 'Reading the tasks in Jira…',
-          loadFailed: 'Could not read the tasks: {{message}}',
-          tableKey: 'Task',
-          tableGroup: 'Group',
-          tableStatus: 'Now',
-          unread: 'Not read: {{reason}}',
-          status: 'New status',
-          statusHint: 'Only statuses every task that was read can move to',
-          statusHintFrom: 'Only statuses every task in the chosen status can move to',
-          from: 'From status',
-          fromHint: 'Move only the tasks that are in this status right now',
-          fromAll: 'All tasks',
-          fromOption_one: '{{status}} — {{count}} task',
-          fromOption_few: '{{status}} — {{count}} tasks',
-          fromOption_many: '{{status}} — {{count}} tasks',
-          fromOption_other: '{{status}} — {{count}} tasks',
-          offline:
-            'Jira is not connected in the panel, so there is nothing to move the tasks with. Connect it in Settings, «Integrations»: address, email and token; after that the button moves the tasks itself.',
-          connect: 'Open «Integrations»',
-          noStatusFrom: 'Nowhere to move from this status: the transitions of its tasks differ',
-          noStatus:
-            'There is nowhere to move all the tasks at once: they already share a status or their available transitions differ',
-          submit: 'Move',
-          cancel: 'Cancel',
-          done: 'Done',
-          outcomes: {
-            moved: 'moved',
-            already: 'already in this status',
-            unavailable: 'no transition to this status',
-            failed: 'error: {{reason}}',
-            skipped: 'left alone — it is in «{{reason}}»',
-          },
-          toast: 'Moved {{moved}} of {{total}}',
-          failed: 'Failed: {{message}}',
-        },
-        tickets: {
-          title_one: 'Suggested tickets: {{count}}',
-          title_few: 'Suggested tickets: {{count}}',
-          title_many: 'Suggested tickets: {{count}}',
-          title_other: 'Suggested tickets: {{count}}',
-          hint: 'Defects outside the groups’ tasks found along the way. Copy them, file one by one, or handle all at once — «Resolve…»',
-          foundBy: 'found by: {{groups}}',
-          copy: 'Copy',
-          copied: 'Copied',
-          copyFailed: 'Could not copy',
-          copyText: '{{title}}\n\nWhere: {{where}}\nWhy: {{why}}\nFound by split group: {{groups}}',
-          file: 'File in {{project}}',
-          fileAsk: 'File an issue in {{project}}?',
-          fileConfirm: 'File',
-          filed: 'Filed: {{key}}',
-          filedCommented: '{{key}}: already open — added as a comment',
-          fileFailed: 'Could not file: {{message}}',
-          taken: 'Taken into a chat',
-          resolve: {
-            action: 'Resolve…',
-            hint: 'All open proposals at once: publish to Jira or resolve in a new chat',
-            title: 'Resolve suggested tickets',
-            open_one: '{{count}} open proposal.',
-            open_few: '{{count}} open proposals.',
-            open_many: '{{count}} open proposals.',
-            open_other: '{{count}} open proposals.',
-            duplicates_one: '{{count}} of them is an obvious duplicate and goes with the original.',
-            duplicates_few: '{{count}} of them are obvious duplicates and go with the originals.',
-            duplicates_many: '{{count}} of them are obvious duplicates and go with the originals.',
-            duplicates_other: '{{count}} of them are obvious duplicates and go with the originals.',
-            duplicateOf: 'same: {{title}}',
-            planned_one:
-              '{{count}} issue to file — before the model pass and the check against open Jira issues.',
-            planned_few:
-              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
-            planned_many:
-              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
-            planned_other:
-              '{{count}} issues to file — before the model pass and the check against open Jira issues.',
-            bundleFiles: 'one issue — shared file {{files}}',
-            explain:
-              '«Publish to Jira» — duplicates merge into one defect, defects of one file into one issue with a section each (what, where, evidence, expected and actual); the model adds titles, context, what to do, acceptance criteria, side and severity. Every issue gets a side label (frontend, backend or both), a Jira priority from the severity (medium without one), a shared label of this split and no assignee. Similar open Jira issues are listed above: you decide to link (a comment into it), skip, or file a new one. This click is the consent. «Resolve here» — a new chat in this project with the task of fixing every open proposal; they get marked «taken into a chat».',
-            site: 'Jira: {{site}}',
-            project: 'Project',
-            projectFrom: {
-              bound: 'linked to the panel project',
-              last: 'picked last time',
-              first: 'first in the Jira list',
-            },
-            issueType: 'Issue type',
-            targetLoading: 'Reading Jira projects…',
-            targetFailed: 'Jira did not answer: {{message}}',
-            offline:
-              'Jira is not connected — nowhere to publish. Connect it in settings, «Integrations»; «Resolve here» works without it.',
-            offlineShort: 'Jira is not connected',
-            noProjects: 'No Jira projects available',
-            noTarget: 'No Jira project selected',
-            nothingOpen: 'No open proposals',
-            connect: 'Connect Jira',
-            publish: 'Publish to Jira',
-            publishHint:
-              'The model groups the proposals into issues and the panel files them right away with your decisions on similar issues — there is no separate confirmation',
-            take: 'Resolve here',
-            takeHint: 'A new chat in this project with a task built from every open proposal',
-            created_one: '{{count}} issue filed',
-            created_few: '{{count}} issues filed',
-            created_many: '{{count}} issues filed',
-            created_other: '{{count}} issues filed',
-            merged_one: '{{count}} proposal',
-            merged_few: '{{count}} proposals',
-            merged_many: '{{count}} proposals',
-            merged_other: '{{count}} proposals',
-            existing: 'already filed',
-            commented: 'already open — added as a comment',
-            defectMerged: 'merged: {{titles}}',
-            failed_one: '{{count}} issue was not filed — its proposals stay open',
-            failed_few: '{{count}} issues were not filed — their proposals stay open',
-            failed_many: '{{count}} issues were not filed — their proposals stay open',
-            failed_other: '{{count}} issues were not filed — their proposals stay open',
-            fallback:
-              'The model is unavailable: issues were built without it — duplicates together, defects of one file in one issue; the side comes from the paths, the priority is medium.',
-            retry: 'Retry failed',
-            close: 'Close',
-            takenToast_one: 'Chat started: {{count}} proposal',
-            takenToast_few: 'Chat started: {{count}} proposals',
-            takenToast_many: 'Chat started: {{count}} proposals',
-            takenToast_other: 'Chat started: {{count}} proposals',
-            publishFailed: 'Could not publish: {{message}}',
-            takeFailed: 'The chat did not start: {{message}}',
-            bundleSide: 'side by paths: {{side}}',
-            side: {
-              frontend: 'FRONTEND',
-              backend: 'BACKEND',
-              fullstack: 'FULLSTACK (frontend and backend)',
-              other: 'not determined',
-            },
-            dupChecking: 'Searching Jira for similar open issues…',
-            dupCheckingShort: 'The duplicate check in Jira is running',
-            dupFailed:
-              'Could not check Jira for duplicates: {{message}}. Publishing still matches titles and fingerprints on its own.',
-            dupNone: 'No similar open issues in Jira.',
-            dupTitle_one: '{{count}} similar open issue in Jira — decide what to do with it',
-            dupTitle_few: '{{count}} similar open issues in Jira — decide for each',
-            dupTitle_many: '{{count}} similar open issues in Jira — decide for each',
-            dupTitle_other: '{{count}} similar open issues in Jira — decide for each',
-            dupReason: {
-              fingerprint: 'the same finding (the panel already filed or commented on it here)',
-              title: 'almost the same title',
-              similar: 'a similar title',
-            },
-            dupChoiceLabel: 'What to do',
-            dupChoice: {
-              link: 'Link — comment into {{key}}',
-              skip: 'Skip — do not file now',
-              create: 'It is different — file a new issue',
-            },
-            meta: '{{side}} · priority «{{priority}}»',
-            metaNoPriority: '{{side}} · Jira default priority',
-            assignee:
-              'Jira assigned someone on its own: {{name}}. The panel never sets an assignee — remove it in Jira if unwanted.',
-            skipped_one: 'Skipped by your decision: {{count}} — the proposal stays open',
-            skipped_few: 'Skipped by your decision: {{count}} — the proposals stay open',
-            skipped_many: 'Skipped by your decision: {{count}} — the proposals stay open',
-            skipped_other: 'Skipped by your decision: {{count}} — the proposals stay open',
-          },
-        },
-        humanSteps: {
-          title_one: 'For you to do: {{count}}',
-          title_few: 'For you to do: {{count}}',
-          title_many: 'For you to do: {{count}}',
-          title_other: 'For you to do: {{count}}',
-          hint: 'Steps the groups cannot take themselves: a merge request dependency, access, another service’s settings. The panel does not perform them',
-          askedBy: 'asked by: {{groups}}',
-          copyText:
-            '{{action}}\n\nWhere: {{where}}\nWhy: {{why}}\nAsked by split group: {{groups}}',
-        },
-      },
-      overlap: {
-        idle: 'Branch overlap not checked',
-        none: 'No overlap between branches',
-        title_one: 'Branch overlap: {{count}} file',
-        title_few: 'Branch overlap: {{count}} files',
-        title_many: 'Branch overlap: {{count}} files',
-        title_other: 'Branch overlap: {{count}} files',
-        check: 'Check branches',
-        hint: 'Count the files several groups touched at once. The panel never touches branches — merging stays with you',
-        outside: 'outside ownership: {{names}}',
-        mergeOrder: 'Merge order: {{names}}',
-        unread: 'Unread: {{names}}',
-        clean: 'Branches checked — no shared files',
-        failed: 'Check failed: {{message}}',
-        expand: 'Show files',
-        collapse: 'Collapse the list',
-        outsideCount_one: 'Outside ownership: {{count}} file',
-        outsideCount_few: 'Outside ownership: {{count}} files',
-        outsideCount_many: 'Outside ownership: {{count}} files',
-        outsideCount_other: 'Outside ownership: {{count}} files',
       },
       tree: {
         pauseAll: 'Stop all ({{count}})',
@@ -1758,58 +1220,6 @@ export const en: TranslationSchema = {
           'The panel could not read the review verdict — the block is left above as it came. ' +
           'No fix run was started: ask the agent to repeat the block.',
       },
-    },
-    review: {
-      title: 'Merge request review',
-      titleNamed: 'Review: {{title}}',
-      branch: 'copy on branch {{branch}}',
-      offBranch:
-        'The copy could not be put on this MR branch — it was cut from the base branch. ' +
-        'The findings may have been read from the wrong diff.',
-      clean: 'No findings — the group is closed.',
-      applyAll_one: 'same decision for {{count}} more group',
-      applyAll_few: 'same decision for {{count}} more groups',
-      applyAll_many: 'same decision for {{count}} more groups',
-      applyAll_other: 'same decision for {{count}} more groups',
-      fix: 'Fix in the copy',
-      post: 'Post to the MR',
-      both: 'Both',
-      none: 'Do nothing',
-      decided: {
-        fix: 'Decided: fixing in the copy',
-        post: 'Decided: posted to the MR',
-        both: 'Decided: fixing and posting',
-        none: 'Decided: do nothing',
-      },
-      posted: 'The summary comment is written to the MR',
-      postFailed: 'The comment was not written: {{message}}',
-      push: 'Commit and push to the MR',
-      pushed: 'Consent given — the agent commits and pushes the fixes',
-      donePlain_one: 'Decision applied: {{count}} group',
-      donePlain_few: 'Decision applied: {{count}} groups',
-      donePlain_many: 'Decision applied: {{count}} groups',
-      donePlain_other: 'Decision applied: {{count}} groups',
-      doneToast_one: 'Decision applied: {{count}} group, comments posted: {{posted}}',
-      doneToast_few: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
-      doneToast_many: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
-      doneToast_other: 'Decision applied: {{count}} groups, comments posted: {{posted}}',
-      pushToast: 'Consent to commit and push sent to the agent',
-      missing:
-        'The review reply ended without a result block — the findings are unknown. This is not "no findings".',
-      retry: 'Ask for the review result again',
-      retryToast: 'The review was asked for its result in the same session',
-      incomplete:
-        'The review stayed incomplete even after it was asked to finish — this is not "no findings":',
-      depthGap: {
-        unreported: 'the reviewer did not report what it read and how much',
-        partial: 'only part of the diff was read',
-        entries: 'high risk, yet the review had one entry point — two are needed (diff and frame)',
-        trace:
-          "the requirement-trace block is missing or could not be parsed — the owner's points were not checked",
-      },
-      witness: 'Second independent pass over an empty review',
-      pushBlocked: 'The fixes cannot be pushed to the MR: the MR branch is unknown',
-      failed: 'Failed: {{message}}',
     },
     attach: 'Attach a file',
     attachments: 'Attached files',
@@ -1934,30 +1344,6 @@ export const en: TranslationSchema = {
       'infra-change': 'changing infrastructure',
       'volume-delete': 'deleting Docker volumes with data',
     },
-    branchGate: {
-      title: 'First edit — where do we work?',
-      reason:
-        'The agent is about to edit files ({{tool}}) in the main working copy. ' +
-        'One git directory is shared by every chat of the project: leave the work here and ' +
-        'the next chat edits the same files on the same branch.',
-      branchLabel: 'Branch for the copy',
-      branchHint:
-        'The copy lands next to the project, in "<repo>-worktrees", and the conversation moves ' +
-        'there — same history, same task, the main directory left untouched',
-      copy: 'Create the copy and continue there',
-      here: 'Write here',
-      stop: 'Do not edit',
-      working: 'Creating the copy…',
-      failed: 'The copy could not be created.',
-      handedTitle:
-        'The work of this conversation is already handed to groups — they edit the code:',
-      handedChild: '{{number}}. “{{title}}” — branch {{branch}}',
-      handedHint:
-        '“Hand to a group” declines the edit here, and the agent forwards it to the right group in its chat.',
-      base: 'The copy will branch from the groups’ MR branch: {{base}}',
-      handOff: 'Hand to a group',
-      target: 'File to edit',
-    },
     permissionFromChild: 'Requested by “{{title}}”',
     permissionLost:
       'The decision never reached the agent: the request had already been dropped — it timed out or the conversation was restarted. If the agent is still waiting, send the prompt again.',
@@ -1965,6 +1351,11 @@ export const en: TranslationSchema = {
       'The request has already expired: the agent stopped waiting for an answer, so the decision would not run anything. If it asks again, answer the new card.',
     permissionUnreachable:
       'The decision was not sent: no connection to the panel server. The agent keeps waiting for an answer.',
+    corePermitBadge: 'Core question',
+    corePermitRefused: 'The core did not accept the answer to the permission question: {{reason}}',
+    corePermitNoGrant:
+      'The core did not name the repository or path of this question — there is nothing to build a grant from. Answer the question in the core task’s timeline.',
+    coreGrantRefused: 'Auto-approve: the core did not accept the edit grant — {{reason}}',
     allow: 'Allow',
     deny: 'Deny',
     model: 'Model',
@@ -1998,14 +1389,6 @@ export const en: TranslationSchema = {
       preparing: 'the agent is preparing a request to the model',
       failed: 'no request to the model: the model server refused the last one',
       failure: 'The model server answered {{status}}: {{message}}',
-      starting: 'the model server is starting',
-      loading: 'the model is loading into memory',
-      queued: 'the request waits for the server to take it',
-      prompt: 'reading the prompt: {{filled}} of {{total}} tokens',
-      promptNoTotal: 'reading the prompt: {{filled}} tokens',
-      generating: 'writing the answer: {{decoded}} tokens',
-      silent: 'the server has been silent for {{seconds}} s — in {{left}} s the request goes again',
-      stalled: 'the request was cut after {{seconds}} s of silence and went again',
       restart: 'Restart the server',
       restarting: 'Restarting…',
       restartFailed: 'The server did not restart: {{message}}',
@@ -2155,7 +1538,7 @@ export const en: TranslationSchema = {
     autoApproveOn: 'Permissions auto',
     autoApproveOff: 'Permissions manual',
     autoApproveHint:
-      'The panel itself approves anything that can be undone — commit, push, branch, moving a file, an API call. What still asks is the irreversible: deleting, wiping history, tearing down data and infrastructure, publishing — plus anything covered by ask/deny rules from settings.json. Reading files is always allowed, whatever this toggle says. This is auto mode for this chat only: on — Claude runs in CLI auto mode, and models without it get the panel’s auto-approve. The choice here beats the “Auto permission mode in every chat” setting either way.',
+      'The core judges each step’s permissions: whatever it does not forbid goes through with no card. On — the window hands the core an edit grant on the task’s whole repository, and no path questions come up. Off — editing every path that needs a grant asks with a «Core question» card. Publishing by the agent (push, MRs, forge writes) is forbidden by the core whatever the toggle says. The position is remembered for this chat.',
     menu: 'Chat settings',
     menuHint: 'Permission toggles, rules, export, refresh and help',
     barChat: 'Conversation',
@@ -2163,70 +1546,10 @@ export const en: TranslationSchema = {
     barEditor: 'Editor',
     menuPermissions: 'Permissions',
     menuActions: 'Conversation',
-    /** Group and autonomy of THIS chat — a header menu section. */
-    groupSettings: {
-      title: 'Group and autonomy',
-      group: 'Group',
-      auto: 'Auto — triage picks by description',
-      projectGroup: '{{name}} (project)',
-      missingGroup: 'Not in the list: {{key}}',
-      inactivePairSide: '{{name}} — the other side of the pair, not active in this project',
-      groupHint: 'A set of rules and skills enabled for the runs of this chat',
-      autonomous: 'Autonomous — pick the recommended option',
-      autonomousHint:
-        'An agent question with a "(Recommended)" option does not wait for you: that option is taken and the pick stays as a line in the feed',
-      fromParent: 'from parent: {{title}}',
-      loadFailed: 'Chat settings did not load — try reloading the page',
-      resetToParent: 'Same as parent',
-    },
     /** A question closed by autonomy: a muted line instead of a card. */
     autoPick: 'Auto-pick: {{label}}',
     autoPickQuestion: 'Question: {{question}}',
     autoPickUnparsed: 'Auto-pick: the question was closed with the recommended option',
-    /** Critical from a split child — a card in the main chat. */
-    escalation: {
-      title: 'Critical from group "{{title}}"',
-      fromBlock: 'Reported by the group itself',
-      fromAutoPick: 'Autonomy picked for you in a critical question',
-      open: 'Open the group chat',
-      unread: 'Unread critical notes: {{count}}',
-      dismiss: 'Mark as read',
-    },
-    rules: {
-      title: 'Approve without asking — in every project',
-      modelCascade: 'Match the model to the task (this project)',
-      modelCascadeHint:
-        'The panel gives each split group a model that fits its kind of work — never above the ' +
-        'one you picked; work on a weaker model gets a higher bar: project checks run, result ' +
-        'matched against the task. Off — every child runs on the model you picked',
-      reviewAfterWork: 'Review after work (this project)',
-      reviewAfterWorkHint:
-        'After a group finishes its work the panel starts a review on the model you picked. ' +
-        'Off — no review: a group with delivery goes straight to it and the chat feed names the ' +
-        'reason; model matching stays. Applies to groups started after the switch',
-      externalWrite: 'Writes to external services',
-      externalWriteHint: 'MR comments and threads, Jira tickets, wiki pages — over MCP',
-      gitWrite: 'Commits, branches, plain push',
-      gitWriteHint: 'commit, push, branch, rebase, cherry-pick, revert',
-      filesDelete: 'Deleting files',
-      filesDeleteHint: 'rm, del, shred, dd, Remove-Item, reg delete',
-      gitHistory: 'Wiping git history',
-      gitHistoryHint: 'reset --hard, clean, restore, branch -D, stash drop, push --force',
-      database: 'Tearing down database data',
-      databaseHint: 'DROP, TRUNCATE, DELETE FROM, migration rollback',
-      infrastructure: 'Containers and infrastructure',
-      infrastructureHint: 'docker prune, kubectl delete, helm uninstall, terraform destroy, reboot',
-      packagePublish: 'Publishing packages',
-      packagePublishHint: 'npm/pnpm/yarn publish, unpublish, deprecate',
-      externalDestroy: 'Deleting and merging in external services',
-      externalDestroyHint: 'Merging an MR, deleting a ticket or a wiki page — not undoable here',
-      networkExec: 'Dangerous network commands',
-      networkExecHint: 'curl | sh — running what was downloaded, curl -X DELETE',
-      editInMainCopy: 'Edits in the project main copy',
-      editInMainCopyHint:
-        'Off — before the first edit the panel offers a copy on its own branch and moves the ' +
-        'conversation there: one git directory is shared by every chat of the project',
-    },
     retry: 'Retry',
     continueAfterDrop:
       'Continue from where you stopped: the connection dropped and the last answer may be unfinished. Do not redo what is already done.',
@@ -3654,7 +2977,7 @@ export const en: TranslationSchema = {
     consumersTitle: 'Where the contour works',
     consumer: {
       chat: 'Chat',
-      groups: 'Split groups',
+      groups: 'Groups',
       tests: 'Test agent',
       assistant: 'Panel assistant',
       terminal: 'Terminal (CLI files)',
@@ -3724,7 +3047,7 @@ export const en: TranslationSchema = {
       'best-effort': 'Warn and leave the decision to you.',
     },
     modeRequiredWarning:
-      'With the panel off the gateway is closed, and a CLI pointed at it is left without a model: it gets a connection refusal instead of quietly going to the cloud.',
+      'With the AgentDeck core off the gateway is closed, and a CLI pointed at it is left without a model: it gets a connection refusal instead of quietly going to the cloud.',
     budgetLabel: 'Key budget, $',
     budgetHint: 'Type the number from the admin console. Zero — do not track.',
     budgetManual: 'The contour exposes no route for the remainder — the number is typed by hand.',
@@ -4048,7 +3371,7 @@ export const en: TranslationSchema = {
     layersFlagsNone: 'No flags — everything of ours travels into the run.',
     layersPromptOff: 'The panel’s addition is dropped by the panel itself, it has no flag.',
     layersNoRun:
-      'Nobody receives them yet: this contour’s route has neither chat, nor split groups, nor the ' +
+      'Nobody receives them yet: this contour’s route has neither chat, nor groups, nor the ' +
       'tests agent ticked. The terminal edits configuration files, the assistant travels by the ' +
       'endpoint profile, a foreign CLI runs its own set — layers are dropped by a Claude run only.',
     layersNotes:
@@ -4173,9 +3496,9 @@ export const en: TranslationSchema = {
         revisitWhen: 'If the contour starts refusing checks with a code clients understand.',
       },
       'gateway-required': {
-        name: 'With the panel down, CLIs pointed at the gateway stop working',
-        how: 'The contour key never leaves the panel, so CLIs go to its local gateway rather than to the contour. Panel off — gateway silent, and such a CLI is left without a model.',
-        why: 'The alternative is spreading a corporate key across nine CLI configs, from where it can never be recalled. Depending on a running panel is the cheaper price.',
+        name: 'With the AgentDeck core down, CLIs pointed at the gateway stop working',
+        how: 'The contour key never leaves the machine, so CLIs go to a local gateway held by the AgentDeck core rather than to the contour. Core off — gateway silent, and such a CLI is left without a model. Closing the panel does not stop the gateway.',
+        why: 'The alternative is spreading a corporate key across nine CLI configs, from where it can never be recalled. Depending on a running core is the cheaper price.',
         revisitWhen: 'If a way appears to issue CLIs a short-lived token instead of the key.',
       },
       'cli-no-endpoint': {
@@ -4538,12 +3861,6 @@ export const en: TranslationSchema = {
   providerChat: {
     title: '{{provider}} chat',
     you: 'You',
-    noneHint:
-      'First connect the CLI subscription or a provider API key (see the instructions dialog).',
-    mode: {
-      cli: 'via CLI (subscription)',
-      api: 'via API',
-    },
     conversations: 'Conversations',
     new: 'New',
     noConversations: 'No conversations yet.',
@@ -4557,7 +3874,7 @@ export const en: TranslationSchema = {
       count_other: '{{count}} projects',
       emptyTitle: 'No projects yet',
       emptyText:
-        'Folders where Claude or another CLI has worked show up here. A conversation folder is set in its header.',
+        'Folders where Claude or another CLI has worked show up here. «New conversation here» opens a core chat in that folder.',
       notFound: 'Nothing found.',
       providersLabel: 'Who worked in this project',
       badgeTitle_one: '{{provider}}: {{count}} conversation',
@@ -4566,7 +3883,6 @@ export const en: TranslationSchema = {
       badgeTitle_other: '{{provider}}: {{count}} conversations',
       startHere: 'New conversation here',
       startHereLabel: 'New {{provider}} conversation in project {{name}}',
-      startFailed: 'Could not start a conversation in the project: {{message}}',
       problem: {
         empty: 'The folder path is empty',
         relative: 'The path is not absolute — there is nowhere to run the CLI',
@@ -4580,49 +3896,19 @@ export const en: TranslationSchema = {
     messageCount_many: '{{count}} messages',
     messageCount_other: '{{count}} messages',
     startHint:
-      'Start a conversation — the transcript is kept, and the provider will remember it in the next question.',
-    empty: 'Type a message — the reply appears as the provider prints it.',
-    placeholder: 'Message the provider…',
-    queuePlaceholder: 'Add more — it goes out as soon as the answer ends…',
-    steerPlaceholder: 'Add more — the CLI gets it mid-answer…',
-    send: 'Send',
-    queueSend: 'Queue',
-    steerSend: 'Pass on',
-    stop: 'Stop',
-    thinking: 'The provider is thinking…',
+      'These are the conversations the panel kept before the chat moved to the core. A new conversation opens in the core chat.',
+    empty: 'This conversation has no messages.',
     failed: 'error',
     // A message picked up by the running CLI turn (В1), not sent after it.
     steered: 'mid-answer',
-    restart: 'Restart',
-    restartTitle: 'Restart the conversation from a clean slate',
-    allowEdits: 'Allow edits without asking',
-    editsAllowed: 'Edits without asking',
-    editsAsk: 'Ask before edits',
-    editsDenied: 'Edits blocked',
-    groupHint:
-      "The group reaches the CLI as a layer on every reply — Claude's files do not change. «Auto» means the groups bound to the project and switched on for this CLI.",
-    editsByCli: '{{name}} decides on edits itself, by its own settings',
-    permissionFailed: 'The answer did not reach the CLI: {{message}}',
-    restartDone:
-      'Work continues in a new conversation — a foreign CLI has no session, so this is a new conversation with the checkpoint.',
-    restartRequested:
-      'The checkpoint file is not ready: the agent was asked to write the state down, then the panel continues on its own.',
-    restartFailed: 'Failed to restart the conversation: {{message}}',
     rename: 'Rename',
     renamePrompt: 'Conversation title',
     delete: 'Delete',
     deleteTitle: 'Delete the conversation?',
     deleteDescription: 'The transcript is removed from disk with no way back.',
     deleteFailed: 'Failed to delete the conversation.',
-    createFailed: 'Failed to create the conversation.',
-    workdir: 'Working directory',
     workdirBadge: 'directory: {{path}}',
     modelBadge: 'model: {{model}}',
-    workdirHint: 'The directory the provider CLI runs in — it sees the files of that project.',
-    attach: 'Attach a file',
-    attachHint: 'The file path goes into the message: agent CLIs read files themselves.',
-    attached: 'Attached files: {{count}}',
-    clearAttachments: 'Clear',
     // How the reply arrived: CLI stream, local server session, or a direct API call.
     transport: {
       stream: 'CLI stream',
@@ -4633,6 +3919,11 @@ export const en: TranslationSchema = {
     timing: {
       step: 'Answer took {{step}}',
       full: 'Answer took {{step}}, {{total}} in this conversation',
+    },
+    history: {
+      badge: 'history',
+      continue: 'Continue in the core chat',
+      note: 'Read-only: the panel kept this conversation before the chat moved to the core, and it cannot go on in the same {{provider}} session. «Continue in the core chat» opens a new chat in the same folder.',
     },
   },
   mcp: {
@@ -4993,7 +4284,7 @@ export const en: TranslationSchema = {
       'The texts the panel speaks to the model with, not on your behalf: the tool protocol, the agent behind a contour, the image and presentation modes.',
     tab_groups: 'Groups',
     tabHint_groups:
-      'Split groups: what they decide on their own, how many run at once and which project counts as heavy. Shared rules and what a project overrides.',
+      'Task steps and groups: the economy levers the core gives every step, and the sieves a group passes before an MR.',
     tab_globalLayer: 'Global layer',
     tabHint_globalLayer:
       'Mechanics that live both in the panel and in the hooks and skills of the config directory: which copy is better on one case corpus, and how to carry the better one over.',
@@ -5078,33 +4369,6 @@ export const en: TranslationSchema = {
       classColumn: 'Blocker class',
       escaped: 'Escaped to MR',
       caught: 'Caught',
-    },
-    verifyLedger: {
-      title: 'Verification ledger',
-      hint: 'A gate or test on the same tree content does not need a second run: the record of the last green run is enough. While the ledger is measuring, checks run as usual, and this card shows how much it would have saved and whether a record ever disagreed with a real run.',
-      loading: 'Loading the ledger…',
-      inactive: 'Not working',
-      mode: {
-        shadow: 'Measuring',
-        on: 'Reuse on',
-        off: 'Record only',
-        disabled: 'Disabled',
-      },
-      window_one: 'over the last {{count}} day',
-      window_few: 'over the last {{count}} days',
-      window_many: 'over the last {{count}} days',
-      window_other: 'over the last {{count}} days',
-      records: 'Runs recorded',
-      wouldSkip: 'Reuses',
-      saved: 'Saved',
-      minutes_one: '{{count}} minute',
-      minutes_few: '{{count}} minutes',
-      minutes_many: '{{count}} minutes',
-      minutes_other: '{{count}} minutes',
-      mismatches: 'Disagreements with a run',
-      repos: 'Repositories',
-      seen: 'The ledger fired under: {{list}}.',
-      seenNone: 'No check has run under the panel’s launches yet.',
     },
     globalLayer: {
       loading: 'Loading comparison pairs…',
@@ -5296,13 +4560,8 @@ export const en: TranslationSchema = {
     deliverToMrHint:
       'On — a project chat header shows the “To MR” button: that is where delivery is turned on and off ' +
       'for this project (on out of the box). The agent takes a code-change task to a ready MR by the ' +
-      'general delivery skill, each split group to its own MR; questions and reviews without edits open ' +
+      'general delivery skill, each group to its own MR; questions and reviews without edits open ' +
       'no MR. Off — no button, and no project delivers.',
-    taskSplitInitiative: 'Offer to split tasks across chats',
-    taskSplitInitiativeHint:
-      'Given three or more independent tasks in one message, the agent first offers to spread them ' +
-      'across separate chats — each on its own branch and its own copy of the repository. Off means ' +
-      'no offer, but the “Split the tasks” button in the composer still works.',
     handoffInitiative: 'Offer to continue in a clean session',
     handoffInitiativeHint:
       'Once a task is closed, the agent first tidies its working files (.agent/PROGRESS.md, ' +
@@ -5336,11 +4595,6 @@ export const en: TranslationSchema = {
       '(deletion, rolling back uncommitted work, rewriting history) and your ask/deny rules still ' +
       'wait for you. For models without auto mode (haiku) and other CLIs, the panel’s auto-approve ' +
       'does the same. The permissions toggle in the chat menu beats this setting either way.',
-    deferAfterMinutes: 'Minutes before an unanswered permission card moves to «Awaiting decision»',
-    deferAfterMinutesHint:
-      'The agent is told «queued for the human as D-n» and keeps working, and the call waits for ' +
-      'you in the «Awaiting decision» list. 0 means the card waits as long as it takes. Groups and ' +
-      'an autonomous chat nobody has open defer at once.',
     deferredTtlDays: 'Days a D-n ask waits for an answer',
     deferredTtlDaysHint:
       'After that it expires; an expired one can still be allowed from the list — a fresh grant is issued.',
@@ -5350,89 +4604,61 @@ export const en: TranslationSchema = {
       'and ScheduleWakeup tools. Their descriptions take about 12k tokens at the start of every ' +
       'request and are rarely used. Turn this off when the agent needs to publish pages, run ' +
       'multi-agent workflows or wake itself on a timer — it gets the full set from its next turn.',
-    groupEconomyTitle: 'Split group economy',
-    groupEconomyHint:
-      'A group is a long conversation, and every call sends the model the whole window again. ' +
-      'These levers keep the window smaller and the mechanical steps cheaper. Each one switches ' +
-      'off on its own, no panel restart needed. The compaction threshold and a new conversation ' +
-      "after a pause apply from the group's next turn, Sonnet delivery from the next delivery. " +
-      "The rest apply from the group's next new conversation: one already started keeps the " +
-      'levers it started with — changing them midway would rewrite its whole cache.',
-    groupCompactWindow: 'Group context compaction threshold',
-    groupCompactWindowHint:
-      "When a group's window reaches the threshold, the CLI compacts it into a summary. A lower " +
-      'threshold makes every call cheaper but compacts more often and loses more detail. Until a ' +
-      'comparison run shows quality holds, the default is the Claude Code threshold. The ' +
-      'AGENTDECK_GROUP_COMPACT_WINDOW variable at panel start wins.',
-    groupCompactWindowEnv:
-      'Groups now run with a {{tokens}} thousand token threshold from the ' +
-      'AGENTDECK_GROUP_COMPACT_WINDOW variable: the choice above does not apply while the panel ' +
-      'runs with it.',
-    groupCompactWindowOff: 'As in Claude Code settings (recommended)',
-    groupCompactWindowValue: '{{tokens}} thousand tokens',
-    groupCompactWindowDefault: '{{tokens}} thousand tokens (recommended)',
-    groupBashOutput: 'Command output in the conversation',
-    groupBashOutputHint:
-      'Ceiling for command output. Longer output the CLI saves to a file and shows the group a ' +
-      'preview of the start (about 2000 characters) and the path; for a failed command, the exit ' +
-      'code and the start of the output up to the ceiling, with no file. Long output is not paid ' +
-      'for by every later call.',
-    groupBashOutputOff: 'CLI default (30,000 characters)',
-    groupBashOutputValue: '{{chars}} characters',
-    groupBashOutputDefault: '{{chars}} characters (recommended)',
-    groupReadOutput: 'One file read',
-    groupReadOutputHint:
-      'The ceiling of one file read. For a bigger file the CLI returns its start and the agent reads ' +
-      'the rest in parts, so only the needed part enters the conversation.',
-    groupReadOutputOff: 'CLI default',
-    groupReadOutputValue: '{{tokens}} thousand tokens',
-    groupReadOutputDefault: '{{tokens}} thousand tokens (recommended)',
-    groupCacheTtl: 'Conversation cache lifetime',
-    groupCacheTtlHint:
-      'Five minutes is cheaper to write, but any longer pause — a long check, a question to you — ' +
-      'writes the whole window again. Groups pause like that often, so by default the CLI decides ' +
-      '(one hour on a subscription).',
-    groupCacheTtlAuto: 'CLI decides (recommended)',
-    groupCacheTtl5m: '5 minutes (not recommended: a pause rewrites the window)',
-    groupCacheTtl1h: '1 hour',
-    groupSonnetDeliver: 'Delivery on Sonnet',
-    groupSonnetDeliverHint:
-      'The group commits, pushes, opens the MR and runs the sieves on Sonnet: it is mechanics, and a ' +
-      'call costs almost half. Work, review and fixes keep their model. Not applied through a contour.',
-    groupFreshOnColdResume: 'New conversation after a long pause',
-    groupFreshOnColdResumeHint:
-      'The group stood idle for 55 minutes or more (the cache went cold) and its window is 25k ' +
-      'above the conversation base (about 85k): any continuation — «Continue», a panel message, ' +
-      'review, push — goes on as a new conversation. The panel builds the brief itself: the ' +
-      "group's notes, commits and changes since the main branch, the last answer. Continuing the " +
-      'cold conversation would write the whole window again. The previous conversation stays on ' +
-      'disk, and the group can search it.',
-    groupKeepWarm: 'Keep the cache warm while a group waits',
-    groupKeepWarmHint:
-      'The group waits for an answer or a permission, is paused or queued for a heavy step: ten ' +
-      'minutes before the one-hour cache expires the panel sends its conversation one short ' +
-      'word. The ping reads the window from the cache and extends it by another hour, so the ' +
-      'continuation does not write the whole window again (sixteen times cheaper in the ' +
-      'measurement). The conversation itself is not changed. No ping with a five-minute cache, ' +
-      'a window under the threshold “Window from which a cold cache is a loss” (set on the ' +
-      '“Split-group watch” card, even with the watch off) or while a subscription limit reset is awaited; ' +
-      'a ping that did not read the window from the cache stops the pings of that wait.',
-    groupKeepWarmPings: 'Pings per wait',
-    groupKeepWarmPingsHint:
-      'After that the cache goes cold, and the continuation starts a new conversation with the ' +
-      "panel's brief.",
-    groupKeepWarmPingsValue: '{{count}} — warm for up to {{hours}} h of waiting',
-    groupKeepWarmPingsDefault: '{{count}} — warm for up to {{hours}} h of waiting (recommended)',
-    groupDetachIde: 'Keep groups off the editor',
-    groupDetachIdeHint:
-      'A panel started from a VS Code terminal handed its groups the editor connection, and every ' +
-      "turn received diagnostics of someone else's folder — extra tokens and false errors.",
-    groupWorkHabits: 'Economical agent habits',
-    groupWorkHabitsHint:
-      'A line in the group task: independent reads and commands in one step, work from the copy root ' +
-      'without changing folders, narrow command output. The agent reads only what it edits or ' +
-      'judges; the line does not suggest subagents. The CLI also stops reminding the agent about a ' +
-      'long silence: nobody reads an interim report inside a stage.',
+    coreEconomy: {
+      title: 'Task step economy',
+      hint:
+        'A task step is a long conversation, and every call sends the model the whole window again. ' +
+        'These levers keep the window smaller. The task core stores them and reads them at the start ' +
+        'of every step (chat excluded): a change applies from the next step, no restart needed; a ' +
+        'step already started keeps the levers it started with. Delivery on a cheaper model, a new ' +
+        'conversation after a cold cache and a warm cache while waiting are always on in the core and ' +
+        'have no levers.',
+      unavailable: 'The task core stores these levers, and it is unavailable: {{reason}}',
+      issue:
+        'The economy section of the core config failed its check, so the core ignores it: {{reason}}',
+      saveFailed: 'The core did not save the lever: {{reason}}',
+      compactWindow: 'Step context compaction threshold',
+      compactWindowHint:
+        "When a step's window reaches the threshold, the CLI compacts it into a summary. A lower " +
+        'threshold makes every call cheaper but compacts more often and loses more detail. Until a ' +
+        'comparison run shows quality holds, the default is the CLI threshold.',
+      compactWindowOff: 'As in the CLI settings (recommended)',
+      compactWindowValue: '{{tokens}} thousand tokens',
+      compactWindowDefault: '{{tokens}} thousand tokens (recommended)',
+      bashOutput: 'Command output in the conversation',
+      bashOutputHint:
+        'Ceiling for command output. Longer output the CLI saves to a file and shows the agent a ' +
+        'preview of the start and the path; for a failed command, the exit code and the start of the ' +
+        'output up to the ceiling, with no file. Long output is not paid for by every later call.',
+      bashOutputOff: 'CLI default (30,000 characters in Claude Code)',
+      bashOutputValue: '{{chars}} characters',
+      bashOutputDefault: '{{chars}} characters (recommended)',
+      readOutput: 'One file read',
+      readOutputHint:
+        'The ceiling of one file read. For a bigger file the CLI returns its start and the agent ' +
+        'reads the rest in parts, so only the needed part enters the conversation.',
+      readOutputOff: 'CLI default',
+      readOutputValue: '{{tokens}} thousand tokens',
+      readOutputDefault: '{{tokens}} thousand tokens (recommended)',
+      cacheTtl: 'Conversation cache lifetime',
+      cacheTtlHint:
+        'Five minutes is cheaper to write, but any longer pause — a long check, a question to you — ' +
+        'writes the whole window again. Steps pause like that often, so by default the CLI decides ' +
+        '(one hour for Claude Code on a subscription).',
+      cacheTtlAuto: 'CLI decides (recommended)',
+      cacheTtl5m: '5 minutes (not recommended: a pause rewrites the window)',
+      cacheTtl1h: '1 hour',
+      detachIde: 'Keep steps off the editor',
+      detachIdeHint:
+        'A core started from a VS Code terminal would hand its steps the editor connection, and ' +
+        "every turn would receive diagnostics of someone else's folder — extra tokens and false errors.",
+      workHabits: 'Economical agent habits',
+      workHabitsHint:
+        'A line in the step task: independent reads and commands in one step, work from the copy root ' +
+        'without changing folders, narrow command output; the line does not suggest subagents. ' +
+        'Claude Code also stops reminding the agent about a long silence: nobody reads an interim ' +
+        'report inside a step.',
+    },
     groupEconomySupportLabel: 'Where it works:',
     groupEconomySupportNative: '{{name}} · own setting',
     groupEconomySupportNativeTitle: "The CLI's own setting",
@@ -6513,6 +5739,7 @@ export const en: TranslationSchema = {
       cost: 'cost: ${{value}}',
       agentCli: 'agent: {{name}}',
       openChat: 'Open the conversation',
+      openCoreTask: 'Open the core task',
       exportMd: 'Report .md',
       exportCsv: 'Report .csv',
       exportPdf: 'Report .pdf',
@@ -7124,7 +6351,6 @@ export const en: TranslationSchema = {
         permission: 'Agent asks for rights',
         question: 'Agent asked a question',
         budget: 'Contour budget running out',
-        groupSignal: 'Group watch signal (“attention” and “alarm”)',
       },
       test: 'Send a test message',
       sent: 'Test message sent',

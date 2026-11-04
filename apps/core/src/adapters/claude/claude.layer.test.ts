@@ -95,6 +95,34 @@ describe('claude adapter — F-86 the layer the plan is built for', () => {
     expect(plan.files['claude/observed-hooks.json']).toBeUndefined();
   });
 
+  it('F6: sources user → `--setting-sources user`, repo env/hooks absent, human layer kept; an empty brief drops the brief flag', () => {
+    const { cwd, config } = stand();
+    const userSpec = spec(cwd, config, {
+      brief: '',
+      layer: { hooks: 'on', skills: 'on', sources: 'user' },
+    });
+    const run: LayerRun = {
+      asked: 'on',
+      ran: 'on',
+      repoLayer: false,
+      trust: 'none',
+      detail: 'user setting source only (task session)',
+    };
+    const plan = planClaude(userSpec, null, run);
+    expect(plan.args[plan.args.indexOf('--setting-sources') + 1]).toBe('user');
+    expect(plan.args).not.toContain('--append-system-prompt-file');
+    // Слой человека CLI читает сам (`user` из CLAUDE_CONFIG_DIR); слой репозитория в наш
+    // `--settings` не переносится.
+    const settings = settingsOf(plan);
+    expect(settings.env?.REPO_VAR).toBeUndefined();
+    expect(JSON.stringify(settings.hooks)).not.toContain('repo.sh');
+
+    // Тот же сеанс с брифом и без `sources` — флаг брифа есть, источники CLI как есть.
+    const normal = planClaude(spec(cwd, config), null, trustedLayer(spec(cwd, config)));
+    expect(normal.args).toContain('--append-system-prompt-file');
+    expect(normal.args).not.toContain('--setting-sources');
+  });
+
   it('F-86: trusted `on` leaves the CLI its own sources; trusted observe still reads the repo files', () => {
     const { cwd, config } = stand();
     const on = planClaude(spec(cwd, config), null, trustedLayer(spec(cwd, config)));

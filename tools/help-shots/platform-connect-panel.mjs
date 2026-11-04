@@ -1,32 +1,34 @@
 /**
  * Кадры путеводителя «Контур», сторона ПАНЕЛИ: все сценарии одной съёмкой.
  *
- * Панель поднимается СВОЯ, одноразовая: каталог конфигурации во временной
- * папке, свои порты, свой фронт. Рабочий стенд человека не трогается — ни его
- * контуры, ни его ассистент, ни его конфигурации CLI. Тот же приём, что в
- * `tools/qa/check-platform-foreign.mjs`.
+ * Панель поднимается СВОЯ, одноразовая — `startStand` из `tools/qa/throwaway-stand.mjs`: свой дом
+ * (`~/.claude` И `~/.agentdeck` во временной папке), свои порты, свой фронт, ядро под надзором
+ * панели, как у человека. Рабочий стенд человека не трогается — ни его контуры, ни его ассистент,
+ * ни его конфигурации CLI (прежний запуск подменял один CLAUDE_CONFIG_DIR, и данные панели
+ * уезжали в настоящий `~/.agentdeck`).
  *
  * Сценарии идут путём человека, потому что каждый опирается на состояние,
  * оставленное предыдущим: подключение → активация с пробным запросом →
  * маршрут → правила → агент → режимы → сценарный контур → удаление.
- * Живой контур — локальный стенд платформы компании, проброшенный на локальный порт
- * через `kubectl port-forward`; ключ — файлом из
- * `PLATFORM_STAND_KEY_FILE` / `PLATFORM_STAND_KEY_VAR` (не печатается). Сценарный — `tools/qa/stub-platform.mjs` (см.
- * `platform-scripted-panel.mjs`, зачем он и что в нём подменено).
+ * Живой контур — локальный стенд платформы компании (`PLATFORM_API`); ключ — файлом из
+ * `PLATFORM_STAND_KEY_FILE` / `PLATFORM_STAND_KEY_VAR` (не печатается). Сценарный —
+ * `tools/qa/stub-platform.mjs` (см. `platform-scripted-panel.mjs`, зачем он и что в нём подменено).
  *
  * `finish()` зовётся только после ПОЛНОСТЬЮ удачной съёмки: он удаляет кадры
  * своей стороны, не снятые этим прогоном, и упавшая на середине съёмка
- * стёрла бы честные кадры прошлой.
+ * стёрла бы честные кадры прошлой. Съёмка части шагов (`GUIDE_STEPS`) кадров вне выбора не
+ * трогает (`keepUnshot`): «Удаление» дописывает кадр в «connect», а «Активация» — его 17-й.
  *
- * Запуск: node tools/help-shots/platform-connect-panel.mjs   (GUIDE_LANG=en — английские)
- * Переменные: PLATFORM_API, PLATFORM_MODEL, PLATFORM_STAND_KEY_FILE, PLATFORM_STAND_KEY_VAR, GUIDE_PANEL_PORT, GUIDE_WEB_PORT, GUIDE_STUB_PORT,
- * GUIDE_HEADED=1; отладка упавшей съёмки — GUIDE_KEEP, GUIDE_REUSE, GUIDE_STEPS (ниже).
+ * Запуск: node tools/help-shots/platform-connect-panel.mjs   (GUIDE_LANG=en, GUIDE_THEME=dark)
+ * Переменные: PLATFORM_API, PLATFORM_MODEL, PLATFORM_STAND_KEY_FILE, PLATFORM_STAND_KEY_VAR,
+ * GUIDE_STUB_PORT, GUIDE_HEADED=1, GUIDE_STEPS=connect,rules (только эти шаги).
  */
-import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
+import { startStand } from '../qa/throwaway-stand.mjs';
 import { applyShotLanguage, openScenario } from './kit.mjs';
 import { LANG } from './platform-shots-lib.mjs';
 import {
@@ -40,52 +42,70 @@ import {
 } from './platform-stand-panel.mjs';
 import { shootScripted } from './platform-scripted-panel.mjs';
 
-const CONTOUR_URL = process.env.PLATFORM_API ?? 'http://127.0.0.1:5300';
-const PANEL_PORT = Number(process.env.GUIDE_PANEL_PORT ?? 5192);
-const WEB_PORT = Number(process.env.GUIDE_WEB_PORT ?? 8899);
-const PANEL = `http://127.0.0.1:${PANEL_PORT}`;
-const WEB = `http://127.0.0.1:${WEB_PORT}`;
+const CONTOUR_URL = process.env.PLATFORM_API ?? 'http://api.localhost';
 const SCENARIOS = ['connect', 'activate', 'route', 'rules', 'agent', 'media', 'scripted'];
-
-async function waitFor(url, seconds) {
-  for (let i = 0; i < seconds * 2; i += 1) {
-    try {
-      const res = await fetch(url);
-      if (res.ok || res.status === 401) return true;
-    } catch {
-      /* ещё не поднялось */
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
-  return false;
-}
-
-/**
- * Отладка съёмки: `GUIDE_KEEP=1` оставляет панель жить после падения,
- * `GUIDE_REUSE=1 GUIDE_STEPS=scripted,delete` продолжает на ней с упавшего
- * шага. Кадры такой съёмки честные, но опись дочищается только у снятых ею
- * сценариев.
- */
-const KEEP = process.env.GUIDE_KEEP === '1';
-const REUSE = process.env.GUIDE_REUSE === '1';
 const ONLY = (process.env.GUIDE_STEPS ?? '').split(',').filter(Boolean);
 
-const started = [];
-const home = mkdtempSync(join(tmpdir(), 'cc-guide-'));
-mkdirSync(join(home, 'agentdeck'), { recursive: true });
-writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
-writeFileSync(join(home, 'CLAUDE.md'), '# путеводитель\n', 'utf8');
-let ok = false;
+/**
+ * Каталог настоящего `claude` из PATH оболочки — в конец PATH стенда, как у `check-core-chat.mjs`.
+ * Сценарный контур ведёт чат через ядро, а оценка ядра отказывает задаче, когда CLI её маршрута нет
+ * в PATH («claude not found»). Модель у такого чата — заглушка сценарного контура за шлюзом ядра.
+ */
+function claudeDir() {
+  const found = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], {
+    encoding: 'utf8',
+  });
+  const first = found.status === 0 ? found.stdout.split(/\r?\n/)[0].trim() : '';
+  return first ? [dirname(first)] : [];
+}
 
+const stand = await startStand({
+  label: 'guide',
+  web: true,
+  core: { supervised: true },
+  extraPath: claudeDir(),
+});
+/** @type {string[]} */
+const leftovers = [];
 try {
-  if (!REUSE) await startPanel();
-  await applyShotLanguage(PANEL, LANG);
+  console.log(`панель на ${stand.apiUrl}, фронт на ${stand.webUrl}`);
+  await applyShotLanguage(stand.apiUrl, LANG);
   const shots = Object.fromEntries(SCENARIOS.map((id) => [id, openScenario('platform', id)]));
   const browser = await chromium.launch({ headless: process.env.GUIDE_HEADED !== '1' });
   const ran = new Set();
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
-    const ctx = { page, web: WEB, panel: PANEL, shots, contourUrl: CONTOUR_URL };
+    // Дом стенда одноразовый: входа Claude Code в нём нет, и боковая полоса писала «Нет входа
+    // Claude Code на этой машине» над каждым кадром — про контур это ничего не говорит. Окна
+    // подписки прячутся так же, как у входа ключом API; знакомство с маскотом уже было — его
+    // приветствие ложилось на низ кадра.
+    await page.route('**/api/usage-limits', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'api-key' }),
+      }),
+    );
+    // По той же причине чат открывался окном «Ассистенту Claude Code нужен доступ» поверх кадра и
+    // под ним прятал кнопку режимов: у человека вход есть, раннер — CLI.
+    await page.route('**/api/provider-runner', async (route) => {
+      const response = await route.fetch();
+      const runner = await response.json();
+      await route.fulfill({ response, json: { ...runner, mode: 'cli' } });
+    });
+    await page.addInitScript(() =>
+      window.localStorage.setItem(
+        'agentdeck.mascot',
+        JSON.stringify({ enabled: false, chatty: false, greeted: true }),
+      ),
+    );
+    const ctx = {
+      page,
+      web: stand.webUrl,
+      panel: stand.apiUrl,
+      shots,
+      contourUrl: CONTOUR_URL,
+      leftovers,
+    };
     const steps = [
       ['connect', shootConnect],
       ['activate', shootActivate],
@@ -113,60 +133,15 @@ try {
   } finally {
     await browser.close();
   }
-  // Удаление дописывает кадр в «connect»: без съёмки самого «connect» его
-  // опись не дочищается, иначе кадры 09–17 считались бы неснятыми.
-  for (const id of SCENARIOS) if (ran.has(id)) shots[id].finish();
-  ok = true;
+  for (const id of SCENARIOS) if (ran.has(id)) shots[id].finish({ keepUnshot: ONLY.length > 0 });
 } finally {
-  if (REUSE || ok || !KEEP) {
-    // При REUSE `started` пуст, а `home` — своя пустая папка этого запуска.
-    for (const child of started) child.kill();
-    rmSync(home, { recursive: true, force: true });
-  } else {
-    for (const child of started) child.unref();
-    console.log(`панель оставлена: ${WEB}, дом ${home}`);
+  await stand.stop();
+  // Папки съёмки, которые держал живой чат ядра, — только теперь, когда стенд остановлен.
+  for (const folder of leftovers) {
+    try {
+      rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 });
+    } catch (error) {
+      console.log(`папка съёмки не убрана (${error.code ?? error.message}): ${folder}`);
+    }
   }
-}
-
-async function startPanel() {
-  const env = {
-    ...process.env,
-    CLAUDE_CONFIG_DIR: home,
-    PORT: String(PANEL_PORT),
-    WEB_PORT: String(WEB_PORT),
-  };
-  started.push(
-    spawn(
-      process.execPath,
-      ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
-      { env, stdio: 'ignore', shell: false, detached: KEEP },
-    ),
-  );
-  if (!(await waitFor(`${PANEL}/api/system`, 40)))
-    throw new Error('одноразовая панель не поднялась');
-  console.log(`панель на ${PANEL}`);
-
-  started.push(
-    spawn(
-      'node',
-      [
-        join('node_modules', 'vite', 'bin', 'vite.js'),
-        '--port',
-        String(WEB_PORT),
-        '--strictPort',
-        '--host',
-        '127.0.0.1',
-      ],
-      {
-        cwd: join(process.cwd(), 'apps', 'web'),
-        // BROWSER=none — иначе Vite откроет окно поверх съёмки.
-        env: { ...env, API_PORT: String(PANEL_PORT), BROWSER: 'none' },
-        stdio: 'ignore',
-        shell: false,
-        detached: KEEP,
-      },
-    ),
-  );
-  if (!(await waitFor(WEB, 90))) throw new Error('фронт одноразовой панели не поднялся');
-  console.log(`фронт на ${WEB}`);
 }

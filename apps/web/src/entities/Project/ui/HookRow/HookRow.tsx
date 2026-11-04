@@ -1,5 +1,6 @@
 import type { HookRowProps } from '../ProjectLocalConfigView/ProjectLocalConfigView.types';
 import { useTranslation } from 'react-i18next';
+import { serverFieldText } from '@shared/config/i18n';
 import styles from './HookRow.module.scss';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -35,7 +36,7 @@ export function HookRow({ hook }: HookRowProps) {
         </Stack>
         {hook.description && (
           <Typography variant="body-sm" color="muted" clamp={2} className={styles.text}>
-            {hook.description}
+            {serverFieldText(hook, 'description', t)}
           </Typography>
         )}
         <Stack direction="row" align="center" gap="var(--spacing-2xs)">

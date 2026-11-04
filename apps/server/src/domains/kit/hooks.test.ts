@@ -31,8 +31,7 @@ function runNode(script: string, input: string, env: NodeJS.ProcessEnv = {}) {
     env: {
       ...process.env,
       AGENTDECK_KIT_VARIANT: '',
-      AGENTDECK_SPLIT_CHILD: '',
-      AGENTDECK_USER_MEMORY_OFF: '',
+      AGENTDECK_STEP_KIND: '',
       ...env,
     },
     timeout: 15_000,

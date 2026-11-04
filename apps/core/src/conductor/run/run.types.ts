@@ -3,6 +3,7 @@ import type { StepDoneCall } from '@agentdeck/contracts/core/model-tools';
 import type { Scenario, ScenarioRef, StepDef } from '@agentdeck/contracts/core/scenario';
 import type { WindowDecision } from '@agentdeck/contracts/core/economy';
 import type { SendOrigin } from '@agentdeck/contracts/core/user-layer';
+import type { SendImage } from '@agentdeck/contracts/core/ask';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { PublishNext } from '../next/next.types.ts';
 import type { RoutingEnv, StepRouting } from '../scenario/index.ts';
@@ -155,7 +156,14 @@ export interface SessionPort {
    * `cmdId` — ключ дубля: та же отправка после перезапуска ядра не уходит второй раз. `origin` —
    * чья отправка (P37): слово человека получает строку `agentdeck-from: human`; нет — платформа.
    */
-  send(sessionId: string, text: string, cmdId: string, origin?: SendOrigin): Promise<void>;
+  send(
+    sessionId: string,
+    text: string,
+    cmdId: string,
+    origin?: SendOrigin,
+    /** Картинки к этой отправке (первое слово вопроса «ask»); нет — только текст. */
+    images?: readonly SendImage[],
+  ): Promise<void>;
   end(sessionId: string, mode: 'soft' | 'tree'): Promise<void>;
 }
 

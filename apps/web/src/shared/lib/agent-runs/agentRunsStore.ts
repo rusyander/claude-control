@@ -16,7 +16,6 @@ import { setOnBackgroundEvent } from './setOnBackgroundEvent';
 import { setOnPermissionRequest } from './setOnPermissionRequest';
 import { setOnHandoff } from './setOnHandoff';
 import { setAutoApprove } from './setAutoApprove';
-import { decideBranchGate } from './decideBranchGate';
 import { decidePermission } from './decidePermission';
 import { resumeActive } from './resumeActive';
 import { restoreQueue } from './restoreQueue';
@@ -67,7 +66,6 @@ export const agentRuns = {
   setOnHandoff,
   setAutoApprove,
   decidePermission,
-  decideBranchGate,
 };
 
 export { EMPTY_RUN } from './agent-runs.constants';
@@ -81,8 +79,6 @@ export { parseSseFrame } from './parseSseFrame';
 export type {
   AgentRun,
   HandoffEvent,
-  PendingBranchGate,
-  BranchGateChild,
   PendingPermission,
   QueuedMessage,
   SendOutcome,

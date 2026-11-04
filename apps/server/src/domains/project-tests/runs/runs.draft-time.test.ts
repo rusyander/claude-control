@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatRun, type ChatEvent } from '../../chat/ChatRunner/ChatRunner.ts';
+import type { TestsAgentEvent } from '../agent/agent-run.types.ts';
+import { TestsCoreRun } from '../agent/core-run.ts';
 import { draftFile, readDrafts } from '../drafts/drafts.ts';
 import { ProjectTestRunRegistry } from './runs.ts';
 import { createGroup, upsertCase } from '../store/store.ts';
@@ -33,7 +34,7 @@ describe('project-tests/runs: время черновика', () => {
 
   it('выдуманное агентом время заменяется временем конца генерации', async () => {
     let runId = '';
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
       const file = join(root, draftFile(runId));
       mkdirSync(join(file, '..'), { recursive: true });
       writeFileSync(
@@ -54,7 +55,10 @@ describe('project-tests/runs: время черновика', () => {
           ],
         }),
       );
-      (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+      (onEvent as (event: TestsAgentEvent) => void)({
+        kind: 'done',
+        sessionId: 's1',
+      } as TestsAgentEvent);
     });
 
     const view = registry.start(
@@ -72,7 +76,7 @@ describe('project-tests/runs: время черновика', () => {
 
   it('отброшенная правка агента видна после конца прогона: в черновике и в логе (X-1)', async () => {
     let runId = '';
-    vi.spyOn(ChatRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
+    vi.spyOn(TestsCoreRun.prototype, 'start').mockImplementation(async (_options, onEvent) => {
       const file = join(root, draftFile(runId));
       mkdirSync(join(file, '..'), { recursive: true });
       writeFileSync(
@@ -92,7 +96,10 @@ describe('project-tests/runs: время черновика', () => {
           ],
         }),
       );
-      (onEvent as (event: ChatEvent) => void)({ kind: 'done', sessionId: 's1' } as ChatEvent);
+      (onEvent as (event: TestsAgentEvent) => void)({
+        kind: 'done',
+        sessionId: 's1',
+      } as TestsAgentEvent);
     });
 
     runId = registry.start(

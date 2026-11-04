@@ -9,31 +9,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:51:42.228Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Совет от Деки Вкладки проектов перетаскиваются мышью, а Alt+←/→ на вкладке сдвигает её на шаг. Следующий совет Панель заказов C:/work/orders-panel Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. «Сборка релиза» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "shotAt": "2026-11-03T14:33:56.678Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работает 1 агент Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Новый чат Проект панели — Панель заказов — C:/work/orders-panel Папка проекта Начало чата — ваше разрешение CLI работать в этой папке; копия проекта не делается. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider Чат идёт тем CLI, который вы выбрали; модель — по умолчанию этого CLI. Первое сообщение Начать чат «Сборка релиза» ждёт вашего ответа Открыть чат ×",
       "en": {
         "file": "01-project-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:53:21.400Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 A tip from Decky Drop a file right into the input — it goes with the message as an attachment. Next tip Панель заказов C:/work/orders-panel A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. “Сборка релиза” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:35:08.870Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 1 agent working Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. New chat Panel project — Панель заказов — C:/work/orders-panel Project folder Starting the chat is your permission for the CLI to work in this folder; no copy is made. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider The chat runs on the CLI you pick, with that CLI’s default model. First message Start chat “Сборка релиза” is waiting for your answer Open the chat ×",
+        "seal": {
+          "png": "7a97f96e0d9143b8",
+          "text": "601170283bc95223"
+        }
       },
       "dark": {
         "file": "01-project-empty.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:55:11.680Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Совет от Деки Enter отправляет сообщение, Shift+Enter — новая строка. Следующий совет Панель заказов C:/work/orders-panel Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. «Сборка релиза» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-11-03T14:36:13.409Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работает 1 агент Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Новый чат Проект панели — Панель заказов — C:/work/orders-panel Папка проекта Начало чата — ваше разрешение CLI работать в этой папке; копия проекта не делается. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider Чат идёт тем CLI, который вы выбрали; модель — по умолчанию этого CLI. Первое сообщение Начать чат «Сборка релиза» ждёт вашего ответа Открыть чат ×",
+        "seal": {
+          "png": "68350401cef87a81",
+          "text": "924f3ab8f444c1bc"
+        }
       },
       "darkEn": {
         "file": "01-project-empty.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:56:55.378Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 A tip from Decky An agent in another project is done or waiting for you? A sound and a notification tell you — no need to watch the screen. Next tip Панель заказов C:/work/orders-panel A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. “Сборка релиза” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:37:19.910Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 1 agent working Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. New chat Panel project — Панель заказов — C:/work/orders-panel Project folder Starting the chat is your permission for the CLI to work in this folder; no copy is made. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider The chat runs on the CLI you pick, with that CLI’s default model. First message Start chat “Сборка релиза” is waiting for your answer Open the chat ×",
+        "seal": {
+          "png": "be11fb8d0dce3d35",
+          "text": "601170283bc95223"
+        }
+      },
+      "seal": {
+        "png": "9d694c4199e97421",
+        "text": "924f3ab8f444c1bc"
       }
     },
     {
@@ -43,31 +59,47 @@
       "masked": 0,
       "width": 896,
       "height": 276,
-      "shotAt": "2026-10-22T16:51:45.270Z",
+      "shotAt": "2026-11-03T14:34:00.139Z",
       "text": "orders-export.md Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "02-composer.en.png",
         "masked": 0,
         "width": 896,
         "height": 276,
-        "shotAt": "2026-10-22T16:53:24.484Z",
-        "text": "orders-export.md Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:35:12.337Z",
+        "text": "orders-export.md Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "26d214e0a79fec48",
+          "text": "eb3eb8767da67212"
+        }
       },
       "dark": {
         "file": "02-composer.dark.png",
         "masked": 0,
         "width": 896,
         "height": 276,
-        "shotAt": "2026-10-22T16:55:14.730Z",
-        "text": "orders-export.md Сообщение Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-11-03T14:36:16.881Z",
+        "text": "orders-export.md Сообщение Enter — отправить, Shift+Enter — перенос строки",
+        "seal": {
+          "png": "655b2a788450a372",
+          "text": "be362cc74ae901c7"
+        }
       },
       "darkEn": {
         "file": "02-composer.dark.en.png",
         "masked": 0,
         "width": 896,
         "height": 276,
-        "shotAt": "2026-10-22T16:56:58.492Z",
-        "text": "orders-export.md Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:37:23.395Z",
+        "text": "orders-export.md Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "5454aa655bb18f90",
+          "text": "eb3eb8767da67212"
+        }
+      },
+      "seal": {
+        "png": "1ff9cb207d0d39e8",
+        "text": "be362cc74ae901c7"
       }
     },
     {
@@ -77,31 +109,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:51:49.414Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 111.3k tok Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1м 00с Σ 1м 00с Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Размышления Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. идёт 28с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
+      "shotAt": "2026-11-03T14:34:04.359Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 111.3k tok Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1м 00с Σ 1м 00с Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Размышления Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. идёт 37с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "03-answer.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:53:28.636Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 111.3k tok Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1m 00s Σ 1m 00s Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Thinking Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. The agent is working. Feel free to leave for another section — I will call you when it is done. running 26s Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:35:16.500Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 111.3k tok Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1m 00s Σ 1m 00s Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Thinking Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. running 38s Message Stop Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "8a4b913aa89a45fe",
+          "text": "565833dfa8239d48"
+        }
       },
       "dark": {
         "file": "03-answer.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:55:18.880Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 111.3k tok Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1м 00с Σ 1м 00с Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Размышления Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. Агент работает. Можно уйти в другой раздел — я позову, когда он закончит. идёт 27с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-11-03T14:36:21.029Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 111.3k tok Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1м 00с Σ 1м 00с Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Размышления Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. идёт 39с Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
+        "seal": {
+          "png": "807b6984177e54a7",
+          "text": "3f7d89fa06aa5ddb"
+        }
       },
       "darkEn": {
         "file": "03-answer.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:57:02.672Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 111.3k tok Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1m 00s Σ 1m 00s Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Thinking Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. running 29s Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:37:27.569Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Экспорт заказов в CSV C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 111.3k tok Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Посмотри, как устроена страница заказов. Read 45.0k +3.8k 1m 00s Σ 1m 00s Страница собирает список из useOrders и рисует таблицу. Выгрузки нет ни в одном месте. Добавь на страницу заказов выгрузку в CSV: колонки как в таблице, кнопка рядом с фильтром. Формат — во вложении. Thinking Grep 55.2k +2.9k Write 56.0k +1.9k Завёл src/pages/Orders/export.ts: собирает строки из тех же данных, что и таблица, и отдаёт их одним файлом. Кнопку повесил в шапку страницы, рядом с фильтром. running 41s Message Stop Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "79285d328be3e7cc",
+          "text": "d5ff7d0af5aa322f"
+        }
+      },
+      "seal": {
+        "png": "ed8e029351f86743",
+        "text": "3ab0a06d9ec0c140"
       }
     },
     {
@@ -111,31 +159,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:51:54.140Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Claude-opus-5 думает над ответом Агент просит разрешение Bash rm -rf dist Запретить Разрешить Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
+      "shotAt": "2026-11-03T14:34:09.094Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Claude-opus-5 думает над ответом Агент просит разрешение Bash rm -rf dist Запретить Разрешить Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "04-permission.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:53:33.377Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Claude-opus-5 is thinking The agent needs permission Bash rm -rf dist Deny Allow Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:35:21.279Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Claude-opus-5 is thinking The agent needs permission Bash rm -rf dist Deny Allow Message Stop Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "00daa1bfce87aebf",
+          "text": "2277c101e75002da"
+        }
       },
       "dark": {
         "file": "04-permission.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:55:23.603Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Claude-opus-5 думает над ответом Агент просит разрешение Bash rm -rf dist Запретить Разрешить Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-11-03T14:36:25.809Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Claude-opus-5 думает над ответом Агент просит разрешение Bash rm -rf dist Запретить Разрешить Сообщение Остановить Enter — отправить, Shift+Enter — перенос строки",
+        "seal": {
+          "png": "625ba1851b5ceab7",
+          "text": "03f6a005915d395a"
+        }
       },
       "darkEn": {
         "file": "04-permission.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:57:07.438Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Claude-opus-5 is thinking The agent needs permission Bash rm -rf dist Deny Allow Message Stop Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:37:32.345Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Сборка релиза C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Claude-opus-5 is thinking The agent needs permission Bash rm -rf dist Deny Allow Message Stop Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "a1fe0c2d946ee9e8",
+          "text": "2277c101e75002da"
+        }
+      },
+      "seal": {
+        "png": "dd40eebe4dc57f70",
+        "text": "03f6a005915d395a"
       }
     },
     {
@@ -145,31 +209,47 @@
       "masked": 0,
       "width": 905,
       "height": 706,
-      "shotAt": "2026-10-22T16:51:59.477Z",
+      "shotAt": "2026-11-03T14:34:14.455Z",
       "text": "Нужен ваш выбор вопрос 1 из 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Свой вариант Разделитель Какой разделитель в CSV? Ответьте на предыдущий вопрос Состав Что входит в первую выгрузку? Ответьте на предыдущий вопрос",
       "en": {
         "file": "05-question.en.png",
         "masked": 0,
         "width": 905,
         "height": 706,
-        "shotAt": "2026-10-22T16:53:38.747Z",
-        "text": "Your choice is needed question 1 of 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Answer in your own words Разделитель Какой разделитель в CSV? Answer the previous question first Состав Что входит в первую выгрузку? Answer the previous question first"
+        "shotAt": "2026-11-03T14:35:26.628Z",
+        "text": "Your choice is needed question 1 of 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Answer in your own words Разделитель Какой разделитель в CSV? Answer the previous question first Состав Что входит в первую выгрузку? Answer the previous question first",
+        "seal": {
+          "png": "185b213b14f5d0ee",
+          "text": "befd10ff12332d9d"
+        }
       },
       "dark": {
         "file": "05-question.dark.png",
         "masked": 0,
         "width": 905,
         "height": 706,
-        "shotAt": "2026-10-22T16:55:28.940Z",
-        "text": "Нужен ваш выбор вопрос 1 из 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Свой вариант Разделитель Какой разделитель в CSV? Ответьте на предыдущий вопрос Состав Что входит в первую выгрузку? Ответьте на предыдущий вопрос"
+        "shotAt": "2026-11-03T14:36:31.200Z",
+        "text": "Нужен ваш выбор вопрос 1 из 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Свой вариант Разделитель Какой разделитель в CSV? Ответьте на предыдущий вопрос Состав Что входит в первую выгрузку? Ответьте на предыдущий вопрос",
+        "seal": {
+          "png": "f9078a227a3a0861",
+          "text": "95dcf03ddadcea48"
+        }
       },
       "darkEn": {
         "file": "05-question.dark.en.png",
         "masked": 0,
         "width": 905,
         "height": 706,
-        "shotAt": "2026-10-22T16:57:12.876Z",
-        "text": "Your choice is needed question 1 of 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Answer in your own words Разделитель Какой разделитель в CSV? Answer the previous question first Состав Что входит в первую выгрузку? Answer the previous question first"
+        "shotAt": "2026-11-03T14:37:37.763Z",
+        "text": "Your choice is needed question 1 of 3 Дата Что считать датой заказа в выгрузке? Дата создания Когда заказ появился в базе. Дата оплаты Когда деньги подтвердил банк. Answer in your own words Разделитель Какой разделитель в CSV? Answer the previous question first Состав Что входит в первую выгрузку? Answer the previous question first",
+        "seal": {
+          "png": "0e4abe5dc746a93b",
+          "text": "befd10ff12332d9d"
+        }
+      },
+      "seal": {
+        "png": "e8d2527287cc2b61",
+        "text": "95dcf03ddadcea48"
       }
     },
     {
@@ -179,31 +259,47 @@
       "masked": 0,
       "width": 800,
       "height": 1200,
-      "shotAt": "2026-10-22T16:52:00.848Z",
+      "shotAt": "2026-11-03T14:34:15.831Z",
       "text": "Изменено файлов: 4 · впереди на 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Ветка main feature/orders-export feature/login Подтянуть изменения Текущая ветка origin/main origin/feature/orders-export Pull Отправить ветку впереди на 2 Push Новая ветка Создать Сообщение коммита Закоммитить Параллельные ветки feature/orders-export основная агент работает C:/work/orders-panel Открыть вкладкой Завести копию Копия — отдельный каталог рядом с проектом со своей веткой и общей историей: в ней работает свой агент, не мешая остальным. Ветка показана та, что в копии сейчас, — внутри агент волен переключаться сам. Слияние веток панель не делает Настройка копий Коммит берёт все изменения рабочего дерева. Pull может привести к слиянию — конфликт панель не разбирает. Push отправляет только текущую ветку и только вперёд: --force не передаётся. Удаления веток и ребейза здесь нет",
       "en": {
         "file": "06-branch.en.png",
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:53:40.089Z",
-        "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches feature/orders-export main copy agent working C:/work/orders-panel Open as a tab Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here"
+        "shotAt": "2026-11-03T14:35:27.972Z",
+        "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches feature/orders-export main copy agent working C:/work/orders-panel Open as a tab Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here",
+        "seal": {
+          "png": "ce09180a004d396a",
+          "text": "18c025c4579d8d25"
+        }
       },
       "dark": {
         "file": "06-branch.dark.png",
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:55:30.265Z",
-        "text": "Изменено файлов: 4 · впереди на 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Ветка main feature/orders-export feature/login Подтянуть изменения Текущая ветка origin/main origin/feature/orders-export Pull Отправить ветку впереди на 2 Push Новая ветка Создать Сообщение коммита Закоммитить Параллельные ветки feature/orders-export основная агент работает C:/work/orders-panel Открыть вкладкой Завести копию Копия — отдельный каталог рядом с проектом со своей веткой и общей историей: в ней работает свой агент, не мешая остальным. Ветка показана та, что в копии сейчас, — внутри агент волен переключаться сам. Слияние веток панель не делает Настройка копий Коммит берёт все изменения рабочего дерева. Pull может привести к слиянию — конфликт панель не разбирает. Push отправляет только текущую ветку и только вперёд: --force не передаётся. Удаления веток и ребейза здесь нет"
+        "shotAt": "2026-11-03T14:36:32.556Z",
+        "text": "Изменено файлов: 4 · впереди на 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Ветка main feature/orders-export feature/login Подтянуть изменения Текущая ветка origin/main origin/feature/orders-export Pull Отправить ветку впереди на 2 Push Новая ветка Создать Сообщение коммита Закоммитить Параллельные ветки feature/orders-export основная агент работает C:/work/orders-panel Открыть вкладкой Завести копию Копия — отдельный каталог рядом с проектом со своей веткой и общей историей: в ней работает свой агент, не мешая остальным. Ветка показана та, что в копии сейчас, — внутри агент волен переключаться сам. Слияние веток панель не делает Настройка копий Коммит берёт все изменения рабочего дерева. Pull может привести к слиянию — конфликт панель не разбирает. Push отправляет только текущую ветку и только вперёд: --force не передаётся. Удаления веток и ребейза здесь нет",
+        "seal": {
+          "png": "004efd9a6c13ba2a",
+          "text": "7aecffe7b0f4df9c"
+        }
       },
       "darkEn": {
         "file": "06-branch.dark.en.png",
         "masked": 0,
         "width": 800,
         "height": 1200,
-        "shotAt": "2026-10-22T16:57:14.260Z",
-        "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches feature/orders-export main copy agent working C:/work/orders-panel Open as a tab Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here"
+        "shotAt": "2026-11-03T14:37:39.122Z",
+        "text": "Changed files: 4 · ahead by 2 M src/pages/Orders/ OrdersPage.tsx A src/pages/Orders/ export.ts M src/shared/api/ client.ts ? notes.txt Branch main feature/orders-export feature/login Pull changes Current branch origin/main origin/feature/orders-export Pull Push branch ahead by 2 Push New branch Create Commit message Commit Parallel branches feature/orders-export main copy agent working C:/work/orders-panel Open as a tab Create a copy A copy is a separate directory next to the project with its own branch and shared history: its own agent works there without disturbing the others. The branch shown is the one the copy is on right now — inside it the agent is free to switch. The panel never merges branches Copy settings A commit takes every change in the working tree. Pull may merge — the panel does not resolve conflicts. Push sends the current branch only and only forward: --force is never passed. No branch deletions or rebases here",
+        "seal": {
+          "png": "f822a1aa83784b3f",
+          "text": "18c025c4579d8d25"
+        }
+      },
+      "seal": {
+        "png": "e2470fffbda3cd9d",
+        "text": "7aecffe7b0f4df9c"
       }
     },
     {
@@ -212,66 +308,48 @@
       "side": "panel",
       "masked": 0,
       "width": 800,
-      "height": 1080,
-      "shotAt": "2026-10-22T16:52:03.018Z",
-      "text": "Группа и автономность Группа Авто — разбор выберет по описанию Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR Набор правил и скиллов, включаемый к прогонам этого чата Автономно — выбирать рекомендованное Вопрос агента с вариантом «(Recommended)» не ждёт вас: берётся этот вариант, а выбор остаётся строкой в ленте Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу",
+      "height": 710,
+      "shotAt": "2026-11-03T14:34:18.034Z",
+      "text": "Права Права автоматом Правки разрешены Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу",
       "en": {
         "file": "07-menu.en.png",
         "masked": 0,
         "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:53:42.287Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR A set of rules and skills enabled for the runs of this chat Autonomous — pick the recommended option An agent question with a \"(Recommended)\" option does not wait for you: that option is taken and the pick stays as a line in the feed Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
+        "height": 710,
+        "shotAt": "2026-11-03T14:35:30.124Z",
+        "text": "Permissions Permissions auto Edits allowed Conversation Restart the session Make a case Export Refresh Help for this section",
+        "seal": {
+          "png": "ea8275bba8f939bd",
+          "text": "5be255abc3f5f91b"
+        }
       },
       "dark": {
         "file": "07-menu.dark.png",
         "masked": 0,
         "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:55:32.444Z",
-        "text": "Группа и автономность Группа Авто — разбор выберет по описанию Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR Набор правил и скиллов, включаемый к прогонам этого чата Автономно — выбирать рекомендованное Вопрос агента с вариантом «(Recommended)» не ждёт вас: берётся этот вариант, а выбор остаётся строкой в ленте Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу"
+        "height": 710,
+        "shotAt": "2026-11-03T14:36:34.691Z",
+        "text": "Права Права автоматом Правки разрешены Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу",
+        "seal": {
+          "png": "c91e51fba457c7d6",
+          "text": "be035020312eb2ce"
+        }
       },
       "darkEn": {
         "file": "07-menu.dark.en.png",
         "masked": 0,
         "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:57:16.475Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR A set of rules and skills enabled for the runs of this chat Autonomous — pick the recommended option An agent question with a \"(Recommended)\" option does not wait for you: that option is taken and the pick stays as a line in the feed Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
-      }
-    },
-    {
-      "id": "08-menu-actions",
-      "file": "08-menu-actions.png",
-      "side": "panel",
-      "masked": 0,
-      "width": 800,
-      "height": 1080,
-      "shotAt": "2026-10-22T16:52:03.897Z",
-      "text": "Группа и автономность Группа Авто — разбор выберет по описанию Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR Набор правил и скиллов, включаемый к прогонам этого чата Автономно — выбирать рекомендованное Вопрос агента с вариантом «(Recommended)» не ждёт вас: берётся этот вариант, а выбор остаётся строкой в ленте Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу",
-      "en": {
-        "file": "08-menu-actions.en.png",
-        "masked": 0,
-        "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:53:43.164Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR A set of rules and skills enabled for the runs of this chat Autonomous — pick the recommended option An agent question with a \"(Recommended)\" option does not wait for you: that option is taken and the pick stays as a line in the feed Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
+        "height": 710,
+        "shotAt": "2026-11-03T14:37:41.286Z",
+        "text": "Permissions Permissions auto Edits allowed Conversation Restart the session Make a case Export Refresh Help for this section",
+        "seal": {
+          "png": "43817b46ee9cc9f7",
+          "text": "5be255abc3f5f91b"
+        }
       },
-      "dark": {
-        "file": "08-menu-actions.dark.png",
-        "masked": 0,
-        "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:55:33.306Z",
-        "text": "Группа и автономность Группа Авто — разбор выберет по описанию Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR Набор правил и скиллов, включаемый к прогонам этого чата Автономно — выбирать рекомендованное Вопрос агента с вариантом «(Recommended)» не ждёт вас: берётся этот вариант, а выбор остаётся строкой в ленте Права Права автоматом Правки разрешены Разрешать без вопроса — во всех проектах Подбирать модель под задачу (этот проект) Панель ставит группе разделения модель по роду её работы — не выше выбранной вами; работе на более слабой модели поднимается планка сдачи: проверки проекта прогнаны, сделанное сверено с заданием. Выключено — все дети работают на выбранной вами модели Записи во внешние сервисы Комментарии и треды в MR, тикеты Jira, страницы вики — через MCP Коммиты, ветки, обычный push commit, push, branch, rebase, cherry-pick, revert Удаление файлов rm, del, shred, dd, Remove-Item, reg delete Затирание истории git reset --hard, clean, restore, branch -D, stash drop, push --force Снос данных в БД DROP, TRUNCATE, DELETE FROM, откат миграций Контейнеры и инфраструктура docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Публикация пакетов npm/pnpm/yarn publish, unpublish, deprecate Удаление и слияние во внешних сервисах Слить MR, удалить тикет или страницу вики — отсюда это не вернуть Опасные сетевые команды curl | sh — исполнение скачанного, curl -X DELETE Правки в основной копии проекта Выключено — перед первой правкой панель предлагает завести копию со своей веткой и продолжает разговор в ней: каталог у git один на все чаты проекта Разговор Перезапустить сессию Сделать кейс Экспортировать Обновить Справка по разделу"
-      },
-      "darkEn": {
-        "file": "08-menu-actions.dark.en.png",
-        "masked": 0,
-        "width": 800,
-        "height": 1080,
-        "shotAt": "2026-10-22T16:57:17.374Z",
-        "text": "Group and autonomy Group Auto — triage picks by description Задача → MR (быстро) Задача → MR (строго) Задача → MR: фронт Задача → MR: бэкенд Экраны по макету Figma Задача → MR: фронт и бэкенд Замечания к MR Ревью чужого MR A set of rules and skills enabled for the runs of this chat Autonomous — pick the recommended option An agent question with a \"(Recommended)\" option does not wait for you: that option is taken and the pick stays as a line in the feed Permissions Permissions auto Edits allowed Approve without asking — in every project Match the model to the task (this project) The panel gives each split group a model that fits its kind of work — never above the one you picked; work on a weaker model gets a higher bar: project checks run, result matched against the task. Off — every child runs on the model you picked Writes to external services MR comments and threads, Jira tickets, wiki pages — over MCP Commits, branches, plain push commit, push, branch, rebase, cherry-pick, revert Deleting files rm, del, shred, dd, Remove-Item, reg delete Wiping git history reset --hard, clean, restore, branch -D, stash drop, push --force Tearing down database data DROP, TRUNCATE, DELETE FROM, migration rollback Containers and infrastructure docker prune, kubectl delete, helm uninstall, terraform destroy, reboot Publishing packages npm/pnpm/yarn publish, unpublish, deprecate Deleting and merging in external services Merging an MR, deleting a ticket or a wiki page — not undoable here Dangerous network commands curl | sh — running what was downloaded, curl -X DELETE Edits in the project main copy Off — before the first edit the panel offers a copy on its own branch and moves the conversation there: one git directory is shared by every chat of the project Conversation Restart the session Make a case Export Refresh Help for this section"
+      "seal": {
+        "png": "f6a965f495aaf999",
+        "text": "be035020312eb2ce"
       }
     },
     {
@@ -280,32 +358,48 @@
       "side": "panel",
       "masked": 0,
       "width": 800,
-      "height": 691,
-      "shotAt": "2026-10-22T16:52:06.069Z",
-      "text": "Активных агентов: 3 Звук 200% Остановить всех Чат агент ждёт ответа Чат агент работает orders-panel агент работает · 111.3k tok · claude-opus-5 Всего за сессию 0 tok",
+      "height": 714,
+      "shotAt": "2026-11-03T14:34:20.222Z",
+      "text": "Активных агентов: 3 Остановить всех Звук 200% Чат агент ждёт ответа Чат агент работает orders-panel агент работает · 111.3k tok · claude-opus-5 Всего за сессию 0 tok",
       "en": {
         "file": "09-agents.en.png",
         "masked": 0,
         "width": 800,
-        "height": 691,
-        "shotAt": "2026-10-22T16:53:45.314Z",
-        "text": "Active agents: 3 Sound 200% Stop all Chat agent waiting for a reply Chat agent working orders-panel agent working · 111.3k tok · claude-opus-5 Total this session 0 tok"
+        "height": 714,
+        "shotAt": "2026-11-03T14:35:32.257Z",
+        "text": "Active agents: 3 Stop all Sound 200% Chat agent waiting for a reply Chat agent working orders-panel agent working · 111.3k tok · claude-opus-5 Total this session 0 tok",
+        "seal": {
+          "png": "d198f02f06ffd17a",
+          "text": "82e56028c7a24af6"
+        }
       },
       "dark": {
         "file": "09-agents.dark.png",
         "masked": 0,
         "width": 800,
-        "height": 691,
-        "shotAt": "2026-10-22T16:55:35.442Z",
-        "text": "Активных агентов: 3 Звук 200% Остановить всех Чат агент ждёт ответа Чат агент работает orders-panel агент работает · 111.3k tok · claude-opus-5 Всего за сессию 0 tok"
+        "height": 714,
+        "shotAt": "2026-11-03T14:36:36.844Z",
+        "text": "Активных агентов: 3 Остановить всех Звук 200% Чат агент ждёт ответа Чат агент работает orders-panel агент работает · 111.3k tok · claude-opus-5 Всего за сессию 0 tok",
+        "seal": {
+          "png": "e0da20463fd15d6f",
+          "text": "b59dfee1f5ab5c69"
+        }
       },
       "darkEn": {
         "file": "09-agents.dark.en.png",
         "masked": 0,
         "width": 800,
-        "height": 691,
-        "shotAt": "2026-10-22T16:57:19.541Z",
-        "text": "Active agents: 3 Sound 200% Stop all Chat agent waiting for a reply Chat agent working orders-panel agent working · 111.3k tok · claude-opus-5 Total this session 0 tok"
+        "height": 714,
+        "shotAt": "2026-11-03T14:37:43.565Z",
+        "text": "Active agents: 3 Stop all Sound 200% Chat agent waiting for a reply Chat agent working orders-panel agent working · 111.3k tok · claude-opus-5 Total this session 0 tok",
+        "seal": {
+          "png": "09bd8904066acee1",
+          "text": "82e56028c7a24af6"
+        }
+      },
+      "seal": {
+        "png": "535db2afad365b4b",
+        "text": "b59dfee1f5ab5c69"
       }
     },
     {
@@ -315,31 +409,47 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-10-22T16:52:11.185Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Экспорт закрыт, проверки зелёные. Жду решения. Этап закрыт — продолжить в чистой сессии шаг 1 из 8 Закрыт экспорт заказов: маршрут, тесты и справка. Вычищено: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Опора: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Только завести чат, не запускать агента Дальше продолжай сам Продолжить в новом чате Остаться здесь Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "shotAt": "2026-11-03T14:34:25.419Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Экспорт закрыт, проверки зелёные. Жду решения. Этап закрыт — продолжить в чистой сессии шаг 1 из 8 Закрыт экспорт заказов: маршрут, тесты и справка. Вычищено: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Опора: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Только завести чат, не запускать агента Дальше продолжай сам Продолжить в новом чате Остаться здесь Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "10-handoff.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:53:50.427Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Экспорт закрыт, проверки зелёные. Жду решения. Stage closed — continue in a clean session step 1 of 8 Закрыт экспорт заказов: маршрут, тесты и справка. Pruned: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Checkpoint: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Only create the chat, do not start the agent Keep going on your own Continue in a new chat Stay here Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:35:37.359Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Экспорт закрыт, проверки зелёные. Жду решения. Stage closed — continue in a clean session step 1 of 8 Закрыт экспорт заказов: маршрут, тесты и справка. Pruned: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Checkpoint: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Only create the chat, do not start the agent Keep going on your own Continue in a new chat Stay here Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "087ee42f120b97db",
+          "text": "4c87a46338acbd6b"
+        }
       },
       "dark": {
         "file": "10-handoff.dark.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:55:40.503Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Наблюдатель выкл Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 8 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Экспорт закрыт, проверки зелёные. Жду решения. Этап закрыт — продолжить в чистой сессии шаг 1 из 8 Закрыт экспорт заказов: маршрут, тесты и справка. Вычищено: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Опора: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Только завести чат, не запускать агента Дальше продолжай сам Продолжить в новом чате Остаться здесь Сообщение Enter — отправить, Shift+Enter — перенос строки"
+        "shotAt": "2026-11-03T14:36:42.302Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работают 2 агента Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 2 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Экспорт закрыт, проверки зелёные. Жду решения. Этап закрыт — продолжить в чистой сессии шаг 1 из 8 Закрыт экспорт заказов: маршрут, тесты и справка. Вычищено: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Опора: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Только завести чат, не запускать агента Дальше продолжай сам Продолжить в новом чате Остаться здесь Сообщение Enter — отправить, Shift+Enter — перенос строки",
+        "seal": {
+          "png": "cd15aaa2bc5f729b",
+          "text": "9fd9a269aa984cda"
+        }
       },
       "darkEn": {
         "file": "10-handoff.dark.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-10-22T16:57:24.669Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Watcher off Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 8 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Экспорт закрыт, проверки зелёные. Жду решения. Stage closed — continue in a clean session step 1 of 8 Закрыт экспорт заказов: маршрут, тесты и справка. Pruned: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Checkpoint: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Only create the chat, do not start the agent Keep going on your own Continue in a new chat Stay here Message Enter to send, Shift+Enter for a new line"
+        "shotAt": "2026-11-03T14:37:48.716Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 2 agents working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Импорт прайса C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 2 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 Экспорт закрыт, проверки зелёные. Жду решения. Stage closed — continue in a clean session step 1 of 8 Закрыт экспорт заказов: маршрут, тесты и справка. Pruned: Из TASKS.md убраны три сделанных пункта, уехали в .agent/ARCHIVE.md. Checkpoint: .agent/PROGRESS.md Взяться за импорт: разобрать формат CSV и написать разбор. Only create the chat, do not start the agent Keep going on your own Continue in a new chat Stay here Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "0f87898a40994afb",
+          "text": "4c87a46338acbd6b"
+        }
+      },
+      "seal": {
+        "png": "061f535e07ba7505",
+        "text": "9fd9a269aa984cda"
       }
     }
   ]

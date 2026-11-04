@@ -87,5 +87,6 @@ export const contourMessageParams = {
   'contour-required-no-token': ['title'],
   'contour-required-cli-config': ['title', 'setting'],
   'contour-target-assistant': [],
+  'contour-profile-name': ['title'],
   'contour-bridge-script-missing': [],
 } as const satisfies Record<string, readonly string[]>;

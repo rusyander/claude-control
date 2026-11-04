@@ -94,33 +94,8 @@ await runOnStand(
     },
   },
   async (stand, check) => {
-    // Обёртку стенда ядро отвергает («нужна оболочка»): на Windows оно разбирает только форму
-    // npm cmd-shim. Подменяем обёртку на эту форму — дорога `cli` видит node-скрипт, как у npm.
-    if (process.platform === 'win32') {
-      writeFileSync(
-        join(stand.bin, 'claude.cmd'),
-        [
-          '@ECHO off',
-          'GOTO start',
-          ':find_dp0',
-          'SET dp0=%~dp0',
-          'EXIT /b',
-          ':start',
-          'SETLOCAL',
-          'CALL :find_dp0',
-          '',
-          'IF EXIST "%dp0%\\node.exe" (',
-          '  SET "_prog=%dp0%\\node.exe"',
-          ') ELSE (',
-          '  SET "_prog=node"',
-          '  SET PATHEXT=%PATHEXT:;.JS;=;%',
-          ')',
-          '',
-          'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\claude.mjs" %*',
-          '',
-        ].join('\r\n'),
-      );
-    }
+    // Обёртку `claude.cmd` формы npm cmd-shim (её одну ядро разбирает на Windows) пишет сам
+    // стенд — `npmCmdShim` в throwaway-stand.
     const browser = await chromium.launch();
     try {
       // Высокое окно: прокрутка у панели своя (внутренний контейнер), `fullPage` её не видит.

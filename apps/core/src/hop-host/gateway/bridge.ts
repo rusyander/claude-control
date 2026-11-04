@@ -11,9 +11,11 @@ import {
   maskOutgoing,
   refuseUpstreamStatus,
   sendUpstream,
+  countContour,
   traceOf,
   type GatewayRequest,
 } from './common.ts';
+import { contourIdOf } from '../contour-book/record.ts';
 import { openAiUsage } from './dialect/cache-usage.ts';
 import {
   anthropicRequestToOpenAi,
@@ -26,6 +28,7 @@ import {
 } from './dialect/dialect.ts';
 import { StreamTranslator } from './frames/frames.ts';
 import { expandDeferredTools } from './local-window/deferred-tools.ts';
+import { applyRequestRules, framesFromCompletion, upstreamStreamBody } from './request-rules.ts';
 import { noteSummarized } from './summarized-ledger/summarized-ledger.ts';
 import { hopText } from './texts.ts';
 import { historyHasToolUse } from './tool-shim/encode.ts';
@@ -46,11 +49,36 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+/**
+ * Ответ верха кадрами: поток как есть, цельное тело (правило без потока, выключенный перевод
+ * в поток) — теми же кадрами через `framesFromCompletion`; не ответ модели — `undefined`.
+ */
+async function streamOf(
+  upstream: Response,
+  vendorFields: readonly string[],
+): Promise<ReadableStream<Uint8Array> | null | undefined> {
+  if ((upstream.headers.get('content-type') ?? '').includes('event-stream')) return upstream.body;
+  const text = await upstream.text();
+  if (Buffer.byteLength(text, 'utf8') > MAX_ANSWER_BYTES) return undefined;
+  const frames = framesFromCompletion(text, vendorFields);
+  if (frames === undefined) return undefined;
+  const bytes = new TextEncoder().encode(frames);
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
+
 export async function bridgeChat(
   g: GatewayRequest,
   clientBody: Record<string, unknown>,
+  /** Что выпало при переводе на краю (Responses, Gemini) — в след наравне с потерями диалекта. */
+  dropped: readonly string[] = [],
 ): Promise<void> {
   const { ctx, entry, driver } = g;
+  // compromise: dialect-bridge — клиент говорит по-Anthropic, а родной ручки у платформы нет; что не переносится, названо таблицей
   const anthropic = g.clientKind === 'anthropic';
   const route = chooseToolRoute(
     { toolShim: hasFeature(entry.spec, 'tool-shim'), platformTools: false },
@@ -68,18 +96,14 @@ export async function bridgeChat(
         forwardsCacheMarks(driver, prepared.model),
       )
     : openAiRequestWithShim(prepared, driver.requestFields, route);
-  const lost = translated.lost.map((item) => item.field);
+  const lost = [...dropped, ...translated.lost.map((item) => item.field)];
   const allowed = new Set(translated.tools.map((tool) => tool.name));
-  const model = typeof translated.body.model === 'string' ? translated.body.model : '';
-  // Наверх — поток всегда, с расходом в последнем кадре (`nonstream-120s` панели).
-  const upstreamBody = {
-    ...translated.body,
-    stream: true,
-    stream_options: {
-      ...(isRecord(translated.body.stream_options) ? translated.body.stream_options : {}),
-      include_usage: true,
-    },
-  };
+  // Правила контура (Т7) — ПОСЛЕ перевода диалекта и ДО маски (`request-rules.ts`).
+  const ruled = applyRequestRules(translated.body, entry.spec.requestRules);
+  const model = typeof ruled.model === 'string' ? ruled.model : '';
+  // Наверх — поток с расходом в последнем кадре (`nonstream-120s` панели), кроме значения,
+  // с которым верх поток не принимает, и выключенного перевода в поток.
+  const upstreamBody = upstreamStreamBody(ruled, entry.spec.requestRules);
   const vault = new AliasVault(
     driver.placeholderPattern ? { avoid: driver.placeholderPattern } : {},
   );
@@ -91,6 +115,13 @@ export async function bridgeChat(
   const upstream = sent.reply.response;
   if (upstream.status >= 400)
     return refuseUpstreamStatus(g, upstream, model, lost, sent.reply.retried);
+  const source = await streamOf(upstream, driver.vendorFields);
+  if (!source)
+    return deny(
+      g,
+      { status: 502, code: 'api_error', message: hopText('gateway-answer-not-model') },
+      lost,
+    );
 
   const translator = new StreamTranslator({
     dialect: g.clientKind,
@@ -126,7 +157,7 @@ export async function bridgeChat(
   }
   try {
     const end = await pumpWithStall(
-      upstream.body,
+      source,
       ctx.stallMs,
       () => sent.abort.abort(new Error('stalled')),
       async (text) => {
@@ -170,10 +201,10 @@ export async function bridgeChat(
   if (facts.summarized) {
     noteSummarized(ctx.stateDir, {
       at: new Date(ctx.now()).toISOString(),
-      platformId: entry.spec.routeId,
+      platformId: contourIdOf(entry.spec.routeId) ?? entry.spec.routeId,
       path: g.path,
       ...(anthropic && facts.messageId ? { messageId: facts.messageId } : {}),
-      runTag: entry.spec.tag,
+      ...(entry.runTag ? { runTag: entry.runTag } : {}),
     });
   }
   if (facts.bareThinkClose) ctx.thinkTail.mark(entry.spec.routeId, model);
@@ -188,15 +219,47 @@ export async function bridgeChat(
         : facts.truncated
           ? 502
           : 200;
-  traceOf(g, {
-    status,
-    masked: guarded.masked || facts.masked,
-    tokens: facts.totalTokens,
-    ...(lost.length ? { lost } : {}),
-    ...(facts.violations.length ? { violations: facts.violations } : {}),
-    ...(sent.reply.retried ? { retried: true } : {}),
-    ...(failure ? { error: failure } : {}),
+  // «Дошло без счёта» решает статус: у учёта и следа это один и тот же ответ (как у панели).
+  const unreported = status === 200 && facts.totalTokens === 0;
+  countContour(g, {
+    model,
+    promptTokens: facts.promptTokens,
+    completionTokens: facts.completionTokens,
+    totalTokens: facts.totalTokens,
+    ...(facts.cachedTokens ? { cacheReadTokens: facts.cachedTokens } : {}),
+    ...(facts.cacheWriteTokens ? { cacheWriteTokens: facts.cacheWriteTokens } : {}),
+    ...(facts.cacheWrite1hTokens ? { cacheWrite1hTokens: facts.cacheWrite1hTokens } : {}),
+    ...(unreported ? { unreported: true as const } : {}),
   });
+  traceOf(
+    g,
+    {
+      status,
+      masked: guarded.masked || facts.masked,
+      tokens: facts.totalTokens,
+      ...(lost.length ? { lost } : {}),
+      ...(facts.violations.length ? { violations: facts.violations } : {}),
+      ...(sent.reply.retried ? { retried: true } : {}),
+      ...(failure ? { error: failure } : {}),
+      ...(facts.imageBytes ? { imageBytes: facts.imageBytes } : {}),
+      ...(unreported ? { usageUnreported: true as const } : {}),
+    },
+    {
+      stages: facts.stages,
+      summarized: facts.summarized,
+      ...(anthropic && facts.messageId ? { messageId: facts.messageId } : {}),
+      ...(facts.violations.length > 0 ? { violationActions: facts.violationActions } : {}),
+      interrupted: facts.interrupted,
+      unknownFrames: facts.unknownFrames,
+      shimmed: translated.shimmed,
+      toolCalls: facts.toolCalls,
+      contourCalls: facts.contourCalls,
+      toolFlaws: facts.toolFlaws,
+      toolsBlocked: facts.toolsBlocked,
+      claimedWithoutCall: facts.claimedWithoutCall,
+      ...(facts.rewritten ? { rewritten: facts.rewritten } : {}),
+    },
+  );
 }
 
 /** Клиенту, которому уже льётся поток, беда сообщается кадром ошибки: молчание — «удачный ответ». */

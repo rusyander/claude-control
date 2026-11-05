@@ -15,8 +15,16 @@
 //   • shape: it runs with run_in_background and is never piped into tail/head/grep — a foreground
 //     gate dies at the 600 s tool cap, a truncated one gets re-run just to read it, and only a
 //     background gate can be stopped (TaskStop) when the task grows mid-run.
-// Escape: repeat the identical call. Subagents are skipped — the hook sees the parent's transcript.
-// State survives compaction in the kit state dir, gates/<session>.json.
+//   • overlap: while a background full gate runs, a heavy narrow check (vitest, jest, tsc, type-check,
+//     build, playwright, pytest, go test/build/vet, cargo test/build) is denied too — measured: two agents each
+//     ran a background gate plus a foreground vitest/type-check on top, vitest took a worker per core,
+//     ~60 GB RAM per agent, the machine froze.
+// Escape: repeat the identical call. A subagent is judged against its OWN transcript (`ownTranscript`)
+// with its own state; the delivery words of its spawn prompt open nothing (every lane prompt says
+// commit/push) — its second full gate after a green one takes the repeat escape. A subagent whose own
+// transcript is not found stays unjudged: the parent's history would misjudge it.
+// State survives compaction in the kit state dir, gates/<session>[-<agent>].json.
+// Global copy: ~/.claude/hooks/lib/gate-at-end.mjs — change both.
 // Kit hook item: run by the event dispatcher (lib/run.mjs) or on its own; see lib/items.mjs.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
@@ -38,6 +46,7 @@ import {
   deny,
   currentUserPrompt,
   inSubagent,
+  ownTranscript,
 } from './transcript.mjs';
 
 const KINDS = [
@@ -412,8 +421,23 @@ const isGateRun = (command, cwd) =>
 
 function statePath(input) {
   const session = sessionKey(input);
+  const agent = String(input?.agent_id ?? '').replace(/[^\w-]/g, '');
   const dir = session ? stateDir('gates') : null;
-  return dir ? join(dir, `${session}.json`) : null;
+  return dir ? join(dir, `${session}${agent ? `-${agent}` : ''}.json`) : null;
+}
+
+/**
+ * A heavy narrow check — a segment whose command is a test runner, type checker, build or browser suite.
+ * Run beside a background full gate it doubles the worker pool and the RAM (~60 GB per agent measured).
+ * Only the command word counts: `grep vitest package.json` names it and runs nothing.
+ */
+const HEAVY_SEGMENT =
+  /^(?:\w+=\S*\s+)*(?:(?:timeout|time|nice)\s+(?:\S+\s+)?)?(?:(?:npx|bunx)\s+(?:--\S+\s+)*(?:vitest|jest|tsc|vue-tsc|playwright)|(?:npm|pnpm|yarn|bun)\s+(?:(?:run|exec)\s+)?(?:-s\s+)?(?:test|build|type-?check|vitest|jest|tsc)(?::[\w-]+)?|(?:python3?\s+-m\s+)?pytest|go\s+(?:test|build|vet)|cargo\s+(?:test|build)|vitest|jest|tsc|vue-tsc|playwright)\b/i;
+export function isHeavyCheck(command) {
+  return String(command)
+    .replace(HEREDOC, '')
+    .split(/&&|\|\||;|\||\n|\(|\)/)
+    .some((seg) => HEAVY_SEGMENT.test(seg.trim()));
 }
 
 function loadState(path) {
@@ -790,7 +814,7 @@ function repeatOfRefused(input, command) {
   const key = String(command).replace(/\s+/g, ' ').trim();
   try {
     return wasJustRefused(
-      toolEvents(readTail(input.transcript_path)),
+      toolEvents(readTail(ownTranscript(input))),
       input.tool_name,
       (other) =>
         String(other?.command ?? '')
@@ -805,7 +829,10 @@ function repeatOfRefused(input, command) {
 export default function gateAtEnd(input) {
   const tool = input?.tool_name;
   if (tool !== 'Bash' && tool !== 'PowerShell') return null;
-  if (inSubagent(input)) return null;
+  const subagent = inSubagent(input);
+  const transcript = ownTranscript(input);
+  // A subagent whose own file is not found would be judged by the parent's history: stay out.
+  if (subagent && !/[\\/]subagents[\\/]/.test(transcript)) return null;
   const typed = String(input.tool_input?.command ?? '');
   // The reason comment is no part of the gate: every key and kind below is read without it.
   const command = withoutReason(typed);
@@ -824,13 +851,14 @@ export default function gateAtEnd(input) {
     );
   }
 
-  if (!isGateRun(command, input.cwd)) return null;
+  const gate = isGateRun(command, input.cwd);
+  if (!gate && !isHeavyCheck(command)) return null;
 
   let raw;
   let records;
   try {
-    raw = readTailText(input.transcript_path, 4_000_000);
-    records = readTail(input.transcript_path);
+    raw = readTailText(transcript, 4_000_000);
+    records = readTail(transcript);
   } catch {
     return null;
   }
@@ -839,6 +867,18 @@ export default function gateAtEnd(input) {
     String(text ?? '')
       .replace(/\s+/g, ' ')
       .trim();
+  if (!gate) {
+    const running = previousGates(events, raw, loadState(statePath(input)), input.cwd).findLast(
+      (r) => r.outcome === 'running',
+    );
+    if (!running || repeatOfRefused(input, typed)) return null;
+    return deny(
+      `gate-at-end: a full gate started at ${hhmm(running.ts)} is still running in the background; a heavy check ` +
+        '(tests / tsc / type-check / build / playwright) beside it doubles the worker pool and the RAM — two agents ' +
+        "froze a machine at ~60 GB each this way. Wait for the gate's notification and read its log, or stop it " +
+        '(TaskStop) first. Repeat this exact call only if it must run now.',
+    );
+  }
   if (wasJustRefused(events, tool, (other) => flat(other?.command) === flat(typed))) return null;
   const again = (when) => `Repeat this exact call ${when}.`;
 
@@ -902,7 +942,8 @@ export default function gateAtEnd(input) {
   // entry saved before runs were keyed names no gate and counts for none.
   const thisGate = runKey(command, input.cwd);
   const prev = runs.findLast((r) => r.cmd === thisGate);
-  const prompt = String(currentUserPrompt(input, records) ?? '');
+  // A subagent's «prompt» is its spawn brief, which always names commit/push: no delivery opener there.
+  const prompt = subagent ? '' : String(currentUserPrompt(input, records) ?? '');
 
   if (last?.outcome === 'running') {
     return deny(

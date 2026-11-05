@@ -553,3 +553,69 @@ describe('gate-at-end: скрипты проекта и отказ движка'
     expect(again('v3', [...red, ...edit()])).toBeUndefined();
   });
 });
+
+describe('gate-at-end: тяжёлая проверка рядом с фоновым гейтом и субагенты', () => {
+  const running = (id: string) => [
+    prompt('сделай'),
+    use('Bash', { command: GATE, run_in_background: true }, id),
+    result(id, `Command running in background with ID: ${id}. Output is being written to: x`),
+  ];
+
+  it('пока фоновый гейт идёт, vitest, type-check, go test и pytest рядом отклоняются', () => {
+    for (const command of [
+      'cd web && npx vitest run src/a.test.ts 2>&1 | tail -5',
+      'npm run -s type-check',
+      'cd svc && go test ./internal/...',
+      'python -m pytest tests/test_a.py -q',
+    ]) {
+      expect(pre({ command }, running(`h${++n}`)), command).toBe('deny');
+    }
+  });
+
+  it('слово vitest в grep и go mod tidy — не проверка; после гейта vitest проходит', () => {
+    expect(pre({ command: 'grep -n "vitest" package.json' }, running(`h${++n}`))).toBeUndefined();
+    expect(pre({ command: 'go mod tidy' }, running(`h${++n}`))).toBeUndefined();
+    const id = `h${++n}`;
+    const done = [
+      ...running(id),
+      {
+        type: 'user',
+        timestamp: at(-50_000),
+        message: {
+          role: 'user',
+          content: `<task-notification>\n<task-id>${id}</task-id>\n<status>completed</status>\n<summary>Background command "gate" completed (exit code 0)</summary>\n</task-notification>`,
+        },
+      },
+    ];
+    expect(pre({ command: 'npx vitest run src/a.test.ts' }, done)).toBeUndefined();
+  });
+
+  it('субагент судится по своему журналу: второй гейт после зелёного — отказ, слова брифа не открывают', () => {
+    const parent = transcript([prompt('сделай')]);
+    const own = join(parent.replace(/\.jsonl$/, ''), 'subagents');
+    mkdirSync(own, { recursive: true });
+    const agent = `a${++n}`;
+    const brief = prompt('исправь, закоммить и запушь');
+    writeFileSync(
+      join(own, `agent-${agent}.jsonl`),
+      [brief, use('Bash', { command: GATE }, 'sg1'), result('sg1', 'all green'), ...edit()]
+        .map((r) => JSON.stringify(r))
+        .join('\n') + '\n',
+      'utf8',
+    );
+    const call = (agent_id: string) =>
+      decision(
+        run('pre', {
+          hook_event_name: 'PreToolUse',
+          tool_name: 'Bash',
+          tool_input: { command: GATE, run_in_background: true },
+          session_id: `sub${n}`,
+          agent_id,
+          transcript_path: parent,
+        }),
+      );
+    expect(call(agent)).toBe('deny');
+    // Своего журнала нет — по чужой истории не судим.
+    expect(call('nofile')).toBeUndefined();
+  });
+});

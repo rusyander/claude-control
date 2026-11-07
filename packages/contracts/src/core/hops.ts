@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { ModelPricing, PricingEntry } from '../app-settings.ts';
 import type {
-  PlatformExhaustedScope,
   PlatformGatewayEvent,
   PlatformSpendRecord,
   PlatformSummarizedReport,
@@ -272,7 +271,7 @@ export interface HopDlpProxyState {
 
 /**
  * Маршрут контура для шлюза человека: адрес CLI `/<platformId>/v1/...` (тот же, что у прежнего
- * шлюза панели). `spec` — регистрация, как у метки сеанса; `from` звено ставит по ручке запроса,
+ * шлюза в панели). `spec` — регистрация, как у метки сеанса; `from` звено ставит по ручке запроса,
  * `tag`/`sessionId` — свои (`user:<platformId>`).
  */
 export interface HopUserRoute {
@@ -291,7 +290,7 @@ export interface HopUserRoute {
 }
 
 /**
- * Шлюз человека: `waiting` — порт занят (прежний шлюз панели ещё держит его), звено пробует
+ * Шлюз человека: `waiting` — порт занят (прежний шлюз в панели ещё держит его), звено пробует
  * снова каждые `retryMs` и берёт порт, как только его отпустят; `listening` — держит.
  */
 export interface HopUserGatewayState {
@@ -348,36 +347,14 @@ export type HopControlRequest =
   /** Учёт контуров (C3b): след и счётчики от запуска звена + сводка сжатий. */
   | { op: 'contours' }
   | { op: 'contour-spend' }
-  /**
-   * Запись в учёт звена снаружи. Шлюз панели, который её слал, снят (этап 10); рабочего писателя
-   * нет — запись засевает учёт для проверок чтения (`boot.contours.integration`, `check-core-contours`).
-   */
-  | {
-      op: 'contour-record';
-      platformId: string;
-      event?: PlatformGatewayEvent;
-      usage?: HopContourUsage;
-      exhausted?: { at: string; scope?: PlatformExhaustedScope; level?: string };
-      summarized?: { at: string; path: string; messageId?: string; runTag?: string };
-    }
   /** Факты прогона чужого CLI для его ответа в чате (C3b): сжатие по метке, вызовы с `since`. */
   | { op: 'contour-run'; runTag: string; since: number }
   /** Id сообщений, перед которыми контур сжал историю, — ленте Claude (C3b). */
-  | { op: 'contour-summarized' };
+  | { op: 'contour-summarized' }
+  /** Ход локальных маршрутов сейчас (этап 11, W2-5). */
+  | { op: 'activity' };
 
-/** Расход одного ответа контура — форма `SpendDelta` учёта контуров. */
-export interface HopContourUsage {
-  model: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  cacheReadTokens?: number;
-  cacheWriteTokens?: number;
-  cacheWrite1hTokens?: number;
-  unreported?: true;
-}
-
-/** Учёт контуров звена: то, из чего ядро собирает данные карточки шлюза панели. */
+/** Учёт контуров звена: то, из чего ядро собирает данные карточки шлюза ядра. */
 export interface HopContours {
   /** С какого момента звено считает (запуск хоста, мс). */
   since: number;
@@ -416,9 +393,9 @@ export type HopControlReply =
   | { op: 'dlp-proxy'; ok: true; state: HopDlpProxyState | null }
   | { op: 'contours'; ok: true; contours: HopContours }
   | { op: 'contour-spend'; ok: true; records: Record<string, PlatformSpendRecord> }
-  | { op: 'contour-record'; ok: true }
   | ({ op: 'contour-run'; ok: true } & CoreContourRunReply)
   | ({ op: 'contour-summarized'; ok: true } & CoreContourSummarizedReply)
+  | { op: 'activity'; ok: true; routes: HopActivity[] }
   | { op: HopControlRequest['op']; ok: false; code: string; detail: string };
 
 /**
@@ -580,18 +557,6 @@ const contourEventSchema = z.looseObject({
   status: z.number().int(),
 });
 
-/** Расход одного ответа контура (`SpendDelta` учёта контуров). */
-const contourUsageSchema = z.strictObject({
-  model: z.string(),
-  promptTokens: z.number().int().nonnegative(),
-  completionTokens: z.number().int().nonnegative(),
-  totalTokens: z.number().int().nonnegative(),
-  cacheReadTokens: z.number().int().nonnegative().optional(),
-  cacheWriteTokens: z.number().int().nonnegative().optional(),
-  cacheWrite1hTokens: z.number().int().nonnegative().optional(),
-  unreported: z.literal(true).optional(),
-});
-
 /**
  * `GET /v1/contours` ядра (C3b): учёт контуров звена — единственный источник карточки шлюза,
  * расхода и полосы бюджета панели. `live` — след и счётчики от запуска звена, `records` — дни
@@ -701,12 +666,6 @@ export interface CoreContourLinkReply {
   key: string;
 }
 
-/** Тело `POST /v1/contours/record` — запись в учёт звена снаружи (op `contour-record` без `op`). */
-export type CoreContourRecordBody = Omit<
-  Extract<HopControlRequest, { op: 'contour-record' }>,
-  'op'
->;
-
 /** Перейдённый порог бюджета контура (`HopBudgetNotice`). */
 export const budgetNoticeSchema = z.strictObject({
   seq: z.number().int().positive(),
@@ -773,38 +732,66 @@ export const hopControlRequestSchema = z.discriminatedUnion('op', [
   z.strictObject({ op: z.literal('contours') }),
   /** Постоянный учёт контуров по дням (вся запись, включая отметку «исчерпан»). */
   z.strictObject({ op: z.literal('contour-spend') }),
-  /**
-   * Запись запроса, прошедшего через шлюз ПАНЕЛИ (пока он не снят, этап 10 (v)): след, расход,
-   * отказ по бюджету, сжатие истории. Учёт один — на звене; панель свой больше не ведёт.
-   */
-  z.strictObject({
-    op: z.literal('contour-record'),
-    platformId: nonEmpty,
-    event: contourEventSchema.optional(),
-    usage: contourUsageSchema.optional(),
-    exhausted: z
-      .strictObject({
-        at: z.string().min(1),
-        scope: z.enum(['key', 'limit']).optional(),
-        level: z.string().optional(),
-      })
-      .optional(),
-    summarized: z
-      .strictObject({
-        at: z.string().min(1),
-        path: z.string(),
-        messageId: z.string().optional(),
-        runTag: z.string().optional(),
-      })
-      .optional(),
-  }),
   z.strictObject({
     op: z.literal('contour-run'),
     runTag: nonEmpty,
     since: z.number().int().nonnegative(),
   }),
   z.strictObject({ op: z.literal('contour-summarized') }),
+  /** Ход локальных маршрутов сейчас (этап 11, W2-5): этапы, доля промпта, ответ, застой. */
+  z.strictObject({ op: z.literal('activity') }),
 ]);
+
+/**
+ * Этап хода локального маршрута: `starting` — сервер поднимается, `loading` — грузит модель,
+ * `queued` — запрос ждёт слота, `prompt` — читает промпт, `generating` — пишет ответ.
+ */
+export const HOP_ACTIVITY_PHASES = [
+  'idle',
+  'starting',
+  'loading',
+  'queued',
+  'prompt',
+  'generating',
+] as const;
+export type HopActivityPhase = (typeof HOP_ACTIVITY_PHASES)[number];
+
+/**
+ * Предел тишины локального маршрута: столько без движения — застой. Один на ленту звена ядра и на
+ * снимок панели (`stallMs`), чтобы «застой» в чате и на странице моделей наступал в одну секунду.
+ * Видеокарта: пакет промпта там — секунды.
+ */
+export const HOP_STALL_GPU_MS = 120_000;
+/** То же на процессоре: пакет в 2048 токенов у 27B идёт минуту и дольше. */
+export const HOP_STALL_CPU_MS = 600_000;
+
+/**
+ * Ход одного локального маршрута звена. Сервер опрашивается, только пока по маршруту идёт
+ * запрос (`inFlight > 0`); без запросов — `idle` и ни одного опроса.
+ */
+export const hopActivitySchema = z.strictObject({
+  route: nonEmpty,
+  model: z.string().min(1).optional(),
+  phase: z.enum(HOP_ACTIVITY_PHASES),
+  /** Запросов по маршруту в полёте сейчас. */
+  inFlight: z.number().int().nonnegative(),
+  /** Когда ушёл самый ранний запрос в полёте, мс эпохи. */
+  startedAt: z.number().int().nonnegative().optional(),
+  /** Прочитано токенов промпта и сколько всего (`total` сервер называет не всегда). */
+  prompt: z
+    .strictObject({
+      filled: z.number().int().nonnegative(),
+      total: z.number().int().positive().optional(),
+    })
+    .optional(),
+  /** Токенов ответа написано. */
+  decoded: z.number().int().nonnegative().optional(),
+  /** Последнее движение (новый токен промпта или ответа, смена этапа), мс эпохи. */
+  lastMoveAt: z.number().int().nonnegative(),
+  /** Движения нет дольше предела устройства (GPU 120 с, CPU 600 с). */
+  stalled: z.boolean(),
+});
+export type HopActivity = z.output<typeof hopActivitySchema>;
 
 export type HopControlMessage = z.output<typeof hopControlRequestSchema>;
 export type HopProbeMessage = Extract<HopControlMessage, { op: 'probe' }>;
@@ -820,9 +807,9 @@ const HOP_OPS = [
   'dlp-proxy',
   'contours',
   'contour-spend',
-  'contour-record',
   'contour-run',
   'contour-summarized',
+  'activity',
 ] as const;
 
 const userGatewayStateSchema = z.looseObject({
@@ -923,7 +910,6 @@ export const hopControlReplySchema = z.union([
     ok: z.literal(true),
     records: z.record(z.string(), contourSpendRecordSchema),
   }),
-  z.looseObject({ op: z.literal('contour-record'), ok: z.literal(true) }),
   z.looseObject({
     op: z.literal('contour-run'),
     ok: z.literal(true),
@@ -934,6 +920,11 @@ export const hopControlReplySchema = z.union([
     op: z.literal('contour-summarized'),
     ok: z.literal(true),
     messageIds: z.array(z.string()),
+  }),
+  z.looseObject({
+    op: z.literal('activity'),
+    ok: z.literal(true),
+    routes: z.array(hopActivitySchema),
   }),
   z.looseObject({
     op: z.enum(HOP_OPS),

@@ -38,7 +38,7 @@ import { TASK_TICKETS_FILE as TASK_TICKETS } from '@agentdeck/contracts/quality-
  * 12.10.2026): ребёнку разделения и разговору, где разделение погашено, строка
  * рекламировала «разнести задачи по чатам», а инструкции к этому уже не было.
  */
-const SOURCE_OPENER =
+export const SOURCE_OPENER =
   'This run was started from the AgentDeck panel: the human talks to you not in a terminal but ' +
   'in a web panel that shows your questions and proposals as cards with buttons.';
 const SOURCE_CLOSER =

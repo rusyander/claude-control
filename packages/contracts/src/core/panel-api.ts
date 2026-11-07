@@ -52,6 +52,21 @@ export const CORE_PANEL_ROUTES = [
   { method: 'POST', path: '/commands' },
   // Перенос привязанных ключей телефона в устройства ядра (G9, F11): строгий суд человека.
   { method: 'POST', path: '/devices/adopt' },
+  // Сброс ключа обучения (этап 11, P140, W3-16): только человек, тело `learnedResetBodySchema`.
+  { method: 'POST', path: '/learned/reset' },
+  // Дерево агентов задачи (этап 11, P148): узлы сеансов, субагентов и фоновых работ; узел —
+  // подробно со страницами вызовов; поток — изменения дерева; выгрузка — всё дерево одним телом.
+  { method: 'GET', path: '/tasks/:id/agents' },
+  { method: 'GET', path: '/tasks/:id/agents/:nodeId' },
+  { method: 'GET', path: '/tasks/:id/agents/stream', stream: true },
+  { method: 'GET', path: '/tasks/:id/agents/export' },
+  // Все агенты всех задач (этап 11): фильтры `agentsQuerySchema`.
+  { method: 'GET', path: '/agents' },
+  // Распределитель мест сеансов (этап 11, P145): места, очередь, кто кого ждёт.
+  { method: 'GET', path: '/allocator' },
+  // Работа локальных CLI вне задач (этап 11): снимок и поток.
+  { method: 'GET', path: '/local/activity' },
+  { method: 'GET', path: '/local/activity/stream', stream: true },
 ] as const satisfies readonly CorePanelRoute[];
 
 export interface CorePanelRoute {
@@ -166,6 +181,13 @@ export interface TaskListItem {
   title: string | null;
   /** Задача требует человека: журнал не открылся или сверка упала при загрузке. */
   attention: string | null;
+  /**
+   * Этап 11 (W3-18): группа задачи (`task.created.groupId`), в каждой строке списка. Фильтр
+   * `?groupId=` отдаёт только пункты группы — дети XL несут группу родителя, но ищутся `?parentTaskId=`.
+   */
+  groupId?: string;
+  /** Этап 11 (W3-18): дочерняя задача XL — её родитель (`task.created.parentTaskId`). */
+  parentTaskId?: string;
 }
 
 export interface TasksReply {

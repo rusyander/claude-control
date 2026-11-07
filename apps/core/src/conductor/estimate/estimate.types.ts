@@ -18,6 +18,15 @@ import type {
 import type { SplitCapacity } from '../split-check/index.ts';
 
 /**
+ * Места сеансов машины (вне сеансов чата): `holders` держат место, `slotWaiters` ждут именно
+ * места (не ёмкости маршрута) — они впереди нового сеанса в очереди распределителя.
+ */
+export interface SessionOccupancy {
+  holders: number;
+  slotWaiters: number;
+}
+
+/**
  * Что оценке, делению и запуску даёт загрузка (G5, G6, P101): чтение git, пробы предпроверки,
  * подъём точки 10. Собирает её дирижёр (`conductor-wiring/split.ts`, одна на ядро) и отдаёт на
  * своей ручке; ручка `/v1/estimate` и команды берут её через порт `split()` среды команды
@@ -53,9 +62,22 @@ export interface SplitEnv {
    * каталогом задач. `null` — истории нет (оценка отвечает «no-history», не отказывает).
    */
   history?(): Promise<LearnedTable | null>;
-  /** Ёмкость для проверки деления: слоты и окно (фаза 5 — окно не моделируется). */
-  capacity(): SplitCapacity;
+  /**
+   * Ёмкость для проверки деления: слоты и окно (фаза 5 — окно не моделируется). Этап 11: слоты —
+   * действующая параллельность задачи (профиль, `sessionSlots`), если задача названа.
+   */
+  capacity(task?: LiveTask): SplitCapacity;
+  /**
+   * Занятость мест сеансов машины сейчас (этап 11, P141; ожидание места на оценке ведущего): по
+   * файлам мест распределителя. Нет порта — распределитель не подключён, ожидание не оценивается.
+   */
+  sessionOccupancy?(): Fact<SessionOccupancy>;
   foldCase: boolean;
+  /**
+   * id проверок реестра репозитория (этап 11, договор плана ведущего): кусок плана с проверкой
+   * вне реестра отказан. `null` — реестр не прочитан; нет порта — проверка куска не решается.
+   */
+  checksOf?(repo: { repoKey: string; path: string }): Promise<readonly string[] | null>;
   /** Точка 10 (G15) через единственный подъём зоны E. */
   raise(task: LiveTask, raise: HumanPointRaise): { kind: string };
   /**
@@ -71,6 +93,22 @@ export interface SplitEnv {
    * книги — такая оценка отказывается (значения некуда положить, сеанс пошёл бы без них).
    */
   taskEnv?: { put(taskId: string, values: Readonly<Record<string, string>>): void };
+  /**
+   * Этап 11 (W3-18): дочерние задачи XL — по задаче на часть деления, тем же путём оценки
+   * (`conductor/split/children.ts`). Нет порта — XL делится единицами одной задачи.
+   */
+  childTasks?(
+    parent: LiveTask,
+    splitId: string,
+    units: readonly JournalDataV1['split.proposed']['units'][number][],
+    /** Имена этой волны (Q-2 s11: часть с зависимостями — после сданных зависимостей); нет — все. */
+    only?: readonly string[],
+  ): Promise<{
+    taskIds: string[];
+    problems: string[];
+    byName?: Record<string, string>;
+    refused?: Record<string, string>;
+  }>;
 }
 
 export type GrantRequiredRow = NonNullable<CoreConfig['grantRequired']>[number];
@@ -106,15 +144,29 @@ export interface CreateSeed {
   /** Ветка единицы 0 вместо своей `agentdeck/<id8>`. */
   branch?: string;
   /**
+   * Ссылка строки `base-pin` вместо той, что дал `pinBase` (ребёнок XL, Q-2 s11): база приколота
+   * sha (голова зависимости или база родителя), а ветка базы на сервере — та, что у родителя;
+   * `undefined` — своя.
+   */
+  pinRef?(repoKey: string): string | undefined;
+  /**
    * Отказ сценария и упавшая предпроверка — 422 ДО создания, без задачи. Создающий без человека
    * (опрос форжа) повторит позже; провалившаяся задача на каждый круг копилась бы в списке.
    */
   refuseBeforeCreate?: boolean;
   /**
    * Поля `task.created` сверх оценки (ревью по ссылке, этап 10 F8): зовётся после `checkPinned`,
-   * поэтому может нести то, что предпроверка базы узнала (общий предок MR).
+   * поэтому может нести то, что предпроверка базы узнала (общий предок MR). `launchPolicy` сильнее
+   * поля оценки: `split` в `lead.alwaysAsk` ведущего — всегда `confirm` (D25).
    */
-  created?(): Pick<JournalDataV1['task.created'], 'review'>;
+  created?(
+    pinned: readonly PinnedRepoView[],
+  ): Partial<
+    Pick<
+      JournalDataV1['task.created'],
+      'review' | 'lead' | 'launchPolicy' | 'groupId' | 'parentTaskId'
+    >
+  >;
   /** Строки после `unit.created` единицы 0 (ключ единицы уже известен). */
   afterUnitZero?(task: LiveTask, zero: JournalDataV1['unit.created'], cmdId: string): void;
 }

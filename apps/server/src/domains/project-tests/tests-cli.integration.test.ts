@@ -836,7 +836,8 @@ describe('tests-cli: наборы пакетов монорепозитория'
       '--cmd',
       'node pkg.mjs {paths} {report}',
     );
-    expect(result.code).toBe(0);
+    // Вывод — в сообщение: 07.11 этот шаг раз покраснел кодом 1 под нагрузкой, и причина не дошла.
+    expect(result.code, result.out).toBe(0);
     expect(status('suites-chat')).toBe('passed');
     expect(status('suites-admin')).toBe('unknown');
   });

@@ -26,6 +26,19 @@ export const STEP_BUDGET_SCOPE = 'step:';
  */
 export const MODEL_SERVED_SIGNAL = 'model-served';
 
+/**
+ * Утверждение человеком (02 §Split, точка 10) — второе решение по делению: оно идёт после
+ * `accepted` / `edited` проверки. Остальные повторные решения — аномалия.
+ */
+function humanApproval(
+  state: TaskFoldState['splits'][string]['state'],
+  d: JournalLine<'split.decided'>['data'],
+): boolean {
+  return (
+    (state === 'accepted' || state === 'edited') && d.outcome === 'approved' && d.by === 'human'
+  );
+}
+
 function withStep(next: TaskFoldState, stepId: string, step: StepRecord): TaskFoldState {
   return { ...next, steps: { ...next.steps, [stepId]: step } };
 }
@@ -125,7 +138,8 @@ export function reduceStage4(
       const d = (line as JournalLine<'split.decided'>).data;
       const split = own(next.splits, d.splitId);
       if (!split) return anomaly(`split.decided: unknown ${d.splitId}`);
-      if (split.state !== 'proposed') return anomaly(`split ${d.splitId} decided twice`);
+      if (split.state !== 'proposed' && !humanApproval(split.state, d))
+        return anomaly(`split ${d.splitId} decided twice`);
       return { ...next, splits: { ...next.splits, [d.splitId]: { ...split, state: d.outcome } } };
     }
     case 'scenario.edited': {

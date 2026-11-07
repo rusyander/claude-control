@@ -168,6 +168,14 @@ export async function serveGatewayEntry(
       code: 'invalid_request_error',
       message: hopText('gateway-body-not-json'),
     });
+  // Лента хода локального маршрута: запрос в полёте до закрытия ответа (этап 11, W2-5).
+  const activityDone = ctx.activity?.begin(entry, {
+    credential: call.credential,
+    route,
+    path: call.path,
+    body,
+  });
+  if (activityDone) call.raw.once('close', activityDone);
   if (route === 'responses') return responsesChat(g, body);
   if (route === 'google') return googleChat(g, call.raw, body);
   const native =

@@ -7,4 +7,4 @@ export {
   waitsOn,
 } from './window.ts';
 export { WindowBook, windowHealth } from './book.ts';
-export type { WindowHealthRow } from './window.types.ts';
+export type { WindowFactStore, WindowHealthRow } from './window.types.ts';

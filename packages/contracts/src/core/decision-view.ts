@@ -1,5 +1,7 @@
 import type { DecisionClassId } from './decisions.ts';
+import { INTAKE_VERDICTS } from './intake.ts';
 import { SIGNAL_ACTIONS, WINDOW_VERDICTS } from './journal-data.ts';
+import { TASK_CLASSES } from './lead.ts';
 
 /**
  * Исход решения для человека (07:21, этап 9, развилка F1): строка `decision` несёт причины
@@ -45,6 +47,7 @@ export const DECISION_OUTCOMES = {
     'raise',
     'skip-step',
     'end-unit',
+    'launch-children',
     'finish-task',
     'fail-task',
     'cancel-task',
@@ -72,6 +75,8 @@ export const DECISION_OUTCOMES = {
   'set-route': ['applied', 'refused'],
   precedence: ['within-levels', 'widening-rejected'],
   'layer-run': ['as-asked', 'lowered'],
+  intake: INTAKE_VERDICTS,
+  classify: TASK_CLASSES,
 } as const satisfies Record<DecisionClassId, readonly string[]>;
 
 export type DecisionOutcome<C extends DecisionClassId = DecisionClassId> =
@@ -156,6 +161,8 @@ const READ: { [C in DecisionClassId]: (o: Out) => string | undefined } = {
     if (typeof asked !== 'object' || typeof ran !== 'object' || !asked || !ran) return undefined;
     return asked.hooks === ran.hooks && asked.skills === ran.skills ? 'as-asked' : 'lowered';
   },
+  intake: (o) => str(o, 'verdict'),
+  classify: (o) => str(o, 'class'),
 };
 
 export function isDecisionClass(cls: string): cls is DecisionClassId {

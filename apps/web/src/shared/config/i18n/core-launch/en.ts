@@ -1,7 +1,9 @@
+import { coreLaunchLeadEn } from './lead.en.ts';
 import type { coreLaunchRu } from './ru.ts';
 
 /** English texts of the core task launch screen; typed against the Russian module. */
 export const coreLaunchEn: typeof coreLaunchRu = {
+  ...coreLaunchLeadEn,
   title: 'Launch a task',
   subtitle:
     'Time and spend estimate, CLI and model route check, splitting into parts — before launch.',
@@ -77,6 +79,10 @@ export const coreLaunchEn: typeof coreLaunchRu = {
     },
     unknown: 'unknown',
     problems: 'Problems',
+    group: 'Group {{id}}: {{count}} tasks',
+    groupHint:
+      'The numbers and progress below are for the first task of the group; every task of the group opens in Core tasks.',
+    groupTask: 'Task {{n}}: {{id}}',
   },
   roads: {
     heading: 'Road check',
@@ -186,6 +192,33 @@ export const coreLaunchEn: typeof coreLaunchRu = {
       'split-unsaved': 'The split edit is not saved.',
       'grants-unconfirmed': 'Confirm the access above.',
       'grant-unreadable': 'An access row cannot be read: the repository key is hidden by the mask.',
+    },
+    group: {
+      button: 'Launch the group: {{count}} tasks',
+      retry: 'Launch the group tasks not started yet',
+      allStarted: 'All group tasks started: {{count}} — follow each in its own feed.',
+      started: 'Tasks started: {{started}} of {{total}}.',
+      refused: 'Task {{task}} not started: {{reason}}',
+      notReady: {
+        'no-view': 'the core returned no task view',
+        ended: 'the task has already ended',
+        'awaiting-split': 'the split is not ready yet',
+        'split-refused': 'the check refused the split — fix it in the task feed',
+        'not-awaiting-launch': 'the task is not awaiting launch yet',
+      },
+    },
+    intake: {
+      hint: 'Each group task waits for its intake card to be confirmed. The button answers each one “Confirm the card”, as in its feed; the answer is written to the task journal as yours.',
+      button: 'Confirm the group cards: {{count}}',
+      retry: 'Confirm the unconfirmed group cards: {{count}}',
+      done: 'Cards confirmed: {{confirmed}} of {{total}}.',
+      classWait:
+        'Waiting for your answer about the task class — tasks: {{count}}. The class is chosen in the task feed; there is no button for it here.',
+      refused: 'Task {{task}} not confirmed: {{reason}}',
+      notReady: {
+        'no-view': 'the core returned no task view',
+        ended: 'the task has already ended',
+      },
     },
   },
   failure: {

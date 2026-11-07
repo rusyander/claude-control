@@ -26,6 +26,8 @@ export interface ChatHeaderProps {
   defaultModel: string;
   defaultEffort: string;
   models?: ModelInfo[];
+  /** CLI разговора (W3-17a): не Claude — алиасов Claude в выборе модели нет. */
+  cli?: string;
   /**
    * Кем прогон этого разговора пойдёт через контур: `groups` у разговора,
    * заведённого разделением, иначе `chat`. Спрашивать план всегда за «Чат»

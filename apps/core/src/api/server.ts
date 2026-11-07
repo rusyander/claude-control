@@ -27,11 +27,15 @@ import {
   type TokenClass,
   type TokenSources,
 } from './auth.ts';
+import { registerAgents, type AgentsPort } from './agents.ts';
+import { registerAllocator, type AllocatorPort } from './allocator.ts';
 import { registerAsk, type AskPort } from './ask.ts';
+import { registerLocalActivity, type LocalActivityPort } from './local-activity.ts';
 import { registerTaskAttachments } from './attachments.ts';
 import { registerReviewLink, type ReviewLinkPort } from './review-link.ts';
 import { registerConfig } from './config.ts';
 import { registerDevices, type DevicesPort } from './devices.ts';
+import { registerLearned, type LearnedPort } from './learned.ts';
 import { registerLocalHold, type LocalHoldPort } from './local-hold.ts';
 import type { ConfigPort } from './config.types.ts';
 import { registerContours, type ContoursPort } from './contours.ts';
@@ -50,6 +54,7 @@ import { registerSessionStream } from './session-stream.ts';
 import type { AdapterRegistry } from '../adapters/index.ts';
 import { followTask, lastEventId, openSse } from './sse.ts';
 import { priceBookOf, taskViewOf } from './task-view.ts';
+import { taskListOf, taskListQuery } from './task-read.ts';
 
 /**
  * HTTP API ядра (07 §API) — только на 127.0.0.1, порт вне 5170–5180 (P59). Каждое чтение —
@@ -95,6 +100,8 @@ export interface ApiDeps {
   trustedHops?: () => { count: number; recordedAt: number | null };
   /** Перенос ключей телефона в устройства ядра (G9); нет — `/v1/devices/adopt` отвечает 501. */
   devices?: () => DevicesPort | undefined;
+  /** Сброс ключа обучения человеком (этап 11, P140); нет — `/v1/learned/reset` отвечает 501. */
+  learned?: () => LearnedPort | undefined;
   /** Реестр переходников загрузки: вид сеанса читает поток их нормализатором (этап 10). */
   adapters?: AdapterRegistry;
   /** Серверы MCP человека по CLI для экрана выбора (s10 p9); нет — `/v1/mcp-offers` отвечает 501. */
@@ -109,6 +116,12 @@ export interface ApiDeps {
   ask?: () => AskPort | undefined;
   /** Ревью MR по ссылке (этап 10, F8); нет — `/v1/review-link` после суда отвечает 501. */
   reviewLink?: () => ReviewLinkPort | undefined;
+  /** Дерево агентов (этап 11, `bootstrap/agents-wiring`); нет — `/v1/*agents*` отвечает 501. */
+  agents?: () => AgentsPort | undefined;
+  /** Места сеансов (этап 11, `bootstrap/allocator-wiring`); нет — `/v1/allocator` отвечает 501. */
+  allocator?: () => AllocatorPort | undefined;
+  /** Управляющий канал хоста звеньев для активности своей модели (этап 11); нет — 501. */
+  localActivity?: () => LocalActivityPort | undefined;
 }
 
 const READ_TOKENS: ReadonlySet<TokenClass> = new Set(['core', 'panel-bearer']);
@@ -154,7 +167,8 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   app.get('/v1/tasks', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;
     // Тип ответа — контракт панели: строка списка, разошедшаяся с ним, не собирается.
-    const body: TasksReply = { tasks: deps.registry.list() };
+    // `?groupId=` / `?parentTaskId=` (W3-18): задачи группы и дочерние задачи XL.
+    const body: TasksReply = { tasks: taskListOf(deps.registry, taskListQuery(request.query)) };
     return body;
   });
 
@@ -241,9 +255,13 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   registerRoutesView(app, routeContext, () => deps.routes?.());
   registerMcpOffers(app, routeContext, () => deps.mcpOffers?.());
   registerDevices(app, routeContext, () => deps.devices?.());
+  registerLearned(app, routeContext, () => deps.learned?.());
   registerLocalHold(app, routeContext, () => deps.localHold?.());
   registerContours(app, routeContext, () => deps.contours?.());
   registerDlpProxy(app, routeContext, () => deps.dlpProxy?.());
+  registerAgents(app, routeContext, () => deps.agents?.());
+  registerAllocator(app, routeContext, () => deps.allocator?.());
+  registerLocalActivity(app, routeContext, () => deps.localActivity?.());
 
   app.get<{ Querystring: { page?: string } }>('/v1/nonce', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;

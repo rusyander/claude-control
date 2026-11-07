@@ -39,13 +39,34 @@ describe('io-record', () => {
 
   it('whole tail: no blank line is inserted between intact lines', () => {
     const dir = mkdtempSync(join(tmpdir(), 'iorec-'));
-    appendIoRecord(dir, { t: 'send', cmdId: 'a', uuid: 'u1', at: 0, data: 'x' });
+    appendIoRecord(dir, { t: 'send', cmdId: 'a', uuid: 'u1', at: 0, data: 'x' }, () => 77);
     appendIoRecord(dir, { t: 'ack', cmdId: 'a' });
     const text = readFileSync(join(dir, IO_RECORD), 'utf8');
     expect(text.split('\n')).toHaveLength(3);
     expect(readIoRecord(dir).sends).toEqual([
-      { t: 'send', cmdId: 'a', uuid: 'u1', at: 0, seen: 0, data: 'x', acked: true },
+      { t: 'send', cmdId: 'a', uuid: 'u1', at: 0, seen: 0, wall: 77, data: 'x', acked: true },
     ]);
+  });
+
+  // Этап 11, волна 3: отправка несёт стену записи — время хода человека в истории чата не-Claude
+  // CLI (вид сеанса времени строк не несёт). Заданная главнее; не число — как прежние записи.
+  it('a send is stamped with the wall clock at record time; a given wall wins; a bad one is dropped', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'iorec-'));
+    appendIoRecord(dir, { t: 'send', cmdId: 'a', uuid: 'u1', at: 0, data: 'x' }, () => 1_000);
+    appendIoRecord(dir, { t: 'send', cmdId: 'b', uuid: 'u2', at: 0, wall: 5, data: 'y' }, () => 9);
+    appendIoRecord(dir, { t: 'ack', cmdId: 'a' }, () => 2_000);
+    writeFileSync(
+      join(dir, IO_RECORD),
+      `${readFileSync(join(dir, IO_RECORD), 'utf8')}{"t":"send","cmdId":"c","uuid":"u3","at":5,"wall":"9","data":"z"}\n`,
+    );
+    expect(readIoRecord(dir).sends.map((s) => [s.cmdId, s.wall])).toEqual([
+      ['a', 1_000],
+      ['b', 5],
+      ['c', undefined],
+    ]);
+    expect(readFileSync(join(dir, IO_RECORD), 'utf8')).not.toContain(
+      '"t":"ack","cmdId":"a","wall"',
+    );
   });
 
   // Проход 8 зоны C: отправка несёт длину вывода на миг записи — по ней вид ставит ход человека,

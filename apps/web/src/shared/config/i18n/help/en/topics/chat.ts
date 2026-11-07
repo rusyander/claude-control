@@ -36,57 +36,40 @@ export const chatEn: typeof chatRu = {
       'call), answers, adds it to the plan or changes course, and carries on with the ' +
       'same turn — no waiting for it to end. In the feed such a message is a faint ' +
       'bubble marked “passed to the agent — it takes it into account at the next ' +
-      'step”. A message with attachments and a ' +
-      'conversation with another CLI queue up instead: a bubble marked “goes out ' +
-      'next” that survives a page reload and goes out as soon as the current turn ends',
+      'step”. In a chat on another CLI a word sent mid-turn gets its answer as a turn of ' +
+      'its own in the same run: the answer sits under that word, not appended to the ' +
+      'previous one. A message with attachments queues up instead: a bubble marked “goes ' +
+      'out next” that survives a page reload and goes out as soon as the current turn ' +
+      'ends; the previous turn’s answer stays in the feed meanwhile, and after a page ' +
+      'reload mid-turn every message and every answer appears once',
     canProgress:
-      "Watch the agent's plan: the strip above the input shows its own checkpoints " +
-      '(done, in progress) and the tree of subagents it handed work to, together ' +
-      'with what each one returned. When a turn ended with a question to you, the strip ' +
-      'leads with “Waiting for your answer”. A background command the agent stopped itself ' +
-      '(cleaning up a dev server) reads “stopped by the agent”, not “lost”. Subagents form ' +
-      'a tree: one launched by a subagent sits under it, and the arrow folds the branch. ' +
-      'Each node shows the model, the number of calls, tokens spent, time and the last ' +
-      'action. A click or Enter opens the subagent’s turn on the right: the task it was ' +
-      'started with and its steps in order — read-only, Escape closes it and returns to the ' +
-      'node. Arrow keys walk the tree: up and down move between neighbours, left folds or ' +
-      'goes to the parent, right unfolds or steps into the first child. A subagent has no ' +
-      'separate “Stop”: the core session host owns the CLI process, so only the whole turn ' +
-      'stops — “Stop” in the input. Chips under the main agent’s line and under each node show ' +
-      'which skills and MCP servers it called, how many hooks fired for it and how many of ' +
-      'them refused (“hooks 3”, “denied 1”); an agent with nothing fired has no chips. A ' +
-      'click on the chips opens the “Skills, hooks and MCP” window: the main agent and every ' +
-      'subagent on the left, and for the selected one its skills, MCP calls and hooks in time ' +
-      'order on the right, each with its outcome (“passed”, “error”, “denied” with the reason, ' +
-      '“into context”, “running”) and duration; Escape closes the window and returns to the ' +
-      'chips. The strip above the input also appears when the main agent called a skill or ' +
-      'MCP, while hooks alone do not open it — they fire in every conversation. A group card ' +
-      'shows how many of its agents are running and how many are done, a chip for each (a ' +
-      'click opens its turn) and a line of chips for the whole group with the same window. ' +
-      'The “Agent history · N” button opens every session of the conversation, newest first — ' +
-      'for a group, each of its links with its stage: the main agent and the subagents of each ' +
-      'session. The main agent is a button just like a subagent: on the right, its turn read ' +
-      'from the whole file, in windows of 200 steps (“Show earlier”, “Later”, “To the latest”) with ' +
-      'an exact “Steps a–b of M”. Each call shows its time, duration, full result size, an ' +
-      'error or a hook denial with its reason; the first step of an answer shows that answer’s ' +
-      'token spend and model. A call cut by a pause or the end of the session is marked ' +
-      '“interrupted” in a calm colour: it never got a result, but it is not an error. ' +
-      'A line under each agent lists anomalies: hook denials, errors, ' +
-      'repeated reads of one file (the hint names the files) and results longer than 10,000 ' +
-      'characters; zero counts are hidden. Calls cut by a pause are not counted as errors — ' +
-      'their number stands on its own line, “cut by a pause N”. Next to the button — who is ' +
-      'working now: “now: 1 agent · 2 subagents”, the numbers bold and coloured (agents in the ' +
-      '“running” colour, subagents in the accent, a zero muted), or a muted “nobody is ' +
-      'working”. At the top of the window, the “Now” block: whether the main agent is working ' +
-      'and what it is doing (the call, since when and for how long, or “writing an answer”), ' +
-      'which subagents are working and what each is doing, or plainly “No subagents working ' +
-      'now”; clicking a row opens its turn on the right, and a session with someone working is ' +
-      'marked “working now”. The main agent counts while its ' +
-      'turn is open and its process is alive or its file was written in the last 15 minutes; a ' +
-      'subagent with no result that has been silent for over 15 minutes counts as cut off — by ' +
-      'one rule for the numbers by the button and for the window. The ' +
-      'panel counts all of this itself from the transcript files, no model is called; while ' +
-      'someone is working the number refreshes every 5 seconds',
+      'Watch the agent’s plan: the strip above the input shows its own checkpoints ' +
+      '(what is done, what is in progress) and the tree of subagents it handed work ' +
+      'to, along with what each returned. If the turn ended with a question for you, ' +
+      '“Waiting for your answer” comes first in the strip. A background command the ' +
+      'agent stopped itself (dev-server cleanup) is marked “stopped by the agent”, not ' +
+      '“cut off”. Subagents form a tree: one launched by a subagent sits under it, an ' +
+      'arrow folds the branch. Each node shows the model, number of calls, token ' +
+      'spend and time from the core journal (spend the core does not know is not ' +
+      'shown); a running one shows what it is doing now. A click or Enter opens the subagent on the right ' +
+      'from the core journal: model, brief, spend, calls, files, refusals and what it ' +
+      'returned — read-only, Escape closes it and returns to the node. Arrow keys walk ' +
+      'the tree: up and down — siblings, left — fold or go to the parent, right — ' +
+      'unfold or enter the nested one. A subagent has no “Stop” of its own: the core ' +
+      'session host holds the CLI process, so only the whole turn stops — “Stop” in ' +
+      'the input. Below the strip, the “Agents” card counts background work running ' +
+      'now (“background: 2” or “no background work”) and opens a window with every ' +
+      'agent of every task of the chat — sessions, subagents, background commands — ' +
+      'with filters and export. A background command opens in detail: the command, ' +
+      'its output, whose it is and how it ended — “finished (code 0)”, “orphaned”, ' +
+      '“hanging”; the output tail starts at a whole line. Background work the core first ' +
+      'saw late (after its own restart) is named orphaned but not stopped. Quiet ' +
+      'background work that listens on a port is a server and never gets “hanging”. A ' +
+      'subagent of a session that ended without its own end is “lost”, with the ' +
+      'session’s end time. A group card shows how many of its agents run and how many are ' +
+      'done, a label for each and the same “Agents” button over the group’s tasks. ' +
+      'All of it is the core journal: the panel does not read CLI transcripts for ' +
+      'this, so the window is the same for a chat on any CLI',
     canChatDots:
       'Tell conversations apart by the dots in the chat list: a project can hold ' +
       'several agents, and it is visible which one is waiting for an answer',
@@ -253,7 +236,7 @@ export const chatEn: typeof chatRu = {
       'endpoint profile. Both contour roads — part of the answer and its own images endpoint — go ' +
       'through the core, the same road the CLI requests of this contour take: the request is in ' +
       'the journal, passes data protection, a contour refusal arrives as a readable reason, and ' +
-      'it counts toward the key’s spend when the contour sent usage. The panel gateway switch is ' +
+      'it counts toward the key’s spend when the contour sent usage. The core gateway switch is ' +
       'not needed for this. The core never retries a paid image: a temporary contour refusal ' +
       'comes back as a refusal, not as a second charge. The endpoint profile is your own address, ' +
       'not the corporate key, so it goes directly, bypassing the core: its requests are in ' +
@@ -313,11 +296,14 @@ export const chatEn: typeof chatRu = {
     diffHistoryText:
       'Here conversations are held, there they are read: History shows finished ' +
       'transcripts across projects with search over messages and starts no agents.',
-    diffForeign: 'Chat versus a foreign CLI',
+    diffForeign: 'One chat for every CLI',
     diffForeignText:
-      'This section runs claude. A new conversation with another CLI (Codex, Gemini, Qwen and the rest) ' +
-      'starts in the «Core chat»: the CLI is chosen at launch. The «Providers» section keeps old ' +
-      'conversations of those CLIs read-only, with a «Continue in the core chat» button.',
+      'There is one chat: a new conversation runs on the active provider’s CLI, and a started ' +
+      'one stays on its own CLI even if the provider changes later. The chat has no CLI ' +
+      'picker and no separate screen for Codex, Qwen Code, OpenCode and the rest. Chats of ' +
+      'other CLIs behave like Claude chats: earlier answers stay in the feed, the history ' +
+      'survives a page reload, the chat is in the list on the left (and in the project list ' +
+      'on the phone), and reopened from the list it continues the same session.',
     diffSandbox: 'A project versus the sandbox',
     diffSandboxText:
       'A conversation on a project tab runs in its folder and sees git. The home ' +
@@ -392,15 +378,17 @@ export const chatEn: typeof chatRu = {
         'about exporting orders to CSV.',
       bEmpty: 'Open the project and start a conversation',
       bEmptyText:
-        'The project tab, the New chat button — it opens "Chat through the core": ' +
-        'panel project, project folder, CLI and the first message. The folder comes ' +
-        'from the open project and the CLI is Claude Code; "Start chat" creates a ' +
-        'core task, and the conversation runs right in that folder, with no copy. ' +
+        'The project tab, the New chat button — an empty conversation right in that ' +
+        'tab. The first message creates a core task on the active provider’s CLI, and ' +
+        'the conversation runs in the project folder, with no copy. A link like ' +
+        '/chat?project=<folder> opens that project’s tab straight away. ' +
         'The start reaches the core through the panel: it adds its own layer — the ' +
         'kit and the Tests block line, plus for Claude the flags of its own layers and ' +
         'the profile note — and sets the contour route before the CLI (“Chat” for ' +
         'Claude, its own route for another CLI), so the “best effort” contour carries such a conversation ' +
-        'too. “New conversation here” starts the same way. If the layer cannot be ' +
+        'too. If the core refuses the launch (for example, the CLI has neither a ' +
+        'pre-call hook nor core denials), the feed shows a refusal line with the code ' +
+        'and the input goes away; there is no silent fallback to the old path. If the layer cannot be ' +
         'carried into the session, the start is refused with the reason, and a kit ' +
         'refusal during a turn (hooks, MCP, kit missing) names the cause and the way ' +
         'out — in the panel and on the phone. A folder without the CLI’s trust mark ' +
@@ -451,21 +439,32 @@ export const chatEn: typeof chatRu = {
         'showing 111.3k tok and claude-opus-5. Stop all kills them in one press.',
       bTree: 'Look into the plan of the agent and its subagents',
       bTreeText:
-        'The “The agent’s plan” strip above the input: “Subagents: 5” and the red chip ' +
-        '“Subagent lost: 1”. The “Main agent” line carries chips for what fired for the agent ' +
-        'itself — the reports-plan skill and “hooks 1”. Below, under “Work handed out”, the ' +
-        'subagents form a tree: the test check sits under the one that launched it. The ' +
-        'report build carries reports-build, tracker (an MCP server), “hooks 3” and a red ' +
-        '“denied 1”; nothing fired for the module scouting, so it has no chips.',
-      bExtensions: 'See what fired for an agent',
-      bExtensionsText:
-        'A click on the build’s chips opens the “Skills, hooks and MCP” window. On the left, ' +
-        'the main agent and every subagent with a count such as “skills 1 · MCP 1 · hooks 3 · ' +
-        'hook denials 1”; on the right, three sections in time order for the selected one: ' +
-        'the reports-build skill “passed” in 30s, the MCP call tracker/get_issue in 30s, and ' +
-        'among the hooks git-guard “denied” with its reason, gate-at-end “passed” in 85 ms and ' +
-        'context-watch “into context” with what it added for the agent. Escape closes the ' +
-        'window and returns focus to the chips.',
+        'The “The agent’s plan” strip above the input: the plan steps and “Work handed out” — ' +
+        'subagents as a tree, the test check nested under the review that launched it. A click ' +
+        'on a subagent opens it on the right. Below the strip sits the “Agents” card with ' +
+        '“background: 1”: how many background commands and background subagents run right ' +
+        'now; nothing running reads “no background work”. Chats on any CLI get the card: it ' +
+        'reads the core journal, not a Claude transcript.',
+      bHistory: 'Open every agent of the chat',
+      bHistoryText:
+        '“Agents” opens a window with every node of every task of this chat: the session, ' +
+        'subagents and background commands as a tree, each with its state in words ' +
+        '(“running”, “failed”, “finished (code 0)”), model and duration. On the right, the ' +
+        'selected one shows model and effort, its brief, spend in tokens and window share, ' +
+        'tool calls with durations, files, “Permission refusals” with the reason, “Model ' +
+        'escalations” with the cause (haiku → sonnet: two test failures in a row) and what it ' +
+        'returned. Spend the core does not know reads “unknown”, never zero. Filters cover ' +
+        'state, model, kind, task class and group; “Export” saves the journal lines about ' +
+        'agents as one jsonl file with secrets masked.',
+      bBackground: 'Sort out background work',
+      bBackgroundText:
+        'A background command opens the same way: the command, start, duration, the tail of ' +
+        'its output, whose it is — task, step, session and the call that launched it — and how ' +
+        'it ended. “Orphaned — reaped by cleanup” means the owner process went away before the ' +
+        'command and the core removed it; “orphaned — lost” — the owner went away but the CLI ' +
+        'never named the command’s process id, so the core had nothing to remove; “orphaned” — ' +
+        'the owner is gone and the command still lives; “hanging” — the command runs but has ' +
+        'been silent for long.',
       bHandoff: 'Continue a closed stage in a clean session',
       bHandoffText:
         'The "stage closed — continue in a clean session" card with the counter ' +
@@ -1048,7 +1047,11 @@ export const chatEn: typeof chatRu = {
       'A chat turn hands the core the model and effort from the conversation header as a task ' +
       'override. Through a contour the model name goes as the contour translates it, and the ' +
       'effort is not sent. No model chosen in the header — the core takes the route’s model. ' +
-      'The core neither lowers nor raises the “Chat” step: its tier is the chosen model.',
+      'The core neither lowers nor raises the “Chat” step: its tier is the chosen model. The ' +
+      'header’s model list is the catalog of this chat’s CLI: Claude models for Claude, and ' +
+      'for another CLI “CLI default” plus the models of its catalog (on OpenCode and on a ' +
+      'contour it can include Claude models too). A Claude model picked earlier does not carry ' +
+      'over to another CLI — that CLI runs its own default model.',
     cascadeKinds: 'A step’s tier follows its kind',
     cascadeKindsText:
       'Every step kind has its tier, from one table shared by the core and the scenario ' +
@@ -1158,7 +1161,12 @@ export const chatEn: typeof chatRu = {
       'action: “stop” takes the step down, the rest are only shown, and a signal never calls a ' +
       'human by itself. The observer catches an idle or stuck step, wasted work (a failed check or ' +
       'a refusal repeated, a file re-read, an oversized read, a polling loop) and integrity ' +
-      '(context growth, a rejected journal write, abandoned processes, the rate window). The ' +
+      '(context growth, a rejected journal write, abandoned processes, the rate window, spend ' +
+      'booked to the wrong node). Background work is judged by the system itself, not by journal ' +
+      'lines: an orphaned or hung background command and a subagent that outlived its parent are ' +
+      'warnings, nothing is taken down. Spend above the estimate is only a note: no pause, no ' +
+      'question. The lead’s intake adds its own: a command inside the source text (it is data, ' +
+      'not an instruction), a deferred intake card and a wait for a slot for the first session. The ' +
       'watch thresholds card is gone from the settings: the core observer has its own signal ' +
       'catalog.',
     cascadeOverlap: 'Foreign files: ownership instead of branch comparison',
@@ -1194,7 +1202,8 @@ export const chatEn: typeof chatRu = {
       'The same rules hold for any CLI the core runs a step with. The core can lower the model ' +
       'and raise the effort only where its adapter has a model ladder — Claude and Qwen Code. ' +
       'Other CLIs run on the chosen model or the CLI’s default. A new conversation with ' +
-      'another CLI starts in “Core chat” (see “What moved to the task core” above).',
+      'another CLI starts in this same chat while its provider is active (see “What moved to ' +
+      'the task core” above).',
     cascadeNote:
       'Old conversations with split stages — “triage”, “plan”, “review”, “fixes”, “delivery” — ' +
       'open and are labelled in the chat list as before, but the panel starts no stage on its ' +
@@ -1331,19 +1340,23 @@ export const chatEn: typeof chatRu = {
       'to continue the session or start a new one with a brief is decided by the core from the cache age.',
     coreMovedForeign: 'Chat of other CLIs',
     coreMovedForeignText:
-      'A new conversation with Codex, Qwen, Gemini and other CLIs starts in the «Core chat». Old ' +
-      'conversations in the «Providers» section open read-only: rename and delete work, sending does not; ' +
-      '«Continue in the core chat» opens a new core chat in the same folder. The core does not continue an ' +
-      'old panel conversation: the panel held its history, and the core continues only a conversation whose ' +
-      'transcript the CLI itself confirmed. On the phone these conversations are read-only too.',
+      'A new conversation with Codex, Qwen Code, OpenCode and other CLIs starts in the same chat as with ' +
+      'Claude: the New chat button while that CLI’s provider is active. There is no separate screen, ' +
+      'Projects tab or «New conversation here» button any more; old core chat addresses lead to this chat. ' +
+      'A clean-session continuation and carrying unfinished work to such a CLI land the same way: a new ' +
+      'conversation in the chat list (and on the phone) that survives a page reload and, reopened from the ' +
+      'list, continues the same session. The feed of a continuation or a carry shows the task only, not ' +
+      'the panel’s service instructions to the model. The core does not continue a conversation whose ' +
+      'history the earlier panel held: it continues only a conversation whose transcript the CLI itself ' +
+      'confirmed.',
     coreMovedRefused: 'What the core does not have for the chat',
     coreMovedRefusedText:
       'Three turns are refused by name instead of being lost silently: editing a sent message with a fork ' +
       '(the claude adapter has no --fork-session), the one-off warm cache ping, and a turn the CLI started ' +
       'itself, since the core session host holds the CLI, not the panel.',
     coreMovedNote:
-      'The old routes for sending to another CLI conversation answer with the «provider-chat-core» refusal ' +
-      'and its reason: an old phone build shows the explanation, not an empty screen.',
+      'The old routes for sending to another CLI conversation answer with a refusal and its reason: an ' +
+      'old phone build shows the explanation, not an empty screen.',
 
     deferredTitle: 'Awaiting decision: former D-n calls',
     deferredCaption:
@@ -1685,15 +1698,13 @@ export const chatEn: typeof chatRu = {
       'and it opens on “edits allowed”, the same as a normal chat.',
     editsForeignTitle: 'Edits in another CLI’s chat',
     editsForeignText:
-      'A new conversation with Codex, Qwen, Goose, Kimi Code or OpenCode runs as a core task ' +
-      '(the «Chat through the core» form), and its header has no edits switch. A launch from ' +
+      'A new conversation with Codex, Qwen Code, Goose, Kimi Code or OpenCode runs as a core ' +
+      'task in the same chat, and its header has no edits switch. A launch from ' +
       'the chat is itself the right to edit inside the project folder: there the CLI writes ' +
       'without asking. A request outside it arrives as a core question card: grant the right ' +
       '(project, paths, actions) or refuse; the card lives in the task journal and survives ' +
       'leaving the page and F5. A CLI the core has no adapter for gets the core’s refusal ' +
-      'with its code — there is no silent fallback to the old runner. Old conversations of ' +
-      'these CLIs open read-only: you can rename or delete them, and «Continue in the core ' +
-      'chat» opens a new core chat in the same folder.',
+      'with its code as a line in the feed — there is no silent fallback to the old runner.',
 
     autoApproveTitle: 'Auto-approving permissions',
     autoApproveText:
@@ -1928,23 +1939,20 @@ export const chatEn: typeof chatRu = {
       'watches transcript files and reports changes, and the panel additionally asks ' +
       'for the fingerprint of the open conversation every few seconds — in case file ' +
       'watching is switched off in settings or the stream broke. No page reload needed.',
-    noteProviderTitle: 'Other providers: earlier conversations and the core chat',
+    noteProviderTitle: 'Other providers: the same chat',
     noteProviderText:
-      'With a non-Claude provider active, the Chat section shows its conversations that the old ' +
-      'panel ran — read-only: they can be renamed and deleted but not sent to, and “Continue in ' +
-      'the core chat” opens a new core chat in the same folder. Next to them sits a Projects tab: ' +
-      'every folder where any CLI has worked, Claude projects included, each with badges of who ' +
-      'worked in it and a “New conversation here” button that opens a core chat in that folder. ' +
-      'A folder that no longer exists on disk stays in the list with the button disabled and the ' +
-      'reason shown. A new conversation runs the same way as with Claude: as a core task, with the ' +
-      'panel layer and the contour route (step “Open the project and start a conversation” ' +
-      'above). What a CLI can do in a core turn is up to its adapter; a CLI without an adapter ' +
-      'gets a core refusal with a code (section “Edits in another CLI’s chat”).',
+      'With a non-Claude provider active, the Chat section is the same: project tabs, the chat ' +
+      'list and the New chat button, which starts a conversation on that provider’s CLI. A ' +
+      'conversation already started keeps its CLI after the provider is switched back. A new ' +
+      'conversation runs the same way as with Claude: as a core task, with the panel layer and ' +
+      'the contour route (step “Open the project and start a conversation” above). What a CLI ' +
+      'can do in a core turn is up to its adapter; a CLI the core refuses gets a refusal line ' +
+      'with a code in the feed (section “Edits in another CLI’s chat”).',
   },
   shots: {
     basics: {
       '01-project-empty':
-        'A new project chat is a core task: folder from the open project, CLI, first message',
+        'A new chat right in the project tab: the first message creates a core task on the active provider’s CLI',
       '02-composer': 'A question with a file attached — the attachment shows as a chip',
       '03-answer': 'The answer as it is generated: thinking, tool calls, spend, text',
       '04-permission': 'The agent stands on a call and waits for a decision: deny or allow',
@@ -1956,9 +1964,11 @@ export const chatEn: typeof chatRu = {
     },
     agents: {
       '01-tree':
-        'The agent’s plan: the main agent’s line and the subagent tree with skill, MCP and hook chips',
-      '02-extensions':
-        'The “Skills, hooks and MCP” window: agents on the left, the selected one’s runs in time order',
+        'The agent’s plan: steps, the subagent tree and the “Agents” card with the background count',
+      '02-history':
+        'The “Agents” window: core nodes of every task of the chat, the selected subagent’s spend and refusals',
+      '03-background':
+        'A background command in detail: output, whose it is and how it ended — “orphaned — reaped by cleanup”',
     },
     economy: {
       '01-where':

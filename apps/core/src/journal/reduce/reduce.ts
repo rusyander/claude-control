@@ -10,7 +10,7 @@ import {
   UNIT_MACHINE,
   type MachineDef,
 } from '@agentdeck/contracts/core/states';
-import type { ScenarioRef } from '@agentdeck/contracts/core/scenario';
+import { TASK_CLASSES, type ScenarioRef, type TaskClass } from '@agentdeck/contracts/core/scenario';
 import { commandBodyHash } from '../command-body.ts';
 import {
   REDUCER_VERSION,
@@ -370,6 +370,8 @@ function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
         const { [line.stepId]: _taken, ...observerParks } = next.observerParks;
         return { ...next, observerParks };
       }
+      // Класс задачи (этап 11, `conductor/classify`): последнее решение действует.
+      if (d.class === 'classify') return leadClassAfter(next, out, line.seq);
       if (d.class !== 'reconcile' || !out) return next;
       // Человек ответил «повторить сверку» (`conductor/reconcile.ts` `settleReconcileAnswer`):
       // действие снова начатое — сверка прочтёт факт заново. Такая строка бывает только после
@@ -457,11 +459,33 @@ function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
       const budgeted = recordBudget(next, line as JournalLine<'budget.state'>);
       return reduceStage4(budgeted, line, anomaly) ?? budgeted;
     }
+    // Этап 11: дерево агентов и карточку приёма читают свои свёртки (`agents-view`, приём) по
+    // журналу; состояние задачи эти строки не меняют.
+    case 'tool.started':
+    case 'agent.spawned':
+    case 'agent.ended':
+    case 'bg.started':
+    case 'bg.ended':
+      return next;
+    case 'intake.card': {
+      // Карточка приёма принята (этап 11): шаг разбора, не начатый до неё, пропускается.
+      const { by } = (line as JournalLine<'intake.card'>).data;
+      const lead = next.lead ?? { card: null, taskClass: null };
+      return { ...next, lead: { ...lead, card: { by, seq: line.seq } } };
+    }
     default:
       // Виды этапов 4 и 5 — свои модули; прочие (телеметрия, решения…) состояния задачи не
       // меняют: их читают по журналу части, которым они нужны.
       return reduceStage4(next, line, anomaly) ?? reduceStage5(next, line, anomaly) ?? next;
   }
+}
+
+/** Класс из решения `classify` (`output.class`); чужое значение класс не меняет. */
+function leadClassAfter(state: TaskFoldState, out: unknown, seq: number): TaskFoldState {
+  const value = (out as { class?: unknown } | null)?.class;
+  if (!TASK_CLASSES.some((c) => c === value)) return state;
+  const lead = state.lead ?? { card: null, taskClass: null };
+  return { ...state, lead: { ...lead, taskClass: { class: value as TaskClass, seq } } };
 }
 
 /** Пауза помнит, «сейчас» ли её просили (G10); продолжение и конец задачи её снимают. */

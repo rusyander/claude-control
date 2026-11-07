@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '@agentdeck/contracts';
 import type { StreamedTool } from '../../shared/lib/runs/types';
-import { liveToolsOutsideHistory } from './liveTurn';
+import { liveToolsOutsideHistory, liveTurnStart } from './liveTurn';
 
 const START = Date.parse('2026-09-28T09:00:00.000Z');
 const ASK_INPUT = JSON.stringify({ questions: [{ question: 'Which stack?' }] });
@@ -56,5 +56,21 @@ describe('liveToolsOutsideHistory', () => {
     expect(liveToolsOutsideHistory(history, live, undefined)).toBe(live);
     const human: ChatMessage = { ...history[0]!, role: 'user' };
     expect(liveToolsOutsideHistory([human], live, START)).toBe(live);
+  });
+});
+
+describe('liveTurnStart — граница живого хода (nextTurn, core-chat-012)', () => {
+  it('слово «на ходу» начало новый ход прогона: тот же вызов прошлого хода не гасит вызов нового', () => {
+    const turnAt = Date.parse('2026-09-28T09:00:05.000Z');
+    // Прошлый ход того же прогона (после старта, до границы) уже записал тот же вопрос.
+    const history = [assistant('a1', '2026-09-28T09:00:01.000Z', [['AskUserQuestion', ASK_INPUT]])];
+    const run = { startedAt: START, turnAt };
+    expect(liveTurnStart(run)).toBe(turnAt);
+    expect(liveToolsOutsideHistory(history, live, liveTurnStart(run))).toBe(live);
+  });
+
+  it('без границы хода — старт прогона', () => {
+    expect(liveTurnStart({ startedAt: START })).toBe(START);
+    expect(liveTurnStart({})).toBeUndefined();
   });
 });

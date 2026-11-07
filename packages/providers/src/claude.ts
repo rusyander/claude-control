@@ -47,6 +47,8 @@ export const claudeRunFacts: CliRunFacts = {
     { model: 'opus', ids: ['claude-opus'] },
     { model: 'fable', ids: ['claude-fable'] },
   ],
+  // Ядро само поднимает шаг не выше Opus (F1, D7): Fable — только явный выбор человека.
+  autoCeiling: 'opus',
   // Окно и сроки локальной модели — окружением прогона (бинарь 2.1.286, разбор 13.10 и L4b):
   // без них Claude Code считает окно облачным и рвёт законный разбор длинного промпта.
   // Порядок — порядок записи в `localRunEnv`.

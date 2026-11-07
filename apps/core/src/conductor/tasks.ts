@@ -23,6 +23,10 @@ export interface TaskSummary {
   title: string | null;
   /** Задача требует человека: журнал не открылся или сверка упала при загрузке (ревью F-49). */
   attention: string | null;
+  /** Этап 11 (W3-18): группа задачи из `task.created` — в каждой строке списка, без второго чтения. */
+  groupId?: string;
+  /** Этап 11 (W3-18): родитель дочерней задачи XL (`task.created.parentTaskId`). */
+  parentTaskId?: string;
 }
 
 export interface TaskRegistry {
@@ -75,6 +79,8 @@ function summary(
     ended: state.ended,
     title: state.created?.title ?? null,
     attention,
+    ...(state.created?.groupId ? { groupId: state.created.groupId } : {}),
+    ...(state.created?.parentTaskId ? { parentTaskId: state.created.parentTaskId } : {}),
   };
 }
 

@@ -10,6 +10,7 @@ import { ChatSection } from '@pages/Chat/ChatSection/ChatSection';
 import { i18n, loadHelp, toLanguage } from '@shared/config/i18n';
 import { gated } from './gated';
 import { validateSearch } from './validateSearch';
+import { redirectCoreChat } from './coreChatRedirect';
 import { NotFoundPage } from './NotFoundPage/NotFoundPage';
 import { RouteErrorPage } from './RouteErrorPage/RouteErrorPage';
 import { RoutePending } from './RoutePending/RoutePending';
@@ -63,10 +64,6 @@ const CoreLaunchPage = lazyRouteComponent(
 const CoreScenariosPage = lazyRouteComponent(
   () => import('@pages/CoreScenarios/CoreScenariosPage/CoreScenariosPage'),
   'CoreScenariosPage',
-);
-const CoreChatPage = lazyRouteComponent(
-  () => import('@pages/CoreChat/CoreChatPage/CoreChatPage'),
-  'CoreChatPage',
 );
 const AnalyticsPage = lazyRouteComponent(
   () => import('@pages/Analytics/AnalyticsPage/AnalyticsPage'),
@@ -148,8 +145,8 @@ const routes = [
   { path: '/core', component: CoreTasksPage },
   { path: '/core/launch', component: CoreLaunchPage },
   { path: '/core/scenarios', component: CoreScenariosPage },
-  // Чат через ядро держит свои прокрутки (лента сеанса), как и прежний чат.
-  { path: '/core/chat', component: CoreChatPage, staticData: FILL },
+  // Чат через ядро свёрнут в `/chat` (W3-17a): старый адрес только переводит туда.
+  { path: '/core/chat', beforeLoad: redirectCoreChat },
   // Словарь справки — отдельный чанк; лоадер дотягивает его до первого
   // рендера, поэтому страница ни разу не видит «help.…» вместо текста.
   { path: '/help', component: HelpPage, loader: () => loadHelp(toLanguage(i18n.language)) },

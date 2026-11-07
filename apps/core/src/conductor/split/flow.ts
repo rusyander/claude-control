@@ -1,11 +1,17 @@
-import type { StepDoneCall } from '@agentdeck/contracts/core/model-tools';
+import type { PlanPieceExt, StepDoneCall } from '@agentdeck/contracts/core/model-tools';
 import type { StepDef } from '@agentdeck/contracts/core/scenario';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { SplitEnv } from '../estimate/estimate.types.ts';
 import type { SplitDeliverable } from '../split-check/index.ts';
 import { linesOf, reviewTargetsOf } from './journal-view.ts';
 import { afterAccept, proposedOfClaim, proposeSplit, repoKeyFor } from './split.ts';
-import type { AfterAccept, ProposalSource, ProposedUnit, SplitOutcome } from './split.types.ts';
+import type {
+  AfterAccept,
+  ProposalSource,
+  ProposedUnit,
+  SplitFlowInput,
+  SplitOutcome,
+} from './split.types.ts';
 
 /**
  * Где оценка кончается и предлагается деление (G6): после шага плана или деления; в сценарии без
@@ -76,13 +82,71 @@ export async function runSplitPoint(
       estimate: { minutes: null, tokens: null },
     }));
   } else units = soloOf(task);
+  // Договор плана ведущего судит только куски, которые план заявил сам (соло без заявления — нет).
+  const plan =
+    by === 'plan' && claim?.units && claim.units.length > 0 && isLedTask(task)
+      ? await planOf(task, claim.units, repos, env)
+      : undefined;
   const outcome = proposeSplit(
     task,
     units,
     { by, stepId: step.stepId },
-    { deliverable, ...(knownFiles ? { knownFiles } : {}) },
+    { deliverable, ...(knownFiles ? { knownFiles } : {}), ...(plan ? { plan } : {}) },
     env,
   );
   if (outcome.decision.verdict !== 'accepted') return { outcome, after: null };
   return { outcome, after: await afterAccept(task, outcome, env) };
+}
+
+/**
+ * Задача ведущего (этап 11) — одно правило на деление и крючки ведущего (`conductor-wiring/lead.ts`):
+ * профиль ведения в `task.created.lead` или сценарий ведущего — `lead`, `tracker-ticket` со второй
+ * версии (первая заморожена без ведения). Сценарий — текущий `scenario.ref`: свёртка ставит его
+ * из `task.created` (оценка видит названный при создании), смена сценария его двигает.
+ */
+export function isLedTask(task: LiveTask | undefined): task is LiveTask {
+  if (!task) return false;
+  if (task.state.created?.lead) return true;
+  const ref = task.state.scenario?.ref;
+  return ref?.id === 'lead' || (ref?.id === 'tracker-ticket' && ref.version >= 2);
+}
+
+const PIECE_KEYS = ['check', 'role', 'acRefs', 'inputs', 'spec'] as const;
+
+/** Поля куска плана сверх единицы — по имени куска; пустые не переносятся. */
+function piecesOf(units: NonNullable<StepDoneCall['units']>): Record<string, PlanPieceExt> {
+  const out: Record<string, PlanPieceExt> = {};
+  for (const u of units) {
+    const ext: Record<string, unknown> = {};
+    for (const k of PIECE_KEYS) if (u[k] !== undefined) ext[k] = u[k];
+    out[u.name] = ext as PlanPieceExt;
+  }
+  return out;
+}
+
+/**
+ * Договор плана: открытые требования свёртки (`open`/`unknown`) и реестр проверок каждого
+ * репозитория задачи. Реестр не прочитан или порта нет — проверка куска не решается (отказ).
+ */
+async function planOf(
+  task: LiveTask,
+  claimed: NonNullable<StepDoneCall['units']>,
+  repos: NonNullable<LiveTask['state']['created']>['repos'],
+  env: SplitEnv,
+): Promise<NonNullable<SplitFlowInput['plan']>> {
+  const registry = new Map<string, ReadonlySet<string>>();
+  for (const r of repos) {
+    const ids = env.checksOf ? await env.checksOf({ repoKey: r.repoKey, path: r.path }) : null;
+    if (ids) registry.set(r.repoKey, new Set(ids));
+  }
+  const openRequirements = Object.entries(task.state.requirements)
+    .filter(([, req]) => req.verdict === 'open' || req.verdict === 'unknown')
+    .map(([id]) => id);
+  return {
+    contract: {
+      resolvesCheck: (repoKey, checkId) => registry.get(repoKey)?.has(checkId) ?? false,
+      openRequirements,
+    },
+    pieces: piecesOf(claimed),
+  };
 }

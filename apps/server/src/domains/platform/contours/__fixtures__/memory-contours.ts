@@ -1,11 +1,11 @@
 import type {
+  PlatformExhaustedScope,
   PlatformGatewayEvent,
   PlatformSpendRecord,
   PlatformUsageRecord,
 } from '@agentdeck/contracts';
 import type {
   CoreContourLinkReply,
-  CoreContourRecordBody,
   HopBudgetNotice,
   HopContours,
   HopUserGatewayState,
@@ -13,19 +13,42 @@ import type {
 import { ContourLinkError } from '../contours.ts';
 import type { CoreContours } from '../contours.types.ts';
 
+/** Расход одного ответа контура — форма `SpendDelta` книги контуров звена. */
+export interface MemoryContourUsage {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+/**
+ * Одна запись фикстуры — то, что книга контуров звена кладёт себе с одного запроса CLI через
+ * шлюз ядра: след, расход, отказ по бюджету, сжатие истории. Снаружи в учёт звена записать
+ * нельзя (запись идёт только трафиком звена) — это форма самой фикстуры, не протокола.
+ */
+export interface MemoryContourRecord {
+  platformId: string;
+  event?: PlatformGatewayEvent;
+  usage?: MemoryContourUsage;
+  exhausted?: { at: string; scope?: PlatformExhaustedScope; level?: string };
+  summarized?: { at: string; path: string; messageId?: string; runTag?: string };
+}
+
 /**
  * Учёт контуров без ядра — для тестов панели. Дней и денег он не считает (это дело звена ядра,
  * C3b, и его тестов). `record` — то, что звено записало бы, пропустив запрос CLI через шлюз
- * человека (`contour-record` хоста звеньев): тест кладёт запись сам, а живую часть (`live`)
+ * ядра: тест кладёт запись сам, а живую часть (`live`)
  * фикстура складывает из записей теми же правилами, что звено (`contour-book.ts`: след новыми
  * сверху, не больше 50; отказ — статус ≥ 400; счётчик расхода по контуру считает и пустой ответ).
  * Шлюз человека (`setUserGateway`) и адрес звена (`setLink`) задаёт тест; не задан — ядро молчит.
  */
 export interface MemoryContours extends CoreContours {
   /** Записать запрос в учёт, как это сделало бы звено ядра. */
-  record(message: CoreContourRecordBody): void;
+  record(message: MemoryContourRecord): void;
   /** Записи в порядке `record`. */
-  sent: CoreContourRecordBody[];
+  sent: MemoryContourRecord[];
   /** Состояние шлюза человека у ядра (`null` — ядро не ответило). */
   setUserGateway(state: HopUserGatewayState | null): void;
   /** Ответ `link`/`linkRoute`; не задан — 503, как без ядра. */
@@ -35,7 +58,7 @@ export interface MemoryContours extends CoreContours {
   /** Сколько раз попросили ядро применить контур (`apply`). */
   applies: number;
   /** Записи одного контура с расходом (`usage`) — то, что раньше ложилось днём в state.json. */
-  usageOf(platformId: string): NonNullable<CoreContourRecordBody['usage']>[];
+  usageOf(platformId: string): MemoryContourUsage[];
   /** Заменить живую часть целиком (`undefined` — снова складывать из записей). */
   setLive(live: HopContours | undefined): void;
   setRecords(records: Record<string, PlatformSpendRecord>): void;
@@ -46,7 +69,7 @@ export interface MemoryContours extends CoreContours {
 
 const EVENTS_KEPT = 50;
 
-function liveOf(sent: CoreContourRecordBody[]): HopContours {
+function liveOf(sent: MemoryContourRecord[]): HopContours {
   const events: PlatformGatewayEvent[] = [];
   const usage = new Map<string, PlatformUsageRecord>();
   let failures = 0;
@@ -103,7 +126,7 @@ export function memoryContours(): MemoryContours {
   let live: HopContours | undefined;
   let records: Record<string, PlatformSpendRecord> = {};
   let notices: HopBudgetNotice[] = [];
-  const sent: CoreContourRecordBody[] = [];
+  const sent: MemoryContourRecord[] = [];
   const cleared: string[] = [];
   const linked = (): Promise<CoreContourLinkReply> =>
     link ? Promise.resolve(link) : Promise.reject(new ContourLinkError(503, 'Ядро не найдено'));

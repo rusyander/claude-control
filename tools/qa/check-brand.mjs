@@ -30,7 +30,22 @@ const OLD = /cl[a]ude[-_ ]?c[o]ntrol/giu;
  */
 const OLD_PLATFORM = /g[oa]rg[oa]n|г[оа]рг[оа]н/giu;
 
+/**
+ * Прежнее имя шлюза ядра: «шлюз» + «панели» в любом падеже и числе и его
+ * английский вариант. Буквы-классы — чтобы исходник сторожа не находил сам себя.
+ */
+const OLD_GATEWAY =
+  /шл[ю]з(?:а|у|ом|е|ы|ов|ам|ами|ах)?\s+п[а]нели|p[a]nel(?:['’]s)?(?:\s+(?:local|own))?\s+g[a]teway/giu;
+
 const SKIP = [/^\.agent\//, /(^|\/)node_modules\//];
+/** Опубликованная история изменений прежнее имя шлюза хранит по праву — её не трогаем. */
+const GATEWAY_SKIP = [...SKIP, /^changelog\/entries\//];
+/**
+ * Опись кадра справки — текст того, что на картинке, под печатью (`help-shots-seal.mjs`).
+ * Правка текста рядом с прежней картинкой — ложь описи, поэтому прежнее имя шлюза там не
+ * краснеет, а печатается долгом пересъёмки: уходит, только когда кадр снят заново.
+ */
+const FRAME_INVENTORY = /^apps\/web\/public\/help\/.+\/frames\.json$/;
 
 /** Все пути git (отслеживаемые и новые неигнорируемые), кириллица без экранирования. */
 function listPaths() {
@@ -68,8 +83,30 @@ export function findOld(source, pattern = OLD) {
   return hits;
 }
 
-/** Нарушения по набору файлов { путь: текст }. */
-export function audit(files) {
+/**
+ * Вхождения, разорванные переносом строки: начало имени в конце строки, конец — в начале
+ * следующей (абзац комментария, склейка строк `' +`). Построчный поиск их не видит.
+ */
+export function findSplit(source, pattern) {
+  const lines = source.split('\n');
+  const hits = [];
+  for (let index = 0; index + 1 < lines.length; index += 1) {
+    const head = lines[index].replace(/\s*(?:['"`]\s*\+)?\s*$/u, '');
+    const tail = lines[index + 1].replace(/^\s*(?:\*|\/\/|#|\+\s*['"`]|['"`])?\s*/u, '');
+    for (const match of `${head} ${tail}`.matchAll(pattern)) {
+      if (match.index < head.length && match.index + match[0].length > head.length + 1) {
+        hits.push({ line: index + 1, text: lines[index].trim().slice(0, 160), match: match[0] });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * Нарушения по набору файлов { путь: текст }. `owed` собирает кадры справки, чья картинка
+ * ещё показывает прежнее имя шлюза, — долг пересъёмки, не нарушение.
+ */
+export function audit(files, owed = []) {
   const problems = [];
   for (const [file, source] of Object.entries(files)) {
     for (const hit of findOld(source)) {
@@ -77,6 +114,12 @@ export function audit(files) {
     }
     for (const hit of findOld(source, OLD_PLATFORM)) {
       problems.push(`${file}:${hit.line}: прежнее имя драйвера «${hit.match}» — ${hit.text}`);
+    }
+    if (GATEWAY_SKIP.some((re) => re.test(file))) continue;
+    const frame = FRAME_INVENTORY.test(file);
+    for (const hit of [...findOld(source, OLD_GATEWAY), ...findSplit(source, OLD_GATEWAY)]) {
+      if (frame) owed.push(`${file}:${hit.line}`);
+      else problems.push(`${file}:${hit.line}: прежнее имя шлюза «${hit.match}» — ${hit.text}`);
     }
   }
   return problems;
@@ -135,6 +178,53 @@ function selftest() {
       .length === 0,
     'имя, собранное из частей, — не находка',
   );
+  const gateRu = ['Шлюз', 'панели'].join(' ');
+  const gateEn = ['panel', 'gateway'].join(' ');
+  expect(
+    audit({ 'apps/web/src/x.ts': `// ${gateRu} и ${gateEn}\n` }).length === 2,
+    'прежнее имя шлюза — находка',
+  );
+  const pane = ['пан', 'ели'].join('');
+  const gate = ['gate', 'way'].join('');
+  const forms = ['шлюза', 'шлюзу', 'шлюзом', 'шлюзе', 'ШЛЮЗ', 'шлюзы'].map(
+    (head) => `${head} ${head === 'ШЛЮЗ' ? pane.toUpperCase() : pane}`,
+  );
+  const english = [
+    `panel's ${gate}`,
+    `panel’s ${gate}`,
+    `panel’s local ${gate}`,
+    `panel’s OWN ${gate}`,
+  ];
+  expect(
+    audit({ 'docs/x.md': [...forms, ...english].join('\n') }).length === 10,
+    'все падежи и английские формы прежнего имени — находки',
+  );
+  expect(
+    audit({
+      'apps/core/src/x.ts': ` * Запрос идёт через шлюз\n * ${pane} к контуру.\n`,
+      'apps/web/src/y.ts': `  'through the panel’s ' +\n  '${gate} and on',\n`,
+    }).length === 2,
+    'имя, разорванное переносом строки, — находка',
+  );
+  expect(
+    audit({ 'docs/x.md': `шлюз ядра; прежний шлюз в ${pane}; ${pane} и шлюз; core ${gate}\n` })
+      .length === 0,
+    'новое имя и история «шлюз в панели» — не находки',
+  );
+  expect(
+    audit({ 'changelog/entries/2026-01-01-x.json': `"${gateRu}"` }).length === 0,
+    'то же имя в changelog/entries — пропуск',
+  );
+  const owed = [];
+  const frameProblems = audit({ 'apps/web/public/help/x/y/frames.json': `"${gateRu}"` }, owed);
+  expect(
+    frameProblems.length === 0 && owed.length === 1,
+    'то же имя в описи кадра справки — долг пересъёмки, не находка',
+  );
+  expect(
+    audit({ 'apps/web/public/help/x/y/captions.json': `"${gateRu}"` }).length === 1,
+    'тот же текст в другом файле справки — находка',
+  );
   console.log(failed ? `\n✕ самопроверка провалена: ${failed}` : '\n✓ сторож умеет краснеть');
   return failed;
 }
@@ -148,9 +238,15 @@ for (const file of paths) {
   if (!statSync(full).isFile()) continue;
   contents[file] = readFileSync(full, 'utf8');
 }
-const problems = [...audit(contents), ...auditPaths(paths)];
+const owed = [];
+const problems = [...audit(contents, owed), ...auditPaths(paths)];
 
 console.log(`просмотрено файлов: ${Object.keys(contents).length}`);
+if (owed.length) {
+  console.log(
+    `кадры справки с прежним именем шлюза на картинке (долг пересъёмки, не краснеет): ${owed.length} — ${owed.join(', ')}`,
+  );
+}
 if (problems.length) {
   console.log(`\n✕ прежнее имя (${problems.length}):\n${problems.map((p) => `  ${p}`).join('\n')}`);
   console.log(

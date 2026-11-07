@@ -265,6 +265,94 @@
         "height": 559
       }
     },
+    "launch/09-lead": {
+      "light-ru": {
+        "file": "09-lead.png",
+        "width": 988,
+        "height": 755
+      },
+      "light-en": {
+        "file": "09-lead.en.png",
+        "width": 988,
+        "height": 755
+      },
+      "dark-ru": {
+        "file": "09-lead.dark.png",
+        "width": 988,
+        "height": 755
+      },
+      "dark-en": {
+        "file": "09-lead.dark.en.png",
+        "width": 988,
+        "height": 755
+      }
+    },
+    "launch/10-items": {
+      "light-ru": {
+        "file": "10-items.png",
+        "width": 954,
+        "height": 753
+      },
+      "light-en": {
+        "file": "10-items.en.png",
+        "width": 954,
+        "height": 753
+      },
+      "dark-ru": {
+        "file": "10-items.dark.png",
+        "width": 954,
+        "height": 753
+      },
+      "dark-en": {
+        "file": "10-items.dark.en.png",
+        "width": 954,
+        "height": 753
+      }
+    },
+    "launch/11-group-estimate": {
+      "light-ru": {
+        "file": "11-group-estimate.png",
+        "width": 988,
+        "height": 633
+      },
+      "light-en": {
+        "file": "11-group-estimate.en.png",
+        "width": 988,
+        "height": 633
+      },
+      "dark-ru": {
+        "file": "11-group-estimate.dark.png",
+        "width": 988,
+        "height": 633
+      },
+      "dark-en": {
+        "file": "11-group-estimate.dark.en.png",
+        "width": 988,
+        "height": 633
+      }
+    },
+    "launch/12-group-launch": {
+      "light-ru": {
+        "file": "12-group-launch.png",
+        "width": 988,
+        "height": 326
+      },
+      "light-en": {
+        "file": "12-group-launch.en.png",
+        "width": 988,
+        "height": 326
+      },
+      "dark-ru": {
+        "file": "12-group-launch.dark.png",
+        "width": 988,
+        "height": 326
+      },
+      "dark-en": {
+        "file": "12-group-launch.dark.en.png",
+        "width": 988,
+        "height": 326
+      }
+    },
     "scenarios/01-library": {
       "light-ru": {
         "file": "01-library.png",

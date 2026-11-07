@@ -65,9 +65,21 @@ describe('журнал сжатий истории', () => {
   });
 
   it('журнал ограничен: старейший случай уходит первым', () => {
-    for (let i = 0; i <= SUMMARIZED_CAP; i += 1) {
-      noteSummarized(dir, { at: String(i), platformId: 'c', path: '/p', messageId: `m${i}` });
-    }
+    // Полный журнал — одной записью файла, а не SUMMARIZED_CAP перезаписями: 501 полная
+    // перезапись растущего файла упиралась в 20 с под нагрузкой Linux-контейнера (07.11).
+    const full = Array.from({ length: SUMMARIZED_CAP }, (_, i) => ({
+      at: String(i),
+      platformId: 'c',
+      path: '/p',
+      messageId: `m${i}`,
+    }));
+    writeFileSync(join(dir, 'platform-summarized.json'), JSON.stringify(full));
+    noteSummarized(dir, {
+      at: String(SUMMARIZED_CAP),
+      platformId: 'c',
+      path: '/p',
+      messageId: `m${SUMMARIZED_CAP}`,
+    });
     resetSummarizedCache();
     const ids = summarizedMessageIds(dir);
     expect(ids.size).toBe(SUMMARIZED_CAP);

@@ -2,9 +2,10 @@
  * Контур у чата чужого CLI (X7): НАСТОЯЩИЕ Goose и OpenCode задачей ядра `chat@1` →
  * шлюз контура ядра → стаб-контур.
  *
- * Чат чужого CLI — задача ядра (этап 10, F2c): сервер заводит её тем же стартером, что
- * продолжение и перенос (`startCoreForeignChat`), а галочка `foreign:<cli>` активного контура —
- * разрешённый набор задачи (`coreContourRoutes` → `set-route` до запуска). Обещание человеку —
+ * Чат чужого CLI — ход реестра чата, как у Claude (этап 11, W3-17a): сборка сервера `wireChat` →
+ * `CoreChatRun` → задача ядра (`panel-chat-turn.mjs`); тем же путём идут продолжение и перенос.
+ * CLI разговора — активный провайдер, галочка этого CLI (`foreign:<cli>`) активного контура —
+ * разрешённый набор задачи (`chatContourRoutes(store, cli)` → `set-route` до `set-cli`). Обещание человеку —
  * «с галочкой ни один запрос не уходит провайдером из твоего конфига», и проверить его можно
  * только настоящим CLI: таблицы решают маршрут, но не знают, послушается ли его сам CLI.
  *
@@ -207,10 +208,9 @@ async function main() {
   const { reapCoreSessions } = await import('./throwaway-stand.mjs');
   const { writePlatform, writeToken } =
     await import('../../apps/server/src/domains/platform/store/store.ts');
-  const { coreContourRoutes } =
+  const { chatContourRoutes } =
     await import('../../apps/server/src/domains/platform/routing/core-contour.ts');
-  const { startCoreForeignChat, withRoutes } =
-    await import('../../apps/server/src/domains/chat/core-foreign/core-foreign-start.ts');
+  const { panelChatRuns, startPanelChat } = await import('./panel-chat-turn.mjs');
   const { bootCore } = await import('../../apps/core/src/bootstrap/boot.ts');
   const { createCoreCaller } = await import('../../apps/server/src/domains/core-ask/core-ask.ts');
   const { createCoreChatPort } =
@@ -275,6 +275,7 @@ async function main() {
     await gateway.start({ appDataDir: appData });
     core = await bootCore({ home: gateway.home(), build: 'x7-live-qa', panelAppData: appData });
     const port = createCoreChatPort(createCoreCaller(() => gateway.home()));
+    const chatRuns = await panelChatRuns({ appData, store, coreHome: gateway.home() });
 
     /** Лента сеанса задачи: текст ответов и ошибки, пока сеанс не кончился или не вышел срок. */
     const sessionText = async (taskId, deadline) => {
@@ -321,7 +322,7 @@ async function main() {
       }
     };
 
-    /** Один ход чата CLI задачей ядра, как его заводит сервер (`startCoreForeignChat`). */
+    /** Один ход чата CLI так, как его заводит панель: реестр чата → задача ядра. */
     const turn = async (id, consumers, label, mode = 'required') => {
       writePlatform(store, { ...platform, consumers, mode });
       // Ядро пересобирает маршруты по наблюдателю за state.json; здесь — тем же путём, сразу.
@@ -348,23 +349,21 @@ async function main() {
       }
       const before = { stub: stub.calls.length, human: human.calls.length };
       const eventsBefore = (await gateway.events()).length;
-      const routes = coreContourRoutes(store, `foreign:${id}`, id);
+      // Набор, который сборка чата спросит для этого CLI (`chat-wiring.ts` `routes`).
+      const routes = chatContourRoutes(store, id);
       // Ядро не ответило — провал строки с причиной, а не обрыв проверки посреди CLI.
-      const started = await startCoreForeignChat(port, {
+      const started = await startPanelChat(chatRuns, {
+        appData,
+        store,
         cli: id,
         cwd: work,
         prompt: 'скажи готов',
-        title: `x7 ${id} ${label}`,
-        ...withRoutes(routes),
       }).catch((error) => ({ ok: false, code: 'core-unreachable', message: String(error) }));
       const seen = started.ok
         ? await sessionText(started.taskId, Date.now() + TURN_MS)
         : { view: null, texts: [], ended: true };
-      if (started.ok) {
-        await port
-          .command(started.taskId, 'cancel', { reason: 'x7 live check done' })
-          .catch(() => undefined);
-      }
+      // «Остановить» человека: прогон снимает задачу ядра (`CoreChatRun.stop` → `cancel`).
+      if (started.ok) chatRuns.stop(started.key);
       if (started.ok && (!seen.ended || !seen.texts.length)) {
         // Почему нет ответа: хвост журнала задачи ядра — сеанс, маршрут, отказ.
         console.log(`  (${id}/${label}: ответа нет; хвост журнала задачи)`);
@@ -386,7 +385,7 @@ async function main() {
       console.log(`\n── ${id} ──`);
       configs.write();
 
-      console.log('1. Галочка стоит: задача ядра через контур');
+      console.log(`1. Галочка foreign:${id} стоит: задача ядра через контур`);
       const on = await turn(id, [`foreign:${id}`], 'on');
       check(
         on.routes?.[0]?.route.id === `gateway:${CONTOUR}`,
@@ -475,7 +474,7 @@ async function main() {
         paths.goose,
         `${configs.goose}GOOSE_LEAD_PROVIDER: openai\nGOOSE_LEAD_MODEL: human-model\n`,
       );
-      const bypass = await turn('goose', ['foreign:goose'], 'bypass');
+      const bypass = await turn('goose', ['chat'], 'bypass');
       check(
         bypass.reply.includes('готов') && bypass.ups.length > 0,
         `goose: с GOOSE_LEAD_PROVIDER в конфиге человека прогон всё равно в контуре (${bypass.ups.length})`,
@@ -493,7 +492,7 @@ async function main() {
         '\n3. Gemini: `.env` облака человека над рабочим каталогом — сеанс ядра его не берёт',
       );
       put(paths.workEnv, configs.geminiEnv);
-      const bypass = await turn('gemini', ['foreign:gemini'], 'bypass');
+      const bypass = await turn('gemini', ['chat'], 'bypass');
       rmSync(paths.workEnv, { force: true });
       check(
         bypass.reply.includes('готов') && bypass.ups.length > 0,

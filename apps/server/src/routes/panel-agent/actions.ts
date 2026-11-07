@@ -41,6 +41,7 @@ import { GAPS_PROJECT_ACTIONS } from './actions-gaps-projects/actions-gaps-proje
 import { GAPS_TESTS_ACTIONS } from './actions-gaps-tests/actions-gaps-tests.ts';
 import { LOCAL_MODELS_ACTIONS } from './actions-local-models/actions-local-models.ts';
 import { KIT_ACTIONS } from './actions-kit/actions-kit.ts';
+import { CORE_ACTIONS } from './actions-core/actions-core.ts';
 import { dataField, summaryText, textField } from './texts/texts.ts';
 import { PANEL_E2E_DIR } from '../../domains/project-tests/e2e-scaffold.ts';
 import type { ProjectTestE2eFolder } from '@agentdeck/contracts';
@@ -253,6 +254,7 @@ export const PANEL_ACTIONS: readonly AnyPanelAction[] = [
   ...PANEL_READ_ACTIONS,
   ...LOCAL_MODELS_ACTIONS,
   ...KIT_ACTIONS,
+  ...CORE_ACTIONS,
   ...TESTS_BLOCK_ACTIONS,
   ...ENTITY_EXTRA_ACTIONS,
   ...SETTINGS_EXTRA_ACTIONS,

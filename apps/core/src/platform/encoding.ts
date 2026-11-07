@@ -79,6 +79,14 @@ export function gitBaseArgs(os: OsKind = currentOs()): string[] {
  */
 export const WIRE_CRLF = '\r\n';
 
+/**
+ * Строки текста при любых концах — CRLF, одиночный CR, LF (текст из трекера, файла, буфера Windows).
+ * Без регулярного выражения: этим пользуются модули решения (P32), а литерал CRLF живёт здесь (P51).
+ */
+export function textLines(text: string): string[] {
+  return text.replaceAll('\r\n', '\n').replaceAll('\r', '\n').split('\n');
+}
+
 /** Перевод строки, которым уже написан текст: правка файла пользователя не меняет его концы строк. */
 export function eolOf(text: string): '\r\n' | '\n' {
   return text.includes('\r\n') ? '\r\n' : '\n';

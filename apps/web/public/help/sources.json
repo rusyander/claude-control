@@ -4,7 +4,7 @@
     {
       "topic": "platform",
       "document": "apps/web/src/pages/Help/topics/PlatformTopic/PlatformTopic.tsx",
-      "confirmedAt": "2026-11-03T13:18:37.477Z",
+      "confirmedAt": "2026-11-07T13:15:04.289Z",
       "sources": [
         {
           "path": "packages/contracts/src/compromises.ts",
@@ -34,7 +34,7 @@
         {
           "path": "apps/core/src/hop-host/gateway/handler.ts",
           "why": "«Путь одного запроса»: что шлюз ядра делает с запросом между CLI и контуром",
-          "sha": "6cb81704287226a9"
+          "sha": "417d2a51482389f9"
         },
         {
           "path": "apps/server/src/domains/platform/status/status.ts",
@@ -119,7 +119,7 @@
         {
           "path": "packages/contracts/src/platform-consumers.ts",
           "why": "«Где работает контур»: список потребителей, их умолчание и допустимая форма",
-          "sha": "892fb79858b2967e"
+          "sha": "b79d8b88e27f6581"
         },
         {
           "path": "apps/server/src/domains/platform/rules-matrix/rules-matrix.ts",
@@ -384,7 +384,7 @@
         {
           "path": "apps/server/src/domains/platform/routing/core-contour.ts",
           "why": "«Доступ разделов» и цена режима «обязательно»: задачи ядра (агент тестов, чаты чужих CLI) идут через контур и со снятой галочкой; галочки решают только «по возможности»",
-          "sha": "1598953c41c1f29e"
+          "sha": "cb5affa2db14e530"
         },
         {
           "path": "apps/core/src/hop-host/gateway/tool-shim/protocol.ts",
@@ -505,7 +505,7 @@
         {
           "path": "apps/server/src/domains/chat/core-run/core-run.ts",
           "why": "«Путь одного сообщения»: ход чата задачей ядра — сообщение шагу или оценка chat, set-cli, запуск; отказы по имени; вопрос права карточкой, ответ ядру шлёт окно",
-          "sha": "94035edd5aea06b7"
+          "sha": "80bacd0370e20136"
         },
         {
           "path": "apps/web/src/pages/Chat/lib/corePermit.ts",
@@ -535,7 +535,7 @@
         {
           "path": "apps/server/src/domains/chat/ChatHandoff/ChatHandoff.ts",
           "why": "«Чистая сессия»: предложение прозой или блоком, потолок цепочки, зацикливание",
-          "sha": "d291bc1ff17b31ef"
+          "sha": "0cbb5a79af797abc"
         },
         {
           "path": "apps/server/src/domains/chat/tree-pause/tree-pause.ts",
@@ -591,11 +591,6 @@
           "path": "apps/server/src/domains/chat/sieve-store/sieve-store.ts",
           "why": "«Сита перед MR»: выученное сито приходит предложенным, принять и сделать общим может только человек",
           "sha": "8d575049f9acedf7"
-        },
-        {
-          "path": "apps/server/src/domains/chat/core-foreign/core-foreign-start.ts",
-          "why": "«Правки в чате другого CLI»: чат чужого CLI — задача ядра chat@1 на месте с грантом правки на корень; CLI без переходника — отказ ядра с кодом, без отката",
-          "sha": "10a20e0bc094349c"
         },
         {
           "path": "apps/web/src/features/CoreAsk/model/askCommands.ts",
@@ -698,34 +693,19 @@
           "sha": "6a19b98d36b0e3a7"
         },
         {
-          "path": "apps/server/src/routes/chat/subagent-routes/subagent-routes.ts",
-          "why": "«Смотреть план агента»: ход субагента справа; отдельной остановки субагента нет — только весь ход",
-          "sha": "95016839ac1f7ff4"
-        },
-        {
           "path": "apps/web/src/features/ChatProgress/ui/AgentTree/treeKeys.ts",
           "why": "«Смотреть план агента»: какие клавиши ходят по дереву субагентов и что делают",
-          "sha": "94c00ae055da0f95"
+          "sha": "b0de67a573de28be"
         },
         {
           "path": "apps/web/src/features/ChatMessages/ui/GroupAgents/GroupAgents.tsx",
           "why": "«Смотреть план агента»: счёт агентов группы и ярлыки, открывающие ход",
-          "sha": "596c4d44c8a9835d"
-        },
-        {
-          "path": "apps/server/src/domains/chat/subagent-tree/extension-trail.ts",
-          "why": "«Смотреть план агента»: какие скиллы, MCP и хуки попадают в значки и окно, итог и длительность каждого",
-          "sha": "e2107b930bad1652"
-        },
-        {
-          "path": "apps/web/src/entities/AgentTree/model/extensions.ts",
-          "why": "«Смотреть план агента»: какие значки видны у агента, «хуки N», «отказ N», порядок окна",
-          "sha": "fb7468ffcfaade55"
+          "sha": "42b82976bc27c79b"
         },
         {
           "path": "apps/web/src/features/ChatProgress/model/summarizeProgress.ts",
           "why": "«Смотреть план агента»: когда появляется полоса — скилл или MCP главного агента да, одни хуки нет",
-          "sha": "e79c1685481741a7"
+          "sha": "73a4fd97365aaaf6"
         },
         {
           "path": "apps/web/src/pages/Chat/lib/forkDraft.ts",
@@ -736,36 +716,6 @@
           "path": "apps/server/src/lib/app-store/chat-forks.ts",
           "why": "подпись «ветка от …» в списке: от какого разговора ответвлена ветка",
           "sha": "2f6894291ae7ecdb"
-        },
-        {
-          "path": "apps/server/src/domains/chat/agent-history/agent-history.ts",
-          "why": "«История агентов»: сессии новыми первыми, главный агент целиком, правило «сейчас работают» и порог 15 минут",
-          "sha": "0c42fbdaacff2719"
-        },
-        {
-          "path": "apps/server/src/domains/chat/subagent-tree/agent-anomalies.ts",
-          "why": "странности агента: отказы хуков, ошибки, повторные чтения, результаты длиннее 10 000 символов",
-          "sha": "5b153cb699420e95"
-        },
-        {
-          "path": "apps/web/src/entities/AgentTree/ui/AgentTranscript/AgentTranscript.tsx",
-          "why": "ход агента окнами по 200 шагов: «Показать раньше», «Позже», «К последним», «Шаги a–b из M»",
-          "sha": "154899a56f4ba127"
-        },
-        {
-          "path": "apps/web/src/entities/AgentTree/model/agentHistory.ts",
-          "why": "строка «сейчас: N агентов · M субагентов» / «никто не работает», строка странностей",
-          "sha": "1b934539c17ab05f"
-        },
-        {
-          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentHistoryNow.tsx",
-          "why": "блок «Сейчас» окна истории: главный работает/не работает и чем занят, работающие субагенты или «Субагентов сейчас нет»",
-          "sha": "7cb685148b8b6f3a"
-        },
-        {
-          "path": "apps/web/src/entities/AgentTree/ui/AgentTranscript/AgentStepRow.tsx",
-          "why": "шаг хода: «ошибка», «отказ хука», «прервано» у вызова, оборванного паузой",
-          "sha": "228a614e4662b7a5"
         },
         {
           "path": "apps/web/src/features/ChatMessages/lib/turnTrail.ts",
@@ -783,24 +733,14 @@
           "sha": "1e42d11cbc4afd0c"
         },
         {
-          "path": "apps/web/src/features/CoreChat/model/chatStart.ts",
-          "why": "«Чат других CLI»: новый разговор с другим CLI — чат ядра, порядок estimate → set-cli → launch",
-          "sha": "f9b959abc4a603c8"
-        },
-        {
           "path": "apps/server/src/routes/provider-chat-routes/provider-chat-routes.ts",
           "why": "«Чат других CLI»: старые разговоры только читаются, отправка — отказ provider-chat-core",
           "sha": "69f342acc8a26a81"
         },
         {
-          "path": "apps/web/src/pages/ProviderChat/ProviderChatPage/ProviderChatPage.tsx",
-          "why": "«Чат других CLI»: история только для чтения и «Продолжить в чате ядра»",
-          "sha": "4bad247d985bea6e"
-        },
-        {
           "path": "apps/core/src/policy/human-point/human-point.ts",
           "why": "«Что задача решает сама»: закрытый список действий, которые ждут человека, своя доставка без человека, остальное — развилка в отчёт",
-          "sha": "e31db181d54f6b0d"
+          "sha": "0e4b6331e5875977"
         },
         {
           "path": "apps/core/src/bootstrap/session-road/economy.ts",
@@ -810,15 +750,75 @@
         {
           "path": "packages/contracts/src/core/config.ts",
           "why": "«Экономия шагов»: умолчания рычагов (CORE_ECONOMY_DEFAULTS) и границы раздела economy",
-          "sha": "fae084896cf285be"
+          "sha": "f4030f594c8517a3"
         },
         {
           "path": "apps/core/src/observer/catalog.ts",
           "why": "«Наблюдатель»: каталог сигналов — серьёзность, действие «стоп», человека сигнал не зовёт",
-          "sha": "552afef76c47f2bc"
+          "sha": "a60afcbbb7bb74b4"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/model/coreAgents.ts",
+          "why": "«Смотреть план агента» и «Агенты»: дерево узлов всех задач чата по журналу ядра, расход «неизвестно» вместо нуля, число «фоном: N»",
+          "sha": "eb76433c94817dd5"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentNodePane/AgentNodePane.tsx",
+          "why": "«Смотреть план агента»: субагент справа только для чтения, Escape закрывает и возвращает к узлу; своей остановки у субагента нет",
+          "sha": "34c0beab094a4de4"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentHistoryModal.tsx",
+          "why": "«Откройте всех агентов чата»: окно «Агенты» — дерево слева, узел справа, «Выгрузить» одним файлом jsonl",
+          "sha": "914571d5f1ec0de3"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentNodeList.tsx",
+          "why": "«Откройте всех агентов чата»: сеансы, субагенты и фоновые работы деревом, состояние словом, модель и время",
+          "sha": "a801ddb4091be3f0"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentNodeDetailView.tsx",
+          "why": "«Откройте всех агентов чата»: модель и усилие, задание, расход, вызовы, файлы, «Отказы права», «Подъёмы модели» с причиной",
+          "sha": "a496ca1eb70886a7"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/BgItemDetail.tsx",
+          "why": "«Разберитесь с фоновой работой»: команда, хвост вывода, чья она и чем кончилась — «идёт», «висит», «осиротел»",
+          "sha": "cca41bf504719347"
+        },
+        {
+          "path": "apps/web/src/entities/AgentTree/ui/AgentHistory/AgentFiltersBar.tsx",
+          "why": "«Откройте всех агентов чата»: фильтры состояние, модель, вид, класс задачи, группа — отбирает ядро",
+          "sha": "98152c50658bacb8"
+        },
+        {
+          "path": "apps/web/src/pages/Chat/ChatPage/useProjectParam.ts",
+          "why": "«Новый чат»: ссылка /chat?project=<папка> открывает вкладку проекта сразу",
+          "sha": "8b771f907b91f45d"
+        },
+        {
+          "path": "apps/web/src/pages/Chat/ChatPage/coreRefusal.ts",
+          "why": "«Новый чат» и «Правки в чате другого CLI»: отказ ядра запуску — строка в ленте с кодом, без тихого отката",
+          "sha": "ffb7df3c3c7ae062"
+        },
+        {
+          "path": "apps/server/src/domains/chat/core-run/core-chat-book.ts",
+          "why": "«Один чат для всех CLI»: разговор → задача ядра; после перезапуска панели ход идёт живому шагу, а не новой задаче",
+          "sha": "c4fa17695ac39fe5"
+        },
+        {
+          "path": "apps/server/src/domains/chat/core-run/core-chat-history.ts",
+          "why": "«Один чат для всех CLI»: лента и список разговоров другого CLI — из видов сеансов ядра, не из транскрипта CLI",
+          "sha": "cd47972de2dd55a5"
+        },
+        {
+          "path": "apps/server/src/domains/chat/core-foreign/foreign-carry.ts",
+          "why": "«Правки в чате другого CLI»: сеанс другого CLI получает строку о «Тестах» и набор панели для этого CLI",
+          "sha": "4fd25b51cdaccef3"
         }
       ],
-      "confirmedAt": "2026-11-04T12:11:54.707Z"
+      "confirmedAt": "2026-11-07T13:15:04.437Z"
     },
     {
       "topic": "tests",
@@ -1959,7 +1959,7 @@
     {
       "topic": "providers",
       "document": "apps/web/src/pages/Help/topics/ProvidersTopic/ProvidersTopic.tsx",
-      "confirmedAt": "2026-11-03T12:21:35.897Z",
+      "confirmedAt": "2026-11-07T09:21:52.028Z",
       "sources": [
         {
           "path": "apps/server/src/providers/registry.ts",
@@ -1989,12 +1989,12 @@
         {
           "path": "apps/core/src/adapters/gemini/gemini.ts",
           "why": "«Чат и помощник»: Gemini CLI продолжает разговор (caps.resume, session/load ACP)",
-          "sha": "d59792de7a2493a2"
+          "sha": "320e4fbd76149900"
         },
         {
           "path": "apps/core/src/adapters/opencode/opencode.ts",
           "why": "«Чат и помощник»: у OpenCode продолжения нет (caps.resume false)",
-          "sha": "6cf9d811211f5f5a"
+          "sha": "8247115ea0623e62"
         },
         {
           "path": "apps/core/src/adapters/gateless.ts",
@@ -2185,7 +2185,7 @@
     {
       "topic": "dlp",
       "document": "apps/web/src/pages/Help/topics/DlpTopic/DlpTopic.tsx",
-      "confirmedAt": "2026-11-02T15:59:47.998Z",
+      "confirmedAt": "2026-11-07T09:21:37.963Z",
       "sources": [
         {
           "path": "apps/core/src/hop-host/dlp-proxy/dlp-proxy.ts",
@@ -2195,7 +2195,7 @@
         {
           "path": "packages/dlp/src/api-shapes.ts",
           "why": "«Что разбирается»: какие тела панель понимает и что делает с незнакомым",
-          "sha": "3a92bc2023e6b27d"
+          "sha": "884a94cc3162d5ac"
         },
         {
           "path": "packages/dlp/src/rules.ts",
@@ -2273,7 +2273,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions.ts",
           "why": "«Что агент умеет»: навигация, список и добавление проекта",
-          "sha": "f9547b669002e276"
+          "sha": "b2d0ca399b5ea6c1"
         },
         {
           "path": "apps/server/src/routes/panel-agent/actions-config/actions-config.ts",
@@ -2388,7 +2388,7 @@
         {
           "path": "packages/contracts/src/panel-agent.ts",
           "why": "«Ждёт до…»: 10 минут на решение карточки",
-          "sha": "7e5c15712c771d74"
+          "sha": "3c2c99d4ad234d05"
         },
         {
           "path": "tools/mcp/panel.mjs",
@@ -2594,9 +2594,14 @@
           "path": "apps/server/src/routes/panel-agent/actions-kit/actions-kit.ts",
           "why": "«Набор панели»: элементы, расхождение с глобальным слоем и режимы CLI — только чтение",
           "sha": "1113e7ac61b649c5"
+        },
+        {
+          "path": "apps/server/src/routes/panel-agent/actions-core/actions-core.ts",
+          "why": "«Ядро задач» (только чтение): какие действия о задачах ядра, ленте, отчёте, настройках ведущего и агентах агент может попросить",
+          "sha": "7c771e51441ebc81"
         }
       ],
-      "confirmedAt": "2026-11-04T08:08:49.965Z"
+      "confirmedAt": "2026-11-07T09:21:37.751Z"
     },
     {
       "topic": "portability",
@@ -2635,15 +2640,15 @@
         {
           "path": "apps/server/src/domains/portability/carry-context/carry-context.ts",
           "why": "Перенос незакрытой работы: что именно переезжает, предохранители с причинами, обе ленты",
-          "sha": "b3dc7a3c6d7b7695"
+          "sha": "4db33d7088b5df21"
         },
         {
           "path": "apps/server/src/routes/portability-carry-routes/portability-carry-routes.ts",
           "why": "Кто попадает в список кандидатов, у кого заводится разговор и куда ложится заметка",
-          "sha": "25092feaa5da30a7"
+          "sha": "88e8c42c6b992f03"
         }
       ],
-      "confirmedAt": "2026-11-03T18:10:38.142Z"
+      "confirmedAt": "2026-11-07T09:21:45.184Z"
     },
     {
       "topic": "groups",
@@ -2698,14 +2703,24 @@
           "path": "apps/core/src/conductor/scenario/from-path.ts",
           "why": "«Окно «В ядро»» и «Язык шагов»: финальная проверка и публикация ядра, названия шагов на языке панели, текст и ворота — английская сторона",
           "sha": "60965156cffcf1f0"
+        },
+        {
+          "path": "apps/core/src/conductor/intake/group.ts",
+          "why": "«Что изменилось»: группа пунктов — по задаче на пункт, общий groupId, каждая тем же путём оценки",
+          "sha": "99b0443149ff9b71"
+        },
+        {
+          "path": "apps/web/src/features/CoreLaunch/model/groupLaunch.ts",
+          "why": "«Что изменилось»: кнопка запуска группы запускает все её задачи",
+          "sha": "d784ae11b7291963"
         }
       ],
-      "confirmedAt": "2026-11-04T14:09:09.563Z"
+      "confirmedAt": "2026-11-07T09:21:37.866Z"
     },
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-11-03T14:39:41.480Z",
+      "confirmedAt": "2026-11-07T09:21:38.189Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -2840,7 +2855,7 @@
         {
           "path": "apps/mobile/src/shared/lib/runs/lifecycle.ts",
           "why": "«Когда панель не отвечает», идущий ход и очередь: переподключение, «Связь с панелью потеряна» и повторный подхват, «Сообщение не отправлено», досылка очереди, повтор без двойной доставки",
-          "sha": "7c2ecc29f903ac5b"
+          "sha": "a7d5d0e1678ad6c0"
         },
         {
           "path": "apps/mobile/src/shared/lib/runs/stream.ts",
@@ -2892,12 +2907,12 @@
     {
       "topic": "localModels",
       "document": "apps/web/src/pages/Help/topics/LocalModelsTopic/LocalModelsTopic.tsx",
-      "confirmedAt": "2026-11-03T09:22:41.001Z",
+      "confirmedAt": "2026-11-05T18:17:29.524Z",
       "sources": [
         {
           "path": "packages/contracts/src/local-models.ts",
           "why": "«Пометки каталога»: уровни «влезает / частично / не влезет», причины «не агент» и «короткий контекст», подбор «Рекомендуем»",
-          "sha": "d5a2011f0a9fab8e"
+          "sha": "59cffafe158e9270"
         },
         {
           "path": "apps/server/src/domains/local-models/server.ts",
@@ -2966,8 +2981,13 @@
         },
         {
           "path": "apps/server/src/domains/local-models/activity.ts",
-          "why": "«Контекст — на весь сервер»: строка сервера в чате — модель, окно, отказ сервера по журналу запросов ядра до удачного ответа",
-          "sha": "0f698f4e61f7e75b"
+          "why": "«Контекст — на весь сервер»: строка сервера в чате — модель, окно, отказ сервера по журналу запросов ядра до удачного ответа; этап хода по ленте звена и предел застоя по устройству (2 мин видеокарта, 10 мин процессор)",
+          "sha": "fb5a16f0994a9c51"
+        },
+        {
+          "path": "apps/web/src/entities/LocalModels/model/localRunView.ts",
+          "why": "«Контекст — на весь сервер»: этапы строки чата (подъём, загрузка, очередь, «читает промпт N из M», ответ), «сервер молчит» после 20 с без движения, «движения нет» при застое, загрузка тишиной не считается",
+          "sha": "b38d02c231e92ecc"
         },
         {
           "path": "apps/core/src/platform/slot-cache.ts",
@@ -2997,7 +3017,7 @@
         {
           "path": "apps/server/src/domains/local-models/service.ts",
           "why": "«Туда и обратно — одной кнопкой»: включение без ожидания загрузки, выключение с остановкой сервера (toggle)",
-          "sha": "cc21a2db3a9cf34e"
+          "sha": "7b3d8cf441dfb9f3"
         },
         {
           "path": "apps/core/src/routes/local/own/window.ts",
@@ -3009,7 +3029,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-11-03T13:54:59.705Z",
+      "confirmedAt": "2026-11-07T09:21:38.059Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3029,7 +3049,7 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "cf472f70693bd723"
+          "sha": "b13347005fee7daf"
         },
         {
           "path": "apps/core/src/adapters/claude/plugin-carry.ts",
@@ -3111,7 +3131,7 @@
     {
       "topic": "core",
       "document": "apps/web/src/pages/Help/topics/CoreTopic/CoreTopic.tsx",
-      "confirmedAt": "2026-11-03T09:22:41.631Z",
+      "confirmedAt": "2026-11-07T09:21:37.632Z",
       "sources": [
         {
           "path": "apps/web/src/pages/CoreTask/CoreTaskPage/CoreTaskPage.tsx",
@@ -3121,7 +3141,7 @@
         {
           "path": "apps/web/src/features/CoreLaunch/model/launchDraft.ts",
           "why": "«Экран запуска»: поля формы, «Ждать CI» выключено по умолчанию, что уходит в оценку",
-          "sha": "442559cd97b04299"
+          "sha": "f0a5f678bb0b744e"
         },
         {
           "path": "apps/web/src/features/CoreLaunch/model/mcpPicks.ts",
@@ -3136,7 +3156,7 @@
         {
           "path": "apps/core/src/adapters/gemini/gemini.ts",
           "why": "«Серверы MCP для шагов»: Gemini CLI — серверы не доезжают (папка без доверия), потеря поимённо",
-          "sha": "d59792de7a2493a2"
+          "sha": "320e4fbd76149900"
         },
         {
           "path": "apps/core/src/adapters/cursor/cursor.ts",
@@ -3156,17 +3176,17 @@
         {
           "path": "packages/contracts/src/core/decision-view.ts",
           "why": "«Как читать «почему»»: класс решения, заголовок исхода, причины ядра дословно",
-          "sha": "d7738f349c2aa244"
+          "sha": "c9e6555bc4a57538"
         },
         {
           "path": "packages/contracts/src/core/estimate.ts",
           "why": "«Оценка» и «Проверка дорог»: время, токены, разброс, «неизвестно», дороги, отвергнутые правки, деление; «Заполните форму»: работа в копии, основная папка — только чат человека",
-          "sha": "9d3431711033f26c"
+          "sha": "d148235730ccbe0a"
         },
         {
           "path": "apps/server/src/routes/core-proxy/core-proxy-routes.ts",
           "why": "«Как страницы доходят до ядра»: прокладка /api/core/*, ключ ядра, ожидание подъёма 15 с, 503/502, звено панели для команд",
-          "sha": "4445fd501aa8a961"
+          "sha": "97dd7f7c376915e3"
         },
         {
           "path": "apps/server/src/domains/core-supervisor/core-supervisor.ts",
@@ -3194,9 +3214,44 @@
           "sha": "fcf5012d49b35687"
         },
         {
-          "path": "apps/server/src/routes/core-proxy/chat-start-route.ts",
-          "why": "«Как страницы доходят до ядра»: старт чата ручкой панели — слой панели к оценке, то же доказательство страницы, подписанное тело идёт прокладкой",
-          "sha": "7b284a678e86d375"
+          "path": "apps/web/src/features/CoreLaunch/model/launchSource.ts",
+          "why": "«Источник задачи»: текст по умолчанию, снимок задачи трекера, голос, несколько пунктов",
+          "sha": "7e1333ccb7873574"
+        },
+        {
+          "path": "apps/web/src/features/CoreLaunch/model/leadSettings.ts",
+          "why": "«Ведение задачи»: уровень правки — машина или проект, действующие значения тем же резолвером, что у ядра",
+          "sha": "953f55455a99b6c0"
+        },
+        {
+          "path": "apps/web/src/features/CoreLaunch/model/groupLaunch.ts",
+          "why": "«Группа: оценка и запуск»: одна кнопка запускает все задачи группы",
+          "sha": "d784ae11b7291963"
+        },
+        {
+          "path": "apps/web/src/features/CoreLaunch/model/groupIntake.ts",
+          "why": "«Группа: оценка и запуск»: подтверждение карточек приёма всех задач группы одним нажатием",
+          "sha": "1485fbdf75e38d37"
+        },
+        {
+          "path": "apps/core/src/conductor/classify/classify.ts",
+          "why": "«Класс задачи»: пороги S/M/L/XL из записанных признаков",
+          "sha": "fd48ecee9fdf8fd7"
+        },
+        {
+          "path": "apps/core/src/conductor/intake/card.ts",
+          "why": "«Разбор и карточка приёма»: цель, критерии, область, не больше четырёх развилок с рекомендацией",
+          "sha": "0603211c5a4dbe10"
+        },
+        {
+          "path": "apps/core/src/conductor/intake/questions.ts",
+          "why": "«Что спрашивать всегда»: один вопрос на карточку, вопрос класса",
+          "sha": "af878fd756d88c5b"
+        },
+        {
+          "path": "apps/core/src/economy/tier-raise.ts",
+          "why": "«Эскалация после неудачи»: подъём ступени после провала и по выученному, не выше потолка автоматики",
+          "sha": "389d79fdab51a0af"
         }
       ]
     },
@@ -3207,12 +3262,12 @@
         {
           "path": "apps/server/src/routes/sandbox-routes/sandbox-routes.ts",
           "why": "«Что видит Claude Code внутри», «Два часа простоя», «Ключ API — только из окружения», «Стоп»: задача ядра с каталогом песочницы, только слоем пользователя и без брифа, 410 по простою, отмена",
-          "sha": "462c05d4ad57e1d4"
+          "sha": "917870562c56dea3"
         },
         {
           "path": "apps/server/src/domains/sandbox/SandboxRegistry.ts",
           "why": "«Два часа простоя»: подметание по простою и пощада песочнице, пока идёт ответ",
-          "sha": "50fbc076f5e5fb60"
+          "sha": "1020233a100c014b"
         },
         {
           "path": "apps/server/src/domains/sandbox/HookProbe.ts",
@@ -3230,7 +3285,7 @@
           "sha": "6f77f6207781d619"
         }
       ],
-      "confirmedAt": "2026-11-02T11:05:50.832Z"
+      "confirmedAt": "2026-11-07T09:21:52.117Z"
     }
   ]
 }

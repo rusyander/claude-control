@@ -1,6 +1,6 @@
 import type { LayerRun, SessionSpec } from '../adapter.types.ts';
 import type { HookRefusalRead } from '../sdk-stream/normalise.ts';
-import { keyedHooks, readUserLayer, userLayerFiles } from './user-layer.ts';
+import { claudeSessionHooks, hookCommands } from './session-hooks.ts';
 
 /**
  * Отказ хука человека в потоке Claude Code 2.1.310 (G-e, адаптерная половина; пробы Q1-Q3). Чтение
@@ -105,13 +105,22 @@ export function readClaudeHookRefusals(line: Json, ctx: HookReaderContext): Hook
 
 /**
  * Чтение отказов хуков для сеанса: в `on` хуки человека исполняет сам CLI — их команды знают
- * ключи описи; в `observe` стоит запись (она не отказывает), в `off` — ничего.
+ * ключи описи; в `observe` хуки файлов настроек — запись (она не отказывает), в `off` — ничего.
+ * Плагины переноса и хуки локального слоя CLI исполняет сам в любом режиме сеанса — их команды
+ * (как написаны и с подставленным `${CLAUDE_PLUGIN_ROOT}`) знают свои ключи всегда.
  */
 export function claudeHookReader(spec: SessionSpec | null, layer: LayerRun | null) {
-  const hooks =
-    spec && layer?.ran === 'on'
-      ? keyedHooks(readUserLayer(userLayerFiles(spec.env.pin, spec.cwd, layer.repoLayer)))
+  const run =
+    spec && layer
+      ? claudeSessionHooks(spec.env.pin, spec.cwd, layer.repoLayer, {
+          ran: layer.ran,
+          ...(spec.layer.sources ? { sources: spec.layer.sources } : {}),
+          ...(spec.layer.carry ? { carry: spec.layer.carry } : {}),
+        }).hooks
       : [];
+  const hooks = run
+    .filter((h) => layer?.ran === 'on' || h.origin !== 'settings')
+    .flatMap((h) => hookCommands(h).map((command) => ({ key: h.key, command })));
   const ctx = { hooks, ...(spec?.coreHook ? { coreHook: spec.coreHook } : {}) };
   return (line: Record<string, unknown>) => readClaudeHookRefusals(line, ctx);
 }

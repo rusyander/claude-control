@@ -116,12 +116,6 @@
   margin-left: var(--agent-indent);
 }
 
-// Скиллы, хуки и MCP — под метриками, тем же отступом.
-.extensions {
-  margin-left: var(--agent-indent);
-  align-self: flex-start;
-}
-
 .activityText {
   min-width: 0;
   overflow: hidden;

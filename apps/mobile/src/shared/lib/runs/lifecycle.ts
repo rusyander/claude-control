@@ -273,7 +273,11 @@ async function steer(
     });
     if (!reply?.steered) return 'failed';
     const current = runs.get(run.id);
-    if (current && !(current.steered ?? []).includes(input.prompt)) {
+    // Поток мог обогнать ответ: слово уже доставлено и начало свой ход (`nextTurn`) — тогда оно
+    // реплика ленты, и в строку «Передано агенту» его не возвращаем.
+    const delivered =
+      current?.turnAt !== undefined && current.lastPrompt?.trim() === input.prompt.trim();
+    if (current && !delivered && !(current.steered ?? []).includes(input.prompt)) {
       setRun(run.id, { steered: [...(current.steered ?? []), input.prompt] });
       emit();
     }

@@ -1,5 +1,4 @@
 import { object, string, array, boolean, number, literal, union, type infer as Infer } from 'zod';
-import { agentExtensionSummarySchema } from './agent-tree.ts';
 
 /**
  * Чат поверх Claude Code. Приложение не хранит переписку само: источник правды —
@@ -484,28 +483,11 @@ export const progressAgentSchema = object({
    * говорила только «работает»).
    */
   activity: progressActiveToolSchema.optional(),
-  /**
-   * Id субагента у CLI (`subagents/agent-<id>.jsonl`, он же `task_id` для
-   * `stop_task`): адрес его хода и кнопки «Остановить». Нет файла — нет и id.
+  /*
+   * Модель, вызовы, расход, конец и вложенность субагента сервер больше не шлёт: их читали
+   * транскрипты субагентов, ушедшие в архив (этап 11, W3-17). Панель берёт их у ядра —
+   * `withCoreFacts` в `@entities/AgentTree`, по тому же списку, что кнопка «Агенты».
    */
-  agentId: string().optional(),
-  /** `id` узла, запустившего этого субагента; нет — запустил главный агент. */
-  parentId: string().optional(),
-  /** Модель субагента — по его ответам (`message.model`) или по meta. */
-  model: string().optional(),
-  /** Сколько вызовов инструментов сделал субагент. */
-  toolCalls: number().optional(),
-  /** Расход субагента: каждый ответ модели — один раз, по его `message.id`. */
-  tokens: object({
-    input: number(),
-    output: number(),
-    cacheRead: number(),
-    cacheCreation: number(),
-  }).optional(),
-  /** Последнее действие субагента одной строкой: вызов с аргументом или реплика. */
-  lastAction: string().optional(),
-  /** Когда закончил (ISO) — последняя запись законченного субагента. */
-  endedAt: string().optional(),
   /**
    * Остановлен по просьбе (`TaskStop` агента или «Остановить» в панели): CLI
    * пишет итог `<status>killed</status>`. `status` при этом `failed` — итога
@@ -518,8 +500,6 @@ export const progressAgentSchema = object({
    * а не ошибка субагента.
    */
   interrupted: boolean().optional(),
-  /** Скиллы, хуки и MCP субагента по его транскрипту — сводка по именам. */
-  extensions: array(agentExtensionSummarySchema).optional(),
 });
 
 export type ProgressAgent = Infer<typeof progressAgentSchema>;
@@ -584,8 +564,6 @@ export const chatProgressSchema = object({
    * процессом, а не с ходом; нет процесса — числящийся идущим фон оборван.
    */
   processAlive: boolean().optional(),
-  /** Скиллы, хуки и MCP главного агента — сводка по именам. */
-  extensions: array(agentExtensionSummarySchema).optional(),
 });
 
 export type ChatProgress = Infer<typeof chatProgressSchema>;

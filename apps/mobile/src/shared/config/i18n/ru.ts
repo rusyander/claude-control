@@ -214,7 +214,7 @@ export const ru = {
     platformBypassed: (title: string, reason: string, fix: string) =>
       `Мимо контура: «${title}» включён «по возможности», а ${reason} — сообщение уйдёт напрямую в облако вендора, без защиты контура. ${fix}`,
     platformRefusedReason: {
-      gateway_down: 'шлюз панели не поднят',
+      gateway_down: 'шлюз ядра не поднят',
       no_token: 'ключ контура не сохранён',
     },
     /** Телефон контур не правит (Т12) — чинится в панели, и сказано, где именно. */

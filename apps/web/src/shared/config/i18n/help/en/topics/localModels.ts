@@ -299,7 +299,7 @@ export const localModelsEn: typeof localModelsRu = {
     mcpCaption:
       'By default a local run gets the full set, like cloud Claude: every MCP server, skill and hook. ' +
       'The lean set is switched on in the contour card; then the chat header in a project shows the “MCP: N” button, ' +
-      'and the lean set has no servers by default. In the full set through the panel’s gateway ' +
+      'and the lean set has no servers by default. In the full set through the core gateway ' +
       'the model does not get MCP tool descriptions up front: a request carries only their names, ' +
       'and a tool gets its description on first use through tool search (ToolSearch). Measured ' +
       '15.10 on Qwen3.8 27B: the first request is 23 thousand tokens instead of 71 thousand; once ' +
@@ -450,9 +450,14 @@ export const localModelsEn: typeof localModelsRu = {
       'conversation, every turn gets that refusal: raise the window or pick the lean set on the ' +
       'contour card — the panel never trims the set itself. The server takes minutes over a long ' +
       'request, and that is not a hang: while a turn runs, a server line under the chat messages shows ' +
-      'the model, quantization, window and waiting for permission. The line does not show turn stages ' +
-      '(loading, reading the prompt, answering): the core carries chat requests to the model, and the ' +
-      'stages come back once the core has a hop activity feed. A refusal from the server itself (a ' +
+      'the model, quantization, window and waiting for permission — and the turn stage: “the model ' +
+      'server is starting”, “the model is loading into memory”, “the request is waiting for the server ' +
+      'to take it”, “reading the prompt: 2,048 of 4,096 tokens” with a share bar, “writing the ' +
+      'answer: 120 tokens”. The panel takes the stage from the core hop feed, which polls the server ' +
+      'itself while a request is in flight. No movement for more than 20 seconds — the line says ' +
+      '“the server has been silent” and how long until a stall; a stall (2 minutes on a GPU, 10 on a ' +
+      'CPU) — “no progress”. Both carry a “Restart the server” button; silence never aborts the request — a ' +
+      'person decides. A refusal from the server itself (a ' +
       '4xx/5xx code other than 503 “loading model”) shows on the line in red with its code and text ' +
       'and a “Restart the server” button until the next request goes through: the panel reads the ' +
       'refusal from the core request journal. If the server is not running and ' +

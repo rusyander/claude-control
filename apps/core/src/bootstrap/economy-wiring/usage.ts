@@ -49,6 +49,13 @@ export function usageRow(task: LiveTask, binding: SessionBinding, event: UsageEv
     // Подагент своей сессии ядра не имеет: родитель — сессия, чей CLI его запустил.
     parentSessionId: subagent ? binding.sessionId : null,
     remainder: event.remainder === true,
+    // Вызов субагента, чей это ход (P149): нет поля — поток родителя не назвал, расход узла
+    // тогда неизвестен, а не родителю. Длиннее схемы id не бывает у живых CLI — не режем молча.
+    ...(event.parentToolUseId !== undefined &&
+    (event.parentToolUseId === null ||
+      (event.parentToolUseId.length > 0 && event.parentToolUseId.length <= 256))
+      ? { parentToolUseId: event.parentToolUseId }
+      : {}),
     ...(event.contextWindow !== undefined &&
     Number.isInteger(event.contextWindow) &&
     event.contextWindow > 0

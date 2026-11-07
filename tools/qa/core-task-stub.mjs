@@ -151,6 +151,7 @@ export const CORE_STUB_VIEW = taskViewSchema.parse({
       state: 'open',
       point: 6,
       source: 'ask_human',
+      dedupe: null,
       stepId: STEP,
       lateAnswer: false,
       answer: null,

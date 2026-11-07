@@ -47,9 +47,31 @@ const LABELS = {
     request: 'Требования',
     repo: 'Путь к репозиторию',
     mrUrl: 'Ссылка на MR или PR',
+    scenario: 'Сценарий',
+    source: 'Источник',
+    itemsAs: 'Как запустить пункты',
+    itemTitle: (n) => `Название пункта ${n}`,
+    itemBody: (n) => `Текст пункта ${n}`,
+    addItem: 'Добавить пункт',
   },
-  en: { title: 'Title', request: 'Requirements', repo: 'Repository path', mrUrl: 'MR or PR link' },
+  en: {
+    title: 'Title',
+    request: 'Requirements',
+    repo: 'Repository path',
+    mrUrl: 'MR or PR link',
+    scenario: 'Scenario',
+    source: 'Source',
+    itemsAs: 'How to run the items',
+    itemTitle: (n) => `Item ${n} title`,
+    itemBody: (n) => `Item ${n} text`,
+    addItem: 'Add an item',
+  },
 };
+/** Пункты группы для кадров ведущего: две задачи одной группы в том же репозитории стенда. */
+const GROUP_ITEMS = [
+  { title: 'README.md: typo', body: 'Fix the typo «Instal» in README.md.' },
+  { title: 'README.md: pnpm version', body: 'Name the required pnpm version in README.md.' },
+];
 /** MR для кадра ревью по ссылке: remote репозитория на хосте без API форжа — отказ «форжа нет». */
 const REVIEW_SITE = 'https://tracker.example/group/app';
 const ONLY = new Set(
@@ -328,6 +350,11 @@ const browser = await chromium.launch();
 try {
   const page = await stand.newPage(browser, { width: 1280, height: 900 });
   const taskIds = [];
+  /** Задачи группы ведущего (кадры 11–12): каждая ходит заглушкой, вопросы в виде подменены. */
+  const groupTaskIds = new Set();
+  const groupAskIds = new Map();
+  /** Первая задача каждой группы (у каждого варианта съёмки группа своя) — она ждёт карточку. */
+  const groupLeads = new Set();
   /** Язык панели, с которой задача запущена: вопрос запуска ядро пишет на нём. */
   const langOf = new Map();
 
@@ -364,6 +391,43 @@ try {
       langOf.set(body.taskId, sent?.fields?.lang);
       await pinStubRoute(body.taskId);
     }
+    // Задачи группы ведущего идут шагами разведки и разбора ещё до запуска — каждая только
+    // заглушкой, не одна первая.
+    const lead = body.group?.taskIds?.[0];
+    if (lead) groupLeads.add(lead);
+    for (const id of body.group?.taskIds ?? []) {
+      if (groupTaskIds.has(id)) continue;
+      groupTaskIds.add(id);
+      if (id !== body.taskId) await pinStubRoute(id);
+    }
+    await route.fulfill({ response, json: body });
+  });
+
+  // Кадр запуска группы: вопросы ведущего подменены в виде задач группы (заглушка модели не
+  // говорит языком разведки, и до карточки приёма ей не дойти). Первая задача ждёт карточку,
+  // остальные — ответ о классе; прочее в ответе ядра настоящее.
+  await page.route('**/api/core/tasks/*', async (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').pop();
+    if (!groupTaskIds.has(id)) return route.fallback();
+    const response = await route.fetch();
+    const body = await response.json().catch(() => null);
+    if (!body?.view) return route.fulfill({ response });
+    const first = groupLeads.has(id);
+    body.view.state = 'awaiting-launch';
+    body.view.ended = null;
+    if (!groupAskIds.has(id)) groupAskIds.set(id, uuidv7());
+    body.view.asks = [
+      {
+        askId: groupAskIds.get(id),
+        state: 'open',
+        point: 10,
+        source: 'intake',
+        dedupe: `${first ? 'intake' : 'classify'}:${id}`,
+        stepId: null,
+        lateAnswer: false,
+        answer: null,
+      },
+    ];
     await route.fulfill({ response, json: body });
   });
 
@@ -382,7 +446,8 @@ try {
       await title.fill(TASK.title);
       await form.getByLabel(labels.request, { exact: true }).fill(TASK.request);
       await form.getByLabel(labels.repo, { exact: true }).fill(repo);
-      await form.locator('select').first().selectOption('preset:bug-fix');
+      // Выбор сценария — по подписи: над названием теперь стоит ещё и выбор источника.
+      await form.getByLabel(labels.scenario, { exact: true }).selectOption('preset:bug-fix');
     };
     const estimated = async () => {
       const roads = page.locator('[data-launch-section="roads"]');
@@ -443,6 +508,51 @@ try {
       16,
       async () => {
         await page.locator('[data-mcp-row="orders"]').waitFor({ timeout: 90_000 });
+      },
+    );
+    // Настройки ведения: настоящий ответ ядра о разделе `lead` (умолчания машины).
+    await shotArea(scenario, page, '09-lead', '[data-lead-settings]', 16, async () => {
+      // Профили — в самой карточке (такой же признак есть и у оценки): карточка дорастает до
+      // полной высоты, только когда ответ ядра о настройках пришёл и кнопка «Сохранить» на месте.
+      const card = page.locator('[data-lead-settings]').first();
+      await card.locator('[data-lead-profile="balanced"]:not([disabled])').waitFor({
+        timeout: 90_000,
+      });
+      await card.locator('[data-lead-save]').waitFor({ timeout: 90_000 });
+      await wait(800);
+    });
+    // Несколько пунктов группой со сценарием ведущего — источник читает только он.
+    const itemsDraft = async () => {
+      await filled();
+      if ((await page.locator('[data-source-items-as="group"]').count()) > 0) return;
+      await form.getByLabel(labels.source, { exact: true }).selectOption('items');
+      await form.getByLabel(labels.itemsAs, { exact: true }).selectOption('group');
+      await form.getByRole('button', { name: labels.addItem }).click();
+      for (const [i, item] of GROUP_ITEMS.entries()) {
+        await form.getByLabel(labels.itemTitle(i + 1), { exact: true }).fill(item.title);
+        await form.getByLabel(labels.itemBody(i + 1), { exact: true }).fill(item.body);
+      }
+      await form.getByLabel(labels.scenario, { exact: true }).selectOption('preset:lead');
+      await page.locator('[data-source-items-as="group"]').waitFor({ timeout: 30_000 });
+    };
+    await shotArea(scenario, page, '10-items', '[data-source-picker="items"]', 16, itemsDraft);
+    const groupEstimated = async () => {
+      if ((await page.locator('[data-estimate-group]').count()) > 0) return;
+      await itemsDraft();
+      await page.locator('[data-estimate-button]').click();
+      await page.locator('[data-estimate-group]').waitFor({ timeout: 90_000 });
+    };
+    await shotArea(scenario, page, '11-group-estimate', est, 16, groupEstimated);
+    await shotArea(
+      scenario,
+      page,
+      '12-group-launch',
+      '[data-launch-section="launch"]',
+      16,
+      async () => {
+        await groupEstimated();
+        await page.locator('[data-launch-class-wait]').waitFor({ timeout: 90_000 });
+        await page.locator('[data-launch-intake]').waitFor({ timeout: 90_000 });
       },
     );
   });

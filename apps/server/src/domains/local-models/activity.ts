@@ -1,4 +1,11 @@
+import { z } from 'zod';
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
+import {
+  HOP_STALL_CPU_MS,
+  HOP_STALL_GPU_MS,
+  hopActivitySchema,
+  type HopActivity,
+} from '@agentdeck/contracts/core/hops';
 import type { LocalActivity } from '@agentdeck/contracts/local-models';
 import { LOCAL_PLATFORM_ID } from '@agentdeck/contracts/platform-layers';
 
@@ -13,8 +20,9 @@ import { LOCAL_PLATFORM_ID } from '@agentdeck/contracts/platform-layers';
  * «агент выполняет инструменты», пока каждый запрос падал 500, а Claude Code молча повторял.
  * Последнее событие контура — отказ: чат видит код и текст; удачный ответ после него стирает.
  *
- * Этапов хода (загрузка, разбор промпта, ответ по опросу `/health` и `/slots`) нет: их видел
- * только шлюз панели, у ядра ленты активности звена пока нет (этап 11). Чат судит по отказу и по
+ * Этапы хода (загрузка, разбор промпта, ответ по опросу `/health` и `/slots`) с этапа 11 ведёт
+ * лента звена ядра — сервер моделей опрашивает хост звеньев, и только пока запрос в полёте;
+ * панель её лишь читает (`withHopActivity`). Ядро ленты не дало — чат судит по отказу и по
  * времени последнего запроса.
  */
 
@@ -51,8 +59,11 @@ export function localOutcomeOf(
 }
 
 export interface ActivityDeps {
-  /** Что за сервер: модель, квантование, окно. Нет записи — сервера нет. */
-  server: () => { model: string; quant?: string; context: number } | undefined;
+  /**
+   * Что за сервер: модель, квантование, окно, устройство. Нет записи — сервера нет; устройство
+   * задаёт предел тишины (`stallMs`).
+   */
+  server: () => { model: string; quant?: string; context: number; device?: string } | undefined;
   /** События книги контуров ядра (последний снимок); ядро молчит — `undefined`. */
   events: () => readonly PlatformGatewayEvent[] | undefined;
 }
@@ -65,8 +76,46 @@ export function localActivityOf(deps: ActivityDeps): LocalActivity {
           model: server.model,
           ...(server.quant ? { quant: server.quant } : {}),
           context: server.context,
+          // Предел тишины — тот же, что у ленты звена ядра (один источник в контракте).
+          stallMs: server.device === 'cpu' ? HOP_STALL_CPU_MS : HOP_STALL_GPU_MS,
         }
       : {}),
     ...localOutcomeOf(deps.events()),
+  };
+}
+
+const hopRoutesSchema = z.array(hopActivitySchema);
+
+/**
+ * Ход по ленте звена ядра (этап 11, W2-5; `GET /api/core/local/activity` → `{routes}`). Из
+ * локальных маршрутов берётся тот, где запрос в полёте и движение свежее всех; в полёте никого —
+ * последний двигавшийся. Застой пересчитывается по пределу ЭТОГО сервера: звено устройства не
+ * знает и судит по видеокарте, а процессор законно молчит дольше.
+ *
+ * Тело ядра не той формы (ядро прежней версии, отказ) — хода нет, остаётся `base`.
+ */
+export function withHopActivity(base: LocalActivity, body: unknown, now: number): LocalActivity {
+  const raw = body && typeof body === 'object' ? (body as { routes?: unknown }).routes : undefined;
+  const parsed = hopRoutesSchema.safeParse(raw);
+  if (!parsed.success) return base;
+  const latest = (list: HopActivity[]): HopActivity | undefined =>
+    list.reduce<HopActivity | undefined>(
+      (best, item) => (!best || item.lastMoveAt > best.lastMoveAt ? item : best),
+      undefined,
+    );
+  const hop = latest(parsed.data.filter((item) => item.inFlight > 0)) ?? latest(parsed.data);
+  if (!hop) return base;
+  const stallMs = base.stallMs ?? HOP_STALL_GPU_MS;
+  const moving = hop.phase === 'queued' || hop.phase === 'prompt' || hop.phase === 'generating';
+  return {
+    ...base,
+    phase: hop.phase,
+    inFlight: hop.inFlight,
+    ...(hop.startedAt !== undefined ? { startedAt: hop.startedAt } : {}),
+    ...(hop.prompt ? { prompt: hop.prompt } : {}),
+    ...(hop.decoded !== undefined ? { decoded: hop.decoded } : {}),
+    lastMoveAt: hop.lastMoveAt,
+    stalled: hop.inFlight > 0 && moving && now - hop.lastMoveAt >= stallMs,
+    stallMs,
   };
 }

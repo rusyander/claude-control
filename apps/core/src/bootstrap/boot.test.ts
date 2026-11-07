@@ -81,9 +81,10 @@ describe('core boot', () => {
       expect(log.find((e) => e.event === 'tasks.opened')).toMatchObject({ opened: 1, refused: [] });
       expect(log.find((e) => e.event === 'port')).toMatchObject({ port: core.port });
       // Дирижёр запущен загрузкой один раз: шесть зон этапа 4, две этапа 6 (страж, публикатор),
-      // слой пользователя этапа 7, наблюдатель этапа 8 и ревью по ссылке этапа 10 (F8).
+      // слой пользователя этапа 7, наблюдатель этапа 8, ревью по ссылке этапа 10 (F8), ведущий
+      // этапа 11 (зона F) и ворота интеграции этапа 11 (W3-18b).
       expect(log.filter((e) => e.event === 'conductor.started')).toEqual([
-        expect.objectContaining({ zones: 11 }),
+        expect.objectContaining({ zones: 13 }),
       ]);
       expect(readFileSync(join(layout.root, 'machine-id'), 'utf8')).toMatch(/^[0-9a-f-]{36}\n$/);
 

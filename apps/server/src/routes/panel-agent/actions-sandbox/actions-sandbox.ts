@@ -75,7 +75,8 @@ function answered(url: string, answer: RouteAnswer): unknown {
 
 /**
  * Стереть песочницу. Отказ стирания — в текст исхода: промолчать значило бы
- * оставить на диске копию доступа, называя прогон изолированным.
+ * оставить на диске копию доступа, называя прогон изолированным. Папку, занятую сразу
+ * после прогона (CLI ещё выходит), ждёт сам маршрут удаления — `removeSandboxSettled`.
  */
 async function dropSandbox(inject: InjectRoute, id: string): Promise<string | undefined> {
   try {

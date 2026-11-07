@@ -178,6 +178,9 @@ export async function handleDlpRequest(
   const auth = upstreamAuth(ctx, entry, credential);
   if ('refusal' in auth)
     return deny({ status: 401, code: 'authentication_error', message: auth.refusal });
+  // Лента хода локального маршрута: запрос модели в полёте до закрытия ответа (этап 11, W2-5).
+  const activityDone = ctx.activity?.beginRaw(entry, credential, path, prepared.body);
+  if (activityDone) response.once('close', activityDone);
 
   const upstreamAbort = new AbortController();
   const gone = clientGone(response);

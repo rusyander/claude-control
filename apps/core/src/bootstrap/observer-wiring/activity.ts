@@ -7,7 +7,7 @@ import type { ObserverNote, ObserverTap } from './observer-wiring.types.ts';
  * Кран активности сессий (этап 8, F9): по потоку каждой сессии — когда было последнее живое
  * событие (рабочее монотонное время ядра, сон машины вычтен), идёт ли наш ход (`turn.started` без
  * `turn.ended`), каких инструментов сессия ждёт (запрос без результата → класс действия) и не ждёт
- * ли CLI ответа о праве в самом потоке (`permit.request` — последнее событие). Тик тишины
+ * ли CLI ответа о праве в самом потоке (после `permit.request` разговор не двигался). Тик тишины
  * (`stall.ts`) читает это и пишет переходы; сам кран пишет только `output` — первое живое событие
  * затихшей сессии возвращает её в `live` (quiet → live, никогда live → live).
  *
@@ -22,7 +22,7 @@ export interface SessionActivity {
   turn: boolean;
   /** Ждущие вызовы: id → класс действия. */
   pending: Map<string, string>;
-  /** CLI спросил о праве строкой потока и ждёт ответа (после вопроса событий не было). */
+  /** CLI спросил о праве строкой потока и ждёт ответа (после вопроса разговор не двигался). */
   permitWaiting: boolean;
 }
 
@@ -55,6 +55,33 @@ export interface ActivityBook {
 
 /** Предел ждущих вызовов на сессию: поток с потерянными результатами не раздувает память. */
 const PENDING_LIMIT = 256;
+
+/**
+ * Снимает ли событие ожидание права: да — только движение самого разговора (ход, вызов, его
+ * результат, текст, расход, вопрос/отказ, ошибка) — оно идёт лишь после ответа. Строки жизни
+ * субагентов и фона (`agent.*`, `bg.*`) и факт окна CLI пишет сам, пока ждёт: ответом они не
+ * являются, иначе ждущая права сессия считалась бы затихшей. `true` у самого вопроса — он ставит
+ * ожидание. Запись по каждому типу: новый тип события обязан решить здесь (проверка типов).
+ */
+const ANSWERS_PERMIT: Readonly<Record<AdapterEvent['type'], boolean>> = {
+  init: true,
+  'turn.started': true,
+  'turn.ended': true,
+  'turn.cli-initiated': true,
+  'tool.requested': true,
+  'tool.result': true,
+  'text.delta': true,
+  usage: true,
+  ask: true,
+  'permit.request': true,
+  'hook.refused': true,
+  error: true,
+  window: false,
+  'agent.spawned': false,
+  'agent.ended': false,
+  'bg.started': false,
+  'bg.ended': false,
+};
 
 export function createActivityBook(deps: ActivityDeps): ActivityBook {
   const book = new Map<string, SessionActivity>();
@@ -108,7 +135,7 @@ export function createActivityBook(deps: ActivityDeps): ActivityBook {
           break;
         default:
       }
-      entry.permitWaiting = event.type === 'permit.request';
+      if (ANSWERS_PERMIT[event.type]) entry.permitWaiting = event.type === 'permit.request';
       if (meta.inHistory) return;
       entry.lastAt = deps.now();
       const session = task.state.sessions[binding.sessionId];

@@ -29,7 +29,7 @@ import { resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const SERVER = 'apps/server/src';
-/** Шлюз контуров и его отказы — у ядра (этап 10, C3d: шлюз панели снят). */
+/** Шлюз контуров и его отказы — у ядра (этап 10, C3d: шлюз в панели снят). */
 const CORE = 'apps/core/src';
 const WEB = 'apps/web/src';
 /**

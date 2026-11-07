@@ -93,6 +93,33 @@ const v1 = (id: PresetId, title: string, steps: StepDef[]): Scenario => ({
   steps,
 });
 
+/**
+ * Ведущий (этап 11, P133-P137): разведка только читает и сдаёт карту, разбор собирает карточку
+ * (развилки — одним вопросом), класс решает форму: план — только M и шире, ревью — у всех.
+ */
+function leadSteps(): StepDef[] {
+  return [
+    presetStep('recon', 'research', 'Разведка', [], {
+      text: 'Map the area of the task without changing anything: step_done.map with at most 20 lines, the files with why each matters, the tests and the owners. Never paste file bodies.',
+    }),
+    presetStep('intake', 'intake', 'Разбор запроса', ['recon'], {
+      text: 'Build the intake card: the goal, every acceptance point in step_done.extracted, and at most 4 open forks in step_done.forks, each with your recommended option.',
+    }),
+    { ...presetStep('plan', 'plan', 'План', ['intake']), onlyFor: ['M', 'L', 'XL'] },
+    presetStep('work', 'work', 'Работа', ['plan']),
+    presetStep('review', 'review', 'Ревью', ['work'], { gate: [NO_BLOCKING] }),
+    presetStep('fix', 'fix', 'Правки по ревью', ['review']),
+    ...delivery('fix'),
+    // Единица интеграции (W3-18b): только эти два шага, прочие единицы их пропускают
+    // (`gates/integrated.ts`). Копия — слияние голов единиц; своего MR нет.
+    presetStep('integration-gate', 'final-gate', 'Проверка интеграции', ['work']),
+    presetStep('integration-review', 'review', 'Ревью интеграции', ['integration-gate'], {
+      gate: [NO_BLOCKING],
+      text: 'Review only how the units fit together: git diff <review base>...HEAD in the integration copy is the combined change of every unit. Look for broken shared interfaces, duplicated or contradicting edits. Report every finding in step_done findings (file, line, severity, text). Do not change files.',
+    }),
+  ];
+}
+
 export const PRESETS: readonly Scenario[] = [
   v1('bug-fix', 'Исправление ошибки', [
     intake(),
@@ -171,6 +198,22 @@ export const PRESETS: readonly Scenario[] = [
     presetStep('final-gate', 'final-gate', 'Финальная проверка', [REVIEW_PUSH_STEP]),
     presetStep('publish', 'publish', 'Публикация', ['final-gate']),
   ]),
+  v1('lead', 'Ведущий', leadSteps()),
+  // Задача из трекера, вторая версия (этап 11, W2-6): шаги ведущего + статус в трекере. Источник
+  // обязан быть снимком трекера (`source.kind = tracker`, отказ оценки — `conductor/intake`);
+  // карточку из его критериев ядро принимает само, шаг разбора тогда пропускается. @1 заморожен.
+  {
+    id: 'tracker-ticket',
+    version: 2,
+    title: 'Задача из трекера',
+    presetOf: { id: 'lead', version: 1 },
+    steps: [
+      ...leadSteps(),
+      presetStep('tracker-status', 'custom', 'Статус в трекере', ['answer-reviewers'], {
+        text: 'Update the tracker ticket status to reflect the published merge request.',
+      }),
+    ],
+  },
 ];
 
 export function isPresetId(id: string): id is PresetId {

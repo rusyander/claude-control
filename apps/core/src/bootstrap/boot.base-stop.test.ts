@@ -31,6 +31,8 @@ describe('core stop and the background base probe', () => {
       id: 'claude',
       // Версию для ключа базы читает адаптер своей командой; без неё замер не начинается.
       versionCommand: 'claude',
+      // Сеанс без следа: CLI без него проба не запускает.
+      ephemeral: 'flag',
       launch: async () => {
         launched += 1;
         return { ok: true, handle: { sessionId: 'probe' }, layer: {} };

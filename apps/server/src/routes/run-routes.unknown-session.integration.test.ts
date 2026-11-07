@@ -51,7 +51,12 @@ describe('POST /api/chat/send: неизвестный sessionId', () => {
       stop: () => undefined,
     }));
     const store = new AppStore(join(root, 'agentdeck'));
-    const ctx = { location: { paths: { root } }, store } as unknown as ServerContext;
+    // Каталог данных — как у настоящего контекста: по книге чата ядра в нём маршрут узнаёт CLI
+    // начатого разговора (W3-17a).
+    const ctx = {
+      location: { paths: { root, appData: join(root, 'agentdeck') } },
+      store,
+    } as unknown as ServerContext;
 
     app = Fastify();
     registerChatRoutes(app, ctx, registry, new ChatSession(registry));

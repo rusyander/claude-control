@@ -623,8 +623,8 @@ export const testsEn: typeof testsRu = {
       'chat knows about the section too: a chat turn runs as a core task, and the panel puts the ' +
       'line saying where the cases live and how to keep them into the session settings — the ' +
       'core appends it after its own brief. Claude Code gets it, and so does another CLI — both ' +
-      'when the panel continues or carries the conversation and when it is started from the ' +
-      'core chat form. A session started outside the panel takes the format from the block in ' +
+      'when the panel continues or carries the conversation and when it is started with the ' +
+      'New chat button. A session started outside the panel takes the format from the block in ' +
       'the project CLAUDE.md (the button below) or from your message. Changing how the product behaves — not only ' +
       'when asked to "write tests" — the agent adds or updates the case for the change on its ' +
       'own (tests-cli case) and records what it verified as a run: “tested” becomes a record ' +
@@ -1438,7 +1438,7 @@ export const testsEn: typeof testsRu = {
         'A conversation in the project directory gets a line: which autotest folder the project ' +
         'has and how to name tests in it. A chat turn runs as a core task, and the line travels ' +
         'in the session settings — the core appends it after its own brief. The same goes for a ' +
-        'conversation of any CLI started from the core chat form.',
+        'conversation of any CLI started with the New chat button.',
       chatCase: 'The case appears by itself',
       chatCaseText:
         'The panel watches the e2e folder of a registry project itself: a second and a half ' +
@@ -1466,8 +1466,7 @@ export const testsEn: typeof testsRu = {
         'It asks once and only what is yours: the stand URL, where credentials live, which flows matter most. ' +
         'A chat turn runs as a core task: the panel puts the line into the session settings, and ' +
         'the core appends it to the system prompt after its own brief — for Claude Code and for ' +
-        'another CLI, a conversation started from the core chat form or the «New conversation ' +
-        'here» button included. A command message (/…) gets no line. The ' +
+        'another CLI, a conversation started with the New chat button included. A command message (/…) gets no line. The ' +
         'conversation never creates the folder itself, and the agent will not create it ' +
         'silently either: with none and a task that needs tests, it asks in that same single ' +
         'question whether to keep them in the Tests section. Changing how ' +

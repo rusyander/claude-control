@@ -35,6 +35,7 @@ const CARRY_CODE = {
 } as const satisfies Record<KitCarryRefusal['kind'], string>;
 const REFUSED =
   /^core chat: (?:[\w-]+ refused \(([^)]+)\)|the core refused the chat \(([^)]+)\)|the chat step ended without a session \(([^)]+)\))/;
+const COMPAT_CODE = /compat refused: ([a-z][a-z_]*)/;
 const ESTIMATE_REFUSED = /^core chat: the core refused the chat \(([^)]+)\): ([\s\S]*\S[\s\S]*)$/;
 export function coreRefusalText(message: string): string | undefined {
   const down = CONTOUR_DOWN.exec(message);
@@ -66,7 +67,10 @@ export function coreRefusalText(message: string): string | undefined {
   }
   const refused = REFUSED.exec(message);
   if (!refused) return undefined;
+  // Суд совместимости назвал код (`compat refused: no_core_hook`, W3-17a): экран чата объясняет
+  // его своей строкой — код суда, а не исход шага (`failed`), который ничего не говорит.
+  const compat = COMPAT_CODE.exec(message)?.[1];
   return serverText('core-chat-refused', {
-    code: (refused[1] ?? refused[2] ?? refused[3]) as string,
+    code: (compat ?? refused[1] ?? refused[2] ?? refused[3]) as string,
   });
 }

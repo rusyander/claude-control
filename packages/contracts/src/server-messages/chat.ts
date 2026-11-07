@@ -3,7 +3,6 @@ export const chatMessageParams = {
   'run-busy': [],
   'run-steer-ended': [],
   'run-group-paused': [],
-  'chat-send-foreign-provider': ['provider'],
   'run-empty-prompt': [],
   'run-unsupported-upload': ['names', 'supported'],
   'run-workspace-missing': ['cwd'],
@@ -83,7 +82,5 @@ export const chatMessageParams = {
   'chat-stop-unconfirmed': [],
   'chat-keep-session-gone': [],
   'chat-pin-invalid': [],
-  'agent-id-invalid': [],
-  'agent-not-found': [],
   'chat-pin-child': [],
 } as const satisfies Record<string, readonly string[]>;

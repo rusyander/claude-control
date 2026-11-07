@@ -191,6 +191,9 @@ const PANEL_ENTRIES = [
 const PANEL_DATA = [
   'apps/server/src/domains/chat/__fixtures__/stream-json-2.1.177.jsonl',
   'apps/server/src/domains/local-models/data/templates',
+  // Настоящие файлы хуков набора панели — kit-hooks.test.ts (этап 11) собирает из них плагин.
+  'apps/server/assets/kit/agentdeck-kit/.claude-plugin/plugin.json',
+  'apps/server/assets/kit/agentdeck-kit/hooks/hooks.json',
 ];
 
 const RELATIVE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)['"](\.{1,2}\/[^'"]+)['"]/g;

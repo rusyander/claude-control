@@ -1,3 +1,4 @@
+import { AGENT_HISTORY_CHAT, installAgentHistoryStub } from './agent-history-stub.mjs';
 import { CORE_STUB_TASK_ID, installCoreTaskStub } from './core-task-stub.mjs';
 
 /**
@@ -127,6 +128,41 @@ export const PANEL_PAGES = [
       }
       await page.waitForSelector('[role="dialog"][aria-label="Git проекта"]', { timeout: 10000 });
       await page.waitForTimeout(1200);
+      await dismissGate();
+    },
+  },
+  // Окно «Агенты» (этап 11, W3-17) открывается только кнопкой над полем ввода чата и закрытым
+  // не попадает ни в один обход. Чат, лента и узлы ядра — подмена (`page.route` переживает
+  // перезагрузку `prepare`); в окне дерево, фильтры и подробность первого узла.
+  {
+    path: `/chat?id=${AGENT_HISTORY_CHAT}`,
+    name: 'Чат — окно «Агенты»',
+    slug: 'chat-agents',
+    prepare: (page) => installAgentHistoryStub(page),
+    ready: '[data-agent-history-open]',
+    interact: async (page) => {
+      // Окно «нужен доступ» на стенде без входа в CLI приходит вслед за ответом сервера и
+      // перехватывает клик — закрывается, где бы ни встало.
+      const gate = page.getByRole('dialog').filter({ hasText: /нужен доступ|needs access/ });
+      const dismissGate = async () => {
+        if (!(await gate.isVisible().catch(() => false))) return;
+        await page.keyboard.press('Escape');
+        await gate.waitFor({ state: 'hidden', timeout: 5000 });
+      };
+      const modal = page.locator('[data-agent-history-modal]');
+      for (let attempt = 0; ; attempt++) {
+        await dismissGate();
+        try {
+          await page.locator('[data-agent-history-open]').click({ timeout: 5000 });
+          await modal.waitFor({ timeout: 5000 });
+          break;
+        } catch (error) {
+          if (attempt >= 3) throw error;
+        }
+      }
+      await modal.locator('[data-agent-row][data-agent-kind="subagent"]').first().click();
+      await modal.locator('[data-agent-detail]').waitFor({ timeout: 10000 });
+      await page.waitForTimeout(600);
       await dismissGate();
     },
   },
@@ -271,8 +307,6 @@ export const PANEL_PAGES = [
   { path: '/core', name: 'Задачи ядра' },
   { path: '/core/launch', name: 'Запуск задачи ядра' },
   { path: '/core/scenarios', name: 'Сценарии ядра' },
-  // Чат через ядро (этап 10): без id — форма нового чата (проекты читает панель, ядро не нужно).
-  { path: '/core/chat', name: 'Чат через ядро' },
   // Лента задачи — страница с параметром: настоящей задачи на стенде может не быть, поэтому
   // id, вид задачи и поток её журнала отдаёт подмена (`page.route` переживает перезагрузку
   // `prepare`). Маркер — панель сигналов с хотя бы одной строкой: поток дошёл и свернулся.

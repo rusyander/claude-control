@@ -4,7 +4,7 @@ import type { ClaudeLocation } from '@agentdeck/contracts';
 import type { AppStore } from '../../lib/app-store/app-store.ts';
 import { readClaudeCredentials, writeSecretFile } from '../../lib/credentials/credentials.ts';
 import { removeTree, sandboxKey, sandboxPaths } from './SandboxPaths.ts';
-import { forgetExpired, forgetSandbox } from './SandboxRegistry.ts';
+import { forgetExpired, forgetSandbox, sandboxSettleLeft } from './SandboxRegistry.ts';
 import { armSandboxSweeper } from './SandboxSweep.ts';
 import { copyScripts, copySkills, writeRules } from './SandboxContents.ts';
 import { buildSettings } from './SandboxSettings.ts';
@@ -108,8 +108,31 @@ export function createSandbox(
  * до этой строки не доводит.
  */
 export function removeSandbox(id: string): void {
+  finishRemove(id, removeTree(sandboxPaths(id).root));
+}
+
+/** Отказ стирания, который проходит сам, когда держащий папку процесс выйдет. */
+const BUSY_REMOVE = /\b(?:EBUSY|EPERM|ENOTEMPTY)\b/;
+const SETTLE_STEP_MS = 250;
+
+/**
+ * Удаление по просьбе (`DELETE /api/sandbox/:id`). Сразу после прогона CLI ещё выходит и держит
+ * папку (см. `SANDBOX_SETTLE_MS`): пока идёт срок успокоения, занятая папка ждётся, а не
+ * объявляется отказом с советом стереть её вручную. Вне срока — тот же честный отказ, что у
+ * `removeSandbox`: папку держит кто-то другой, и ждать его нечего.
+ */
+export async function removeSandboxSettled(id: string): Promise<void> {
   const { root } = sandboxPaths(id);
-  const result = removeTree(root);
+  let result = removeTree(root);
+  while (!result.ok && BUSY_REMOVE.test(result.error) && sandboxSettleLeft(id) > 0) {
+    await new Promise((resume) => setTimeout(resume, SETTLE_STEP_MS));
+    result = removeTree(root);
+  }
+  finishRemove(id, result);
+}
+
+function finishRemove(id: string, result: ReturnType<typeof removeTree>): void {
+  const { root } = sandboxPaths(id);
 
   // Удалили по просьбе — это не «время вышло»: следующий прогон с тем же id
   // должен собрать песочницу заново, а не получить отказ по истечению.

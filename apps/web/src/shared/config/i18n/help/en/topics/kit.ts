@@ -241,8 +241,7 @@ export const kitEn: typeof kitRu = {
       'drop «project», the layer’s instructions follow the core brief, its skills come as a ' +
       'plugin, its hooks and permissions go into the core settings; the approved .mcp.json ' +
       'servers are connected by the core itself. A conversation started from ' +
-      'the core chat form (and «New ' +
-      'conversation here» of another CLI) gets the kit the same way a chat turn does: the panel ' +
+      'the New chat button on any CLI gets the kit the same way a chat turn does: the panel ' +
       'composes it. The Tests section agent on Claude Code gets the kit plugin, its variables ' +
       'and our layers, without the kit addition; an agent of another CLI runs without the kit. ' +
       'The form and resource-structure helper of another CLI gets the kit variables and rules ' +

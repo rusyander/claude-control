@@ -78,6 +78,11 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/chat/:chatId/stream': 'internal:stream',
   'GET /api/chat/active': 'action:list_active_runs',
   'GET /api/chat/spend': 'action:read_chat_spend',
+  // Книга чата ядра (этап 11, W3-17a) — окну: старая ссылка `/core/chat?id=<задача>` находит свой
+  // разговор, шапка чата — каталог моделей CLI разговора. Агенту нечего с ними делать: задачу он
+  // читает `core_task`, разговор — `read_chat`, его агентов — `core_agents` (W3-19).
+  'GET /api/chat/core-task/:taskId': 'internal:ui-state',
+  'GET /api/chat/core-cli/:chatId': 'internal:ui-state',
   'POST /api/chat/:chatId/auto-approve': 'human:rights',
   'POST /api/chat/:chatId/permission-decision': 'human:rights',
   'POST /api/chat/:chatId/stop': 'action:stop_chat_run',
@@ -134,12 +139,6 @@ export const ROUTE_LEDGER: RouteLedger = {
   // Выгрузка разговора файлом — кнопка человека «Экспортировать» (D2, U5c).
   'GET /api/chat/:chatId/export': 'human:download',
   'GET /api/chat/:chatId/progress': 'action:read_chat',
-  // chat/subagent-routes — дерево агентов: ход субагента, скиллы/хуки/MCP, остановка одного.
-  'GET /api/chat/:chatId/agents/:agentId': 'gap:P3',
-  'GET /api/chat/:chatId/extensions': 'gap:P3',
-  'GET /api/chat/:chatId/agents/:agentId/extensions': 'gap:P3',
-  'GET /api/chat/:chatId/agent-history': 'gap:P3',
-  'GET /api/chat/:chatId/main-agent': 'gap:P3',
   'GET /api/chat/search': 'action:search_chats',
   'GET /api/chats': 'action:list_chats',
   'GET /api/chats/:chatId/messages': 'action:read_chat',
@@ -763,35 +762,40 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/dev-restart': 'internal:ui-state',
   'POST /api/dev-restart': 'human:dev-restart',
   // core-proxy-routes.ts — прокладка к ядру (07 фаза 2). Число страницы берёт само окно;
-  // задачи ядра агенту пока не показаны; команда ядру — только рукой человека (решение
-  // координатора 28.10: новая строка `human:` сужает доступ, D2 не задет).
+  // команда ядру — только рукой человека (решение координатора 28.10: новая строка `human:`
+  // сужает доступ, D2 не задет). Этап 11 (P151): ведущему открыты ЧТЕНИЯ — список задач, задача
+  // (хвост ленты и вопросы, ждущие человека), отчёт и настройки ведущего; любая запись в ядро —
+  // человек. Каждая строка ядра закреплена в `registry-strict.test.ts` в обе стороны.
   'GET /api/core/nonce': 'internal:ui-state',
-  'GET /api/core/tasks': 'gap:P3',
-  'GET /api/core/tasks/:id': 'gap:P3',
+  'GET /api/core/tasks': 'action:core_tasks',
+  'GET /api/core/tasks/:id': 'action:core_task',
   'POST /api/core/commands': 'human:rights',
   // Состояние ядра для окна (значок звеньев) и поток ленты задачи — служебные.
   'GET /api/core/health': 'internal:ui-state',
   'GET /api/core/tasks/:id/events': 'internal:stream',
   'GET /api/core/tasks/:id/sessions/:sid/stream': 'internal:stream',
-  // Чтения и правки ядра, которые окно умеет, а агент пока нет (этап 9).
-  'GET /api/core/tasks/:id/report': 'gap:P3',
+  'GET /api/core/tasks/:id/report': 'action:core_report',
+  // Чтения ядра, которые окно умеет, а ведущему пока не нужны (этап 9).
   'GET /api/core/routes': 'gap:P3',
   'GET /api/core/profiles/:repoKey': 'gap:P3',
   'GET /api/core/records/:id': 'gap:P3',
   'GET /api/core/scenarios': 'gap:P3',
   'GET /api/core/scenarios/:ref': 'gap:P3',
-  'POST /api/core/scenarios': 'gap:P3',
-  'GET /api/core/config': 'gap:P3',
-  'POST /api/core/config': 'gap:P3',
+  // Запись сценария и настройки ядра — кнопки человека (этап 11, P151): прежде `gap:P3`,
+  // то есть «агент ещё не умеет», а не «агенту нельзя».
+  'POST /api/core/scenarios': 'human:rights',
+  // Настройки ведущего читает `core_lead_settings` — только свои разделы, прочие не уходят.
+  'GET /api/core/config': 'action:core_lead_settings',
+  'POST /api/core/config': 'human:rights',
   // Серверы MCP человека по CLI для экрана выбора (этап 10, зона A) — чтение окна.
   'GET /api/core/mcp-offers': 'gap:P3',
-  // Оценка перед запуском — карточка, ничего не пишет.
-  'POST /api/core/estimate': 'internal:preview',
+  // Оценка перед запуском СОЗДАЁТ задачу (`authority.ts` ядра: `estimate` — человек). До этапа 11
+  // строка стояла `internal:preview` («ничего не пишет»), и любое действие могло позвать оценку
+  // при сборке своей карточки; ядро её отвергало (pid пира не узнан), панель — нет.
+  'POST /api/core/estimate': 'human:rights',
   // Сверка доставки копии судьёй публикации ядра для `tests-cli delivery` — только чтение,
   // не возможность интерфейса (этап 10, G16).
   'GET /api/core/delivery': 'internal:callback',
-  // Та же оценка чата, но со слоем панели, собранным сервером (этап 10, G13).
-  'POST /api/chat/core-start': 'internal:preview',
   // Перенос ключей устройств в ядро — доверие к телефону, полномочие человека (решение
   // координатора этапа 10: новая строка `human:` сужает доступ, D2 не задет).
   'POST /api/core/devices/adopt': 'human:rights',
@@ -804,4 +808,21 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/core/supervisor': 'internal:ui-state',
   'POST /api/core/supervisor/restart': 'human:consent',
   'POST /api/core/supervisor/autostart': 'human:consent',
+  // Агенты ядра (этап 11, W3-19): дерево задачи, узел подробно и агенты разговора читает
+  // `core_agents`; поток — окну. Выгрузка — файл jsonl для человека, как выгрузка разговора.
+  'GET /api/core/tasks/:id/agents': 'action:core_agents',
+  'GET /api/core/tasks/:id/agents/:nodeId': 'action:core_agents',
+  'GET /api/core/tasks/:id/agents/stream': 'internal:stream',
+  'GET /api/core/tasks/:id/agents/export': 'human:download',
+  'GET /api/core/agents': 'action:core_agents',
+  // Сброс ключа обучения ведущего (этап 11, P140) — кнопка человека в настройках ведущего.
+  'POST /api/core/learned/reset': 'human:rights',
+  // Распределитель и активность локальных моделей (этап 11, зона C): ведущему пока не нужны.
+  'GET /api/core/allocator': 'gap:P3',
+  'GET /api/core/local/activity': 'gap:P3',
+  'GET /api/core/local/activity/stream': 'internal:stream',
+  // core-proxy/intake-snapshot-route.ts (этап 11, W3-16): снимок задачи трекера для формы запуска
+  // ядра. Действия нет (W3-19): снимок нужен только телу оценки, а оценка — кнопка человека;
+  // саму задачу агент уже читает `jira_issue`.
+  'GET /api/core-intake/tracker-snapshot': 'gap:P3',
 };

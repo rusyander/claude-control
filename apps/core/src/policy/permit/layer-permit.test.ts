@@ -145,6 +145,32 @@ describe('subagent: proven, within the ceiling, rank known (G5, F25)', () => {
     });
   });
 
+  it('no named ceiling: the CLI-reported model judges; an unranked report is no ceiling (chat allows, unit denies)', () => {
+    const reported = (model: string | null) =>
+      subagents({
+        ceilingRank: null,
+        reportedCeiling: () => (model === null ? null : { model, rank: RANKS[model] ?? null }),
+      });
+    expect(decidePermit(agent('plain', 'opus'), reported('sonnet'))).toMatchObject({
+      allow: false,
+      code: 'model-above-ceiling',
+      reason:
+        'subagent plain: requested model opus is above the session ceiling sonnet (reported by the CLI)',
+    });
+    const odd = { ...reported('glm-4.6') };
+    expect(decidePermit(agent('plain', 'haiku'), odd)).toMatchObject({
+      allow: false,
+      code: 'subagent-model-unknown',
+    });
+    odd.subagents = { ...odd.subagents!, openWithoutCeiling: true };
+    expect(decidePermit(agent('plain', 'haiku'), odd)).toEqual({
+      allow: true,
+      signal: null,
+      reason:
+        'subagent plain: requested model haiku, no ceiling is known for this chat (the CLI reported model glm-4.6, which has no known rank)',
+    });
+  });
+
   it('read-only step: allowed only when the denies hold inside the subagent', () => {
     expect(decidePermit(agent('cheap'), subagents(), 'review')).toMatchObject({ allow: true });
     expect(

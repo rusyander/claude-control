@@ -11,7 +11,7 @@ import { userGatewayStand, type UserGatewayStand } from './__fixtures__/user-gat
  * Негативные сценарии контура (`docs/PLATFORM.ru.md` § «Негативные сценарии», сторож
  * `tools/qa/check-negative-scenarios.mjs`) на настоящем пути CLI: `state.json` панели →
  * `userRouteOf` → шлюз человека на хосте звеньев → контур (заглушка `packages/stub-model`).
- * Раньше их доказывали тесты шлюза панели (`pipeline.integration.test.ts`); шлюз панели снят
+ * Раньше их доказывали тесты шлюза в панели (`pipeline.integration.test.ts`); шлюз в панели снят
  * (этап 10, C3d), и доказательство переехало туда, где запрос CLI теперь идёт.
  */
 

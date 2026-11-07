@@ -28,6 +28,9 @@ import { STAND_TITLE as standTitle } from './platform-stand-panel.mjs';
 
 export const SCRIPTED_TITLE = L('Сценарный контур', 'Scripted contour');
 const SCRIPTED_ID = 'scripted';
+const FRAMES = (process.env.FRAMES ?? '').split(',').filter(Boolean);
+const CHAT_FRAMES_ONLY =
+  FRAMES.length > 0 && FRAMES.every((id) => id === '01-shim-call' || id === '02-shim-quote');
 /** Порт постоянный: продолжение отладочной съёмки находит контур на том же адресе. */
 const STUB_PORT = Number(process.env.GUIDE_STUB_PORT ?? 5199);
 const SMOKE_OK = new RegExp(L('Пробный запрос прошёл', 'Test request went through'));
@@ -126,68 +129,59 @@ async function createScripted(page, url) {
 }
 
 /**
- * Новый чат через ядро, первый ход до конца. Путь человека: «Новый чат» в `/chat` открывает «Чат
- * через ядро» (`/core/chat`); папка проекта здесь подставлена адресом, как её подставляет открытый
- * проект, — у одноразовой панели проектов нет. Ход кончен, когда строка состояния говорит «ждёт
- * вашего сообщения» и в ленте уже есть ответ модели; отказ ядра или ошибка хода — исключение со
- * словами экрана, а не кадр.
+ * Новый чат, первый ход до конца. Путь человека: вкладка проекта (`/chat?project=<папка>` — у
+ * одноразовой панели проектов нет, адрес подставляет папку так же, как открытый проект), «Новый
+ * чат», сообщение, Enter: ход идёт задачей ядра на CLI активного провайдера. Ход кончен, когда
+ * кнопки «Остановить» нет, а в ленте стоят реплика человека и ответ модели; строка отказа ядра —
+ * исключение со словами экрана, а не кадр.
  */
 async function runChat(page, web, folder, text) {
-  await page.goto(`${web}/core/chat?project=${encodeURIComponent(folder)}`, {
+  await page.goto(`${web}/chat?project=${encodeURIComponent(folder)}`, {
     waitUntil: 'domcontentloaded',
   });
-  await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
-  await page.locator('[data-core-chat-first] textarea').fill(text);
-  // Ответы панели на старт — причина отказа: экран мог назвать лишь код статуса.
+  const input = page.locator('textarea[data-chat-input]');
+  await input.waitFor({ timeout: 90_000 });
+  await page
+    .getByRole('button', { name: exact('Новый чат', 'New chat') })
+    .first()
+    .click();
+  await pause(1000);
+  // Ответы панели на ход — причина отказа: экран мог назвать лишь код статуса.
   const answers = [];
   const listen = async (response) => {
-    if (!/\/api\/(chat\/core-start|core\/)/.test(response.url()) || response.status() < 400) return;
+    if (!/\/api\/(chat\/|core\/)/.test(response.url()) || response.status() < 400) return;
     const body = await response.text().catch(() => '');
     answers.push(`${response.status()} ${response.url().split('/api/')[1]}: ${body.slice(0, 600)}`);
   };
   page.on('response', listen);
-  await page.locator('[data-core-chat-submit]').click();
-  await page
-    .waitForURL(/[?&]id=/, { timeout: 60_000 })
-    .catch(async () => {
-      const why = await page
-        .locator('[data-core-chat-start-failed]')
-        .innerText()
-        .catch(() => '');
-      throw new Error(
-        `чат через ядро не начался: ${why || 'адрес задачи не появился'}\n  ${answers.join('\n  ')}`,
-      );
-    })
-    .finally(() => page.off('response', listen));
-  for (let i = 0; i < 240; i += 1) {
-    await pause(1000);
-    const refused = page.locator('[data-core-chat-launch-refused], [data-core-chat-error-line]');
-    if (await refused.count())
-      throw new Error(`ядро отказало: ${await refused.first().innerText()}`);
-    if (await page.locator('[data-core-chat-turn-failed], [data-core-chat-error]').count())
-      throw new Error(
-        `ход кончился ошибкой: ${await page.locator('[data-core-chat-thread]').innerText()}`,
-      );
-    const status = await page
-      .locator('[data-core-chat-status]')
-      .first()
-      .getAttribute('data-core-chat-status')
-      .catch(() => null);
-    const answered = await page.locator('[data-core-chat-assistant]').count();
-    if (status === 'waiting' && answered > 0) {
-      // Съёмка сама сторожит живую ленту, без перезагрузки: ход человека, записанный ядром
-      // после того, как первый опрос сеанса прошёл его место, раньше в ленту не попадал вовсе
-      // («живьём 0, после перезагрузки 1»). Пауза — чтобы следующие опросы успели показать
-      // повтор, если бы он был.
-      await pause(1500);
-      const humans = await page.locator('[data-core-chat-human]').count();
-      console.log(`  чат: реплик человека в живой ленте ${humans}`);
-      if (humans !== 1)
-        throw new Error(`в живой ленте реплик человека ${humans}, ждали одну — кадр плавал бы`);
-      return;
+  await input.fill(text);
+  await input.press('Enter');
+  const stop = page.getByRole('button', { name: exact('Остановить', 'Stop') });
+  try {
+    for (let i = 0; i < 240; i += 1) {
+      await pause(1000);
+      const refused = page.locator('[data-core-chat-launch-refused]');
+      if (await refused.count())
+        throw new Error(
+          `ядро отказало: ${await refused.first().innerText()}\n  ${answers.join('\n  ')}`,
+        );
+      const running = (await stop.count()) > 0;
+      const humans = await page.locator('[data-feed-message][class*="_rowUser"]').count();
+      const all = await page.locator('[data-feed-message]').count();
+      if (!running && humans > 0 && all > humans) {
+        // Пауза — чтобы следующие опросы успели показать повтор реплики, если бы он был.
+        await pause(1500);
+        const again = await page.locator('[data-feed-message][class*="_rowUser"]').count();
+        console.log(`  чат: реплик человека в ленте ${again}`);
+        if (again !== 1)
+          throw new Error(`в ленте реплик человека ${again}, ждали одну — кадр плавал бы`);
+        return;
+      }
     }
+  } finally {
+    page.off('response', listen);
   }
-  throw new Error('ход чата через ядро не кончился за 4 минуты');
+  throw new Error('ход чата не кончился за 4 минуты');
 }
 
 async function setDefaultModel(page, web, model) {
@@ -268,6 +262,9 @@ export async function shootScripted({ page, web, shots, leftovers = [] }) {
     if (existsSync(quoted))
       throw new Error('пример из забора исполнился — это дефект прослойки, а не кадр');
     await scripted.shot(page, '02-shim-quote');
+    // `FRAMES=01-shim-call,02-shim-quote` (с `GUIDE_STEPS=scripted`) — переснять только кадры
+    // чата: дальше путь ведёт на живой стенд (кадры 06–07), которому сценарный контур не нужен.
+    if (CHAT_FRAMES_ONLY) return;
 
     await openPlatformTab(page, web, 'tools');
     let area = await frameArea(

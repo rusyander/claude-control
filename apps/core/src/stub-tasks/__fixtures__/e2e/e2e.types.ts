@@ -1,4 +1,4 @@
-import type { ActionKind, JournalKind } from '@agentdeck/contracts/core/journal';
+import type { ActionKind, JournalDataV1, JournalKind } from '@agentdeck/contracts/core/journal';
 
 /**
  * Сквозной прогон задачи-заглушки (07 фаза 2, P10): ядро — дочерний процесс, его можно убить
@@ -48,6 +48,12 @@ export interface ChildConfig {
   /** Требования задачи с id ядра: пишутся в журнал до шага, заявка ссылается на них. */
   requirements?: { id: string; text: string }[];
   stepKind: string;
+  /**
+   * Встроенные инструменты сессии шага. Нет — `all`, как было (флаги CLI ничего не снимают, судит
+   * только дорога права). `by-step` — как в продукте (`session-start.ts`): набор вида шага
+   * `toolPlanFor(stepKind).builtins`, неизвестный вид — только чтение.
+   */
+  tools?: 'all' | 'read-only' | 'none' | 'by-step';
   until: Until;
   /** Задача уже есть (перезапуск ядра) — продолжаем её; нет — создаём. */
   taskId?: string;
@@ -58,6 +64,8 @@ export interface ChildConfig {
    * (`createUserLayerTap`) пишет отказы хуков в журнал, как в продукте.
    */
   layerMode?: 'on' | 'observe' | 'off';
+  /** Задача под ведением (`task.created.lead`, этап 11): сеанс единицы — исполнитель ведущего. */
+  lead?: JournalDataV1['task.created']['lead'];
   /** Пороги наблюдателя этапа 8 (тишина, порог без выученного p95): живой прогон — ниже 30 с; нет — спека. */
   observer?: { silentAfterMs?: number; stallDefaultMs?: number };
   /** Сколько ждать конца шага (мс). */

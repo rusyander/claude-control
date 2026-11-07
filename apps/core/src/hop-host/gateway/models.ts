@@ -3,7 +3,7 @@ import { refuseUpstreamStatus, sendUpstream, traceOf, type GatewayRequest } from
 import { openAiModelsToAnthropic } from './dialect/dialect.ts';
 
 /**
- * Список моделей (`GET /v1/models`) шлюза человека — перенос `models` шлюза панели. Путь в обоих
+ * Список моделей (`GET /v1/models`) шлюза человека — перенос `models` шлюза в панели. Путь в обоих
  * диалектах один, поэтому клиент узнаётся по `anthropic-version` (его шлёт каждый клиент
  * Anthropic). Контур отдаёт список по-OpenAI: клиенту OpenAI он уходит байт в байт (пересборка
  * потеряла бы поля, которых мост не знает), клиенту Anthropic — в его схеме. Ключ, отказы

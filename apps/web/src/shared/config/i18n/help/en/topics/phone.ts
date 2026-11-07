@@ -328,8 +328,10 @@ export const phoneEn: typeof phoneRu = {
     offlineQueue: 'A message while the agent is busy',
     offlineQueueText:
       'Goes to the agent at once: it reads it at its next step and carries on with the same ' +
-      'turn. Offline, with an attachment or with another CLI it goes into a queue that is ' +
-      'sent when the turn ends. A queued message never disappears silently: it either reaches ' +
+      'turn. In a chat on the core, a word sent when the answer is already done starts a turn ' +
+      'of its own: it shows in the feed as your message, and the answer to it sits separately ' +
+      'under it, not as a continuation of the previous one. Offline or with an attachment it ' +
+      'goes into a queue that is sent when the turn ends. A queued message never disappears silently: it either reaches ' +
       'the agent or stays in the queue while the chat says «The message was not sent» and why; ' +
       'one that failed on the network the phone sends by itself as soon as the panel answers ' +
       'again. A message that failed straight from the input field stays in the field: send it ' +

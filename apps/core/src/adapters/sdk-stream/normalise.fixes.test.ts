@@ -98,3 +98,132 @@ describe('sdk normaliser: core-s2 fixes', () => {
     expect(n.usage()).toMatchObject([{ messageId: 'm1', input: 4, output: 9 }]);
   });
 });
+
+/**
+ * s11 w3 (f) «готовготов»: ход Qwen Code с фоновым субагентом — ответ после результата вызова,
+ * уведомление CLI о конце субагента (`user`-текст без нашей отправки) и второй ответ модели в
+ * том же ходе (форма списана со `stdout.log` живого прогона `check-chat-next-turn.mjs`).
+ */
+describe('sdk normaliser: separate model messages of one turn', () => {
+  const message = (id: string, text: string): object[] => [
+    { type: 'stream_event', event: { type: 'message_start', message: { id } } },
+    {
+      type: 'stream_event',
+      event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+    },
+    { type: 'assistant', message: { id, content: [{ type: 'text', text }] } },
+    { type: 'stream_event', event: { type: 'message_stop' } },
+  ];
+  const texts = (events: AdapterEvent[]): string =>
+    events.map((e) => (e.type === 'text.delta' ? e.text : '')).join('');
+
+  it('the answer after a CLI notification is its own paragraph, not glued to the first', () => {
+    const n = new SdkNormaliser(NO_ECHO);
+    n.expect('c1', 'u1');
+    const events = feed(n, [
+      { type: 'system', subtype: 'init', session_id: 's' },
+      ...message('m1', 'готов'),
+      {
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Background agent "general-purpose" completed.' }],
+        },
+      },
+      ...message('m2', 'готов'),
+      result({ result: 'готов', num_turns: 3 }),
+    ]);
+    expect(texts(events)).toBe('готов\n\nготов');
+  });
+
+  it('pieces of one message stay glued; the next turn starts without a separator', () => {
+    const n = new SdkNormaliser(NO_ECHO);
+    n.expect('c1', 'u1');
+    n.expect('c2', 'u2');
+    const one = feed(n, [
+      { type: 'stream_event', event: { type: 'message_start', message: { id: 'm1' } } },
+      ...['гот', 'ов'].map((text) => ({
+        type: 'stream_event',
+        event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } },
+      })),
+      { type: 'stream_event', event: { type: 'message_stop' } },
+      result(),
+    ]);
+    const two = feed(n, [...message('m2', 'дальше'), result()]);
+    expect(texts(one)).toBe('готов');
+    expect(texts(two)).toBe('дальше');
+  });
+});
+
+/**
+ * s11 w3: частичные строки подагента (`stream_event` с `parent_tool_use_id` — форма
+ * `SDKPartialAssistantMessage` SDK: `parent_tool_use_id: string | null`, `uuid`, `session_id`)
+ * идут вперемешку с частичными строками главного контекста. Текст подагента не ответ сессии,
+ * а его `message_start` не начинает нового сообщения главного контекста.
+ */
+describe('sdk normaliser: subagent partial lines', () => {
+  const partial = (event: object, parent: string | null, uuid: string): object => ({
+    type: 'stream_event',
+    event,
+    parent_tool_use_id: parent,
+    uuid,
+    session_id: 's',
+  });
+  const text = (t: string): object => ({
+    type: 'content_block_delta',
+    index: 0,
+    delta: { type: 'text_delta', text: t },
+  });
+  const interleaved = (): object[] => [
+    { type: 'system', subtype: 'init', session_id: 's' },
+    partial(
+      { type: 'message_start', message: { id: 'p1', usage: { input_tokens: 4 } } },
+      null,
+      'a',
+    ),
+    partial(text('Запускаю'), null, 'b'),
+    partial(
+      {
+        type: 'message_start',
+        message: { id: 's1', model: 'sub-model', usage: { input_tokens: 7 } },
+      },
+      'toolu_task',
+      'c',
+    ),
+    partial(text('секрет подагента'), 'toolu_task', 'd'),
+    partial({ type: 'message_delta', usage: { output_tokens: 3 } }, 'toolu_task', 'e'),
+    partial({ type: 'message_stop' }, 'toolu_task', 'f'),
+    partial(text(' агента.'), null, 'g'),
+    partial({ type: 'message_delta', usage: { output_tokens: 5 } }, null, 'h'),
+    partial({ type: 'message_stop' }, null, 'i'),
+    result({ result: 'Запускаю агента.' }),
+  ];
+
+  it('subagent text never reaches the session answer, and the parent message is not split', () => {
+    const n = new SdkNormaliser(NO_ECHO);
+    n.expect('c1', 'u1');
+    const events = feed(n, interleaved());
+    const answer = events.map((e) => (e.type === 'text.delta' ? e.text : '')).join('');
+    expect(answer).toBe('Запускаю агента.');
+  });
+
+  it('usage stays with its own message: the subagent row is marked, the parent row keeps its output', () => {
+    const n = new SdkNormaliser(NO_ECHO);
+    n.expect('c1', 'u1');
+    const rows = feed(n, interleaved()).filter((e) => e.type === 'usage');
+    const byId = new Map(rows.map((e) => [e.type === 'usage' ? e.messageId : '', e]));
+    expect(byId.get('s1')).toEqual(
+      expect.objectContaining({
+        input: 7,
+        output: 3,
+        model: 'sub-model',
+        subagent: true,
+        parentToolUseId: 'toolu_task',
+      }),
+    );
+    expect(byId.get('p1')).toEqual(
+      expect.objectContaining({ input: 4, output: 5, parentToolUseId: null }),
+    );
+    expect(byId.get('p1')).not.toHaveProperty('subagent');
+  });
+});

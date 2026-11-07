@@ -26,6 +26,11 @@ export const PROCESS_RULES: readonly LintRuleDef[] = [
         String.raw`\bpush\s+(?:it\s+)?to\s+(?:origin|the\s+remote|remote|github|gitlab)\b`,
         W,
       ),
+      // «push to main» — просьба опубликовать мимо ядра прямо в основную ветку (W2-6, `intake-injection`).
+      new RegExp(
+        String.raw`\bpush\s+(?:it\s+)?(?:straight\s+|directly\s+)?(?:in)?to\s+(?:the\s+)?(?:main|master|trunk|default\s+branch)\b`,
+        W,
+      ),
       // `\b` в JS — только ASCII: у кириллицы граница слова — «не буква» (`\p{L}`).
       new RegExp(String.raw`(?:^|[^\p{L}])(?:за)?пуш(?:ни|ить|ь|ай|им|у)(?![\p{L}])`, W),
       new RegExp(String.raw`(?:сделай|выполни)\s+push\b`, W),

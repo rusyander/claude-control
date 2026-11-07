@@ -6,8 +6,8 @@
  * Правку вносят СЮДА и перегенерируют; XML руками не трогают. Служебный слой — тот же,
  * что в `docs/diagrams/kit-guide/generate.mjs` (общей библиотеки у наборов нет намеренно).
  *
- * Две страницы: как страницы панели доходят до ядра (прокладка, звенья) и как задача идёт от
- * формы запуска до шагов (оценка, деление, лента).
+ * Три страницы: как страницы панели доходят до ядра (прокладка, звенья), как задача идёт от
+ * формы запуска до шагов (оценка, деление, лента) и как её ведёт ведущий (класс, единицы, сборка).
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -513,6 +513,239 @@ legend(p2, 60, bottomOf(p2) + 60, [
   { caption: 'источник', edgeColour: FLOW.back, dashed: true },
 ]);
 
+// ─── Страница 3: ведущий ────────────────────────────────────────────────────
+
+const p3 = newPage('Ведущий', 'p3');
+heading(
+  p3,
+  60,
+  30,
+  'Ведущий: от разведки до публикации',
+  'Модель предлагает, решает одна функция ядра; каждое решение с причиной ложится в ленту. Класс задачи выбирает форму, единицы работают в пределах мест сеансов.',
+  1500,
+);
+
+// Ряд карточек одной высоты — по самой высокой: нижние края ровные, стрелки без ступенек.
+function evenRow(p, y, entries) {
+  const h = Math.max(...entries.map(([, , spec]) => cardH(spec, SW)));
+  return entries.map(([id, col, spec]) => card(p, id, sx(col), y, SW, { ...spec, h }));
+}
+
+const [recon, intakeCard, classCard, planCard] = evenRow(p3, 150, [
+  [
+    'd:recon',
+    0,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Разведка',
+      lines: [
+        'Только читает: карта до 20 строк — файлы с причиной, тесты, владельцы.',
+        'Тел файлов в карте нет.',
+      ],
+    },
+  ],
+  [
+    'd:intake',
+    1,
+    {
+      pal: C.check,
+      title: 'Разбор',
+      lines: [
+        'Карточка приёма: цель, пункты приёмки, до 4 развилок с рекомендацией.',
+        'Сама принимается только у задачи трекера с полем критериев и без развилок.',
+      ],
+    },
+  ],
+  [
+    'd:class',
+    2,
+    {
+      pal: C.check,
+      title: 'Класс и форма',
+      lines: [
+        'S — правка без плана; M — одна единица; L — единицы и сборка; XL — дочерние задачи.',
+        'Модель класс только поднимает, понижает человек.',
+      ],
+    },
+  ],
+  [
+    'd:plan',
+    3,
+    {
+      pal: C.check,
+      title: 'План',
+      lines: [
+        'Только M и шире: деление на единицы со своими путями.',
+        'Проверка деления называет каждый пробел одним отказом.',
+      ],
+    },
+  ],
+]);
+
+const ROW2 = recon.y + recon.h + 110;
+const [unitsCard] = evenRow(p3, ROW2, [
+  [
+    'd:units',
+    3,
+    {
+      pal: C.check,
+      icon: 'shape=process',
+      iconText: 'единица',
+      title: 'Единицы',
+      lines: [
+        'Своя сессия, копия, место сеанса, права и журнал — на любом CLI.',
+        'Субагентов внутри сессии нет: отказ «lead-worker».',
+      ],
+    },
+  ],
+  [
+    'd:review',
+    2,
+    {
+      pal: C.check,
+      title: 'Ревью и правки',
+      lines: ['Ревью у каждого класса, у L — у каждой единицы.', 'Ревьюер не слабее автора.'],
+    },
+  ],
+  [
+    'd:integrate',
+    1,
+    {
+      pal: C.check,
+      title: 'Сборка',
+      lines: [
+        'От 2 параллельных частей: ветки сливаются локально, общее изменение проверяется и смотрится ревью.',
+        'Конфликт останавливает публикацию и называет файлы.',
+      ],
+    },
+  ],
+  [
+    'd:publish',
+    0,
+    {
+      pal: C.check,
+      title: 'Финальная проверка и публикация',
+      lines: [
+        'Свой MR у каждой части, только после зелёной сборки.',
+        'MR частей ссылаются друг на друга.',
+      ],
+    },
+  ],
+]);
+
+const ROW3 = unitsCard.y + unitsCard.h + 80;
+evenRow(p3, ROW3, [
+  [
+    'd:ask',
+    0,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Вопросы человеку',
+      lines: [
+        'Развилки карточки, класс и деление (если «Всегда спрашивать»), предел кругов.',
+        'Карточка над лентой; ответ уходит командой.',
+      ],
+    },
+  ],
+  [
+    'd:slots',
+    1,
+    {
+      pal: C.panel,
+      title: 'Места сеансов',
+      lines: [
+        'Экономно 2, Сбалансировано 4, Максимум качества 6 — на все задачи машины.',
+        'Лишние ждут в очереди, отказа нет; чаты не считаются.',
+      ],
+    },
+  ],
+  [
+    'd:tiers',
+    2,
+    {
+      pal: C.store,
+      icon: 'shape=cylinder3',
+      iconText: 'память',
+      title: 'Ступени',
+      lines: [
+        'Неудача — следующая попытка ступенью выше: усилие до xhigh, затем модель, до потолка.',
+        'Меньше 85 % первых проходов из 20 — вид работы на ступень выше.',
+      ],
+    },
+  ],
+  [
+    'd:spend',
+    3,
+    {
+      pal: C.warn,
+      title: 'Расход',
+      lines: [
+        'Предела нет намеренно.',
+        'Больше двух верхних границ оценки — заметка в ленте, задача идёт дальше.',
+      ],
+    },
+  ],
+]);
+
+link(p3, 'd:recon', 'd:intake', 'карта', {
+  colour: FLOW.data,
+  exit: [1, 0.3],
+  entry: [0, (recon.y + recon.h * 0.3 - intakeCard.y) / intakeCard.h],
+});
+link(p3, 'd:intake', 'd:class', 'карточка', {
+  colour: FLOW.fwd,
+  exit: [1, 0.3],
+  entry: [0, (intakeCard.y + intakeCard.h * 0.3 - classCard.y) / classCard.h],
+});
+link(p3, 'd:class', 'd:plan', 'M, L, XL', {
+  colour: FLOW.fwd,
+  exit: [1, 0.3],
+  entry: [0, (classCard.y + classCard.h * 0.3 - planCard.y) / planCard.h],
+});
+link(p3, 'd:plan', 'd:units', 'деление', {
+  colour: FLOW.fwd,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+link(p3, 'd:class', 'd:review', 'S — без плана', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+link(p3, 'd:units', 'd:review', 'работа', {
+  colour: FLOW.fwd,
+  exit: [0, 0.5],
+  entry: [1, 0.5],
+});
+link(p3, 'd:review', 'd:integrate', 'L, XL', {
+  colour: FLOW.fwd,
+  exit: [0, 0.5],
+  entry: [1, 0.5],
+});
+link(p3, 'd:integrate', 'd:publish', 'зелёная', {
+  colour: FLOW.fwd,
+  exit: [0, 0.5],
+  entry: [1, 0.5],
+});
+
+routeEdges(p3);
+legend(p3, 60, bottomOf(p3) + 60, [
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'очередь мест', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'что ядро помнит', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'границы', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'данные', edgeColour: FLOW.data },
+  { caption: 'обход по классу', edgeColour: FLOW.back, dashed: true },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -541,12 +774,14 @@ const bounds = (p) => {
 
 const b1 = bounds(p1);
 const b2 = bounds(p2);
+const b3 = bounds(p3);
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
   `${pageXml(p1, b1.w, b1.h)}\n` +
   `${pageXml(p2, b2.w, b2.h)}\n` +
+  `${pageXml(p3, b3.w, b3.h)}\n` +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
-console.log(`записано ${OUT}: ${b1.w}×${b1.h} и ${b2.w}×${b2.h}`);
+console.log(`записано ${OUT}: ${b1.w}×${b1.h}, ${b2.w}×${b2.h} и ${b3.w}×${b3.h}`);

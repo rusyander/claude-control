@@ -17,8 +17,10 @@ import {
   scenarioOptions,
   scenarioValue,
 } from '../../model/launchDraft';
+import { sourceFieldsOf } from '../../model/launchSource';
 import type { DraftProblem, LaunchDraft, RepoDraft } from '../../model/launch.types';
 import { LaunchSection } from '../LaunchSection/LaunchSection';
+import { SourcePicker } from '../SourcePicker/SourcePicker';
 import styles from './LaunchForm.module.scss';
 
 interface LaunchFormProps {
@@ -48,14 +50,25 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
       'repos',
       draft.repos.map((r, i) => (i === index ? { ...r, ...patch } : r)),
     );
+  /** Проблема источника — кодом (`tracker-unread`, `items-empty`), иначе общая `source`. */
+  const sourceProblem = (() => {
+    const p = problems.find((x) => x.field === 'source');
+    if (!p) return undefined;
+    return p.message === 'tracker-unread' || p.message === 'items-empty' ? p.message : 'source';
+  })();
   const problemOf = (field: DraftProblem['field']): string | undefined => {
     const p = problems.find((x) => x.field === field);
     if (!p) return undefined;
     return t(`${P}.problems.${p.message === 'forge-only' ? 'forge-only' : field}`);
   };
 
-  const submit = () => {
-    const got = fieldsOf(draft, i18n.language);
+  const submit = async () => {
+    const source = await sourceFieldsOf(draft);
+    if (!source.ok) {
+      setProblems([{ field: 'source', message: source.problem }]);
+      return;
+    }
+    const got = fieldsOf(draft, i18n.language, source.fields);
     if (!got.ok) {
       setProblems(got.problems);
       return;
@@ -67,6 +80,7 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
   return (
     <LaunchSection title={t(`${P}.heading`)} name="form">
       <Stack gap="var(--spacing-sm)" data-core-launch-form>
+        <SourcePicker draft={draft} onDraft={setDraft} problem={sourceProblem} />
         <TextField
           label={t(`${P}.title`)}
           hint={t(`${P}.titleHint`)}
@@ -176,7 +190,7 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
           </Stack>
         </Stack>
         <div>
-          <Button onClick={submit} isLoading={pending} data-estimate-button>
+          <Button onClick={() => void submit()} isLoading={pending} data-estimate-button>
             {retrying ? t(`${P}.retry`) : t(`${P}.estimate`)}
           </Button>
         </div>

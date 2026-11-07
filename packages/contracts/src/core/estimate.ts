@@ -3,13 +3,14 @@ import { CHAT_ATTACHMENT_MAX_BYTES } from '../uploads.ts';
 import { commandIssues, commandProofSchema, type CommandIssue } from './commands.ts';
 import type { EstimateBasis } from './economy.ts';
 import { uuidv7 } from './ids.ts';
+import { INTAKE_SOURCES_MAX, intakeSourceSchema } from './intake.ts';
+import type { LeadProfile, LeadWarning, TaskClass } from './lead.ts';
 import {
   GRANT_OPS,
   LAUNCH_POLICIES,
   taskEnvNameSchema,
   taskSessionSchema,
 } from './journal-data.ts';
-import type { allowedRouteSchema } from './route-schema.ts';
 import { PRESET_IDS, scenarioRefSchema, type OverlayEntry, type ScenarioRef } from './scenario.ts';
 import type { GrantConfirmation, UserLayerReport } from './user-layer.ts';
 
@@ -73,6 +74,20 @@ export const estimateFieldsSchema = z.strictObject({
    * Только сценарий чата; имена `env` обязаны совпасть с ключами `env` тела в обе стороны.
    */
   session: taskSessionSchema.optional(),
+  /**
+   * Этап 11 (P133): снимок источника задачи (трекер, текст, голос, пункт группы); `request` тогда
+   * — его тело. Несколько пунктов — `sources`. Оба поля сразу — противоречие, его называет приём
+   * (`conductor/intake`), а не схема: здесь без уточнений, поля оценки только расширяются.
+   */
+  source: intakeSourceSchema.optional(),
+  sources: z.array(intakeSourceSchema).min(1).max(INTAKE_SOURCES_MAX).optional(),
+  /** Этап 11: разговор чата, из которого запуск; в задаче — `task.created.launchOrigin`. */
+  launchOrigin: z
+    .strictObject({
+      kind: z.literal('chat'),
+      conversationId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
+    })
+    .optional(),
 });
 export type EstimateFields = z.infer<typeof estimateFieldsSchema>;
 
@@ -131,35 +146,6 @@ export const TASK_ATTACHMENT_BODY_LIMIT = Math.ceil(CHAT_ATTACHMENT_MAX_BYTES / 
 export const taskAttachmentsPath = (taskId: string): string =>
   `/v1/tasks/${encodeURIComponent(taskId)}/attachments`;
 
-/**
- * Старт чата ядра из панели (этап 10, G13): веб шлёт оценку чата НЕ ядру напрямую, а этой ручке
- * панели. Панель дописывает слой (строку о тестах, набор, флаги наших слоёв) типизированными полями
- * `fields.session` и значениями `env` — ровно как ход реестра чата (`carryOfRunOptions`), — и
- * пересылает оценку ядру с доказательством страницы как есть: число страницы чеканит ядро, пир —
- * браузер, как у обычной прокладки. `session` и `env` веб не шлёт: их собирает только панель.
- */
-export const CHAT_START_ROUTE = '/api/chat/core-start';
-/** Код отказа ручки: слой панели не переносится в сеанс ядра (флаг без поля, длина, набор). */
-export const CHAT_START_CARRY_REFUSED = 'session-carry-refused';
-export const chatStartBodySchema = z.strictObject({
-  cmdId: uuidv7,
-  /** CLI, который веб назовёт `set-cli` следом: набор и строка собираются под него. */
-  cli: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
-  fields: estimateFieldsSchema,
-  proof: commandProofSchema,
-});
-export type ChatStartBody = z.infer<typeof chatStartBodySchema>;
-
-/**
- * Ответ ручки — ответ оценки ядра плюс `allowedRoutes`: маршрут контура, который панель решила для
- * этого чата (галочка «Чат» контура для Claude, `foreign:<cli>` для чужого CLI, обязательный
- * контур). Веб шлёт его `set-route` ДО `set-cli`, как ход реестра чата (`core-run.ts`): без этого
- * контур «по возможности» новый разговор из веба не вёл. Нет поля — контур чат не ведёт.
- */
-export type ChatStartReply = EstimateReply & {
-  allowedRoutes?: z.infer<typeof allowedRouteSchema>[];
-};
-
 /** Разбор тела оценки: ошибка — список проблем с путём, как у команды (400, P42). */
 export function parseEstimateBody(
   input: unknown,
@@ -196,4 +182,21 @@ export interface EstimateReply {
   userLayer: UserLayerReport;
   /** Гранты, которые человек подтверждает до запуска (06:108-112); нет — пусто. */
   grants: GrantConfirmation[];
+  /**
+   * Этап 11 (P144, W2-6, W3-16): ведение задачи, как его называет экран запуска — профиль,
+   * действующая параллельность и срезанные расширения; класс — когда решён (до разведки — `null`);
+   * ожидание места сеанса — мс, `null` — не оценено. Нет поля — задача не ведущего (чат, ревью).
+   */
+  lead?: {
+    profile: LeadProfile;
+    class: TaskClass | null;
+    parallelism: number;
+    warnings: LeadWarning[];
+    sessionWaitMs: number | null;
+  };
+  /**
+   * Этап 11 (D18, W3-18): `sources` из N пунктов — N задач одной группы; `taskId` выше — первая из
+   * `taskIds`. Нет поля — оценка создала одну задачу.
+   */
+  group?: { groupId: string; taskIds: string[] };
 }

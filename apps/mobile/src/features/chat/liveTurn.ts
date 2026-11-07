@@ -1,5 +1,14 @@
 import type { ChatMessage } from '@agentdeck/contracts';
-import type { StreamedTool } from '../../shared/lib/runs/types';
+import type { AgentRun, StreamedTool } from '../../shared/lib/runs/types';
+
+/**
+ * С какой отметки (часы сервера) ход живой. Чат на ядре отдаёт слово «на ходу» новым ходом того
+ * же прогона (`nextTurn` → `turnAt`): записанное в ленту до этой границы — прошлый ход, и тот же
+ * вызов оттуда не должен гасить вызов нового хода в потоке. Без границы — старт прогона.
+ */
+export function liveTurnStart(run: Pick<AgentRun, 'turnAt' | 'startedAt'>): number | undefined {
+  return run.turnAt ?? run.startedAt;
+}
 
 /**
  * Вызовы живого хода, которых ещё нет в ленте.

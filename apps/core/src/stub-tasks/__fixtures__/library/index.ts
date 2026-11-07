@@ -36,6 +36,12 @@ import { STAGE8_I } from './stage8-i.ts';
 import { STAGE8_M } from './stage8-m.ts';
 import { STAGE8_T } from './stage8-t.ts';
 import { STAGE8_W } from './stage8-w.ts';
+import { STAGE11_F } from './stage11-f.ts';
+import { STAGE11_G } from './stage11-g.ts';
+import { STAGE11_H } from './stage11-h.ts';
+import { STAGE11_I1 } from './stage11-i1.ts';
+import { STAGE11_I2 } from './stage11-i2.ts';
+import { STAGE11_N } from './stage11-n.ts';
 import { REREAD_LOOP, STALLED_STREAM } from './waste.ts';
 
 export { HAPPY_PATH, BASE_REPO, HELLO_FILE, HELLO_TEXT } from './happy-path.ts';
@@ -86,4 +92,11 @@ export const STUB_TASKS: readonly StubTask[] = [
   ...STAGE8_T,
   ...STAGE8_I,
   ...STAGE8_M,
+  // Этап 11: файл на зону, пока зона не подключена — пусто.
+  ...STAGE11_F,
+  ...STAGE11_G,
+  ...STAGE11_H,
+  ...STAGE11_I1,
+  ...STAGE11_I2,
+  ...STAGE11_N,
 ];

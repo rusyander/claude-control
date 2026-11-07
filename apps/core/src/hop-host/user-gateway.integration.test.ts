@@ -46,7 +46,7 @@ function spec(s: HopStand, over: Partial<HopRegisterSpec> = {}): HopRegisterSpec
   };
 }
 
-/** Чужой слушатель на свободном порту — прежний шлюз панели. */
+/** Чужой слушатель на свободном порту — прежний шлюз в панели. */
 async function holdPort(): Promise<{ server: Server; port: number }> {
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' });

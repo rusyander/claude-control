@@ -106,6 +106,7 @@ export function createObserverWiring(deps: ObserverWiringDeps): ObserverWiring {
     options: {
       ...(options.silentAfterMs === undefined ? {} : { silentAfterMs: options.silentAfterMs }),
       ...(options.stallDefaultMs === undefined ? {} : { stallDefaultMs: options.stallDefaultMs }),
+      ...(options.hostCheckMs === undefined ? {} : { hostCheckMs: options.hostCheckMs }),
     },
     ...(deps.permitPending ? { permitPending: deps.permitPending } : {}),
   });

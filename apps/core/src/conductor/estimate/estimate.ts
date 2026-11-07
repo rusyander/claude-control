@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import type { EstimateBody, EstimateReply } from '@agentdeck/contracts/core/estimate';
 import type { JournalDataV1, JournalLine } from '@agentdeck/contracts/core/journal';
 import { REVIEW_LINK_PRESET } from '@agentdeck/contracts/core/review-link';
 import type { ScenarioRef } from '@agentdeck/contracts/core/scenario';
 import { estimateFromHistory } from '../../economy/budget/index.ts';
-import { learnedCachePath, readLearned } from '../../economy/learned/index.ts';
+import { learnedPathsFor, readLearned, type LearnedTable } from '../../economy/learned/index.ts';
 import { linesAfter } from '../../journal/read-view.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
@@ -17,6 +17,8 @@ import {
   storeAttachment,
   taskAttachmentsDir,
 } from '../attachments/attachments.ts';
+// Не `intake/index.ts`: приём ведущего зовёт оценку (`estimateTask`) — модуль ожидания без колец.
+import { journalSessionWait, sessionMedianOf, sessionWaitOf } from '../intake/session-wait.ts';
 import { launchLint } from '../lint/launch-lint.ts';
 import { latestPresets, resolveScenario, scenarioPrecedence } from '../scenario/index.ts';
 import { sessionProblems } from '../task-env/index.ts';
@@ -188,19 +190,32 @@ function estimateOfDetail(detail: string): EstimateReply['estimate'] {
 }
 
 /** Выученное по законченным журналам дома ядра; нечитаемо — «истории нет», а не отказ оценки. */
-async function historyEstimate(
-  registry: TaskRegistry,
-  env: SplitEnv,
-  scenarioId: string,
-  projects: readonly string[],
-): Promise<EstimateReply['estimate']> {
-  const table = env.history
+async function historyTable(registry: TaskRegistry, env: SplitEnv): Promise<LearnedTable | null> {
+  return env.history
     ? await env.history()
-    : await readLearned({
-        tasksDir: registry.tasksDir,
-        cacheFile: learnedCachePath(dirname(registry.tasksDir)),
-      }).then((f) => ('value' in f ? f.value : null));
-  return table ? estimateFromHistory(table, { scenarioId, projects }) : NO_HISTORY;
+    : await readLearned(learnedPathsFor(registry.tasksDir)).then((f) =>
+        'value' in f ? f.value : null,
+      );
+}
+
+/**
+ * Ожидание места первого сеанса задачи ведущего (W3-16): по занятости мест и медиане сеанса,
+ * в журнал — повтор оценки отвечает тем же числом. Не ведущий или распределитель не подключён —
+ * строки нет (ответ `null`, «не оценено»).
+ */
+function journalLeadWait(
+  task: LiveTask,
+  env: SplitEnv,
+  table: LearnedTable | null,
+  cmdId: string,
+): void {
+  if (!task.state.created?.lead || !env.sessionOccupancy) return;
+  const wait = sessionWaitOf({
+    capacity: env.capacity(task).slots,
+    occupancy: env.sessionOccupancy(),
+    ...sessionMedianOf(table),
+  });
+  journalSessionWait(task, wait, cmdId);
 }
 
 /** Ответ по журналу задачи — один и для первого ответа, и для повтора. */
@@ -409,7 +424,7 @@ export async function createTask(
     ...(fields.lang ? { lang: fields.lang } : {}),
     // Только имена и настройки: значения `body.env` — в книгу в памяти строкой ниже.
     ...(fields.session ? { session: fields.session } : {}),
-    ...seed.created?.(),
+    ...seed.created?.(pinned),
   });
   if (body.env && fields.session?.env) env.taskEnv?.put(task.taskId, body.env);
   journalPlacementGrant(task, fields, cmdId);
@@ -435,7 +450,7 @@ export async function createTask(
         signal: BASE_PIN_SIGNAL,
         severity: p.pin.source === 'fresh' ? 'info' : 'warn',
         subject: p.repoKey,
-        detail: basePinDetail(p.pin.ref, p.sha, p.pin.note),
+        detail: basePinDetail(seed.pinRef?.(p.repoKey) ?? p.pin.ref, p.sha, p.pin.note),
       },
     });
   }
@@ -474,12 +489,10 @@ export async function createTask(
     refuse(task, null, cmdId);
     return { status: 202, reply: replyOf(registry, task.taskId, false) };
   }
-  const numbers = await historyEstimate(
-    registry,
-    env,
-    ref.id,
-    pinned.map((p) => p.repoKey),
-  );
+  const table = await historyTable(registry, env);
+  const numbers = table
+    ? estimateFromHistory(table, { scenarioId: ref.id, projects: pinned.map((p) => p.repoKey) })
+    : NO_HISTORY;
   task.append({
     kind: 'signal',
     actor: 'core',
@@ -491,6 +504,7 @@ export async function createTask(
       detail: JSON.stringify(numbers),
     },
   });
+  journalLeadWait(task, env, table, cmdId);
   if (isChatScenario(fields.scenario)) {
     startChatTask(task, fields, cmdId);
     return { status: 202, reply: replyOf(registry, task.taskId, false) };
@@ -538,10 +552,15 @@ export const REVIEW_LINK_PRESET_PROBLEM =
   `scenario ${REVIEW_LINK_PRESET}: opened only by POST /v1/review-link (it reads the MR from the ` +
   'forge); pick another scenario';
 
+/**
+ * Оценка человека. `seed` — дополнения ручки (этап 11: приём ведущего — профиль в `task.created`,
+ * строки критериев и решение приёма после единицы 0); по умолчанию — никаких.
+ */
 export async function estimateTask(
   body: EstimateBody,
   registry: TaskRegistry,
   env: SplitEnv,
+  seed: CreateSeed = {},
 ): Promise<EstimateOutcome> {
   // Тот же `cmdId` ещё создаётся — дождаться и ответить повтором, а не создать вторую задачу.
   const running = inflight.get(body.cmdId);
@@ -565,7 +584,7 @@ export async function estimateTask(
       : ['attachments: only a chat task takes attachments'];
     if (problems.length > 0) return { status: 422, problems };
   }
-  const work = createTask(body, registry, env);
+  const work = createTask(body, registry, env, seed);
   inflight.set(body.cmdId, work);
   try {
     return await work;

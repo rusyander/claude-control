@@ -92,6 +92,7 @@ export const decisionsEn: DecisionTexts = {
       raise: 'Ask the human',
       'skip-step': 'Skip the step',
       'end-unit': 'End the unit',
+      'launch-children': 'Launch the next child tasks',
       'finish-task': 'Finish the task',
       'fail-task': 'The task failed',
       'cancel-task': 'Cancel the task',
@@ -197,5 +198,18 @@ export const decisionsEn: DecisionTexts = {
   'layer-run': {
     label: 'User layer',
     outcomes: { 'as-asked': 'As asked', lowered: 'Lowered' },
+  },
+  intake: {
+    label: 'Task intake',
+    outcomes: { auto: 'Card accepted without a question', ask: 'Card awaits confirmation' },
+  },
+  classify: {
+    label: 'Task class',
+    outcomes: {
+      S: 'Class S — a single edit',
+      M: 'Class M — one unit and review',
+      L: 'Class L — several units and integration',
+      XL: 'Class XL — child tasks',
+    },
   },
 };

@@ -206,7 +206,24 @@ const PERMISSION = frame(
 
 const QUESTION = frame({ kind: 'tool', name: 'AskUserQuestion', input: QUESTIONS, id: 'ask-1' }, 1);
 
-export async function shootBasics(browser, web, scenario, home) {
+/**
+ * `FRAMES=01-project-empty[,…]` — переснять только эти кадры: остальные идут прежним путём (кадр
+ * зависит от состояния, которое оставил предыдущий), но не снимаются, а опись их не теряет.
+ */
+export const BASICS_ONLY = new Set(
+  (process.env.FRAMES ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean),
+);
+
+export async function shootBasics(browser, web, everyFrame, home) {
+  const scenario = {
+    shot: (page, id, options) =>
+      BASICS_ONLY.size === 0 || BASICS_ONLY.has(id)
+        ? everyFrame.shot(page, id, options)
+        : Promise.resolve(),
+  };
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const attachment = join(home, 'orders-export.md');
   writeFileSync(attachment, '# Формат выгрузки\n\nНомер, дата, сумма, статус.\n', 'utf8');
@@ -252,18 +269,17 @@ export async function shootBasics(browser, web, scenario, home) {
 
     await openProject(page, web);
 
-    // ── 01. Новый чат проекта — форма чата ядра ──────────────────────────────
-    // «Новый чат» ведёт на `/core/chat` (задача ядра в папке проекта); прежние разговоры
-    // открываются во вкладке проекта — за ними путь возвращается туда.
+    // ── 01. Новый чат проекта ────────────────────────────────────────────────
+    // Чат один: «Новый чат» открывает пустой разговор прямо во вкладке проекта, первое
+    // сообщение заведёт задачу ядра на CLI активного провайдера. Отдельной формы нет.
     await page
       .getByRole('button', { name: /^(Новый чат|New chat)/ })
       .first()
       .click();
-    await page.waitForURL(/\/core\/chat/);
+    await page.locator('textarea[data-chat-input]').waitFor();
     await page.waitForTimeout(1500);
     await scenario.shot(page, '01-project-empty');
-    // Проект уже открыт (рабочая область помнит его) — вкладка проекта встаёт сразу.
-    await page.goBack({ waitUntil: 'domcontentloaded' });
+    if (BASICS_ONLY.size > 0 && [...BASICS_ONLY].every((id) => id === '01-project-empty')) return;
     await page
       .getByRole('button', { name: /Экспорт заказов в CSV/ })
       .first()

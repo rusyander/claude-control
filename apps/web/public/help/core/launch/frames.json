@@ -401,6 +401,206 @@
         "png": "5d2c2f15dd14a2bf",
         "text": "9d2c87529e825ebe"
       }
+    },
+    {
+      "id": "09-lead",
+      "side": "panel",
+      "file": "09-lead.png",
+      "masked": 0,
+      "width": 988,
+      "height": 755,
+      "shotAt": "2026-11-07T08:47:19.627Z",
+      "text": "Настройки ведения Профиль задаёт ступени ролей и параллельность; правка проекта сильнее умолчаний машины. Предела расхода нет намеренно — расход судит наблюдатель. Область Умолчания машины Профиль Экономно Усилие medium у всех ролей, 2 сеанса сразу. Сбалансировано Усилие high, 4 сеанса сразу. По умолчанию. Максимум качества Разведка и план на ступень выше, ревью xhigh, 6 сеансов сразу. по профилю Подробно Сохранить Сброс обучения Ключ обучения поднимает ступень после провалов первых проходов. Сброс снимает подъём целиком; пробы до сброса больше не считаются. Проект Вид шага intake plan research split work review fix answer-reviewers report custom chat CLI Маршрут Модель Пусто — модель по умолчанию. Роль по виду шага Разбор Разведка План Работа Механическая работа Ревью Сборка Сбросить ключ",
+      "seal": {
+        "png": "06a3546e3875569b",
+        "text": "011efaf2bf08c69e"
+      },
+      "en": {
+        "file": "09-lead.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 755,
+        "shotAt": "2026-11-07T08:47:26.650Z",
+        "text": "Leading settings The profile sets role rungs and parallelism; a project edit beats the machine defaults. There is no spend cap on purpose — the observer judges spend. Scope Machine defaults Profile Economy Medium effort for every role, 2 sessions at once. Balanced High effort, 4 sessions at once. The default. Maximum quality Recon and plan one rung higher, review at xhigh, 6 sessions at once. from the profile Details Save Learning reset A learning key raises the rung after failed first passes. A reset removes the raise entirely; samples before it no longer count. Project Step kind intake plan research split work review fix answer-reviewers report custom chat CLI Route Model Empty — the default model. Role by step kind Intake Recon Plan Work Mechanical work Review Integration Reset the key",
+        "seal": {
+          "png": "b5ecdabf39598f03",
+          "text": "6a643f9bc995f266"
+        }
+      },
+      "dark": {
+        "file": "09-lead.dark.png",
+        "masked": 0,
+        "width": 988,
+        "height": 755,
+        "shotAt": "2026-11-07T08:47:33.868Z",
+        "text": "Настройки ведения Профиль задаёт ступени ролей и параллельность; правка проекта сильнее умолчаний машины. Предела расхода нет намеренно — расход судит наблюдатель. Область Умолчания машины Профиль Экономно Усилие medium у всех ролей, 2 сеанса сразу. Сбалансировано Усилие high, 4 сеанса сразу. По умолчанию. Максимум качества Разведка и план на ступень выше, ревью xhigh, 6 сеансов сразу. по профилю Подробно Сохранить Сброс обучения Ключ обучения поднимает ступень после провалов первых проходов. Сброс снимает подъём целиком; пробы до сброса больше не считаются. Проект Вид шага intake plan research split work review fix answer-reviewers report custom chat CLI Маршрут Модель Пусто — модель по умолчанию. Роль по виду шага Разбор Разведка План Работа Механическая работа Ревью Сборка Сбросить ключ",
+        "seal": {
+          "png": "706465db049a3c2b",
+          "text": "011efaf2bf08c69e"
+        }
+      },
+      "darkEn": {
+        "file": "09-lead.dark.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 755,
+        "shotAt": "2026-11-07T08:47:39.949Z",
+        "text": "Leading settings The profile sets role rungs and parallelism; a project edit beats the machine defaults. There is no spend cap on purpose — the observer judges spend. Scope Machine defaults Profile Economy Medium effort for every role, 2 sessions at once. Balanced High effort, 4 sessions at once. The default. Maximum quality Recon and plan one rung higher, review at xhigh, 6 sessions at once. from the profile Details Save Learning reset A learning key raises the rung after failed first passes. A reset removes the raise entirely; samples before it no longer count. Project Step kind intake plan research split work review fix answer-reviewers report custom chat CLI Route Model Empty — the default model. Role by step kind Intake Recon Plan Work Mechanical work Review Integration Reset the key",
+        "seal": {
+          "png": "47f28fba0d880fad",
+          "text": "6a643f9bc995f266"
+        }
+      }
+    },
+    {
+      "id": "10-items",
+      "side": "panel",
+      "file": "10-items.png",
+      "masked": 1,
+      "width": 954,
+      "height": 753,
+      "shotAt": "2026-11-07T08:49:19.017Z",
+      "text": "Источник Текст Задача трекера Голос Несколько пунктов Откуда требования: текст ниже, задача трекера, диктовка или несколько пунктов — одной задачей или группой. Как запустить пункты Одной задачей Группой — задача на пункт Ядро ставит задачу на каждый пункт; у задач одна группа. Пункт 1 Название пункта 1 Текст пункта 1 Пункт 2 Название пункта 2 Текст пункта 2 Добавить пункт",
+      "seal": {
+        "png": "189dc01ff183a98f",
+        "text": "300970b5146063b5"
+      },
+      "en": {
+        "file": "10-items.en.png",
+        "masked": 1,
+        "width": 954,
+        "height": 753,
+        "shotAt": "2026-11-07T08:49:38.980Z",
+        "text": "Source Text Tracker issue Voice Several items Where the requirements come from: the text below, a tracker issue, dictation or several items — as one task or as a group. How to run the items As one task As a group — a task per item The core creates a task per item; the tasks share one group. Item 1 Item 1 title Item 1 text Item 2 Item 2 title Item 2 text Add an item",
+        "seal": {
+          "png": "070f270b1c24ac85",
+          "text": "6ac13d2a0d70b7bc"
+        }
+      },
+      "dark": {
+        "file": "10-items.dark.png",
+        "masked": 1,
+        "width": 954,
+        "height": 753,
+        "shotAt": "2026-11-07T08:50:11.078Z",
+        "text": "Источник Текст Задача трекера Голос Несколько пунктов Откуда требования: текст ниже, задача трекера, диктовка или несколько пунктов — одной задачей или группой. Как запустить пункты Одной задачей Группой — задача на пункт Ядро ставит задачу на каждый пункт; у задач одна группа. Пункт 1 Название пункта 1 Текст пункта 1 Пункт 2 Название пункта 2 Текст пункта 2 Добавить пункт",
+        "seal": {
+          "png": "00b01f8d8b7d4a89",
+          "text": "300970b5146063b5"
+        }
+      },
+      "darkEn": {
+        "file": "10-items.dark.en.png",
+        "masked": 1,
+        "width": 954,
+        "height": 753,
+        "shotAt": "2026-11-07T08:50:48.980Z",
+        "text": "Source Text Tracker issue Voice Several items Where the requirements come from: the text below, a tracker issue, dictation or several items — as one task or as a group. How to run the items As one task As a group — a task per item The core creates a task per item; the tasks share one group. Item 1 Item 1 title Item 1 text Item 2 Item 2 title Item 2 text Add an item",
+        "seal": {
+          "png": "cdd3b5eeb2c5522c",
+          "text": "6ac13d2a0d70b7bc"
+        }
+      }
+    },
+    {
+      "id": "11-group-estimate",
+      "side": "panel",
+      "file": "11-group-estimate.png",
+      "masked": 5,
+      "width": 988,
+      "height": 633,
+      "shotAt": "2026-11-07T09:41:36.197Z",
+      "text": "Оценка Оценивается Задача 01a1b562-6e1e-7000-896c-cedf2f3bcf1c Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает Ведение Профиль Сбалансировано Класс задачи решится после разведки Сеансов сразу 4 Ожидание места сеанса сразу — место свободно Ступени ролей Разбор: потолок лестницы, усилие high Разведка: потолок лестницы, усилие high План: потолок лестницы, усилие high Работа: потолок лестницы, усилие high Механическая работа: ниже, если механика, усилие high Ревью: потолок лестницы, усилие high Сборка: потолок лестницы, усилие high Настроить для этого проекта Группа group-01a1b562-65ca-7141-adab-2bc5dedb654a: задач 2 Числа и ход ниже — первой задачи группы; каждая задача группы открывается в «Задачах ядра». Задача 1: 01a1b562-6e1e-7000-896c-cedf2f3bcf1c Задача 2: 01a1b562-6fd4-7000-ac9e-19d01082d643",
+      "seal": {
+        "png": "fabfe7847f9d24b8",
+        "text": "add8665957ffd94b"
+      },
+      "en": {
+        "file": "11-group-estimate.en.png",
+        "masked": 5,
+        "width": 988,
+        "height": 633,
+        "shotAt": "2026-11-07T09:41:55.015Z",
+        "text": "Estimate Estimating Task 01a1b562-a1bf-7000-bac7-0a2ea383e30a Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers Leading Profile Balanced Task class decided after recon Sessions at once 4 Session slot wait none — a slot is free Role rungs Intake: ladder ceiling, effort high Recon: ladder ceiling, effort high Plan: ladder ceiling, effort high Work: ladder ceiling, effort high Mechanical work: lower if mechanical, effort high Review: ladder ceiling, effort high Integration: ladder ceiling, effort high Configure for this project Group group-01a1b562-94fe-75e5-81bd-d1ff9a48dba2: 2 tasks The numbers and progress below are for the first task of the group; every task of the group opens in Core tasks. Task 1: 01a1b562-a1bf-7000-bac7-0a2ea383e30a Task 2: 01a1b562-a374-7000-84f8-21ff4acb9b85",
+        "seal": {
+          "png": "a20a2eb8c2b28b64",
+          "text": "e6af7c4192673698"
+        }
+      },
+      "dark": {
+        "file": "11-group-estimate.dark.png",
+        "masked": 5,
+        "width": 988,
+        "height": 633,
+        "shotAt": "2026-11-07T09:42:15.045Z",
+        "text": "Оценка Оценивается Задача 01a1b562-eb30-7000-aca1-c94091df54d1 Время неизвестно Токены неизвестно Разброс неизвестно истории прогонов нет — ядро чисел не придумывает Ведение Профиль Сбалансировано Класс задачи решится после разведки Сеансов сразу 4 Ожидание места сеанса не оценено Ступени ролей Разбор: потолок лестницы, усилие high Разведка: потолок лестницы, усилие high План: потолок лестницы, усилие high Работа: потолок лестницы, усилие high Механическая работа: ниже, если механика, усилие high Ревью: потолок лестницы, усилие high Сборка: потолок лестницы, усилие high Настроить для этого проекта Группа group-01a1b562-df4a-758e-83bf-6d7de1fcb219: задач 2 Числа и ход ниже — первой задачи группы; каждая задача группы открывается в «Задачах ядра». Задача 1: 01a1b562-eb30-7000-aca1-c94091df54d1 Задача 2: 01a1b562-ed8d-7000-980f-01a33f2282d0",
+        "seal": {
+          "png": "c73e401d19e64e98",
+          "text": "83bca5c3db89c148"
+        }
+      },
+      "darkEn": {
+        "file": "11-group-estimate.dark.en.png",
+        "masked": 5,
+        "width": 988,
+        "height": 633,
+        "shotAt": "2026-11-07T09:42:33.307Z",
+        "text": "Estimate Estimating Task 01a1b563-382a-7000-bf29-8fb95d1cab2e Time unknown Tokens unknown Spread unknown no run history — the core does not invent numbers Leading Profile Balanced Task class decided after recon Sessions at once 4 Session slot wait none — a slot is free Role rungs Intake: ladder ceiling, effort high Recon: ladder ceiling, effort high Plan: ladder ceiling, effort high Work: ladder ceiling, effort high Mechanical work: lower if mechanical, effort high Review: ladder ceiling, effort high Integration: ladder ceiling, effort high Configure for this project Group group-01a1b563-2cab-7532-86e2-6120c55429c8: 2 tasks The numbers and progress below are for the first task of the group; every task of the group opens in Core tasks. Task 1: 01a1b563-382a-7000-bf29-8fb95d1cab2e Task 2: 01a1b563-3a62-7000-86e8-d7065d4d6ee0",
+        "seal": {
+          "png": "b972bb718c9ce623",
+          "text": "0d73e405159537b8"
+        }
+      }
+    },
+    {
+      "id": "12-group-launch",
+      "side": "panel",
+      "file": "12-group-launch.png",
+      "masked": 1,
+      "width": 988,
+      "height": 326,
+      "shotAt": "2026-11-07T08:49:33.218Z",
+      "text": "Запуск Ждут вашего ответа о классе задачи — задач: 1. Класс выбирается в ленте задачи, кнопки для него здесь нет. Задача 2: 01a1b532-be2a-7000-8ece-8f5771ffca01 Каждая задача группы ждёт подтверждения своей карточки приёма. Кнопка отвечает каждой «Подтвердить карточку», как в её ленте; ответ записан в журнал задачи от вас. Подтвердить карточки группы: 1 Деление ещё не готово. Запустить группу: задач 2",
+      "seal": {
+        "png": "7141b418b4beafa2",
+        "text": "a0de8a63fe2c651d"
+      },
+      "en": {
+        "file": "12-group-launch.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 326,
+        "shotAt": "2026-11-07T08:50:05.734Z",
+        "text": "Launch Waiting for your answer about the task class — tasks: 1. The class is chosen in the task feed; there is no button for it here. Task 2: 01a1b533-1273-7000-a2cd-940a77704f4a Each group task waits for its intake card to be confirmed. The button answers each one “Confirm the card”, as in its feed; the answer is written to the task journal as yours. Confirm the group cards: 1 The split is not ready yet. Launch the group: 2 tasks",
+        "seal": {
+          "png": "d727bd3d31f41d54",
+          "text": "122c9d7470012cbc"
+        }
+      },
+      "dark": {
+        "file": "12-group-launch.dark.png",
+        "masked": 0,
+        "width": 988,
+        "height": 326,
+        "shotAt": "2026-11-07T08:50:41.802Z",
+        "text": "Запуск Ждут вашего ответа о классе задачи — задач: 1. Класс выбирается в ленте задачи, кнопки для него здесь нет. Задача 2: 01a1b533-90d6-7000-b82f-ba85ffc76372 Каждая задача группы ждёт подтверждения своей карточки приёма. Кнопка отвечает каждой «Подтвердить карточку», как в её ленте; ответ записан в журнал задачи от вас. Подтвердить карточки группы: 1 Деление ещё не готово. Запустить группу: задач 2",
+        "seal": {
+          "png": "494d409236437ed0",
+          "text": "32d7a31a8d190bff"
+        }
+      },
+      "darkEn": {
+        "file": "12-group-launch.dark.en.png",
+        "masked": 0,
+        "width": 988,
+        "height": 326,
+        "shotAt": "2026-11-07T08:51:10.861Z",
+        "text": "Launch Waiting for your answer about the task class — tasks: 1. The class is chosen in the task feed; there is no button for it here. Task 2: 01a1b534-204b-7000-8da1-fb4a55694e7f Each group task waits for its intake card to be confirmed. The button answers each one “Confirm the card”, as in its feed; the answer is written to the task journal as yours. Confirm the group cards: 1 The split is not ready yet. Launch the group: 2 tasks",
+        "seal": {
+          "png": "f499845589bf0b50",
+          "text": "4b3bc3ffaa089598"
+        }
+      }
     }
   ]
 }

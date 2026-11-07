@@ -1,4 +1,5 @@
 import type { GrantConfirmation } from '@agentdeck/contracts/core/user-layer';
+import type { IntakeSource } from '@agentdeck/contracts/core/intake';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 import type { PresetId, Scenario } from '@agentdeck/contracts/core/scenario';
 import type { TaskState } from '@agentdeck/contracts/core/states';
@@ -13,6 +14,31 @@ export interface RepoDraft {
 export type ScenarioChoice =
   { kind: 'preset'; id: PresetId } | { kind: 'library'; id: string; version: number };
 
+/** Пункт источника «несколько пунктов»: время — когда пункт правили (время его снимка). */
+export interface SourceItemDraft {
+  title: string;
+  body: string;
+  at: number;
+}
+
+/** Источник задачи на форме (этап 11, P133): текст, задача трекера, голос, несколько пунктов. */
+export interface SourceDraft {
+  mode: 'text' | 'tracker' | 'voice' | 'items';
+  trackerKey: string;
+  /** Снимок, прочитанный панелью; ключ поменяли — снимка нет. */
+  snapshot: IntakeSource | null;
+  /** Когда расшифровка диктовки последний раз менялась. */
+  voiceAt: number | null;
+  items: SourceItemDraft[];
+  /**
+   * Как запускать пункты: `one` — одна задача, ядро разбирает пункты вместе (по умолчанию);
+   * `group` — группа, задача на пункт (каждый пункт уходит видом `group-item`).
+   */
+  itemsAs: ItemsAs;
+}
+
+export type ItemsAs = 'one' | 'group';
+
 /** Черновик формы запуска: то, что человек набрал до оценки. */
 export interface LaunchDraft {
   title: string;
@@ -21,9 +47,10 @@ export interface LaunchDraft {
   scenario: ScenarioChoice;
   /** Ждать ли CI — живое решение человека для этой задачи (R:S1-09), по умолчанию нет. */
   ciWait: boolean;
+  source: SourceDraft;
 }
 
-export type DraftField = 'title' | 'request' | 'repos' | 'scenario';
+export type DraftField = 'title' | 'request' | 'repos' | 'scenario' | 'source';
 
 export interface DraftProblem {
   field: DraftField;

@@ -355,7 +355,11 @@ export interface RedBeforeResult {
 
 /** D§3.8 приоритет; внутри старение; потолок доли на проект (04:118). */
 export type QueueClass = 'deliver' | 'fix' | 'review' | 'work' | 'background';
-export type LeaseKind = 'check' | 'session' | 'window'; // 00:60; фаза 3 строит `check`
+/**
+ * 00:60; фаза 3 строит `check`, этап 11 — `session` (одна аренда на сеанс модели, P141). Окно
+ * арендой не бывает (D9): факты окна — общая книга `<home>/queue/window/`, а не очередь.
+ */
+export type LeaseKind = 'check' | 'session';
 export interface QueueTicket {
   ticketId: Uuidv7;
   kind: LeaseKind;
@@ -385,6 +389,52 @@ export interface QueueConfig {
   shareCap: number; // 0<x≤1 — доля слотов, которую проект может держать, пока ждёт другой (04:118)
   agingMs: number; // один шаг класса вверх за каждое такое ожидание (D§3.8, старение)
   beatMs: number; // период удара; устаревает после 3 пропущенных (D§3.8)
+  /**
+   * Этап 11 (P141): мест сеансов задач на машине по всем сборкам; действует min(профиль,
+   * `sessionSlots`, ёмкость маршрута). Нет — `SESSION_SLOTS_DEFAULT`.
+   */
+  sessionSlots?: number;
+}
+
+export const SESSION_SLOTS_DEFAULT = 6;
+
+/**
+ * Билет сеанса (этап 11, D9): `class` — класс очереди (`cls` плана), порядок и старение — те же,
+ * что у проверок. `holder` — процесс хоста сеанса, пока билет держит место; `null` — ждёт.
+ */
+export interface SessionTicket extends QueueTicket {
+  kind: 'session';
+  /** Шаг уже шёл (повторный вход): при равном классе идёт раньше нового. */
+  started: boolean;
+  /** Остаток оценки шага, мс; `null` — оценки нет. */
+  remainingMs: number | null;
+  /** Выученная длительность ключа шага, мс; `null` — истории нет. */
+  learnedMs: number | null;
+  waitingSince: number;
+  /**
+   * Аренда берётся ДО `openSession` (D9, `perform.ts` `runStep`): у только что выданного места
+   * сеанса ещё нет — `sessionId: null`, как `TaskView.waiting.holder.sessionId`.
+   */
+  holder: {
+    pid: number;
+    start: string;
+    sessionId: Uuidv7 | null;
+    /**
+     * CLI сеанса (личность от ОС): место возвращается, только когда доказанно мёртв и он — на
+     * POSIX CLI в своей группе переживает хост. `null`/нет — личность не прочитана или место
+     * записано сборкой без этого поля: судится один хост.
+     */
+    cli?: { pid: number; start: string } | null;
+  } | null;
+}
+
+/** Ответ `GET /v1/allocator` (этап 11): места, кто держит, кто ждёт и почему, сеансы чатов. */
+export interface AllocatorView {
+  capacity: { parallelism: number; sessionSlots: number; effective: number };
+  holders: SessionTicket[];
+  waiters: (SessionTicket & { reason: string })[];
+  /** Сеансы чатов: вне счёта мест, окно судит их всё равно. */
+  interactive: { taskId: Uuidv7; sessionId: Uuidv7; since: number }[];
 }
 
 /**

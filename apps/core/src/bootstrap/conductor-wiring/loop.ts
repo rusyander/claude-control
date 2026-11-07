@@ -1,4 +1,5 @@
 import type { AdapterEvent, CliAdapter, SessionHandle } from '../../adapters/index.ts';
+import type { SdkAdapter } from '../../adapters/sdk-stream/sdk-adapter.ts';
 import type {
   LaunchOptions,
   Prepared,
@@ -61,6 +62,9 @@ interface Open {
   road: RoadSession;
   /** Кому идут события: сессию прикрепили раньше шага (шаг в `checking`) — шаг забирает её себе. */
   on: SessionEvents;
+  stepId: string;
+  /** Конец потока уже назван (сам кончился или хост доказанно мёртв): второй раз — нет. */
+  gone?: true;
 }
 
 /** Порт сессии исполнителя на дороге ядра: запуск/прикрепление, отправка, остановка. */
@@ -75,6 +79,30 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
 } {
   const open = new Map<string, Open>();
   const ends = new Map<string, SessionEnd>();
+
+  const ended = (stepId: string, sessionId: string, entry: Open): void => {
+    if (entry.gone) return;
+    entry.gone = true;
+    deps.onEnded?.(stepId, sessionId);
+    entry.on.ended();
+  };
+
+  /**
+   * Хост сеанса доказанно мёртв (`host-dead` → lost: сверка хостов наблюдателя, этап 11): исход
+   * хоста не придёт, и поток сам не кончится — шаг ждал бы его вечно, держа место. Насос сеанса
+   * закрывается, `done` ведёт к обычному концу (место, исход шага); у переходника без доступа к
+   * насосу конец называется сразу.
+   */
+  const unwatch = deps.task.subscribe((line) => {
+    if (line.kind !== 'session.transition' || !line.sessionId) return;
+    if ((line.data as { to?: string }).to !== 'lost') return;
+    const o = open.get(line.sessionId);
+    if (!o || o.gone) return;
+    deps.note('session.host-lost', { sessionId: line.sessionId });
+    const pump = 'session' in o.adapter ? (o.adapter as SdkAdapter).session(o.handle) : undefined;
+    if (pump) pump.close();
+    else ended(o.stepId, line.sessionId, o);
+  });
 
   const events = (stepId: string, to: () => SessionEvents | undefined) => {
     // Инструмент считается по запросу и результату: конец хода с открытым — не безопасная точка.
@@ -158,11 +186,8 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
         ...(resumed?.replayed === undefined ? {} : { replayed: resumed.replayed }),
         onEvent: events(s.stepId, () => target.on),
       });
-      const entry: Open = Object.assign(target, { handle, adapter, road });
-      void road.done.then(() => {
-        deps.onEnded?.(s.stepId, sessionId);
-        entry.on.ended();
-      });
+      const entry: Open = Object.assign(target, { handle, adapter, road, stepId: s.stepId });
+      void road.done.then(() => ended(s.stepId, sessionId, entry));
       open.set(sessionId, entry);
       return { ok: true, sessionId, resumed: resumed !== undefined };
     },
@@ -178,6 +203,7 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
     end,
     async release() {
       for (const sessionId of [...open.keys()]) await end(sessionId, 'soft');
+      unwatch();
     },
   };
 }

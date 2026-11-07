@@ -15,10 +15,17 @@
 module.exports = {
   forbidden: [
     { name: 'no-circular', severity: 'error', from: {}, to: { circular: true } },
+    // env-failure.ts берёт динамическим импортом tools/tests-cli (`domain('env-failure')`) — граф его не видит.
     {
       name: 'no-orphans',
       severity: 'warn',
-      from: { orphan: true, pathNot: '\\.(d\\.ts|d\\.mts|test\\.tsx?|stories\\.tsx)$' },
+      from: {
+        orphan: true,
+        pathNot: [
+          '\\.(d\\.ts|d\\.mts|test\\.tsx?|stories\\.tsx)$',
+          '^apps/server/src/domains/project-tests/env-failure/env-failure\\.ts$',
+        ],
+      },
       to: {},
     },
     // Cross-feature запрещён: одна feature не тянет другую.

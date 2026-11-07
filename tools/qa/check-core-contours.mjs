@@ -4,7 +4,7 @@
  * свободном порту. Сеть и ключ живой платформы не нужны.
  *
  * Что проверяется:
- * 1. Запрос CLI через шлюз панели → расход ложится днём у звена ядра (файл
+ * 1. Запрос CLI через шлюз ядра → расход ложится днём у звена ядра (файл
  *    `<дом ядра>/hops/contour-spend.json`), а не в `state.json` панели; карточка расхода панели
  *    (`GET /api/platforms/:id/spend`) показывает ту же цифру по цене человека.
  * 2. Карточка шлюза (`GET /api/platforms/gateway`) — след запросов и счётчик от звена.
@@ -13,13 +13,15 @@
  * 4. Отказ 402 контура ставит отметку «исчерпан» у звена; снятие с карточки её убирает.
  * 5. Прогон чужого CLI с меткой `_run/<tag>` и сжатием у контура → звено отвечает «сжато в
  *    этом прогоне» и счёт вызовов с его начала; чужая метка — нет.
- * 6. Лента Claude (`GET /api/chats/:id/messages`) подписывает ответ «контур сжал историю» по
- *    журналу сжатий звена; у панели своего журнала нет.
+ * 6. Запрос Claude со сжатием у контура через шлюз ядра → лента Claude
+ *    (`GET /api/chats/:id/messages`) подписывает ИМЕННО этот ответ «контур сжал историю» по
+ *    журналу сжатий звена (id ответа выдало звено); прежний ответ — без подписи; у панели своего
+ *    журнала нет. Учёт засевается только трафиком звена — записи снаружи у ядра нет.
  *
  * Запуск: `node tools/qa/check-core-contours.mjs`. Код выхода: 0 / 1 провал / 2 стенд.
  */
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startHookSink } from './hook-sink.mjs';
 import { freePort, runOnStand, wait } from './throwaway-stand.mjs';
@@ -33,9 +35,26 @@ const KEY = ['spend', 'stub', 'key'].join('-');
 const PER_REQUEST_USD = 1.3;
 /** 1.3 из 1.4 — порог внимания (90 %), второй запрос — бюджет перейдён. */
 const BUDGET_USD = 1.4;
-/** Разговор Claude и id ответа, перед которым контур сжал историю (п. 6). */
+/**
+ * Разговор Claude (п. 6): прежний ответ шёл мимо сжатия; ответ, перед которым контур сжал
+ * историю, получает id от шлюза ядра и ложится в транскрипт строкой `LATER_ROW`.
+ */
 const CHAT = '0c0c0c0c-1111-4222-8333-c0c0c0c0c0c0';
-const SUMMARIZED_MESSAGE = 'msg_qa_contour_summarized';
+const EARLIER_MESSAGE = 'msg_qa_contour_unsummarized';
+const EARLIER_ROW = '0c0c0c0c-2222-4222-8333-c0c0c0c0c0c1';
+const LATER_ROW = '0c0c0c0c-2222-4222-8333-c0c0c0c0c0c2';
+
+/** Строка транскрипта Claude Code там, где её ищет лента панели. */
+function transcriptRow(cwd, type, message, uuid = randomUUID()) {
+  return {
+    type,
+    uuid,
+    sessionId: CHAT,
+    cwd,
+    timestamp: new Date().toISOString(),
+    message,
+  };
+}
 /** Метка прогона чужого CLI в адресе шлюза (п. 5). */
 const RUN_TAG = 'qa-run-1';
 
@@ -60,24 +79,21 @@ const standOptions = {
     // Разговор Claude, ответ которого контур «сжал» (п. 6): транскрипт там, где его ищет лента.
     const dir = join(cfg, 'projects', 'qa-contours');
     mkdirSync(dir, { recursive: true });
-    const row = (type, message) => ({
-      type,
-      uuid: randomUUID(),
-      sessionId: CHAT,
-      cwd: dir,
-      timestamp: new Date().toISOString(),
-      message,
-    });
     writeFileSync(
       join(dir, `${CHAT}.jsonl`),
       `${[
-        row('user', { role: 'user', content: 'длинный разговор' }),
-        row('assistant', {
-          id: SUMMARIZED_MESSAGE,
-          role: 'assistant',
-          model: 'stub-chat',
-          content: [{ type: 'text', text: 'ответ после сжатия' }],
-        }),
+        transcriptRow(dir, 'user', { role: 'user', content: 'длинный разговор' }),
+        transcriptRow(
+          dir,
+          'assistant',
+          {
+            id: EARLIER_MESSAGE,
+            role: 'assistant',
+            model: 'stub-chat',
+            content: [{ type: 'text', text: 'ответ до сжатия' }],
+          },
+          EARLIER_ROW,
+        ),
       ]
         .map((item) => JSON.stringify(item))
         .join('\n')}\n`,
@@ -103,6 +119,31 @@ async function chat(model = 'stub-chat', runTag) {
   });
   await res.text();
   return res.status;
+}
+
+/**
+ * Запрос Claude Code (Anthropic messages) через шлюз ядра; id ответа — тот, что выдало звено
+ * клиенту: из тела ответа, а при потоке — из кадра `message_start`.
+ */
+async function anthropic(model) {
+  const res = await fetch(`http://127.0.0.1:${gatewayPort}/${CONTOUR}/v1/messages`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      max_tokens: 16,
+      messages: [{ role: 'user', content: 'длинный разговор' }],
+    }),
+  });
+  const text = await res.text();
+  let messageId;
+  try {
+    messageId = JSON.parse(text)?.id;
+  } catch {
+    messageId = /"id":"(msg_[^"]+)"/.exec(text)?.[1];
+  }
+  return { status: res.status, messageId };
 }
 
 try {
@@ -285,7 +326,7 @@ try {
     };
     const runStart = Date.now();
     check(
-      'запрос прогона со сжатием прошёл через шлюз панели',
+      'запрос прогона со сжатием прошёл через шлюз ядра',
       (await chat('stub-summarizing', RUN_TAG)) === 200,
     );
     await until(
@@ -303,33 +344,55 @@ try {
     );
 
     // ── 6. Подпись «контур сжал историю» в ленте Claude ─────────────────
-    const messages = async () =>
-      (await stand.api(`/chats/${CHAT}/messages`)).body?.messages?.find(
+    const feed = async () =>
+      (await stand.api(`/chats/${CHAT}/messages`)).body?.messages?.filter(
         (message) => message.role === 'assistant',
-      );
-    const unsigned = await messages();
+      ) ?? [];
+    const unsigned = (await feed()).find((message) => message.id === EARLIER_ROW);
     check(
-      'до записи сжатия ответ без подписи',
+      'до запроса со сжатием ответ без подписи',
       unsigned !== undefined && unsigned.contextSummarized !== true,
       JSON.stringify(unsigned ?? null).slice(0, 300),
     );
-    // Сжатие перед ответом Claude засеваем записью снаружи — тот же учёт, что пишет звено.
-    const recorded = await core('/v1/contours/record', {
-      method: 'POST',
-      body: JSON.stringify({
-        platformId: CONTOUR,
-        summarized: {
-          at: new Date().toISOString(),
-          path: `/${CONTOUR}/v1/messages`,
-          messageId: SUMMARIZED_MESSAGE,
-        },
-      }),
-    });
-    check('запись сжатия принята звеном', recorded.status === 200, JSON.stringify(recorded.body));
+    // Сжатие перед ответом Claude — настоящим запросом Claude через шлюз ядра: id ответа выдаёт
+    // звено, им же подписывает журнал сжатий. Записи в учёт снаружи у ядра нет.
+    const summarizing = await anthropic('stub-summarizing');
+    const messageId = summarizing.messageId;
+    check(
+      'запрос Claude со сжатием прошёл через шлюз ядра, id ответа выдан звеном',
+      summarizing.status === 200 && /^msg_/.test(messageId ?? ''),
+      JSON.stringify({ status: summarizing.status, messageId }),
+    );
+    // Ответ ложится в транскрипт разговора, как его записал бы Claude Code.
+    appendFileSync(
+      join(stand.cfg, 'projects', 'qa-contours', `${CHAT}.jsonl`),
+      `${[
+        transcriptRow(join(stand.cfg, 'projects', 'qa-contours'), 'user', {
+          role: 'user',
+          content: 'ещё длиннее',
+        }),
+        transcriptRow(
+          join(stand.cfg, 'projects', 'qa-contours'),
+          'assistant',
+          {
+            id: messageId,
+            role: 'assistant',
+            model: 'stub-summarizing',
+            content: [{ type: 'text', text: 'ответ после сжатия' }],
+          },
+          LATER_ROW,
+        ),
+      ]
+        .map((item) => JSON.stringify(item))
+        .join('\n')}\n`,
+    );
+    // Лента зовёт строку транскрипта её uuid; id ответа модели лежит внутри строки.
     await until(
-      'лента панели: подпись у ТОГО ответа — из журнала звена',
-      messages,
-      (message) => message?.contextSummarized === true,
+      'лента панели: подпись у ТОГО ответа — из журнала звена, прежний ответ без неё',
+      feed,
+      (list) =>
+        list.some((message) => message.id === LATER_ROW && message.contextSummarized === true) &&
+        list.some((message) => message.id === EARLIER_ROW && message.contextSummarized !== true),
     );
     check(
       'журнал сжатий лежит у звена, у панели его нет',

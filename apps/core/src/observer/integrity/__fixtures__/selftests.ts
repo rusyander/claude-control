@@ -117,7 +117,57 @@ export const CONTEXT_55 = journalLines([
 
 export { started as sessionStarted, S1, STEP, ROUTE, RID };
 
+/** Строка расхода хода внутри вызова субагента `parent` (этап 11, P149). */
+export const subagentUsage = (parent: string, messageId: string, tokens = 1000) => ({
+  kind: 'turn.usage' as const,
+  sessionId: S1,
+  data: {
+    ...usage(S1, tokens, { subagent: true, messageId }).data,
+    parentToolUseId: parent,
+  },
+});
+
+const spawnedCall = (toolUseId: string) => ({
+  kind: 'agent.spawned' as const,
+  sessionId: S1,
+  data: {
+    sessionId: S1,
+    toolUseId,
+    parentToolUseId: null,
+    cliTaskId: `cli-${toolUseId}`,
+    kind: 'subagent',
+    subagentType: null,
+    model: null,
+    effort: null,
+    background: false,
+    depth: 1,
+    briefExcerpt: null,
+  },
+});
+
+export const sessionEnded = {
+  kind: 'session.transition' as const,
+  sessionId: S1,
+  data: { sessionId: S1, event: 'exited', from: 'live', to: 'ended' },
+};
+
+/** Расход назвал вызов, которого сессия так и не запустила, — сессия кончилась. */
+export const GHOST_SPEND = journalLines([
+  started(S1),
+  subagentUsage('toolu_ghost', 'm-g1'),
+  subagentUsage('toolu_ghost', 'm-g2'),
+  sessionEnded,
+]);
+/** Почти-двойник: строка расхода пришла раньше `agent.spawned` своего вызова, но он пришёл. */
+export const LATE_SPAWN = journalLines([
+  started(S1),
+  subagentUsage('toolu_late', 'm-l1'),
+  spawnedCall('toolu_late'),
+  sessionEnded,
+]);
+
 export const SELFTESTS: SelftestPair[] = [
+  { signal: 'spend-misattributed', fires: GHOST_SPEND, silent: LATE_SPAWN },
   { signal: 'resource-leak', fires: LEAKED_LEASE, silent: RELEASED_LEASE },
   { signal: 'window', fires: WINDOW_REFUSAL, silent: WINDOW_STEADY },
   {

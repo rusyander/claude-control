@@ -31,13 +31,25 @@ function repo(name: string, file?: string): { repoKey: string; path: string } {
 }
 
 describe('scenario presets and library', () => {
-  it('nine presets (chat, ask and review-link included), every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
-    expect(PRESETS.map((p) => p.id).sort()).toEqual([...PRESET_IDS].sort());
+  it('ten presets (chat, ask, review-link and lead included), every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
+    expect([...new Set(PRESETS.map((p) => p.id))].sort()).toEqual([...PRESET_IDS].sort());
     for (const p of PRESETS) {
       expect(scenarioSchema.safeParse(p).success).toBe(true);
       expect({ id: p.id, problems: scenarioProblems(p) }).toEqual({ id: p.id, problems: [] });
     }
-    expect(latestPresets()).toHaveLength(9);
+    expect(latestPresets()).toHaveLength(10);
+  });
+
+  it('tracker-ticket@2 is lead@1 plus the tracker status step; @1 stays frozen and latest picks @2', () => {
+    const lead = PRESETS.find((p) => p.id === 'lead' && p.version === 1)!;
+    const v1 = PRESETS.find((p) => p.id === 'tracker-ticket' && p.version === 1)!;
+    const v2 = PRESETS.find((p) => p.id === 'tracker-ticket' && p.version === 2)!;
+    expect(v2.presetOf).toEqual({ id: 'lead', version: 1 });
+    expect(v2.steps.map((s) => s.id)).toEqual([...lead.steps.map((s) => s.id), 'tracker-status']);
+    expect(v2.steps.find((s) => s.id === 'plan')!.onlyFor).toEqual(['M', 'L', 'XL']);
+    expect(v1.steps.map((s) => s.id)[0]).toBe('intake');
+    expect(v1.presetOf).toBeUndefined();
+    expect(latestPresets().find((p) => p.id === 'tracker-ticket')!.version).toBe(2);
   });
 
   it('library versions are write-once: same text again is "same", another text is version-taken, preset id refused', async () => {

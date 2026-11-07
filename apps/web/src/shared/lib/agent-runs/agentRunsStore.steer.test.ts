@@ -130,6 +130,73 @@ describe('agentRuns — слово агенту на ходу', () => {
     stream.close();
   });
 
+  // core-chat-012: чат чужого CLI на ядре. Ядро доставляет слово «на ходу» новым ходом того же
+  // прогона; транскрипта такого CLI панель не читает, и слово, убранное по концу прогона, пропадало
+  // с экрана, а ответ на него дописывался к прежнему одним текстом.
+  it('граница хода (nextTurn): слово уходит в ленту, поток рисует новый ход, по концу оно не пропадает', async () => {
+    agentRuns.setActiveId('st-turn');
+    void agentRuns.start({ chatId: 'st-turn', prompt: 'ход-41', projectPath: '/p' });
+    stream.push(
+      '{"kind":"session","sessionId":"sess-t","model":"m","tools":0,"startedAt":1000,"seq":1}',
+    );
+    stream.push('{"kind":"text","text":"готов","seq":2}');
+    // Прошлый ход оставил вызов чтения и открытый вопрос человеку (F-08).
+    stream.push('{"kind":"tool","name":"Read","input":{"file_path":"a.ts"},"id":"r1","seq":3}');
+    stream.push(
+      '{"kind":"tool","name":"AskUserQuestion","input":{"questions":[]},"id":"q1","seq":4}',
+    );
+    await settle();
+    post.mockResolvedValueOnce({ data: { steered: true } });
+    expect(await agentRuns.steer('st-turn', { prompt: 'ход-42' })).toBe('steered');
+    stream.push('{"kind":"steer","text":"ход-42","at":"2026-11-06T10:00:00.000Z","seq":5}');
+    stream.push('{"kind":"nextTurn","prompt":"ход-42","at":5000,"seq":6}');
+    await settle();
+
+    const run = getRun('st-turn');
+    expect(run.sentFromQueue).toEqual({ id: 'turn-5000', prompt: 'ход-42' });
+    expect(pendingBubbles(run)).toEqual([]);
+    expect(run.text).toBe('');
+    expect(run.turnAt).toBe(5000);
+    expect(run.startedAt).toBe(1000);
+    // Открытый вопрос переживает границу хода — на него ещё не ответили; чтение ушло с ходом.
+    expect(run.tools.map((tool) => tool.id)).toEqual(['q1']);
+
+    stream.push('{"kind":"text","text":"готов","seq":7}');
+    await settle();
+    expect(getRun('st-turn').text).toBe('готов');
+    stream.push('{"kind":"done","costUsd":0,"durationMs":1,"sessionId":"sess-t","seq":8}');
+    stream.close();
+    await settle();
+    // Пузырь потока на экране держит ответ ход-42, а не склейку двух ответов.
+    expect(getRun('st-turn').text).toBe('готов');
+    agentRuns.setActiveId(undefined);
+  });
+
+  // Граница хода (`turnAt`) — свойство одного прогона. Новый прогон того же разговора без сброса
+  // унёс бы её до события session: лента считала бы живым ходом то, что уже лежит в истории.
+  it('новый прогон того же разговора стартует без границы хода прошлого (turnAt)', async () => {
+    const second = openStream();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(stream.response).mockResolvedValue(second.response),
+    );
+    void agentRuns.start({ chatId: 'st-turn-2', prompt: 'ход-1', projectPath: '/p' });
+    stream.push('{"kind":"session","sessionId":"sess-t2","model":"m","tools":0,"seq":1}');
+    stream.push('{"kind":"nextTurn","prompt":"ход-2","at":7000,"seq":2}');
+    await settle();
+    expect(getRun('st-turn-2').turnAt).toBe(7000);
+    stream.push('{"kind":"done","costUsd":0,"durationMs":1,"sessionId":"sess-t2","seq":3}');
+    stream.close();
+    await settle();
+
+    void agentRuns.start({ chatId: 'st-turn-2', prompt: 'ход-3', projectPath: '/p' });
+
+    expect(getRun('st-turn-2').status).toBe('running');
+    expect(getRun('st-turn-2').turnAt).toBeUndefined();
+    second.close();
+    await settle();
+  });
+
   it('запрос «на ходу» отказан — «Передаётся…» сменяется очередью', async () => {
     void agentRuns.start({ chatId: 'st-wait-2', prompt: 'первое' });
     await settle();

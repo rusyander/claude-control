@@ -6,10 +6,12 @@ import { reviewBaseOf, unitCopyOf } from '../../conductor/copy/index.ts';
 import type { RunEconomy } from '../../conductor/run/run.types.ts';
 import type { PackFile, ReviewPackInput } from '../../context/review-pack/index.ts';
 import { reviewInputsOf } from '../../context/review-pack/index.ts';
-import { learnedCachePath, readLearned, type LearnedTable } from '../../economy/learned/index.ts';
+import { learnedPathsFor, readLearned, type LearnedTable } from '../../economy/learned/index.ts';
 import type { TierLadder } from '../../economy/tier.types.ts';
 import type { WindowBook } from '../../economy/window/index.ts';
 import type { LiveTask } from '../../journal/resume.ts';
+import { layoutOf } from '../../platform/core-home.ts';
+import { readCoreConfig } from '../../platform/core-config/read.ts';
 import { diffFileOf, diffUnit } from '../../platform/git.ts';
 import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { SessionTokens } from '../../policy/session-tokens/session-tokens.ts';
@@ -18,6 +20,7 @@ import type { SessionKeyBook } from '../session-keys.ts';
 import type { ContextWiring } from './context.ts';
 import { createRunEconomy } from './continuation.ts';
 import { laddersOf } from './ladders.ts';
+import { learnedRaiseFor } from './routing-facts.ts';
 
 /**
  * Экономика исполнителя в сборе (этап 5, W): `boot.ts` строит её один раз — та же книга окон, что
@@ -64,6 +67,9 @@ export interface BootEconomy {
 
 /** Короче — не секрет, а совпадение: маска по значению съела бы обычные слова диффа. */
 const MIN_KNOWN = 8;
+
+/** Выученное старше этого перечитывается в фоне при суде шага (подъём по обучению, F1). */
+const LEARNED_REFRESH_MS = 60_000;
 
 /**
  * Секреты окружения сеанса: токен шага, который дорога кладёт в окружение CLI, значения пина
@@ -125,13 +131,32 @@ export async function unitReviewInput(
 export function bootEconomy(deps: BootEconomyDeps): BootEconomy {
   const now = deps.now ?? Date.now;
   let learned: LearnedTable | null = null;
+  // Последняя прочитанная таблица — для подъёма по обучению: сбой чтения каталога задач не
+  // снимает заработанный подъём (P140: автоматического понижения нет), суд идёт по ней.
+  let lastRead: LearnedTable | null = null;
+  let readAt = Number.NEGATIVE_INFINITY;
+  let reading = false;
   const history = async (): Promise<LearnedTable | null> => {
-    const got = await readLearned({
-      tasksDir: deps.tasksDir,
-      cacheFile: learnedCachePath(dirname(deps.tasksDir)),
-    });
+    readAt = now();
+    const got = await readLearned(learnedPathsFor(deps.tasksDir));
     learned = 'value' in got ? got.value : null;
+    if (learned) lastRead = learned;
     return learned;
+  };
+  // Подъём по обучению судит по прочитанному; старше минуты — перечитать в фоне (F1: задача,
+  // законченная после запуска ядра, учит следующую без перезапуска).
+  const refresh = (): void => {
+    if (reading || now() - readAt < LEARNED_REFRESH_MS) return;
+    reading = true;
+    void history()
+      .catch(() => undefined)
+      .finally(() => {
+        reading = false;
+      });
+  };
+  const leadSection = () => {
+    const read = readCoreConfig(layoutOf(dirname(deps.tasksDir)));
+    return 'value' in read ? read.value.doc.lead : undefined;
   };
   const known = (taskId: string, sessionId: string): readonly string[] => {
     const pin = deps.pin();
@@ -160,6 +185,11 @@ export function bootEconomy(deps: BootEconomyDeps): BootEconomy {
           journaledSessionDir(where.task, where.sessionId),
         ),
     ...(deps.windowOf ? { windowOf: deps.windowOf } : {}),
+    // Раздел ведущего — на каждый шаг, как у распределителя мест: правка доходит без перезапуска.
+    facts: {
+      leadSection,
+      learnedRaise: learnedRaiseFor({ table: () => lastRead, leadSection, refresh }),
+    },
   });
   return { run, known, history, learned: () => learned, ladders };
 }

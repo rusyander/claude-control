@@ -1,6 +1,8 @@
 import type { ConductorHandle, ConductorWiringDeps, ZoneHooks } from './conductor-wiring.types.ts';
 import { guardHooks } from './guard.ts';
 import { humanHooks } from './human.ts';
+import { integrationHooks } from './integration.ts';
+import { leadHooks } from './lead.ts';
 import { publishHooks, publishWiringFor } from './publish.ts';
 import { loopHooks } from './loop.ts';
 import { observerHooks } from './observer.ts';
@@ -9,7 +11,7 @@ import { requirementsHooks } from './requirements.ts';
 import { reviewLinkHooks, reviewLinkWiringFor } from './review-link.ts';
 import { scenarioHooks, type ScenarioWiringDeps } from './scenario.ts';
 import { processPin } from './session-start.ts';
-import { splitEnvFor, splitHooks } from './split.ts';
+import { splitEnvFor, splitHooks, xlPortFor } from './split.ts';
 import { userLayerHooks } from './user-layer.ts';
 import { wiringHooks } from './wiring.ts';
 
@@ -23,9 +25,14 @@ import { wiringHooks } from './wiring.ts';
  */
 export const ZONE_ORDER: readonly ZoneHooks[] = [
   wiringHooks,
+  // Ворота интеграции (этап 11, W3-18b) — сразу за копией: конфликт голов краснит шаг раньше
+  // финальной проверки, которая без копии не идёт.
+  integrationHooks,
   scenarioHooks,
   splitHooks,
   requirementsHooks,
+  // Ведущий (этап 11, зона F) — после требований: карточка разбора собирается из уже записанных строк.
+  leadHooks,
   humanHooks,
   userLayerHooks,
   observerHooks,
@@ -80,6 +87,9 @@ export function startConductor(deps: ConductorWiringDeps): ConductorHandle {
         ...(deps.economy ? { economy: deps.economy } : {}),
         ...(deps.measureBase ? { measureBase: deps.measureBase } : {}),
         ...(deps.taskEnv ? { taskEnv: deps.taskEnv } : {}),
+        ...(deps.allocator ? { allocator: deps.allocator.seats } : {}),
+        // Родитель XL ждёт детей и запускает следующую волну (Q-2 s11).
+        xl: xlPortFor(deps),
       });
     },
     running: () => loops?.running() ?? [],

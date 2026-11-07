@@ -184,7 +184,7 @@ export const panelTextsRu: PanelTextDictionary = {
   'value-key-state': 'сохранён ({{state}})',
   'value-probe-never': 'не проверялся',
   'value-happens-rollback': 'применения «{{previous}}» снимаются, затем проба и пробный запрос',
-  'value-happens-probe': 'проба и пробный запрос через шлюз панели',
+  'value-happens-probe': 'проба и пробный запрос через шлюз ядра',
   'value-file-shape':
     '{{path}} перепишется целиком в формате панели (отступ 2 пробела): часть строк диффа меняет только отступы, не значения',
   'note-rule-group-off':
@@ -277,6 +277,11 @@ export const panelTextsRu: PanelTextDictionary = {
   'journal-compare-providers': 'Сравнение CLI',
   'journal-local-models-status': 'Локальные модели: состояние',
   'journal-kit-status': 'Набор панели: состояние',
+  'journal-core-tasks': 'Задачи ядра',
+  'journal-core-task': 'Задача ядра',
+  'journal-core-report': 'Отчёт задачи ядра',
+  'journal-core-lead-settings': 'Настройки ведущего ядра',
+  'journal-core-agents': 'Агенты ядра',
   'journal-env-passport': 'Паспорт среды',
   'journal-list-plugins': 'Список плагинов',
   'journal-list-available-plugins': 'Каталог плагинов',

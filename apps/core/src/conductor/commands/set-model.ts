@@ -1,5 +1,6 @@
 import type { COMMAND_FIELDS } from '@agentdeck/contracts/core/commands';
 import type { z } from 'zod';
+import { reviewAuthorOf } from '../../economy/review-author.ts';
 import { decideTier } from '../../economy/tier.ts';
 import { modelRank } from '../../economy/tier-ladder.ts';
 import type { OverrideRow, TierLadder } from '../../economy/tier.types.ts';
@@ -62,23 +63,16 @@ export function ladderRank(ladders: Readonly<Record<string, TierLadder>>): Model
   return (adapter, model) => modelRank(ladders[adapter], model);
 }
 
-const AUTHOR_KINDS: ReadonlySet<string> = new Set(['work', 'fix']);
-
-/** Идущие шаги ревью и автор каждого — последний шаг работы/правки той же единицы до ревью. */
+/**
+ * Идущие шаги ревью и автор каждого — по общему правилу `reviewAuthorOf` (то же у пола ревьюера
+ * суда `tier`): предупреждение команды и подъём на старте шага смотрят на одного автора.
+ */
 function reviewAuthors(state: TaskFoldState): { review: string; author: string; unitId: string }[] {
-  const steps = Object.entries(state.steps);
   const out: { review: string; author: string; unitId: string }[] = [];
-  for (const [id, step] of steps) {
+  for (const [id, step] of Object.entries(state.steps)) {
     if (step.stepKind !== 'review' || ENDED_STEP.has(step.state) || step.outcome) continue;
-    const author = steps
-      .filter(
-        ([, s]) =>
-          s.unitId === step.unitId &&
-          AUTHOR_KINDS.has(s.stepKind) &&
-          s.startedSeq < step.startedSeq,
-      )
-      .sort(([, a], [, b]) => b.startedSeq - a.startedSeq)[0];
-    if (author) out.push({ review: id, author: author[0], unitId: step.unitId });
+    const author = reviewAuthorOf(state, { stepId: id, unitId: step.unitId });
+    if (author) out.push({ review: id, author, unitId: step.unitId });
   }
   return out;
 }

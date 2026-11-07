@@ -144,7 +144,8 @@ export const providersEn: typeof providersRu = {
     mapChat: 'Chat and assistant',
     mapChatValue:
       'The full chat with streaming, attachments and parallel agents is Claude. A ' +
-      'conversation with another CLI runs in “Core chat”: the core holds the CLI session, ' +
+      'conversation with another CLI runs in the same chat while its provider is active: the ' +
+      'core holds the CLI session, ' +
       'not the panel. The core can continue a started conversation with Claude, Codex, ' +
       'Gemini CLI, Qwen Code, Goose and Kimi Code — from the transcript the CLI itself ' +
       'confirmed (Gemini through the ACP session/load call). OpenCode and Cursor have no ' +

@@ -2,7 +2,11 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { journalRecorder } from '../bootstrap/session-road/recorder.ts';
+import { CREATED, deps as journalDeps } from '../journal/__fixtures__/journal-harness.ts';
+import { createTask } from '../journal/resume.ts';
 import { ensureHopHost } from '../routes/hops/hops.ts';
+import { createStubRoute, parseStubServerRef } from '../routes/stub/stub.ts';
 import { launchSession } from '../session-host/launch.ts';
 import { sweepStaleLive } from '../../vitest.temp-sandbox.ts';
 import { coreIdentitiesUnder, reapCoreProcessesUnder } from './__fixtures__/reap-home.ts';
@@ -99,4 +103,33 @@ describe('reap the detached core processes recorded under one home', () => {
     // Каталог прогона до прохода 6: его остатки — решение человека, процессы не трогаются.
     expect(await alive(kept.host)).toBe(true);
   }, 120_000);
+
+  it('stub-route server recorded only by the task journal (resource.created) dies with its home', async () => {
+    // Сервер заглушки маршрута (этап 11) переживает ядро (P10) и записан ТОЛЬКО строкой
+    // `resource.created` журнала задачи — ни `procs.json`, ни `host.json`. До правки уборка его
+    // не видела: прерванный прогон оставлял серверы жить (07.11: 1 в основном дереве, 10 в копии).
+    const tasks = join(root, 'stub', '.agentdeck', 'core', 'tasks');
+    mkdirSync(tasks, { recursive: true });
+    const task = await createTask(tasks, CREATED, journalDeps());
+    const route = createStubRoute({ name: 'reap', script: ['left'] });
+    const lease = await route.acquire(
+      { taskId: task.taskId, model: 'stub-model' },
+      journalRecorder(task),
+    );
+    task.close();
+    const ref = lease.resources.find((r) => r.kind === 'stub-server')?.ref ?? '';
+    const parsed = parseStubServerRef(ref);
+    if ('unreadable' in parsed) throw new Error(parsed.unreadable);
+    const server = parsed.identity;
+    leftovers.push(server);
+    expect(await alive(server)).toBe(true);
+
+    expect(
+      coreIdentitiesUnder(join(root, 'stub')).map((id) => [id.role, id.pid, id.start]),
+    ).toEqual([['server', server.pid, server.start]]);
+    const report = await reapCoreProcessesUnder(join(root, 'stub'));
+
+    expect(report.residual).toEqual([]);
+    expect(await alive(server)).toBe(false);
+  }, 60_000);
 });

@@ -11,7 +11,9 @@ import { stopTree, type TreeStopDeps } from '../tree-stop.ts';
  *
  * Кого снимаем — только по записям, которые пишет само ядро ПОД этим каталогом, никогда по имени:
  * `host.json` (хост сессии и его CLI), каждый `procs.json` (строки `servers[]` — хост звеньев,
- * серверы заглушки; `cores[]` — ядро), строки `session.started` журналов задач. Снимается
+ * серверы заглушки; `cores[]` — ядро), строки `session.started` журналов задач и их
+ * `resource.created` вида `stub-server` (сервер маршрута-заглушки этапа 11 записан только там,
+ * личность — в ссылке ресурса; 07.11 прерванный прогон оставил такие серверы жить). Снимается
  * личность (номер + старт): освободившийся номер мог достаться чужому процессу. Хост звеньев
  * человека (`~/.agentdeck/core`) сюда не попадает, пока каталог не его.
  */
@@ -35,6 +37,20 @@ const readJson = (path: string): unknown => {
 
 const field = (value: unknown, key: string): unknown =>
   value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined;
+
+/**
+ * Личность сервера заглушки из ссылки ресурса `http://127.0.0.1:N/?dialect=…&pid=…&start=…`
+ * (`stubServerRef` маршрута; разбор здесь свой — платформа маршруты не импортирует).
+ */
+function stubServerIdentity(ref: unknown): { pid: number; start: string } | undefined {
+  if (typeof ref !== 'string') return undefined;
+  try {
+    const url = new URL(ref);
+    return { pid: Number(url.searchParams.get('pid')), start: url.searchParams.get('start') ?? '' };
+  } catch {
+    return undefined;
+  }
+}
 
 /** Записи ядра под `root`: файлы `host.json`, `procs.json`, `journal.jsonl` (ссылки не обходятся). */
 function recordsUnder(root: string, depth = 0, out: string[] = []): string[] {
@@ -95,17 +111,24 @@ export function coreIdentitiesUnder(root: string): ReapedIdentity[] {
         continue;
       }
       for (const raw of text.split('\n')) {
-        if (!raw.includes('"session.started"')) continue;
+        if (!raw.includes('"session.started"') && !raw.includes('"resource.created"')) continue;
         let line: unknown;
         try {
           line = JSON.parse(raw) as unknown;
         } catch {
           continue;
         }
-        if (field(line, 'kind') !== 'session.started') continue;
         const data = field(line, 'data');
-        add(field(data, 'hostPid'), field(data, 'hostStart'), 'host', path);
-        add(field(data, 'cliPid'), field(data, 'cliStart'), 'cli', path);
+        if (field(line, 'kind') === 'session.started') {
+          add(field(data, 'hostPid'), field(data, 'hostStart'), 'host', path);
+          add(field(data, 'cliPid'), field(data, 'cliStart'), 'cli', path);
+        } else if (
+          field(line, 'kind') === 'resource.created' &&
+          field(data, 'kind') === 'stub-server'
+        ) {
+          const server = stubServerIdentity(field(data, 'ref'));
+          if (server) add(server.pid, server.start, 'server', path);
+        }
       }
     }
   }

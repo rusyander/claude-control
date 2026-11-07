@@ -1,5 +1,5 @@
 /**
- * Codex через шлюз панели (MAP D): настоящий `codex exec` → ручка `/v1/responses`
+ * Codex через шлюз ядра (MAP D): настоящий `codex exec` → ручка `/v1/responses`
  * шлюза → стаб-контур, который говорит только на `chat/completions`.
  *
  * Подменён только контур (`stub-platform.mjs`, сетевая граница). Codex —

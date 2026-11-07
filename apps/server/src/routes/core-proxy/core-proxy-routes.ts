@@ -24,6 +24,9 @@ import {
 import { ownerOf, readTcpTable, type TcpRow } from '../../lib/peer-process/peer-process.ts';
 import { serverText } from '../../lib/server-texts/server-texts.ts';
 import { CLIENT_PORT_HEADER } from '../chat/human-only/human-only.ts';
+import type { ServerContext } from '../../context.ts';
+import { jiraAccessFrom } from '../../domains/integrations/atlassian/access.ts';
+import { registerIntakeSnapshotRoute } from './intake-snapshot-route.ts';
 
 /**
  * Прокладка панели к ядру (07, этап 9): ручки — ОДИН список контрактов `CORE_PANEL_ROUTES`,
@@ -282,9 +285,19 @@ export function coreProxyDepsOf(registration: CoreProxyRegistration = {}): CoreP
   };
 }
 
+/**
+ * `context` — панели с доступом к трекеру: снимок задачи трекера для экрана запуска (этап 11,
+ * W3-16) читает панель, а не ядро. Без контекста (стенд прокладки) — одна пересылка.
+ */
 export function registerCoreProxyRoutes(
   app: FastifyInstance,
   registration: CoreProxyRegistration = {},
+  context?: Pick<ServerContext, 'store' | 'location'>,
 ): void {
   createCoreProxyRoutes(coreProxyDepsOf(registration))(app);
+  if (context) {
+    registerIntakeSnapshotRoute(app, {
+      access: () => jiraAccessFrom(context.store, context.location.paths.appData),
+    });
+  }
 }

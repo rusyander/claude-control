@@ -17,6 +17,8 @@ import type { LaunchDraft } from '../model/launch.types';
 interface CoreLaunchScreenProps {
   /** Начальный черновик формы: страница «Группы» открывает запуск со сценарием из «Пути» группы. */
   initial?: Partial<LaunchDraft>;
+  /** «Настроить для этого проекта» на оценке ведущего: область карточки ведения — этот проект. */
+  onLeadScope?: (repoKey: string) => void;
 }
 
 /**
@@ -24,10 +26,10 @@ interface CoreLaunchScreenProps {
  * → деление из ленты задачи → запуск. Блоки ответа появляются только после ответа ядра: до него
  * показывать нечего, а пустые карточки выглядели бы «всё в порядке».
  */
-export function CoreLaunchScreen({ initial }: CoreLaunchScreenProps = {}) {
+export function CoreLaunchScreen({ initial, onLeadScope }: CoreLaunchScreenProps = {}) {
   const flow = useLaunchFlow();
   const { reply } = flow;
-  const closed = flow.blockers.includes('refused') || flow.blockers.includes('launched');
+  const { closed } = flow;
   return (
     <Stack gap="var(--spacing-md)" data-core-launch>
       <LaunchForm
@@ -45,7 +47,11 @@ export function CoreLaunchScreen({ initial }: CoreLaunchScreenProps = {}) {
       {flow.failure && <FailureNote failure={flow.failure} />}
       {reply && (
         <>
-          <EstimateCard reply={reply} />
+          <EstimateCard
+            reply={reply}
+            repoKey={flow.fold.repoKeys[0] ?? null}
+            onLeadScope={onLeadScope}
+          />
           <RoadsCard roads={roadsOf(reply.preflight)} />
           <RejectedCard rows={rejectedRows(reply)} />
           <LayerCard layer={reply.userLayer} />
@@ -72,6 +78,15 @@ export function CoreLaunchScreen({ initial }: CoreLaunchScreenProps = {}) {
             canLaunch={flow.canLaunch}
             launching={flow.busy === 'launch'}
             launched={flow.launched}
+            groupSize={flow.groupSize}
+            groupRows={flow.groupRows}
+            intake={{
+              pending: flow.intake.pending,
+              classWaiting: flow.intake.classWaiting,
+              rows: flow.intake.rows,
+              busy: flow.intake.busy,
+              onConfirm: () => void flow.intake.confirm(),
+            }}
             onLaunch={() => void flow.launch()}
           />
         </>

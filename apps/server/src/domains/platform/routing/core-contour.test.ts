@@ -7,7 +7,13 @@ import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/plat
 import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
 import { AppStore } from '../../../lib/app-store/app-store.ts';
 import { writePlatform } from '../store/store.ts';
-import { contourModelOf, coreContourRoutes, coreGatewayRouteId } from './core-contour.ts';
+import {
+  chatConsumerOf,
+  chatContourRoutes,
+  contourModelOf,
+  coreContourRoutes,
+  coreGatewayRouteId,
+} from './core-contour.ts';
 
 /**
  * Галочка потребителя контура → разрешённый набор задачи ядра (этап 10, F6): маршрут
@@ -55,6 +61,31 @@ const activate = (platform: Platform): void => {
   writePlatform(store, platform);
   store.updateSettings({ activePlatformId: platform.id });
 };
+
+// Единый чат (W3-17a) ведёт любой CLI, но галочка мастера и подключение локальной модели
+// (`connect.ts` ставит `foreign:qwen`) обещают маршрут ИМЕННО этого CLI.
+describe('chatContourRoutes — the box of the conversation CLI decides', () => {
+  it('maps claude to «chat» and any other CLI to its own foreign box', () => {
+    expect(chatConsumerOf('claude')).toBe('chat');
+    expect(chatConsumerOf('qwen')).toBe('foreign:qwen');
+  });
+
+  it('best-effort: only foreign:qwen ticked — qwen goes through the contour, claude does not', () => {
+    activate({ ...PLATFORM, mode: 'best-effort', consumers: ['foreign:qwen'] });
+    expect(chatContourRoutes(store, 'qwen')?.[0]).toEqual({
+      adapter: 'qwen',
+      route: { kind: 'gateway', id: 'gateway:company-dev' },
+      modelPattern: '*',
+    });
+    expect(chatContourRoutes(store, 'claude')).toBeUndefined();
+  });
+
+  it('best-effort: only «chat» ticked — claude goes through the contour, qwen does not', () => {
+    activate({ ...PLATFORM, mode: 'best-effort', consumers: ['chat'] });
+    expect(chatContourRoutes(store, 'claude')?.[0]?.adapter).toBe('claude');
+    expect(chatContourRoutes(store, 'qwen')).toBeUndefined();
+  });
+});
 
 describe('coreContourRoutes', () => {
   it('no active contour, or the consumer box is off in best-effort mode — no routes (core default set)', () => {

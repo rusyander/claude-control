@@ -90,7 +90,6 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
   const {
     chatRuns,
     chatSession,
-    coreChats,
     foreignCarry,
     handoffChains,
     treePause,
@@ -148,14 +147,13 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     registerPortabilityRoutes,
     // Перенос незакрытой работы к новому CLI (П6.1). Живёт отдельно от переноса
     // среды: тому хватает хранилища, а этому нужны реестр прогонов, память
-    // цепочек, права сессии и ручки ядра для чужого CLI — всё, что переживает запрос.
+    // цепочек и права сессии — всё, что переживает запрос; чужой CLI заводится тем же
+    // стартером продолжения, что и Claude.
     (instance, context) =>
       registerPortabilityCarryRoutes(instance, context, {
         runs: chatRuns,
         chains: handoffChains,
         session: chatSession,
-        coreChats,
-        foreignCarry,
       }),
     registerFormatCheckRoutes,
     registerPluginRoutes,
@@ -192,6 +190,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         (chatId) => treePause.isPaused(chatId),
         runtime.outsideTurnEnded,
         () => runtime.contours.summarizedIds(),
+        runtime.coreHistory,
       ),
     // Правило «подбирать модель под задачу»: одно положение на проект, без
     // зависимостей — ни реестр прогонов, ни сессия ему не нужны.
@@ -206,8 +205,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
         runs: chatRuns,
         chains: handoffChains,
         session: chatSession,
-        coreChats,
-        foreignCarry,
+        coreHistory: runtime.coreHistory,
       }),
     (instance, context) => registerProviderChatRoutes(instance, context),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
@@ -292,11 +290,7 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
     // Отложенный перезапуск dev-сервера: правки ждут живых ходов, панель это видит.
     registerDevRestartRoutes,
     // Прокладка к ядру — список зоны надзора за ядром.
-    ...coreSupervisorRoutes(
-      runtime.coreSupervisor,
-      runtime.chatStartCarry,
-      runtime.chatStartRoutes,
-    ),
+    ...coreSupervisorRoutes(runtime.coreSupervisor),
     // Агент панели: действия исполняются настоящими маршрутами через `inject`,
     // поэтому ему нужен тот же гейт доступа (токен при удалённом доступе), а
     // решению по карточке — список своих источников.

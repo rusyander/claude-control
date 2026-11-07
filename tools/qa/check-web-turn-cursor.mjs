@@ -42,7 +42,8 @@ const framesOf = (text) =>
     .map((line) => JSON.parse(line.slice('data: '.length)));
 
 await runOnStand(
-  { label: 'web-turn-cursor', fakeCli: { claude: FAKE_BASICS_CLI } },
+  // Чат Claude идёт через ядро (s10): без `core` ход отказывает «core is not running».
+  { label: 'web-turn-cursor', fakeCli: { claude: FAKE_BASICS_CLI }, core: true },
   async (stand, check) => {
     const browser = await chromium.launch();
     try {

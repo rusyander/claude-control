@@ -1,5 +1,13 @@
-import type { StepClass, WindowDecision, WindowVerdict } from '@agentdeck/contracts/core/economy';
+import type {
+  LearnedKey,
+  LearnedRaise,
+  LearnedRaiseQuery,
+  StepClass,
+  WindowDecision,
+  WindowVerdict,
+} from '@agentdeck/contracts/core/economy';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
+import type { LeadRole, RoleRow, TaskClass } from '@agentdeck/contracts/core/lead';
 import type { ModelTier, StepDef } from '@agentdeck/contracts/core/scenario';
 import type { RouteRegistry } from '../routes/registry.ts';
 
@@ -21,6 +29,35 @@ export interface TierLadder {
    */
   aliases?: readonly (readonly string[])[];
   efforts: readonly string[];
+  /**
+   * Потолок автоматики переходника (`CliRunFacts.autoCeiling`, этап 11 D7): эскалация и подъём по
+   * обучению выше не поднимают. Нет — модель сама не поднимается, только усилие.
+   */
+  autoCeiling?: string;
+}
+
+/** Ступень лестницы: модель и усилие (`null` — по умолчанию CLI). */
+export interface TierRung {
+  model: string | null;
+  effort: string | null;
+}
+
+/** Почему прошлая попытка шага провалилась (этап 11, D21): красная проверка или пониженная модель. */
+export interface EscalationCause {
+  /** Шаг прошлой попытки. */
+  stepId: string;
+  /** Строка журнала, где провал виден (`check.result` красной проверки или `step.ended`). */
+  seq: number;
+  /** Запись вывода проверки — из неё вводная берёт отрывок провала (F); нет — `null`. */
+  recordId: string | null;
+  why: 'red-check' | 'lowered-failure';
+}
+
+/** Прошлая попытка того же шага провалилась: эта идёт на ступень выше (до потолка автоматики). */
+export interface TierEscalation {
+  cause: EscalationCause;
+  /** Ступень, на которой шла прошлая попытка. */
+  from: TierRung;
 }
 
 /** Автор шага, который ревьюер проверяет: ревьюер не слабее (P35). */
@@ -51,8 +88,22 @@ export interface TierInput {
   author?: TierAuthor | null;
   /** Шаг этой задачи уже падал на пониженной модели — повтор идёт на потолке. */
   lowerFailedHere?: boolean;
-  /** Выученное (`economy/learned`): падал ли этот вид шага проекта на этой меньшей модели. */
-  learnedLowerFailed?: (key: { adapter: string; routeId: string; model: string }) => boolean;
+  /** Роль ведущего шага (P138); нет — роли нет (шаг без сессии, чат). */
+  role?: LeadRole | null;
+  /**
+   * Строка роли действующих настроек ведущего (D7, `economy/lead-settings`): заменяет уровень и
+   * усилие сценария; модель строки — выбор человека. `source` — откуда строка (умолчания машины
+   * считаются профилем). Нет — решает уровень сценария.
+   */
+  roleRow?: { row: RoleRow; source: 'profile' | 'project' } | null;
+  /** Прошлая попытка шага провалилась — ступень вверх (D21). */
+  escalation?: TierEscalation | null;
+  /** Выученный подъём ключа (F1, `economy/learned` `promotionOf`); нет — без подъёма. */
+  learnedRaise?: (query: LearnedRaiseQuery) => LearnedRaise | null;
+  /** Ключ репозитория единицы — часть ключа обучения. */
+  project?: string | null;
+  /** Класс задачи — запасной ключ обучения (backoff). */
+  taskClass?: TaskClass | null;
   /**
    * Вердикты окна по маршрутам (`economy/window`): маршрут, на котором шаг этого класса ждёт
    * (`routeWait`: отказ, исчерпание, офлайн; `held` — только откладываемые классы), выбор пропускает.
@@ -80,10 +131,37 @@ export type PickSource =
   /** Ревьюер поднят до автора (P35). */
   | 'author'
   /** Модель обязательного контура по умолчанию — шлюзу никто не назвал модель (s10 G7). */
-  | 'contour';
+  | 'contour'
+  /** Строка роли профиля ведения (или умолчаний машины). */
+  | 'profile'
+  /** Строка роли из правки проекта. */
+  | 'project'
+  /** Ступень вверх после провала прошлой попытки (D21). */
+  | 'escalation'
+  /** Ступень вверх по выученному (F1). */
+  | 'learned-promotion';
+
+/** Что последним решило ступень роли: профиль, проект, сценарий, эскалация, обучение, человек. */
+export type RoleSource =
+  'profile' | 'project' | 'scenario' | 'escalation' | 'learned-promotion' | 'human';
 
 /** Что сделал уровень сценария на деле. */
 export type TierApplied = 'ceiling' | 'raised' | 'lowered';
+
+/** Выбор внутри `decideTier`, который сдвигают уровень, обучение, эскалация и ревьюер. */
+export interface TierPick {
+  route: AllowedRoute;
+  model: string | null;
+  modelSource: PickSource;
+  effort: string | null;
+  effortSource: PickSource;
+  applied: TierApplied;
+  warnings: string[];
+  /** Модель назвал человек (правка или строка роли): уровень и подъёмы её не трогают. */
+  modelHuman: boolean;
+  /** Усилие назвал человек (правка): подъёмы его не трогают. */
+  effortHuman: boolean;
+}
 
 export interface TierSkip {
   route: AllowedRoute;
@@ -119,6 +197,15 @@ export type TierDecision =
       warnings: string[];
       /** Правка человека — выбор не учит выученное (03 §Economy «tagged out of learning»). */
       learning: 'counted' | 'override';
+      /** Роль шага (P138); `null` — роли нет. */
+      role: LeadRole | null;
+      roleSource: RoleSource;
+      /** Ступень вверх после провала: причина и упёрлась ли в потолок. */
+      escalation: { cause: EscalationCause; atCeiling: boolean } | null;
+      /** Подъём по обучению: на сколько ступеней и образцы-доказательства. */
+      promotion: { rungs: number; evidence: string[] } | null;
+      /** Ключ обучения базового выбора (до подъёмов): по нему образцы копятся и читаются. */
+      learnedKey: LearnedKey | null;
     } & TierCommon)
   | ({
       ok: false;

@@ -28,8 +28,13 @@ export type {
 } from './SandboxConfig.types.ts';
 
 export { sandboxPaths } from './SandboxPaths.ts';
-export { isSandboxExpired, markSandboxBusy, markSandboxFree } from './SandboxRegistry.ts';
-export { createSandbox, removeSandbox } from './SandboxAssembly.ts';
+export {
+  isSandboxExpired,
+  markSandboxBusy,
+  markSandboxFree,
+  SANDBOX_SETTLE_MS,
+} from './SandboxRegistry.ts';
+export { createSandbox, removeSandbox, removeSandboxSettled } from './SandboxAssembly.ts';
 export {
   startSandboxHousekeeping,
   startSandboxSweeper,

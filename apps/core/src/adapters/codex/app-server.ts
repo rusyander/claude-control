@@ -23,6 +23,8 @@ export interface CodexDialectInput {
   effort?: string;
   /** Нить, которую продолжаем (`thread/resume`): её файл уже лежит в доме сеанса. */
   resume?: string;
+  /** Сеанс без следа (`SessionSpec.ephemeral`, замер базы): нить эфемерная, файла разговора нет. */
+  ephemeral?: true;
   permit: 'core' | 'refuse';
   mapPermission(raw: RawToolCall): PermissionAsk;
 }
@@ -91,7 +93,8 @@ export function createCodexDialect(input: CodexDialectInput): RpcDialect {
         sandbox: input.sandbox,
         developerInstructions: input.developerInstructions,
         // Нить не эфемерная: файл разговора в доме сеанса — то, что продолжит следующая сессия.
-        ...(input.resume ? { threadId: input.resume } : { ephemeral: false }),
+        // Замер базы продолжать некому — его нить эфемерная, на диск разговор не ложится.
+        ...(input.resume ? { threadId: input.resume } : { ephemeral: input.ephemeral === true }),
         ...(input.model ? { model: input.model } : {}),
       },
       (msg) => {

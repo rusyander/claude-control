@@ -285,8 +285,8 @@ export const HOP_TEXTS = {
     en: 'Contour “{{id}}” is not set up in the panel',
   },
   'gateway-route-unknown': {
-    ru: 'Шлюз панели принимает только {{routes}} по адресу /<контур>/v1/...',
-    en: 'The panel gateway accepts only {{routes}} at /<contour>/v1/...',
+    ru: 'Шлюз ядра принимает только {{routes}} по адресу /<контур>/v1/...',
+    en: 'The core gateway accepts only {{routes}} at /<contour>/v1/...',
   },
   'gateway-url-not-http': {
     ru: 'Адрес контура не http(s): {{url}}',

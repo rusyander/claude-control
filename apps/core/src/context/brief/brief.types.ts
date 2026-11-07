@@ -9,9 +9,13 @@ export const BRIEF_SECTION_IDS = [
   'answer',
   'requirements',
   'knowledge',
+  // Этап 11 (W2-7): карта разведки — строки целиком, файлы списком, тел файлов нет никогда.
+  'recon-map',
   'handoff',
   'findings',
   'failing',
+  // Этап 11 (W2-10): чем кончилась прошлая попытка шага — запись провала, а не её текст.
+  'previous-attempt',
   'external-edits',
   'ownership',
   'copy-setup',
@@ -36,6 +40,8 @@ export type BudgetBin =
   | 'requirements'
   | 'knowledge'
   | 'unit-state'
+  /** Карта разведки (этап 11): своя корзина — карта не теснит состояние единицы. */
+  | 'recon'
   | 'check-scope'
   | 'platform'
   | 'human';

@@ -5,6 +5,7 @@ import type {
   ProgressShell,
   ProgressTask,
 } from '@agentdeck/contracts';
+import type { TreeAgent } from '@entities/AgentTree';
 
 export interface ChatProgressSheetProps {
   /** Разговор, чей это прогресс: адрес хода субагента и его остановки. */
@@ -21,7 +22,8 @@ export interface TaskRowProps {
 }
 
 export interface AgentRowProps {
-  agent: ProgressAgent;
+  /** Строка транскрипта с фактами ядра (`withCoreFacts`). */
+  agent: TreeAgent;
   /** Ход ещё идёт. */
   isRunning: boolean;
   /** Жив ли процесс CLI разговора: нет — «работающий» субагент умер вместе с ним. */
@@ -43,10 +45,8 @@ interface AgentRowTree {
   /** Открыт справа именно его ход. */
   isSelected: boolean;
   onToggle: () => void;
-  /** Открыть ход справа; нет — у узла нет файла субагента. */
+  /** Открыть узел справа (журнал ядра); нет — у полосы нет чата. */
   onOpen?: () => void;
-  /** Окно «Скиллы, хуки и MCP» этого субагента; нет — у узла нет файла. */
-  onExtensions?: () => void;
 }
 
 export interface AgentTreeProps {
@@ -56,8 +56,6 @@ export interface AgentTreeProps {
   isRunning: boolean;
   processAlive?: boolean;
   now: number;
-  /** Открыть окно «Скиллы, хуки и MCP» на субагенте с этим id. */
-  onExtensions?: (agentId: string) => void;
 }
 
 export interface ShellRowProps {

@@ -17,9 +17,15 @@ function webTabs(file: string, pattern: RegExp): string[] {
   return [...text.matchAll(pattern)].map((match) => match[1] ?? '');
 }
 
+/**
+ * Пути страниц роутера. Адрес без `component` (только `beforeLoad`, перевод на другой раздел,
+ * как старый `/core/chat` → `/chat`) — не раздел: агенту открывать там нечего.
+ */
 function routerPaths(): string[] {
   const text = readFileSync(ROUTER, 'utf8');
-  return [...text.matchAll(/\{\s*path:\s*'([^']+)'/g)].map((match) => match[1] ?? '');
+  return [...text.matchAll(/\{\s*path:\s*'([^']+)'([^\n]*)/g)]
+    .filter((match) => !/^\s*,\s*beforeLoad:[^}]*\}/.test(match[2] ?? ''))
+    .map((match) => match[1] ?? '');
 }
 
 describe('PANEL_SECTIONS ↔ router.tsx', () => {

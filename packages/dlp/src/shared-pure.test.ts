@@ -25,7 +25,7 @@ describe('redact — чужой текст без ключей', () => {
   });
 });
 
-describe('dataMaskDecision — одно решение для шлюза панели и звена', () => {
+describe('dataMaskDecision — одно решение для шлюза ядра и звена', () => {
   it('общий выключатель сильнее выбора «нет» на контуре', () => {
     expect(dataMaskDecision({ globalOn: true, choice: false, declared: false })).toEqual({
       on: true,

@@ -11,6 +11,7 @@ import type { LiveTask } from '../../journal/resume.ts';
 import type { Prepared, SessionRoad } from '../session-road.ts';
 import type { VerifierWiring } from '../verifier-wiring/index.ts';
 import type { ReviewLinkWiring } from '../review-link-wiring/index.ts';
+import type { ConductorAllocator } from '../allocator-wiring/index.ts';
 
 /**
  * Что загрузка даёт дирижёру этапа 4: всё уже собранное `boot.ts` — одна обвязка проверок, одна
@@ -48,6 +49,11 @@ export interface ConductorWiringDeps {
    * публикатора и стража. Нет или `null` — без панели: проводки каталог сами не ищут.
    */
   panelAppData?: string | null;
+  /**
+   * Распределитель мест сеансов (этап 11, P141): места шагов исполнителю и действующая
+   * параллельность — делению и брифу плана. Нет — мест не считает никто (тесты без него).
+   */
+  allocator?: ConductorAllocator;
 }
 
 /** Настройки исполнителя продукта (`conductor-wiring/loops.ts`). */

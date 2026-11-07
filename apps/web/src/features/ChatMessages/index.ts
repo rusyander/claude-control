@@ -6,37 +6,13 @@ export { QueuedBubbles } from './ui/QueuedBubbles/QueuedBubbles';
  * к ранней части длинного разговора можно, только вернув и окно, где она есть.
  */
 export { recallFeedLimit, rememberFeedLimit } from './lib/feedPosition';
-/**
- * Карточка предложения разделить задачи. Наружу выставлена потому, что лент
- * переписки в панели ДВЕ — своя у Claude и своя у чужого провайдера, — а
- * предложение приходит одинаковым блоком в обеих. Вторая копия карточки
- * разошлась бы с первой на первой же правке формата.
- */
-export { TaskSplitCard } from './ui/TaskSplitCard/TaskSplitCard';
-export type { TaskSplitCardProps } from './ui/TaskSplitCard.types';
-/**
- * Карточка просьбы о разрешении — по той же причине: у чужого CLI просьбы идут
- * из его серверного режима, а решает их человек той же карточкой, что у Claude.
- */
-export { PermissionCard } from './ui/PermissionCard/PermissionCard';
+/** Просьба о разрешении: её состав собирает страница из потока хода. */
 export type { PendingPermission } from './ui/PermissionCard/PermissionCard.types';
-/** Карточка продолжения в чистой сессии — по той же причине, что и соседняя. */
-export { HandoffCard } from './ui/HandoffCard/HandoffCard';
-export type { HandoffCardProps } from './ui/HandoffCard/HandoffCard.types';
-/**
- * Карточка вложения из ответа агента (Т10) — и снова по той же причине: блоки
- * `agentdeck:{deck,svg}` приходят в обе ленты, а дорога агента и есть та,
- * которая работает у любого CLI.
- */
-export { MediaFeedCard } from './ui/MediaFeedCard/MediaFeedCard';
-export { MediaRequestText } from './ui/MediaRequestText/MediaRequestText';
-export type { MediaFeedCardProps } from './ui/MediaFeedCard/MediaFeedCard.types';
 export type { ChildPermission, ChildQuestion, HandoffControls } from './ui/ChatMessages.types';
 /**
- * Сводка звеньев у родителя. Наружу выставлена по той же причине, что и
- * карточка разделения: хаб нужен ОБЕИМ лентам — у Claude его ставит `ChatMessages`,
- * у чужого провайдера страница его чата. Строки собирает страница: у Claude из
- * списка чатов и прогонов, у чужого CLI из дерева (`pages/ProviderChat/lib`).
+ * Сводка звеньев у родителя: хаб ставит `ChatMessages`, а строки собирает страница из списка
+ * чатов и прогонов. Карточки лент (разделение, продолжение, вложение, разрешение) наружу больше
+ * не выставлены: вторая лента чужого CLI (`pages/ProviderChat`) снята с единым чатом (этап 11).
  */
 export { ChildStages } from './ui/ChildStages/ChildStages';
 /**

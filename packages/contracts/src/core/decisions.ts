@@ -225,6 +225,18 @@ export const DECISION_CLASSES = [
     decisionType: 'LayerRunDecision',
     inputs: 'asked modes, adapter caps, trust, inventory hash',
   },
+  {
+    id: 'intake',
+    module: 'conductor/intake',
+    decisionType: 'IntakeDecision',
+    inputs: 'source snapshots, structured acceptance, card unknowns, lead.alwaysAsk',
+  },
+  {
+    id: 'classify',
+    module: 'conductor/classify',
+    decisionType: 'TaskClassDecision',
+    inputs: 'recorded class signals, lead.classThresholds, model raise, human override',
+  },
 ] as const satisfies readonly DecisionClassDef[];
 
 export type DecisionClassId = (typeof DECISION_CLASSES)[number]['id'];

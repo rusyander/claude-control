@@ -180,7 +180,7 @@ export const en: Dictionary = {
     platformBypassed: (title: string, reason: string, fix: string) =>
       `Bypassing the contour: “${title}” is set to “best effort”, but ${reason} — the message goes straight to the vendor cloud, without the contour’s protection. ${fix}`,
     platformRefusedReason: {
-      gateway_down: 'the panel gateway is not up',
+      gateway_down: 'the core gateway is not up',
       no_token: 'the contour key is not saved',
     },
     platformRefusedFix: {

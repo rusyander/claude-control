@@ -15,7 +15,6 @@ import {
 } from '../ChatHistory/ChatHistory.ts';
 import { isHumanPrompt } from '../chat-inbox/chat-inbox.ts';
 import { killsProcess } from '../group-command/kill.ts';
-import { isInterruptedResult } from '../subagent-tree/agent-anomalies.ts';
 
 /**
  * Прогресс агента по его собственному следу в транскрипте.
@@ -30,6 +29,18 @@ import { isInterruptedResult } from '../subagent-tree/agent-anomalies.ts';
  * он кончился. Живой поток дал бы то же самое только в одной вкладке и только
  * пока она открыта.
  */
+
+/**
+ * Результат, который CLI дописывает за вызов, оборванный паузой или концом сессии: «[Tool call
+ * interrupted: the session ended before this call's result was recorded…]». Пишется с
+ * `is_error`, но это обрыв, а не ошибка вызова — иначе каждая пауза группы считалась бы ошибкой.
+ */
+const TOOL_INTERRUPTED = /^\[Tool call interrupted\b/u;
+
+/** Вызов оборван паузой или концом сессии — по тексту его результата. */
+export function isInterruptedResult(text: string): boolean {
+  return TOOL_INTERRUPTED.test(text.trimStart());
+}
 
 /** Сколько символов ответа субагента показывать: это заглядывание, не чтение. */
 const RESULT_LIMIT = 600;

@@ -28,6 +28,8 @@ export interface ObserverOptions {
   stallDefaultMs?: number;
   /** Через сколько тишины с ходом в работе сессия `silent` (спека: 60 с). */
   silentAfterMs?: number;
+  /** Сверка хостов открытых сеансов (этап 11): не чаще, чем раз в столько; нет — 5 с, 0 — каждый тик. */
+  hostCheckMs?: number;
   /** Проба жизни (pid + старт, CPU); нет — проба платформы. */
   probe?: LivenessProbe;
   /** Тикающие часы ядра (`startClockJumps`); нет — часы загрузки. */

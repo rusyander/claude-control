@@ -101,6 +101,7 @@ export function PanelAgentTopic() {
             riskyRow('secPermissions'),
             riskyRow('secScripts'),
             riskyRow('secGroups'),
+            readRow('secCore'),
             riskyRow('secPlugins'),
             riskyRow('secHistory'),
             riskyRow('secSettings'),

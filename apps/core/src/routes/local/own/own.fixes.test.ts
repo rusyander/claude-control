@@ -13,7 +13,7 @@ import { RouteAborted, RouteRefused } from '../../lease.ts';
 import { createRouterClient } from './client.ts';
 import { decideFit, pinDeviceEnv } from './fit.ts';
 import { stopLeaseServers } from './__fixtures__/lease-sweep.ts';
-import { ownDir, ownOptions } from './__fixtures__/own-options.ts';
+import { ownDir, ownOptions, realStartToken } from './__fixtures__/own-options.ts';
 import { createOwnRoute } from './own.ts';
 import { presetIni } from './server.ts';
 import { createSlotQueue } from './slot.ts';
@@ -58,6 +58,8 @@ const realProbe = createLivenessProbe();
 /** Живость серверов прошлых ядер — подставная; о себе ядро читает настоящую таблицу. */
 /** Ядро, записавшее аренды на диск, — прошлое и мёртвое (F-88: аренду живого ядра не принимают). */
 const DEAD_CORE = { pid: 999_989, start: 'dead-core', bootId: 'previous-core' };
+/** Старт сервера в записи аренды — токен настоящего вида (номер чужой: по личности мёртв). */
+const SERVER_START = await realStartToken();
 
 const probeOf = (state: Liveness, identityOf = realProbe.identityOf) => ({
   isAlive: async (id: { start: string }) => (id.start === DEAD_CORE.start ? 'dead' : state),
@@ -105,7 +107,7 @@ function leaseOnDisk(
       resources,
       baselineUsedBytes: GIB,
       server: {
-        identity: { pid, start: 'gone' },
+        identity: { pid, start: SERVER_START },
         origin: 'http://127.0.0.1:9',
         port: 9,
         marker: `own-fixes-${leaseId}-${process.pid}`,
@@ -271,7 +273,7 @@ describe('core-s2 local:own acquire and release edges (F-63, F-65, F-69, F-70)',
     lease.resources.push({
       rid: 'L1-server',
       kind: 'model-server',
-      ref: 'pid 999990 start gone http://127.0.0.1:9',
+      ref: `pid 999990 start ${SERVER_START} http://127.0.0.1:9`,
       release: 'task-end',
     });
     lease.resources.push({

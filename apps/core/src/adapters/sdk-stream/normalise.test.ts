@@ -66,7 +66,8 @@ describe('sdk-stream normaliser — recorded streams', () => {
     // Вход — из начала сообщения, выход — из дельты: части сводятся по id сообщения; окно —
     // из `result.modelUsage.stub-model.contextWindow` записи.
     const stub = { input: 11, cacheRead: 5, cacheWrite: 0, cacheWrite1h: 0, output: 3 };
-    const reported = { model: 'stub-model', contextWindow: 64_000 };
+    // Строки главного контекста (`parent_tool_use_id: null`) несут родителя `null` (P149).
+    const reported = { model: 'stub-model', contextWindow: 64_000, parentToolUseId: null };
     expect(n.usage()).toEqual([
       { messageId: 'msg_stub_1', ...stub, ...reported },
       { messageId: 'msg_stub_2', ...stub, ...reported },

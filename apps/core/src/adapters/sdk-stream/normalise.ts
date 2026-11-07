@@ -8,6 +8,7 @@ import type {
   WindowObservation,
 } from '../adapter.types.ts';
 import { readToolOutcome, type OutcomeRule } from './outcome.ts';
+import { resultText, TaskTracker, type TaskRule } from './task-lines.ts';
 
 /**
  * Разбор потока `stream-json` (формат SDK, на нём говорят и Claude Code, и Qwen Code) в
@@ -61,6 +62,8 @@ export interface SdkRule {
   readWindow?(line: Record<string, unknown>): WindowObservation | undefined;
   /** Исход вызова из блока `tool_result` (этап 8, F18); нет — `tool.result` без `outcome`. */
   outcome?: OutcomeRule;
+  /** Строки задач CLI → субагенты и фон (этап 11, P148); нет — `agent.*` / `bg.*` не издаются. */
+  tasks?: TaskRule;
 }
 
 interface Pending {
@@ -86,11 +89,25 @@ type Json = Record<string, unknown>;
 interface UsageMeta {
   model?: string;
   subagent?: boolean;
+  /** Вызов-родитель строки (P149): `undefined` — строка поля не несёт. */
+  parent?: string | null;
 }
 
 /** Строка подагента: CLI метит её вызовом-родителем (`parent_tool_use_id`). */
 const subagentLine = (o: Json): boolean =>
   typeof o.parent_tool_use_id === 'string' && o.parent_tool_use_id !== '';
+
+/** Родитель строки: id вызова, `null` — главный контекст, `undefined` — поле не названо. */
+const parentOf = (o: Json): string | null | undefined => {
+  if (!Object.hasOwn(o, 'parent_tool_use_id')) return undefined;
+  return subagentLine(o) ? (o.parent_tool_use_id as string) : null;
+};
+
+/** Названный родитель побеждает `null`: части одного сообщения не спорят, а дополняют. */
+function mergedParent(was: string | null | undefined, now: string | null | undefined) {
+  if (typeof now === 'string') return now;
+  return was !== undefined ? was : now;
+}
 
 const isObject = (value: unknown): value is Json =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -114,10 +131,30 @@ export class SdkNormaliser {
   private readonly windows = new Map<string, number>();
   private remainders = 0;
   private message: string | null = null;
+  /**
+   * Текст хода по сообщениям модели: `said` — в ходе уже был текст, `fresh` — начато новое
+   * сообщение, а его текста ещё не было. Куски разных сообщений одного хода (ответ после
+   * результата вызова и ответ на уведомление CLI о конце фонового субагента) иначе вставали
+   * в показе одним словом — «готовготов» (s11 w3).
+   */
+  private said = false;
+  private fresh = false;
+  /** Текущее сообщение каждого подагента по вызову-родителю — для его дельты и конца без id. */
+  private subMessages = new Map<string, string>();
   private controls: ControlRequest[] = [];
+  private readonly tasks: TaskTracker | null;
 
   constructor(rule: SdkRule) {
     this.rule = rule;
+    this.tasks = rule.tasks ? new TaskTracker(rule.tasks) : null;
+  }
+
+  /**
+   * Конец сеанса: задачи, чей конец CLI назвал только `task_updated`, кончаются; ждущие
+   * `bg.started` выпускаются (P148).
+   */
+  flushTasks(): AdapterEvent[] {
+    return this.tasks?.flush() ?? [];
   }
 
   /** Наша отправка ушла в stdin: ждём её эха (или, без эха, — следующего хода). */
@@ -219,6 +256,7 @@ export class SdkNormaliser {
       out.push({ type: 'turn.cli-initiated', cause: 'late-tail', numTurns: 0 });
     }
     this.turn = { kind: 'core', cmdId: p.cmdId, uuid: p.uuid, origin, folded: [] };
+    this.said = false;
     out.push({ type: 'turn.started', attribution: p.cmdId, origin });
     return out;
   }
@@ -277,7 +315,8 @@ export class SdkNormaliser {
 
   private system(o: Json): AdapterEvent[] {
     if (o.subtype === 'informational') return this.refusals(o);
-    if (o.subtype !== 'init') return [];
+    // Строки задач — не содержание хода: хода они не открывают (уведомление приходит между ходами).
+    if (o.subtype !== 'init') return this.tasks?.line(o) ?? [];
     const out = this.ensureTurn(o);
     const id = str(o.session_id);
     if (id && id !== this.conversation) {
@@ -310,14 +349,26 @@ export class SdkNormaliser {
     const results = content.filter((b) => isObject(b) && b.type === 'tool_result') as Json[];
     if (results.length === 0) return o.isSynthetic === true ? this.refusals(o) : [];
     const out = this.ensureTurn(o);
+    // Стена строки, как её назвал CLI (`timestamp`): начало фона, выпущенного этим результатом.
+    const at = typeof o.timestamp === 'string' ? Date.parse(o.timestamp) : Number.NaN;
     for (const block of results) {
+      const toolUseId = str(block.tool_use_id) ?? '';
       out.push({
         type: 'tool.result',
-        toolUseId: str(block.tool_use_id) ?? '',
+        toolUseId,
         isError: block.is_error === true,
         cliInitiated: this.cliInitiated,
         ...(this.rule.outcome ? { outcome: readToolOutcome(block, this.rule.outcome) } : {}),
       });
+      if (this.tasks)
+        out.push(
+          ...this.tasks.result(
+            toolUseId,
+            resultText(block),
+            block.is_error === true,
+            Number.isFinite(at) ? at : null,
+          ),
+        );
     }
     out.push(...this.refusals(o));
     return out;
@@ -341,6 +392,7 @@ export class SdkNormaliser {
     const split = isObject(raw.cache_creation) ? raw.cache_creation : {};
     const model = meta.model ?? was.model;
     const subagent = meta.subagent === true || was.subagent === true;
+    const parent = mergedParent(was.parentToolUseId, meta.parent);
     // Поля приходят частями (начало сообщения — вход и часовая доля кэша, дельта — выход);
     // берём наибольшее.
     this.usageById.set(id, {
@@ -352,6 +404,7 @@ export class SdkNormaliser {
       output: Math.max(was.output, num(raw.output_tokens)),
       ...(model ? { model } : {}),
       ...(subagent ? { subagent } : {}),
+      ...(parent !== undefined ? { parentToolUseId: parent } : {}),
     });
     this.attachWindow(id);
   }
@@ -432,15 +485,17 @@ export class SdkNormaliser {
 
   private streamEvent(o: Json): AdapterEvent[] {
     const event = isObject(o.event) ? o.event : {};
+    if (subagentLine(o)) return this.subagentStreamEvent(o, event);
     const kind = event.type;
     if (kind === 'message_start') {
       const out = this.ensureTurn(o);
       const message = isObject(event.message) ? event.message : {};
       this.message = str(message.id) ?? str(o.api_message_id) ?? null;
+      this.fresh = true;
       if (this.message)
         this.mergeUsage(this.message, message.usage, {
           ...(str(message.model) ? { model: str(message.model) } : {}),
-          subagent: subagentLine(o),
+          parent: parentOf(o),
         });
       return out;
     }
@@ -448,16 +503,60 @@ export class SdkNormaliser {
       const delta = isObject(event.delta) ? event.delta : {};
       if (delta.type !== 'text_delta') return [];
       const out = this.ensureTurn(o);
-      out.push({ type: 'text.delta', text: str(delta.text) ?? '' });
+      const text = str(delta.text) ?? '';
+      // Первый текст нового сообщения модели после текста прошлого — с пустой строкой между
+      // ними, как у транскрипта: лента, история чата и ответ ассистента склеивают куски как есть.
+      const gap = text && this.fresh && this.said ? '\n\n' : '';
+      if (text) {
+        this.said = true;
+        this.fresh = false;
+      }
+      out.push({ type: 'text.delta', text: gap + text });
       return out;
     }
     if (kind === 'message_delta') {
       const id = str(o.api_message_id) ?? this.message;
-      if (id) this.mergeUsage(id, event.usage, { subagent: subagentLine(o) });
+      if (id) this.mergeUsage(id, event.usage, { parent: parentOf(o) });
       return [];
     }
     if (kind === 'message_stop') {
       return this.flushUsage(str(o.api_message_id) ?? this.message);
+    }
+    return [];
+  }
+
+  /**
+   * Частичная строка подагента (`stream_event` с `parent_tool_use_id`; у Claude SDK это
+   * законная форма, у Qwen Code — фоновый `agent`). Его текст — не ответ сессии: итог подагента
+   * доезжает результатом вызова (`tool_result` → задача), как и у его целых строк `assistant`,
+   * текст которых тоже не издаётся. Его `message_start` не трогает сообщение главного контекста
+   * (`message`, `fresh`, `said`): иначе дельта учёта главного сообщения уходила подагенту, а
+   * продолжение ответа получало лишний абзац. Ход строка подагента не открывает — её учёт
+   * записан и уйдёт на `message_stop` или итогом хода.
+   */
+  private subagentStreamEvent(o: Json, event: Json): AdapterEvent[] {
+    const parent = o.parent_tool_use_id as string;
+    const meta = { subagent: true, parent };
+    if (event.type === 'message_start') {
+      const message = isObject(event.message) ? event.message : {};
+      const id = str(message.id) ?? str(o.api_message_id);
+      if (id) {
+        this.subMessages.set(parent, id);
+        this.mergeUsage(id, message.usage, {
+          ...(str(message.model) ? { model: str(message.model) } : {}),
+          ...meta,
+        });
+      }
+      return [];
+    }
+    const id = str(o.api_message_id) ?? this.subMessages.get(parent) ?? null;
+    if (event.type === 'message_delta') {
+      if (id) this.mergeUsage(id, event.usage, meta);
+      return [];
+    }
+    if (event.type === 'message_stop') {
+      this.subMessages.delete(parent);
+      return this.flushUsage(id);
     }
     return [];
   }
@@ -470,18 +569,23 @@ export class SdkNormaliser {
       this.mergeUsage(id, message.usage, {
         ...(str(message.model) ? { model: str(message.model) } : {}),
         subagent: subagentLine(o),
+        parent: parentOf(o),
       });
     const content = Array.isArray(message.content) ? message.content : [];
     for (const block of content) {
       if (!isObject(block) || block.type !== 'tool_use') continue;
+      const toolUseId = str(block.id) ?? '';
+      const name = str(block.name) ?? '';
+      // Вызов внутри подагента: CLI метит строку вызовом-родителем (R11); иначе главный контекст.
+      const parent = subagentLine(o) ? (o.parent_tool_use_id as string) : null;
+      this.tasks?.call(toolUseId, name, block.input, parent);
       out.push({
         type: 'tool.requested',
-        toolUseId: str(block.id) ?? '',
-        name: str(block.name) ?? '',
+        toolUseId,
+        name,
         input: block.input ?? {},
         cliInitiated: this.cliInitiated,
-        // Вызов внутри подагента: CLI метит строку вызовом-родителем (R11); иначе главный контекст.
-        parentToolUseId: subagentLine(o) ? (o.parent_tool_use_id as string) : null,
+        parentToolUseId: parent,
       });
     }
     return out;
@@ -544,6 +648,8 @@ export class SdkNormaliser {
     }
     this.turn = null;
     this.message = null;
+    this.said = false;
+    this.fresh = false;
     return out;
   }
 }

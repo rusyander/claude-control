@@ -2,9 +2,12 @@ import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buildAgentTree,
+  NO_FILTERS,
   openAgentPane,
   useAgentPane,
+  useCoreAgents,
   visibleNodes,
+  withCoreFacts,
   type AgentTreeNode,
 } from '@entities/AgentTree';
 import { AgentRow } from '../AgentRow/AgentRow';
@@ -16,18 +19,18 @@ import { nodeKey, treeKeyTarget } from './treeKeys';
  * Дерево субагентов разговора — ARIA-дерево с одной остановкой Tab, как
  * дерево агентов у расширения VS Code: ↑↓ по видимым узлам, ← свернуть или к
  * родителю, → раскрыть или к первому вложенному, Home/End — края, Enter —
- * ход субагента справа (Escape его закрывает и возвращает фокус сюда).
+ * ход субагента справа (Escape его закрывает и возвращает фокус сюда). Модель, вызовы, расход
+ * и вложенных субагентов строки берут у ядра — тот же запрос, что у кнопки «Агенты», второго
+ * опроса нет; транскрипты субагентов панель не читает (этап 11, W3-17).
  */
-export function AgentTree({
-  chatId,
-  agents,
-  isRunning,
-  processAlive,
-  now,
-  onExtensions,
-}: AgentTreeProps) {
+export function AgentTree({ chatId, agents, isRunning, processAlive, now }: AgentTreeProps) {
   const { t } = useTranslation();
-  const roots = useMemo(() => buildAgentTree(agents), [agents]);
+  const core = useCoreAgents(chatId, NO_FILTERS, isRunning);
+  const coreNodes = core.data?.nodes;
+  const roots = useMemo(
+    () => buildAgentTree(withCoreFacts(agents, coreNodes ?? [])),
+    [agents, coreNodes],
+  );
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [focused, setFocused] = useState<string>();
   const pane = useAgentPane(chatId);
@@ -53,9 +56,10 @@ export function AgentTree({
   };
 
   const open = (node: AgentTreeNode): void => {
-    if (!chatId || !node.agent.agentId) return;
+    if (!chatId) return;
     setFocused(nodeKey(node));
-    openAgentPane(chatId, node.agent.agentId);
+    // Id вызова `Agent` — узел субагента у ядра: панель справа читает его из журнала ядра.
+    openAgentPane(chatId, node.agent.id);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLUListElement>): void => {
@@ -77,7 +81,6 @@ export function AgentTree({
     const hasChildren = node.children.length > 0;
     const isOpen = hasChildren && !collapsed.has(agent.id);
     const key = nodeKey(node);
-    const agentId = agent.agentId;
     return (
       <AgentRow
         key={agent.id}
@@ -89,10 +92,9 @@ export function AgentTree({
           level: node.level,
           ...(hasChildren ? { expanded: isOpen } : {}),
           isTabStop: tabStop !== undefined && nodeKey(tabStop) === key,
-          isSelected: pane !== undefined && pane.agentId === agentId,
+          isSelected: pane !== undefined && pane.agentId === agent.id,
           onToggle: () => toggle(node),
-          ...(agentId && chatId ? { onOpen: () => open(node) } : {}),
-          ...(onExtensions && agentId ? { onExtensions: () => onExtensions(agentId) } : {}),
+          ...(chatId ? { onOpen: () => open(node) } : {}),
         }}
       >
         {isOpen && (

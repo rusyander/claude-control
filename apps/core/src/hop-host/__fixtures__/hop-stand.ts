@@ -81,7 +81,7 @@ export async function hopStand(options: {
   /** Подготовить каталог данных панели до старта хоста (ключи, правила). */
   prepare?: (appData: string) => void;
   /** Свой ответ контура на запрос (451 вендорного тела); `undefined` — дальше сценарию. */
-  reply?: (request: RouteRequest) => RouteReply | undefined;
+  reply?: (request: RouteRequest) => RouteReply | undefined | Promise<RouteReply | undefined>;
 }): Promise<HopStand> {
   const home = tempDir('hop-home-');
   const appData = tempDir('hop-app-');

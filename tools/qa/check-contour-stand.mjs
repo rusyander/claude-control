@@ -9,8 +9,8 @@
  * словами панели, а не сырым кодом.
  *
  * Подменено только то, что над платформой: ничего. Дом, конфиги и данные CLI — во временных
- * каталогах; ядро, хост звеньев, шлюз и сеанс CLI — код ядра; стартер и маршрут контура — код
- * панели. Ключ не печатается и в журнал не попадает.
+ * каталогах; ядро, хост звеньев, шлюз и сеанс CLI — код ядра; ход чата (реестр чата из сборки
+ * сервера → `CoreChatRun`, `panel-chat-turn.mjs`) и маршрут контура — код панели. Ключ не печатается и в журнал не попадает.
  *
  * Для каждого CLI (`CLIS`, по умолчанию `claude,qwen`):
  *   1. разрешённая ключу модель: запрос дошёл до платформы с её ключом (ответ модели или названный
@@ -57,11 +57,14 @@ const ONLY = (
 const SAID = {
   keyRejected: /Контур отклонил ключ|contour rejected the key/i,
   // Шлюз называет запрет словами контура; ядро, знающее список моделей ключа, отказывает раньше
-  // запроса и называет модель в причине шага (`compatRefusalReason`).
-  modelForbidden: (model) =>
-    new RegExp(
-      `(Ключу не разрешена модель «?|Model “|model_absent: model )${model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
-    ),
+  // запроса и называет модель в причине шага (`compatRefusalReason`) — чат показывает этот отказ
+  // текстом панели по коду `core-chat-contour-model` («модель X недоступна в контуре…»).
+  modelForbidden: (model) => {
+    const name = model.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(
+      `(Ключу не разрешена модель «?|Model “|model_absent: model )${name}|(модель|model) ${name} (недоступна в контуре|is not available in contour) \\S+ — (ключ контура её не разрешает|the contour key does not allow it)`,
+    );
+  },
   // Без потока платформа отвечает 502 (текст статуса шлюза), в потоке — 200 и кадром
   // `{"error":{"code":"upstream_error"}}` (текст `gateway-upstream-aborted` со словами платформы).
   providerDown:
@@ -153,10 +156,9 @@ async function main() {
   const { writePlatform, writeToken, forgetToken } =
     await import('../../apps/server/src/domains/platform/store/store.ts');
   const { probePlatform } = await import('../../apps/server/src/domains/platform/probe/probe.ts');
-  const { coreContourRoutes } =
+  const { chatContourRoutes } =
     await import('../../apps/server/src/domains/platform/routing/core-contour.ts');
-  const { startCoreForeignChat, withRoutes } =
-    await import('../../apps/server/src/domains/chat/core-foreign/core-foreign-start.ts');
+  const { panelChatRuns, startPanelChat } = await import('./panel-chat-turn.mjs');
   const { bootCore } = await import('../../apps/core/src/bootstrap/boot.ts');
   const { createCoreCaller } = await import('../../apps/server/src/domains/core-ask/core-ask.ts');
   const { createCoreChatPort } =
@@ -225,6 +227,7 @@ async function main() {
     await gateway.start({ appDataDir: appData });
     core = await bootCore({ home: gateway.home(), build: 'stand-live-qa', panelAppData: appData });
     const port = createCoreChatPort(createCoreCaller(() => gateway.home()));
+    const chatRuns = await panelChatRuns({ appData, store, coreHome: gateway.home() });
 
     const sessionText = async (taskId, deadline) => {
       let sessionId = '';
@@ -267,7 +270,10 @@ async function main() {
       }
     };
 
-    /** Один ход CLI задачей ядра с маршрутом контура; `edit` правит контур и ключ до хода. */
+    /**
+     * Один ход чата CLI так, как его заводит панель (реестр чата → задача ядра, маршрут — галочка
+     * «Чат» или обязательный контур); `edit` правит контур и ключ до хода.
+     */
     const turn = async (id, label, edit = {}) => {
       writePlatform(store, { ...platform, ...edit.platform });
       if (edit.token === null) forgetToken(appData, CONTOUR);
@@ -284,23 +290,23 @@ async function main() {
         if (git.status !== 0) throw new Error(`git ${full[0]}: ${git.stderr}`);
       }
       const eventsBefore = (await gateway.events()).length;
-      const routes = coreContourRoutes(store, id === 'claude' ? 'chat' : `foreign:${id}`, id);
-      const started = await startCoreForeignChat(port, {
+      // Набор, который сборка чата спросит для этого CLI (`chat-wiring.ts` `routes`).
+      const routes = chatContourRoutes(store, id);
+      const started = await startPanelChat(chatRuns, {
+        appData,
+        store,
         cli: id,
         cwd: work,
         prompt: 'Ответь одним словом: готов',
-        title: `stand ${id} ${label}`,
-        ...withRoutes(routes),
       }).catch((error) => ({ ok: false, code: 'core-unreachable', message: String(error) }));
       const seen = started.ok
         ? await sessionText(started.taskId, Date.now() + turnMs(id))
         : { view: null, texts: [], kinds: [] };
-      if (started.ok) {
-        await port
-          .command(started.taskId, 'cancel', { reason: 'stand check done' })
-          .catch(() => {});
-      }
-      const reply = seen.texts.join('\n');
+      // «Остановить» человека: прогон снимает задачу ядра (`CoreChatRun.stop` → `cancel`).
+      if (started.ok) chatRuns.stop(started.key);
+      // Отказ до сеанса (ядро знает список моделей ключа и не пускает шаг) человек видит ошибкой
+      // хода, а не лентой сеанса: её текст и есть то, что проверяется.
+      const reply = started.ok ? seen.texts.join('\n') : started.message;
       if (reply.includes(key)) throw new Error('ключ стенда попал в ленту сеанса');
       return {
         routes,

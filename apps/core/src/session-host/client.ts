@@ -372,3 +372,40 @@ export async function attachSession(dir: string, deps: AttachDeps = {}): Promise
   }
   return { state: 'live', session: opened.connection, record };
 }
+
+export type HostVerdict =
+  | { state: 'alive' }
+  | { state: 'exited' }
+  | { state: 'unknown'; reason: string }
+  | { state: 'lost'; reason: string; host: Identity; child: Identity | null; childAlive: Liveness };
+
+/**
+ * Суд `attachSession` о хосте сеанса БЕЗ подключения (этап 11, сверка хостов на ходу ядра): живой
+ * хост держит одного клиента, и сверка не отнимает канал у насоса сеанса. `lost` — только хост
+ * доказанно мёртв (свежий снимок) И исхода нет (перечитан после пробы); `exited` — хост успел
+ * записать исход, это обычный конец, его ведёт насос. Записи хоста нет — `unknown`, а не «потерян»:
+ * каталог без `host.json` хосту не принадлежал, и судить в нём нечего (F25).
+ */
+export async function hostVerdict(
+  dir: string,
+  deps: Pick<AttachDeps, 'probe'> = {},
+): Promise<HostVerdict> {
+  const probe = deps.probe ?? createLivenessProbe(undefined, 0);
+  const hostRead = readJson<HostRecord>(sessionFile(dir, 'host'));
+  if ('unknown' in hostRead) return { state: 'unknown', reason: `host.json: ${hostRead.unknown}` };
+  if (!('value' in hostRead)) return { state: 'unknown', reason: 'no host record' };
+  const record = hostRead.value;
+  const alive = await probe.isAlive(record.host);
+  if (alive === 'alive') return { state: 'alive' };
+  if (alive === 'unknown') return { state: 'unknown', reason: 'host liveness unknown' };
+  const exit = readJson<ExitRecord>(sessionFile(dir, 'exit'));
+  if ('value' in exit) return { state: 'exited' };
+  if ('unknown' in exit) return { state: 'unknown', reason: `exit.json: ${exit.unknown}` };
+  return {
+    state: 'lost',
+    reason: 'host dead, no exit record',
+    host: record.host,
+    child: record.child,
+    childAlive: record.child ? await probe.isAlive(record.child) : 'dead',
+  };
+}

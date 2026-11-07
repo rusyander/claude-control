@@ -12,6 +12,7 @@ import {
   type LocalLimits,
   type SessionSpec,
 } from '../adapter.types.ts';
+import { platformDenySet } from '../deny-overlay.ts';
 import { isRemoteMcp } from '../mcp-carry.ts';
 import { qwenEconomy } from '../economy-carry.ts';
 import { homeDir } from '../../platform/os-kind.ts';
@@ -26,6 +27,7 @@ import {
   type SdkLaunchPlan,
 } from '../sdk-stream/sdk-adapter.ts';
 import { QWEN_OUTCOME } from './outcome.ts';
+import { QWEN_TASKS } from './task-rule.ts';
 import { mapQwenPermission, QWEN_NONE_EXCLUDED, qwenDenyRules } from './permission.ts';
 import { qwenSessionId } from './session-id.ts';
 import { qwenOwnsTranscript } from './transcript.ts';
@@ -300,6 +302,9 @@ export function planQwen(
     const own = qwenSessionId(spec.sessionId);
     if (own) args.push('--session-id', own);
   }
+  // Сеанс без следа (замер базы): запись разговора в `projects/<папка>/chats/` дома CLI выключена —
+  // панель читает чаты оттуда. Форма `--флаг=значение` — одним словом, как бриф и модель (F-14).
+  if (spec.ephemeral) args.push('--chat-recording=false');
   if (spec.model) args.push(`--model=${spec.model}`);
   const excluded =
     spec.tools === 'none' ? [...new Set([...deny.excluded, ...QWEN_NONE_EXCLUDED])] : deny.excluded;
@@ -357,9 +362,12 @@ export function refuseQwen(
   return null;
 }
 
-/** Дом ядра и файлы токенов: их предки — корни поиска под запретом (F-13). */
+/**
+ * Пути платформы (дом ядра, очередь машины, файлы токенов — один набор с оверлеем): их предки —
+ * корни поиска под запретом (F-13).
+ */
 function platformPaths(spec: SessionSpec): string[] {
-  return [spec.platform.coreHome, ...spec.platform.tokenFiles];
+  return platformDenySet(spec.platform).paths;
 }
 
 export interface QwenAdapterOptions extends SdkAdapterOptions {
@@ -398,6 +406,7 @@ export function createQwenAdapter(options: QwenAdapterOptions = {}): SdkAdapter 
       ownsTranscript: qwenOwnsTranscript,
       // `--exclude-tools` каждого встроенного инструмента, что действует (`QWEN_NONE_EXCLUDED`).
       toolsNone: true,
+      ephemeral: 'flag',
       echo: false,
       inBandPermit: true,
       // Без `initialize` первой строкой CLI в «прямом» режиме: вопрос о праве висит молча
@@ -411,6 +420,8 @@ export function createQwenAdapter(options: QwenAdapterOptions = {}): SdkAdapter 
       mapPermission: mapQwenPermission,
       classifyError: (text) => (MISSING_CONVERSATION.test(text) ? 'fresh-required' : null),
       outcome: QWEN_OUTCOME,
+      // Агенты — строки задач, фоновая оболочка — `is_background` вызова (этап 11, P148).
+      tasks: QWEN_TASKS,
     },
     options,
   );

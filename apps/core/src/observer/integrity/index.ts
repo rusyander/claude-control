@@ -2,6 +2,7 @@ import { erasePredicate } from '../erase.ts';
 import type { Predicate } from '../observer.types.ts';
 import { contextGrowth } from './context-growth.ts';
 import { resourceLeak } from './resource-leak.ts';
+import { spendMisattributed } from './spend-misattributed.ts';
 import { windowTransition } from './window.ts';
 
 /**
@@ -13,4 +14,5 @@ export const PREDICATES: readonly Predicate[] = [
   erasePredicate(resourceLeak),
   erasePredicate(windowTransition),
   erasePredicate(contextGrowth),
+  erasePredicate(spendMisattributed),
 ];

@@ -1,188 +1,220 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { AgentHistory } from '@agentdeck/contracts/agent-history';
-import type { ProgressAgent } from '@agentdeck/contracts';
+import type { AgentNode, AgentNodeDetail, BgItem } from '@agentdeck/contracts/core/agents';
 import { i18n } from '@shared/config/i18n';
-import { historyPollMs } from '../../api/agentTreeApi';
-import { AgentHistorySessions } from './AgentHistorySessions';
+import { buildCoreTree } from '../../model/coreAgents';
+import { AgentHistoryCard } from './AgentHistoryButton';
+import { AgentNodeList } from './AgentNodeList';
+import { AgentNodeDetailView } from './AgentNodeDetailView';
+import { BgItemDetail } from './BgItemDetail';
 
 /**
- * Левая колонка окна «История агентов»: что видит человек — все сессии новыми
- * первыми с номером от первой, стадию звена, главного агента и субагентов
- * каждой сессии; «идёт» прошлой сессии — оборван, а не работает.
+ * Окно «Агенты» по журналу ядра: карточка над полем ввода («фоном: N» / «фоновых нет»), дерево
+ * строк с моделью и словом состояния, подробность фоновой работы (команда, итог, «висит»,
+ * «осиротел», «осиротел — потерян») и расход ребёнка — его собственный, а не родителя.
  */
-const agent = (agentId: string | undefined, over: Partial<ProgressAgent> = {}): ProgressAgent => ({
-  id: `toolu_${agentId ?? 'x'}`,
-  kind: 'general-purpose',
-  description: `Агент ${agentId ?? 'без файла'}`,
-  status: 'done',
-  ...(agentId ? { agentId } : {}),
+const TASK = '019a0000-0000-7000-8000-000000000001';
+const STEP = '019a0000-0000-7000-8000-000000000002';
+const SESSION = '019a0000-0000-7000-8000-000000000003';
+const NOW = 100_000;
+
+const node = (nodeId: string, over: Partial<AgentNode> = {}): AgentNode => ({
+  nodeId,
+  parentId: SESSION,
+  taskId: TASK,
+  kind: 'subagent',
+  status: 'completed',
+  stepId: STEP,
+  unitId: null,
+  sessionId: SESSION,
+  model: null,
+  background: false,
+  startedAt: 1_000,
+  endedAt: 61_000,
+  spend: { tokens: null, windowShare: null },
+  counts: { toolCalls: 0, files: 0, refusals: 0, escalations: 0, children: 0 },
+  signals: [],
+  briefExcerpt: null,
+  returnExcerpt: null,
+  ...over,
+});
+const session = (over: Partial<AgentNode> = {}) =>
+  node(SESSION, { kind: 'unit-session', parentId: null, ...over });
+const bg = (nodeId: string, over: Partial<AgentNode> = {}) =>
+  node(nodeId, {
+    kind: 'background-shell',
+    background: true,
+    briefExcerpt: 'npm run watch',
+    ...over,
+  });
+
+const item = (itemId: string, over: Partial<BgItem> = {}): BgItem => ({
+  itemId,
+  kind: 'background-shell',
+  excerpt: 'npm run watch',
+  ownerChain: {
+    taskId: TASK,
+    stepId: STEP,
+    unitId: null,
+    sessionId: SESSION,
+    toolUseId: 'toolu_bash',
+    parentToolUseId: null,
+  },
+  startedAt: 1_000,
   ...over,
 });
 
-const history: AgentHistory = {
-  agentCount: 3,
-  live: { agents: 0, subagents: 0 },
-  sessions: [
-    {
-      chatId: 's-fix',
-      stage: 'fix',
-      current: true,
-      startedAt: '2026-10-26T10:00:00.000Z',
-      endedAt: '2026-10-26T10:20:00.000Z',
-      main: { toolCalls: 5, tokens: { input: 1000, output: 500, cacheRead: 0, cacheCreation: 0 } },
-      agents: [agent('f1', { status: 'running' })],
-    },
-    {
-      chatId: 's-work',
-      stage: 'work',
-      startedAt: '2026-10-26T08:00:00.000Z',
-      endedAt: '2026-10-26T09:30:00.000Z',
-      main: {
-        toolCalls: 12,
-        model: 'claude-opus-4-1-20250805',
-        anomalies: {
-          denials: 2,
-          errors: 1,
-          repeatedReads: [{ path: '/a.ts', count: 3 }],
-          largeResults: 1,
-        },
-      },
-      anomalies: {
-        w1: { denials: 0, errors: 4, repeatedReads: [], largeResults: 0 },
-      },
-      agents: [
-        agent('w1', {
-          status: 'running',
-          model: 'claude-sonnet-4-6',
-          toolCalls: 7,
-          result: 'Выгрузка готова',
-        }),
-        agent(undefined),
-      ],
-    },
-  ],
-};
+const detailOf = (n: AgentNode, bgItems: BgItem[] = []): AgentNodeDetail => ({
+  node: n,
+  toolCalls: { items: [], next: null },
+  files: [],
+  refusals: [],
+  escalations: [],
+  bg: bgItems,
+  outputTail: null,
+});
 
-function render(over: Partial<Parameters<typeof AgentHistorySessions>[0]> = {}): string {
-  return renderToStaticMarkup(
-    <AgentHistorySessions
-      history={history}
-      isLoading={false}
-      isRunning
+const text = (html: string): string =>
+  html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const list = (nodes: AgentNode[]): string =>
+  renderToStaticMarkup(
+    <AgentNodeList
+      roots={buildCoreTree(nodes)}
       picked={undefined}
       onPick={() => undefined}
-      {...over}
+      now={NOW}
     />,
   );
-}
+
+const statusOf = (html: string, nodeId: string): string | undefined => {
+  const at = html.indexOf(`data-agent-row="${nodeId}"`);
+  if (at < 0) return undefined;
+  return /data-node-status="([^"]+)"/.exec(html.slice(at))?.[1];
+};
 
 beforeAll(async () => {
   await i18n.changeLanguage('ru');
 });
 
-describe('AgentHistorySessions — сессии разговора в окне «История агентов»', () => {
-  it('новые первыми, номер от первой, стадия звена; «текущая» — только у текущей', () => {
-    const html = render();
-    const fix = html.indexOf('Сессия 2 · правки');
-    const work = html.indexOf('Сессия 1 · работа');
-    expect(fix).toBeGreaterThanOrEqual(0);
-    expect(work).toBeGreaterThan(fix);
-    expect(html.match(/текущая/g)).toHaveLength(1);
-    expect(html.indexOf('текущая')).toBeLessThan(work);
-  });
-
-  it('главный агент одной строкой: вызовы, расход, модель без даты сборки', () => {
-    const html = render();
-    expect(html).toContain('Главный агент: 5 вызовов · 1.5k ток.');
-    expect(html).toContain('Главный агент: 12 вызовов · opus-4-1');
-  });
-
-  it('субагенты прошлой сессии: модель, вызовы, итог; «идёт» там — оборван', () => {
-    const html = render();
-    expect(html).toContain('data-agent-history-agent="w1" data-agent-state="lost"');
-    expect(html).toContain('general-purpose · sonnet-4-6 · 7 вызовов');
-    expect(html).toContain('Выгрузка готова');
-    expect(html).toContain('data-agent-history-agent="f1" data-agent-state="running"');
-  });
-
-  it('ход текущей сессии кончился — её фоновый субагент всё ещё «идёт», прошлой — оборван', () => {
-    const html = render({ isRunning: false });
-    expect(html).toContain('data-agent-history-agent="f1" data-agent-state="running"');
-    expect(html).toContain('data-agent-history-agent="w1" data-agent-state="lost"');
-  });
-
-  it('выбранный субагент отмечен; без файла хода — кнопка выключена', () => {
-    const html = render({ picked: { chatId: 's-work', agentId: 'w1' } });
-    expect(html).toMatch(/aria-pressed="true"[^>]*data-agent-history-agent="w1"/);
-    expect(html).toMatch(/disabled=""[^>]*data-agent-history-agent="toolu_x"/);
-  });
-
-  it('главный агент каждой сессии — кнопка, открывающая его ход; выбранный отмечен', () => {
-    const picks: Array<{ chatId: string; agentId: string }> = [];
-    const html = render({
-      picked: { chatId: 's-fix', agentId: 'main' },
-      onPick: (p) => picks.push(p),
-    });
-    expect(html).toMatch(/<button[^>]*aria-pressed="true"[^>]*data-agent-history-main="s-fix"/);
-    expect(html).toMatch(/<button[^>]*aria-pressed="false"[^>]*data-agent-history-main="s-work"/);
-    expect(html).toContain('title="Открыть ход главного агента этой сессии"');
-  });
-
-  it('странности агента — строкой под ним: только ненулевые, повторные чтения с файлами в подсказке', () => {
-    const html = render();
-    expect(html).toContain(
-      'отказов хуков 2 · ошибок 1 · повторных чтений 1 · результатов длиннее 10 000 символов 1',
+describe('AgentHistoryCard — карточка над полем ввода', () => {
+  it('идёт фоновая работа — «фоном: 1»', () => {
+    const html = renderToStaticMarkup(
+      <AgentHistoryCard
+        nodes={[session({ status: 'running' }), bg('b1', { status: 'running', endedAt: null })]}
+        onOpen={() => undefined}
+      />,
     );
-    expect(html).toContain('title="Прочитаны больше одного раза: /a.ts ×3"');
-    expect(html).toContain('>ошибок 4<');
-    expect(html.match(/data-agent-history-anomalies/g)).toHaveLength(2);
+    expect(html).toContain('data-agent-history-bg="1"');
+    expect(text(html)).toContain('фоном: 1');
   });
 
-  it('опрос истории: идёт разговор или кто-то работает — каждые 5 с; никого — молчим', () => {
-    const idle = { ...history, live: { agents: 0, subagents: 0 } };
-    expect(historyPollMs(false, idle)).toBe(false);
-    expect(historyPollMs(false, undefined)).toBe(false);
-    expect(historyPollMs(true, idle)).toBe(5000);
-    // Фоновый субагент между ходами: прогона нет, а работающий есть.
-    expect(historyPollMs(false, { ...history, live: { agents: 0, subagents: 1 } })).toBe(5000);
+  it('фон кончился — «фоновых нет»', () => {
+    const html = renderToStaticMarkup(
+      <AgentHistoryCard
+        nodes={[session(), bg('b1', { status: 'completed', exitCode: 0 })]}
+        onOpen={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-agent-history-bg="0"');
+    expect(text(html)).toContain('фоновых нет');
+  });
+});
+
+describe('AgentNodeList — дерево строк', () => {
+  it('строка субагента с моделью, фоновая — «идёт», законченная — «завершён (код 0)»', () => {
+    const html = list([
+      session({ status: 'running', endedAt: null }),
+      node('toolu_sub', { model: 'sonnet', briefExcerpt: 'probe subagent' }),
+      bg('b1', { status: 'running', endedAt: null }),
+      bg('b2', { status: 'completed', exitCode: 0, startedAt: 2_000 }),
+    ]);
+    expect(html).toContain('data-agent-kind="subagent"');
+    expect(html).toContain('data-agent-model="sonnet"');
+    expect(statusOf(html, 'b1')).toBe('running');
+    expect(statusOf(html, 'b2')).toBe('completed');
+    expect(text(html)).toContain('завершён (код 0)');
   });
 
-  it('оборванные паузой — своей строкой «прервано паузой», не в «ошибок»', () => {
-    const cut: AgentHistory = {
-      ...history,
-      sessions: [
-        {
-          ...history.sessions[0]!,
-          main: {
-            toolCalls: 3,
-            anomalies: {
-              denials: 0,
-              errors: 0,
-              interrupted: 2,
-              repeatedReads: [],
-              largeResults: 0,
-            },
-          },
-        },
-      ],
-    };
-    const html = render({ history: cut });
-    expect(html).toContain('data-agent-history-interrupted');
-    expect(html).toContain('прервано паузой 2');
-    expect(html).not.toContain('ошибок');
+  it('сеанс потерян — его потерянная фоновая работа «осиротел — потерян»', () => {
+    const html = list([session({ status: 'lost' }), bg('b1', { status: 'lost' })]);
+    expect(statusOf(html, 'b1')).toBe('orphanLost');
+    expect(text(html)).toContain('осиротел — потерян');
   });
 
-  it('старый сервер без отметок «сейчас» — окна «Сейчас» нет, «идёт» как раньше', () => {
-    const html = render();
-    expect(html).not.toContain('data-agent-history-now');
-    expect(html).not.toContain('data-agent-history-session-live');
+  it('сеанс кончился штатно — потерянная фоновая работа просто «потерян»', () => {
+    const html = list([session({ status: 'completed' }), bg('b1', { status: 'lost' })]);
+    expect(statusOf(html, 'b1')).toBe('lost');
   });
 
-  it('пустая история и чтение — свои строки', () => {
+  it('владельца нет в ответе — строка всё равно есть, корнем', () => {
+    const html = list([bg('b1', { parentId: 'gone', status: 'running', endedAt: null })]);
+    expect(statusOf(html, 'b1')).toBe('running');
+  });
+});
+
+describe('BgItemDetail — фоновая работа подробно', () => {
+  it('команда, «завершён (код 0)», расход «неизвестно», цепочка владельца', () => {
+    const n = bg('b1', { status: 'completed', exitCode: 0 });
+    const html = renderToStaticMarkup(
+      <BgItemDetail detail={detailOf(n, [item('b1', { exitCode: 0, how: 'exit' })])} now={NOW} />,
+    );
+    const seen = text(html);
+    expect(seen).toContain('npm run watch');
+    expect(seen).toContain('завершён (код 0)');
+    expect(seen).toContain('неизвестно');
+    expect(html).toContain('data-agent-fact="owner"');
+  });
+
+  it('молчащая — «висит», живая сирота — «осиротел»', () => {
+    const hang = bg('b1', { status: 'running', endedAt: null, signals: ['bg-hang'] });
     expect(
-      render({ history: { sessions: [], agentCount: 0, live: { agents: 0, subagents: 0 } } }),
-    ).toContain('Сессий у этого чата пока нет');
-    expect(render({ history: undefined, isLoading: true })).toContain('Читаю транскрипты сессий');
+      text(renderToStaticMarkup(<BgItemDetail detail={detailOf(hang, [item('b1')])} now={NOW} />)),
+    ).toContain('висит');
+    const orphan = bg('b1', { status: 'running', endedAt: null, signals: ['bg-orphan'] });
+    const orphanText = text(
+      renderToStaticMarkup(<BgItemDetail detail={detailOf(orphan, [item('b1')])} now={NOW} />),
+    );
+    expect(orphanText).toContain('осиротел');
+    expect(orphanText).not.toContain('осиротел —');
+  });
+
+  it('потеряна при аварийном конце владельца — «осиротел — потерян» и в подробности', () => {
+    const n = bg('b1', { status: 'lost' });
+    const html = renderToStaticMarkup(
+      <AgentNodeDetailView
+        detail={detailOf(n, [item('b1', { how: 'lost' })])}
+        nodes={[session({ status: 'lost' }), n]}
+        now={NOW}
+        hasMore={false}
+        isFetchingMore={false}
+        onMore={() => undefined}
+      />,
+    );
+    expect(html).toContain('data-bg-detail="b1"');
+    expect(text(html)).toContain('осиротел — потерян');
+  });
+});
+
+describe('AgentNodeDetailView — расход ребёнка свой', () => {
+  it('у родителя расход известен, у субагента нет — у субагента «неизвестно»', () => {
+    const parent = session({ spend: { tokens: 12_000, windowShare: null } });
+    const child = node('toolu_sub', { model: 'sonnet' });
+    const html = renderToStaticMarkup(
+      <AgentNodeDetailView
+        detail={detailOf(child)}
+        nodes={[parent, child]}
+        now={NOW}
+        hasMore={false}
+        isFetchingMore={false}
+        onMore={() => undefined}
+      />,
+    );
+    const spend = /data-agent-fact="spend"(.*?)<\/dd>/s.exec(html)?.[1] ?? '';
+    expect(text(spend)).toContain('неизвестно');
+    expect(text(spend)).not.toMatch(/12/);
   });
 });

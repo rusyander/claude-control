@@ -24,6 +24,7 @@ import type {
   MirrorSettings,
 } from './copy.types.ts';
 import { decideCopySetup } from './decide.ts';
+import { integrationBaseOf } from './integration-base.ts';
 import type { ConfiguredInstall } from './install-plan.ts';
 import {
   copyResourceOf,
@@ -155,7 +156,9 @@ export async function createUnitCopy(
   // База закрепляется первой попыткой (sha в журнале): повтор после краха не переезжает на
   // сдвинувшуюся с тех пор ревизию-имя. Первая попытка берёт основу у зоны D (G19).
   const pinned = pinnedBaseOf(task, unitId);
-  const baseRef = pinned ?? branchBaseOf(task, unitId);
+  // Единица интеграции (W3-18b) растёт от слияния голов своих единиц, а не от одной из них.
+  const baseRef =
+    pinned ?? (await integrationBaseOf(task, unitId, repo.path, git)) ?? branchBaseOf(task, unitId);
   if (typeof baseRef !== 'string') return { ok: false, failed: `base: ${baseRef.unknown}` };
   const base = await commitOf(repo.path, baseRef, git);
   if (!('value' in base)) {

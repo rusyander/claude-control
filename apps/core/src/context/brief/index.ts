@@ -9,7 +9,16 @@ export {
   orderParts,
   renderPart,
 } from './brief.ts';
-export { findingsPart, handoffPart, platformRulesPart } from './sections.ts';
+export {
+  findingsPart,
+  handoffPart,
+  platformRulesPart,
+  PREVIOUS_ATTEMPT_BYTES,
+  previousAttemptPart,
+  RECON_BRIEF_BYTES,
+  RECON_FILES_LISTED,
+  reconMapPart,
+} from './sections.ts';
 export {
   BRIEF_SECTION_IDS,
   type Brief,
@@ -21,4 +30,10 @@ export {
   type RenderedPart,
   type SentSection,
 } from './brief.types.ts';
-export type { DoneStepRef, FindingRef, HandoffInput, NotebookRef } from './sections.types.ts';
+export type {
+  DoneStepRef,
+  FindingRef,
+  HandoffInput,
+  NotebookRef,
+  PreviousAttemptRef,
+} from './sections.types.ts';

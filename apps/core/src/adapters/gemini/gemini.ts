@@ -214,6 +214,8 @@ export function createGeminiAdapter(options: RpcAdapterOptions = {}): RpcAdapter
       layer: geminiLayer,
       refuse: refuseGemini,
       plan: planGemini,
+      // Флага без записи у ACP Gemini нет; чаты — под своим GEMINI_CLI_HOME сеанса.
+      ephemeral: 'session-home',
       resume: geminiResume,
       ownsTranscript: geminiOwnsTranscript,
       transcriptPresent: geminiTranscriptPresent,

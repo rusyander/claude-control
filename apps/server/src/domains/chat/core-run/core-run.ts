@@ -3,7 +3,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { CORE_PERMIT_TOOL } from '@agentdeck/contracts/chat-handoff';
 import { estimateFieldsSchema, type ChatAttachment } from '@agentdeck/contracts/core/estimate';
 import type { JournalLine } from '@agentdeck/contracts/core/journal';
-import { humanTextOf, sessionEventKeys } from '@agentdeck/contracts/core/session-stream';
+import { humanTextOf, sentAtOf, sessionEventKeys } from '@agentdeck/contracts/core/session-stream';
 import { ASK_MACHINE, STEP_MACHINE } from '@agentdeck/contracts/core/states';
 import type { TaskView } from '@agentdeck/contracts/core/task-view';
 import { joinAttachments, splitAttachments } from '@agentdeck/contracts/uploads';
@@ -13,20 +13,24 @@ import type { ChatEvent } from '../chat-events.ts';
 import type { RunOptions } from '../run-options/run-options.ts';
 import type { RunLike } from '../ChatRunRegistry/ChatRunRegistry.ts';
 import type { CoreChatRunDeps } from './core-run.types.ts';
+import { modelForCli } from './model-fit.ts';
 import { coreRefusalText } from './refusal-text.ts';
-import { carryOfRunOptions } from './session-carry.ts';
+import { carryOfRunOptions, type CarryOutcome } from './session-carry.ts';
 import { translate, TURN_ERROR_TEXT } from './translate.ts';
 
 /**
- * Ход чата Claude через ядро (этап 10, F2, проход 3): у панели больше нет своего процесса CLI для
+ * Ход чата через ядро (этап 10, F2, проход 3): у панели больше нет своего процесса CLI для
  * `/chat` — ход идёт задачей ядра `chat@1` прямо в папке проекта, CLI — потомок хоста сеанса ядра.
  * Реестр прогонов, вкладка и сторожа не меняются: прогон говорит словарём прежнего исполнителя.
+ *
+ * CLI хода (этап 11, W3-17a): новый разговор — активный провайдер панели, начатый — тот CLI,
+ * которым он начат (книга). Отказ ядра этому CLI (нет хука, нет маршрута) — ошибка хода с кодом.
  *
  * Дорога хода:
  * - разговор уже ведёт живой шаг `chat` (книга + вид задачи) — сообщение шагу (`message-to-step`),
  *   ядро доставит его на границе хода;
  * - иначе — оценка с пресетом `chat` (на месте, грант правки на корень), `resume` с id разговора,
- *   если он есть, затем `set-cli claude`, модель хода и запуск.
+ *   если он есть, затем `set-cli <cli разговора>`, модель хода и запуск.
  * Чтение — вид сеанса с конца прошлого хода до ближайшего конца хода. Ядро недоступно или
  * отказало — ошибка с причиной ядра; тихого отката на прежний исполнитель нет.
  */
@@ -193,12 +197,16 @@ export class CoreChatRun implements RunLike {
     return true;
   }
 
-  /** Доставленное ядром слово человека (`user-text` с шапкой доставки) снимает его с ожидания. */
-  private delivered(text: unknown): void {
-    if (typeof text !== 'string' || this.owed.length === 0) return;
+  /**
+   * Доставленное ядром слово человека (`user-text` с шапкой доставки) снимает его с ожидания.
+   * Возвращает само слово, если оно было «на ходу»: с него начался новый ход этого прогона.
+   */
+  private delivered(text: unknown): string | undefined {
+    if (typeof text !== 'string' || this.owed.length === 0) return undefined;
     const said = humanTextOf(text).trim();
     const at = this.owed.findIndex((p) => p.trim() === said);
-    if (at >= 0) this.owed.splice(at, 1);
+    if (at < 0) return undefined;
+    return this.owed.splice(at, 1)[0];
   }
 
   /** Отмена задачи ядра; следующий ход начнёт новую задачу с продолжением разговора. */
@@ -275,9 +283,25 @@ export class CoreChatRun implements RunLike {
     turn: Turn,
   ): Promise<Placed | null> {
     const { port, book } = this.deps;
+    // CLI разговора (W3-17a): новый — активный провайдер, начатый — тот, которым начат. Чужой
+    // разговор другой CLI продолжить не может; прежние записи без CLI все начаты Claude.
+    const active = this.deps.activeCli?.() ?? 'claude';
+    const cli = conversation ? (book.cliOf(conversation) ?? 'claude') : active;
+    // Галочка контура (и обязательный контур) — разрешённый набор задачи, ДО выбора CLI. Галочка —
+    // по CLI разговора (`chatConsumerOf`): Claude — «Чат», другой CLI — своя `foreign:<cli>`.
+    // Через контур модель — его перевод выбора человека (s10 G7, `contourModelOf`): имя вендора,
+    // которого контур не знает, ядро отказало бы под шаблоном контура; усилие контуру не уезжает.
+    // Модель шапки — из каталога CLI ЭТОГО разговора (веб спрашивает каталог его CLI). Через контур
+    // с моделью выбор переводит контур (его каталог один у любого CLI и несёт `claude-*`, а CLI
+    // видит только модель контура); мимо контура имя Claude другому CLI не уходит (`modelForCli`):
+    // тогда модель своего маршрута.
+    const pick = options.model?.trim() ?? '';
+    const routes = this.deps.routes?.(pick, cli);
+    const contourModel = contourModelOf(routes);
+    const asked = contourModel ? pick : modelForCli(cli, pick);
     // Слой панели этого старта (G6): строка о тестах, строка профиля, набор, флаги наших слоёв.
-    // Закрепляется на задаче: следующие ходы идут сообщением тому же шагу.
-    const carried = carryOfRunOptions(options);
+    // Закрепляется на задаче: следующие ходы идут сообщением тому же шагу. Чужому CLI — его слой.
+    const carried = carryOf(this.deps, options, cli, routes);
     if (!carried.ok) {
       throw new Error(
         `core chat: the panel layer does not fit the core session: ${carried.reason}`,
@@ -294,7 +318,7 @@ export class CoreChatRun implements RunLike {
       ciWait: false,
       // Чат идёт в проекте человека: начало чата и есть грант правки на этот корень (Q1).
       placement: { kind: 'in-place', grant: { project: options.cwd, ops: ['edit'] } },
-      ...(conversation ? { resume: { adapter: 'claude', conversationId: conversation } } : {}),
+      ...(conversation ? { resume: { adapter: cli, conversationId: conversation } } : {}),
       session: carried.carry.session,
     });
     if (!parsed.success) {
@@ -316,14 +340,8 @@ export class CoreChatRun implements RunLike {
       this.cancel();
       return null;
     }
-    // Галочка «Чат» контура (и обязательный контур) — разрешённый набор задачи, ДО выбора CLI:
-    // как у чата чужого CLI (`core-foreign-start.ts`), иначе ход шёл мимо контура.
-    // Через контур модель — его перевод выбора человека (s10 G7, `contourModelOf`): имя вендора,
-    // которого контур не знает, ядро отказало бы под шаблоном контура; усилие контуру не уезжает.
-    const routes = this.deps.routes?.(options.model ?? '');
-    const contourModel = contourModelOf(routes);
     // Выбора нет — `set-model` не нужен: модель маршрута ядро возьмёт само (`modelOn`, «route»).
-    const model = options.model ? (contourModel ?? options.model) : undefined;
+    const model = asked ? (contourModel ?? asked) : undefined;
     const effort = contourModel ? null : options.effort || null;
     const commands: Array<[Parameters<typeof port.command>[1], Record<string, unknown>]> = [
       ...(routes?.length
@@ -331,7 +349,7 @@ export class CoreChatRun implements RunLike {
             [Parameters<typeof port.command>[1], Record<string, unknown>]
           >)
         : []),
-      ['set-cli', { scope: 'task', scopeId: taskId, adapter: 'claude', timing: 'now' }],
+      ['set-cli', { scope: 'task', scopeId: taskId, adapter: cli, timing: 'now' }],
       ...(model
         ? ([
             [
@@ -362,7 +380,7 @@ export class CoreChatRun implements RunLike {
     const conversationId = conversation ?? sessionId;
     this.stepId = stepId;
     this.conversationId = conversationId;
-    book.set(conversationId, { taskId, stepId });
+    book.set(conversationId, { taskId, stepId, cli, cwd: options.cwd });
     if (this.stopped) {
       this.cancel();
       return null;
@@ -431,7 +449,17 @@ export class CoreChatRun implements RunLike {
             seen.add(key);
             if (event.kind === 'user-text') {
               this.held = false;
-              this.delivered((event.data as { text?: unknown })?.text);
+              const word = this.delivered((event.data as { text?: unknown })?.text);
+              // Граница хода внутри прогона: прошлый ответ кончился, слово человека начинает свой
+              // ход. Без неё вкладка дописывала новый ответ к прежнему одним текстом, а само слово
+              // убирала по концу прогона — транскрипта чужого CLI панель не читает, и сообщение
+              // человека пропадало с экрана (core-chat-012).
+              // Граница — та же стена, которой история ядра метит этот ход (`sentAt` отправки
+              // слова CLI), а не минута, когда его увидел сервер: она позже, и ответ хода, уже
+              // записанный в историю, при её перечитывании посреди хода вставал дважды — из
+              // истории и из пузыря потока (F-01). Стены нет (старый журнал) — своё время.
+              if (word !== undefined)
+                onEvent({ kind: 'nextTurn', prompt: word, at: sentAtOf(event) ?? this.now });
             }
             const out = translate(event, this.now);
             if (out.kind === 'event') onEvent(out.event);
@@ -722,4 +750,20 @@ function latestSession(view: TaskView, stepId: string): TaskView['sessions'][num
   return view.sessions
     .filter((s) => s.stepId === stepId)
     .sort((a, b) => b.startedSeq - a.startedSeq)[0];
+}
+
+/**
+ * Слой панели старта задачи: Claude — сборка реестра (`RunOptions`), чужой CLI — его слой
+ * (`foreignCarry`). Без него чужой CLI идёт без слоя панели, а не со слоем Claude: плагин и флаги
+ * Claude ядро чужому CLI отказало бы, и разговор не начался бы вовсе.
+ */
+function carryOf(
+  deps: CoreChatRunDeps,
+  options: RunOptions,
+  cli: string,
+  routes: ReturnType<NonNullable<CoreChatRunDeps['routes']>>,
+): CarryOutcome {
+  if (cli === 'claude') return carryOfRunOptions(options);
+  if (!deps.foreignCarry) return { ok: true, carry: { session: {}, env: {} } };
+  return deps.foreignCarry({ cli, cwd: options.cwd, ...(routes?.length ? { routes } : {}) });
 }

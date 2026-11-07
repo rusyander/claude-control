@@ -5,7 +5,13 @@ import {
   type SkillMode,
   type UserLayerInventory,
 } from '@agentdeck/contracts/core/user-layer';
-import type { AdapterCaps, CliAdapter, LayerRun } from '../../adapters/adapter.types.ts';
+import type {
+  AdapterCaps,
+  CliAdapter,
+  InventorySession,
+  LayerRun,
+  SessionSpec,
+} from '../../adapters/adapter.types.ts';
 import { decideLayerRun } from '../../adapters/layer-run/decide.ts';
 import { openRecorderLog } from '../../adapters/layer-run/recorder.ts';
 import type { LiveTask } from '../../journal/resume.ts';
@@ -54,6 +60,20 @@ export interface LayerStartInput {
   cwd: string;
   skills: SkillMode;
   layer: LayerRun;
+  /** Источники и перенос слоя сеанса (`SessionSpec.layer`): опись видит хуки, которые CLI исполнит. */
+  spec: Pick<SessionSpec['layer'], 'sources' | 'carry'>;
+}
+
+/** Факты сеанса для описи: режим на деле + сужение источников и перенос (плагины набора). */
+export function inventorySession(
+  layer: Pick<LayerRun, 'ran'>,
+  spec: Pick<SessionSpec['layer'], 'sources' | 'carry'> | undefined,
+): InventorySession {
+  return {
+    ran: layer.ran,
+    ...(spec?.sources ? { sources: spec.sources } : {}),
+    ...(spec?.carry ? { carry: spec.carry } : {}),
+  };
 }
 
 /**
@@ -64,7 +84,13 @@ export interface LayerStartInput {
  */
 export function journalLayerStart(input: LayerStartInput): UserLayerInventory | null {
   const { task, stepId, sessionId } = input;
-  const inventory = input.inventoryOf?.(input.pin, input.cwd, input.layer.repoLayer) ?? null;
+  const inventory =
+    input.inventoryOf?.(
+      input.pin,
+      input.cwd,
+      input.layer.repoLayer,
+      inventorySession(input.layer, input.spec),
+    ) ?? null;
   const hash = inventory?.hash ?? null;
   // Последний хеш этого CLI — из свёртки журнала задачи: перезапуск ядра его не теряет.
   if (hash !== null && task.state.layerHashes[input.cli] !== hash) {

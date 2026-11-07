@@ -1,7 +1,7 @@
 import { LOCAL_REPLY_RESERVE_TOKENS } from '@agentdeck/contracts/local-models';
 
 /**
- * Окно своей модели на постоянном адресе (этап 10, зона C4; перенесено со шлюза панели
+ * Окно своей модели на постоянном адресе (этап 10, зона C4; перенесено со шлюза в панели
  * `gateway/local-window`). Запрос, не влезающий в окно сервера, получает отказ в том виде, который
  * клиент узнаёт, а не 400 llama-server («request exceeds the available context size»), который
  * Claude Code и Qwen Code не узнают и на котором ход умирал.

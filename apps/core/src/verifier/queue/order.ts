@@ -42,11 +42,75 @@ export function isSilent(beatAt: number, now: number, beatMs: number): boolean {
   return now - beatAt > MISSED_BEATS * beatMs;
 }
 
+/**
+ * Ключ порядка — ОДИН упорядочиватель ядра (этап 11, D9): им сортируют очередь проверок
+ * (`sortTickets`), места сеансов и судья порядка работ (`conductor/schedule`). Класс шага
+ * deliver > fix > review > work > background, ожидание поднимает на класс за каждые `agingMs`;
+ * при равном ранге начатое раньше нового, начатое — по остатку оценки (ближнее к концу первым),
+ * новое — самое долгое по выученной длительности первым; дальше FIFO и id.
+ */
+export interface OrderKey {
+  cls: QueueClass;
+  /** С какого момента ждёт: FIFO и старение. */
+  since: number;
+  started: boolean;
+  remainingMs: number | null;
+  learnedMs: number | null;
+  /** Последний разрыв равенства: порядок не зависит от порядка чтения каталога. */
+  id: string;
+}
+
 /** Ранг с учётом ожидания: меньше — раньше; ниже `deliver` не поднимается. */
-export function effectiveRank(ticket: QueueTicket, now: number, agingMs: number): number {
-  const waited = Math.max(0, now - ticket.enqueuedAt);
+export function keyRank(
+  key: Pick<OrderKey, 'cls' | 'since'>,
+  now: number,
+  agingMs: number,
+): number {
+  const waited = Math.max(0, now - key.since);
   const steps = agingMs > 0 ? Math.floor(waited / agingMs) : 0;
-  return Math.max(0, CLASS_RANK[ticket.class] - steps);
+  return Math.max(0, CLASS_RANK[key.cls] - steps);
+}
+
+/** Неизвестное — после известного: оценку без числа не ставят впереди измеренной. */
+function byKnown(a: number | null, b: number | null, dir: 1 | -1): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return dir * (a - b);
+}
+
+/** Сравнение двух ключей при уже посчитанных рангах (ранг считают один раз на проход). */
+export function compareRanked(a: OrderKey, b: OrderKey, ra: number, rb: number): number {
+  if (ra !== rb) return ra - rb;
+  if (a.started !== b.started) return a.started ? -1 : 1;
+  const est = a.started
+    ? byKnown(a.remainingMs, b.remainingMs, 1)
+    : byKnown(a.learnedMs, b.learnedMs, -1);
+  if (est !== 0) return est;
+  if (a.since !== b.since) return a.since - b.since;
+  if (a.id === b.id) return 0;
+  return a.id < b.id ? -1 : 1;
+}
+
+export function compareKeys(a: OrderKey, b: OrderKey, now: number, agingMs: number): number {
+  return compareRanked(a, b, keyRank(a, now, agingMs), keyRank(b, now, agingMs));
+}
+
+/** Билет проверки как ключ порядка: оценки у проверки нет — внутри класса чистый FIFO. */
+function checkKey(ticket: QueueTicket): OrderKey {
+  return {
+    cls: ticket.class,
+    since: ticket.enqueuedAt,
+    started: false,
+    remainingMs: null,
+    learnedMs: null,
+    id: ticket.ticketId,
+  };
+}
+
+/** Ранг билета проверки с учётом ожидания. */
+export function effectiveRank(ticket: QueueTicket, now: number, agingMs: number): number {
+  return keyRank(checkKey(ticket), now, agingMs);
 }
 
 /** Слоты в силе: мало памяти — новым выдачам вдвое меньше (04:116), но не меньше одного. */
@@ -66,13 +130,9 @@ function flightId(project: string, key: string | null): string | null {
 }
 
 export function sortTickets(view: QueueView, now: number, agingMs: number): QueueView['tickets'] {
-  return [...view.tickets].sort((a, b) => {
-    const rank = effectiveRank(a.ticket, now, agingMs) - effectiveRank(b.ticket, now, agingMs);
-    if (rank !== 0) return rank;
-    if (a.ticket.enqueuedAt !== b.ticket.enqueuedAt)
-      return a.ticket.enqueuedAt - b.ticket.enqueuedAt;
-    return a.ticket.ticketId < b.ticket.ticketId ? -1 : 1;
-  });
+  return [...view.tickets].sort((a, b) =>
+    compareKeys(checkKey(a.ticket), checkKey(b.ticket), now, agingMs),
+  );
 }
 
 /**

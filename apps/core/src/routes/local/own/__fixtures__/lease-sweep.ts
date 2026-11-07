@@ -30,7 +30,11 @@ export async function stopLeaseServers(root: string): Promise<void> {
           left.push(`${dir}: pid ${report.residual.map((id) => id.pid).join(' ')}`);
       }
       if (state?.startLeft) {
-        const rest = await stopLeftover(state.startLeft.root, state.startLeft.rid);
+        const rest = await stopLeftover(
+          state.startLeft.root,
+          state.startLeft.rid,
+          state.startLeft.since,
+        );
         if (rest) left.push(`${dir}: ${rest}`);
       }
     }

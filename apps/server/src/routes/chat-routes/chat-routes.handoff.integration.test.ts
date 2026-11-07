@@ -102,17 +102,6 @@ describe('маршруты продолжения в чистой сессии',
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      coreChats: {
-        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-        estimate: async () => ({
-          ok: false as const,
-          code: 'no-core',
-          message: 'no core in this test',
-        }),
-        command: async () => {
-          throw new Error('no core in this test');
-        },
-      },
       session: new ChatSession(registry),
     });
     await app.ready();
@@ -210,17 +199,6 @@ describe('маршруты продолжения в чистой сессии',
       registerChatHandoffRoutes(busy, ctxOf(root, store), {
         runs: registry,
         chains: new HandoffChains(),
-        coreChats: {
-          // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-          estimate: async () => ({
-            ok: false as const,
-            code: 'no-core',
-            message: 'no core in this test',
-          }),
-          command: async () => {
-            throw new Error('no core in this test');
-          },
-        },
         session: new ChatSession(registry),
       });
       await busy.ready();
@@ -246,17 +224,6 @@ describe('маршруты продолжения в чистой сессии',
       registerChatHandoffRoutes(quiet, ctxOf(root, store), {
         runs: registry,
         chains,
-        coreChats: {
-          // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-          estimate: async () => ({
-            ok: false as const,
-            code: 'no-core',
-            message: 'no core in this test',
-          }),
-          command: async () => {
-            throw new Error('no core in this test');
-          },
-        },
         session: new ChatSession(registry),
       });
       await quiet.ready();

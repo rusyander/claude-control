@@ -426,6 +426,8 @@ export function startRun(input: StartInput): Promise<SendOutcome> {
     lastPrompt: input.prompt,
     // Старт по часам сервера придёт с событием session.
     startedAt: undefined,
+    // Граница хода внутри прошлого прогона (`nextTurn`) к этому не относится.
+    turnAt: undefined,
     allowEdits: input.allowEdits,
     autoApprove: input.autoApprove,
     model: input.model,

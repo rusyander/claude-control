@@ -10,6 +10,8 @@ export interface RunModelNameInput {
   model: string;
   /** Модель из настроек. */
   defaultModel?: string;
+  /** CLI разговора (W3-17a); нет — Claude. */
+  cli?: string;
 }
 
 /**
@@ -23,6 +25,7 @@ export function useRunModelName({
   consumer = 'chat',
   model,
   defaultModel,
+  cli,
 }: RunModelNameInput): string {
   const { t } = useTranslation();
   const plan = usePlatformRunPlan(consumer);
@@ -30,5 +33,8 @@ export function useRunModelName({
   if (plan.data?.routed === true) {
     return platformRunChoice(plan.data.rules, model, defaultModel).model || plan.data.title;
   }
-  return modelLabel(model || defaultModel || '') || t('chat.modelClaudeDefault');
+  // Модель по умолчанию — своя у каждого CLI: разговор Qwen без выбора — не «Opus думает».
+  const fallback =
+    !cli || cli === 'claude' ? t('chat.modelClaudeDefault') : t('chat.pendingModelFallback');
+  return modelLabel(model || defaultModel || '') || fallback;
 }

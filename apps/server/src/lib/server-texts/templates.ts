@@ -104,8 +104,8 @@ export const serverTextTemplates = {
     en: 'The contour is still starting: the model registry is not ready',
   },
   'gateway-route-unknown': {
-    ru: 'Шлюз панели принимает только {{routes}} по адресу /<контур>/v1/...',
-    en: 'The panel gateway accepts only {{routes}} at /<contour>/v1/...',
+    ru: 'Шлюз ядра принимает только {{routes}} по адресу /<контур>/v1/...',
+    en: 'The core gateway accepts only {{routes}} at /<contour>/v1/...',
   },
   'gateway-contour-unknown': {
     ru: 'Контур «{{id}}» в панели не заведён',
@@ -673,8 +673,8 @@ export const serverTextTemplates = {
     en: 'The tools probe did not pass: {{reason}}.',
   },
   'contour-required-gateway-down': {
-    ru: 'Контур «{{title}}» обязателен, а шлюз панели не поднят — прогон не запущен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура (раздел «Контур») либо верните провайдер по умолчанию.',
-    en: "The contour «{{title}}» is required, and the panel's gateway is down — the run was not started, so that it would not slip into the vendor cloud. Press «Start the gateway» on the contour card (the «Contour» section) or switch the provider back to the default one.",
+    ru: 'Контур «{{title}}» обязателен, а шлюз ядра не поднят — прогон не запущен, чтобы не уйти в облако вендора. Нажмите «Поднять шлюз» на карточке контура (раздел «Контур») либо верните провайдер по умолчанию.',
+    en: 'The contour «{{title}}» is required, and the core gateway is down — the run was not started, so that it would not slip into the vendor cloud. Press «Start the gateway» on the contour card (the «Contour» section) or switch the provider back to the default one.',
   },
   'contour-required-no-token': {
     ru: 'Контур «{{title}}» обязателен, а ключ контура не сохранён — прогон не запущен, чтобы не уйти в облако вендора. Сохраните ключ («Настроить» на карточке контура → шаг «Ключ») либо верните провайдер по умолчанию.',

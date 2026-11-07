@@ -52,7 +52,8 @@ const textOf = (frames) =>
     .join('');
 
 await runOnStand(
-  { label: 'mobile-chat-sync', web: false, fakeCli: { claude: FAKE_BASICS_CLI } },
+  // Чат Claude идёт через ядро (s10): без `core` ход отказывает «core is not running».
+  { label: 'mobile-chat-sync', web: false, fakeCli: { claude: FAKE_BASICS_CLI }, core: true },
   async (stand, check) => {
     const chatId = randomUUID();
     const projectPath = join(stand.root, 'qa-sync');

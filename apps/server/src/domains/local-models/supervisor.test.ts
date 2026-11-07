@@ -199,7 +199,7 @@ describe('присмотр за сервером моделей', () => {
   });
 
   // Запрос её будит — у ядра: hold.integration.test.ts «a dead hold server is raised again by the
-  // next request on the stable port» (подъём шлюзом панели снят вместе со шлюзом, этап 10).
+  // next request on the stable port» (подъём шлюзом в панели снят вместе с ним, этап 10).
   it('таймер не будит модель, которая при нас не жила (после перезагрузки)', async () => {
     const { state, supervisor } = make();
     expect(await supervisor.tick()).toBe('none');

@@ -18,13 +18,9 @@ import {
 import { coreHomeOf, HOP_RECORD_ENV, watchHops, describeRecord } from '../../lib/hop-recorder.mjs';
 import { killProcessTree } from '../../lib/kill-tree.mjs';
 import {
-  coreProxyDepsOf,
   registerCoreProxyRoutes,
   type CoreProxyRegistration,
 } from '../../routes/core-proxy/core-proxy-routes.ts';
-import { registerChatStartRoute } from '../../routes/core-proxy/chat-start-route.ts';
-import type { ChatStartCarry } from '../../domains/chat/core-run/chat-start-carry.ts';
-import type { CoreContourRoutes } from '../../domains/platform/routing/core-contour.ts';
 import type { RouteRegistrar } from '../../routes/register.ts';
 
 /**
@@ -140,15 +136,10 @@ export function registerCoreSupervisorRoutes(app: FastifyInstance, wiring: CoreS
 }
 
 /**
- * Маршруты зоны ядра — таблица маршрутов вставляет их на прежнее место. `chatStartCarry` — слой
- * панели для старта чата ядра из веба (G13): та же прокладка, плюс поля сеанса от панели;
- * `chatStartRoutes` — маршрут контура этого чата, который веб шлёт `set-route`.
+ * Маршруты зоны ядра — таблица маршрутов вставляет их на прежнее место. Старт чата ядра из веба
+ * (`/api/chat/core-start`, G13) снят с единым чатом (W3-17a): ход `/chat` сам становится задачей ядра.
  */
-export function coreSupervisorRoutes(
-  wiring: CoreSupervisorWiring,
-  chatStartCarry?: ChatStartCarry,
-  chatStartRoutes?: (cli: string) => CoreContourRoutes | undefined,
-): RouteRegistrar[] {
+export function coreSupervisorRoutes(wiring: CoreSupervisorWiring): RouteRegistrar[] {
   const supervisor = wiring.supervisor;
   const registration: CoreProxyRegistration = {
     ...(supervisor
@@ -160,16 +151,6 @@ export function coreSupervisorRoutes(
     (instance) => registerCoreSupervisorRoutes(instance, wiring),
     // Прокладка к ядру (07 фаза 2): дом ядра читается на каждом запросе — ядро могло
     // перезапуститься на другом порте; команда — строка `human:` журнала возможностей.
-    (instance) => registerCoreProxyRoutes(instance, registration),
-    ...(chatStartCarry
-      ? [
-          (instance: FastifyInstance) =>
-            registerChatStartRoute(instance, {
-              ...coreProxyDepsOf(registration),
-              carry: chatStartCarry,
-              ...(chatStartRoutes ? { routes: chatStartRoutes } : {}),
-            }),
-        ]
-      : []),
+    (instance, context) => registerCoreProxyRoutes(instance, registration, context),
   ];
 }

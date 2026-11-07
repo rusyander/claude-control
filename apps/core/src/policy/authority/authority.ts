@@ -55,6 +55,9 @@ export const COMMAND_PROOF_CLASS: Record<AuthorityKind, ProofClass> = {
   'save-scenario': 'human-strict',
   // Ключ устройства доказывает человека для каждой строгой команды — перенос ключей строже всех (F11).
   'adopt-devices': 'human-strict',
+  // Сброс ключа обучения (этап 11, P140): таблица обучения общая для всех задач машины — строже
+  // задачи, как настройка; модель и сессия до неё не дотягиваются.
+  'learned-reset': 'human-strict',
 };
 
 export type AuthorityDecision =

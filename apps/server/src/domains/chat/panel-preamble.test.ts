@@ -5,6 +5,7 @@ import {
   OWNER_PRECEDENCE_LINE,
   OWNER_PRECEDENCE_PLAIN_LINE,
 } from '@agentdeck/contracts/quality-floor';
+import { initiativePrompt } from './initiative/initiative.ts';
 import { withoutPanelPreamble } from './panel-preamble.ts';
 
 /**
@@ -49,5 +50,16 @@ describe('withoutPanelPreamble: хвост панели', () => {
       const text = `Почини логин\n\n${ANSWER_LANGUAGE_LINE}\n${legacy(line)}`;
       expect(withoutPanelPreamble(text).trim()).toBe('Почини логин');
     }
+  });
+
+  // Чужому CLI инициатива панели едет абзацем ПОСЛЕ задания (`handoff-routes`: системной
+  // подсказки у него нет). Название продолжения дописывалось английским «This run was
+  // started…», которого у продолжения Claude (инициатива — системной подсказкой) нет.
+  it('инициатива панели после задания чужого CLI — тоже хвост панели', () => {
+    const initiative = initiativePrompt({ handoffInitiative: true }, { foreign: true });
+    expect(initiative).toBeDefined();
+    const prompt = `${buildHandoffPrompt(proposal)}\n\n${initiative}`;
+    expect(withoutPanelPreamble(prompt).trim()).toBe('Добавь проверку входа');
+    expect(withoutPanelPreamble(`Почини логин\n\n${initiative}`).trim()).toBe('Почини логин');
   });
 });

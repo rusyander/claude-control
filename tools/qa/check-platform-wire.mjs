@@ -1,5 +1,5 @@
 /**
- * Шлюз панели НА ПРОВОДЕ: весь путь клиент → шлюз → контур, без единой подмены
+ * Шлюз ядра НА ПРОВОДЕ: весь путь клиент → шлюз → контур, без единой подмены
  * внутри панели.
  *
  * Чем это отличается от соседей. `check-platform.mjs` подменяет API панели и
@@ -49,6 +49,7 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { REWRITTEN_FINAL, startStubPlatform } from './stub-platform.mjs';
 import { killChildProcessTree } from '../../apps/server/src/lib/kill-tree.mjs';
+import { reapCoreSessions } from './throwaway-stand.mjs';
 
 /**
  * Свободный порт у системы. Прежде здесь стояли числа 5191/5192, и это давало
@@ -142,7 +143,7 @@ async function lastEvent() {
   return events.find((event) => event.platformId === CONTOUR);
 }
 
-/** Один запрос через шлюз панели, ответ строкой как есть. */
+/** Один запрос через шлюз ядра, ответ строкой как есть. */
 async function gateway(port, path, body, headers = {}) {
   const res = await fetch(`http://127.0.0.1:${port}/${encodeURIComponent(CONTOUR)}${path}`, {
     method: 'POST',
@@ -155,6 +156,7 @@ async function gateway(port, path, body, headers = {}) {
 async function main() {
   const stub = await startStubPlatform({ port: 0 });
   const home = mkdtempSync(join(tmpdir(), 'cc-wire-'));
+  const coreHome = mkdtempSync(join(tmpdir(), 'cc-wire-core-'));
   mkdirSync(join(home, 'agentdeck'), { recursive: true });
   writeFileSync(join(home, 'settings.json'), '{}\n', 'utf8');
   writeFileSync(join(home, 'CLAUDE.md'), '# проверка\n', 'utf8');
@@ -192,11 +194,23 @@ async function main() {
     );
   }
 
+  // Шлюз держит ядро (этап 10, C3d). Без своего дома надзор одноразовой панели находил дом
+  // `~/.agentdeck/core` занятым ядром человека и подхватывал ЕГО: маршруты тот брал из панели
+  // человека, и контур проверки получал 404 «в панели не заведён». Своё ядро — на временном доме,
+  // с каталогом данных и портом шлюза этой панели (как `standCoreEnv` стенда).
   const panel = spawn(
     process.execPath,
     ['--experimental-strip-types', '--no-warnings', 'apps/server/src/index.ts'],
     {
-      env: { ...process.env, CLAUDE_CONFIG_DIR: home, PORT: String(PANEL_PORT) },
+      env: {
+        ...process.env,
+        CLAUDE_CONFIG_DIR: home,
+        PORT: String(PANEL_PORT),
+        AGENTDECK_CORE_SUPERVISE: '1',
+        AGENTDECK_CORE_HOME: coreHome,
+        AGENTDECK_PANEL_DATA: join(home, 'agentdeck'),
+        AGENTDECK_USER_GATEWAY_PORT: String(GATEWAY_PORT),
+      },
       stdio: 'ignore',
       shell: false,
     },
@@ -207,7 +221,11 @@ async function main() {
   // прогон — тот самый случай, ради которого порт выше стал случайным.
   // Деревом, а не одним `kill()`: у панели свои дети (шлюз, CLI) — без этого
   // они переживали прогон. Общий помощник, не `taskkill /T` (чужие сироты).
-  const reap = () => killChildProcessTree(panel);
+  // Ядро надзора — отвязанный процесс: дерево панели его не уносит, снимается по procs.json дома.
+  const reap = () => {
+    killChildProcessTree(panel);
+    reapCoreSessions(coreHome);
+  };
   process.once('exit', reap);
   process.once('SIGINT', () => {
     reap();
@@ -222,12 +240,16 @@ async function main() {
     if (!(await waitFor(`${PANEL}/api/system`, 30))) {
       throw new NotChecked('одноразовая панель не поднялась.');
     }
-    console.log(`Стаб-контур: ${stub.url}\nПанель: ${PANEL}\n`);
+    if (!(await waitFor(`${PANEL}/api/core/health`, 90))) {
+      throw new NotChecked('надзор одноразовой панели не поднял её ядро.');
+    }
+    console.log(`Стаб-контур: ${stub.url}\nПанель: ${PANEL}\nДом ядра: ${coreHome}\n`);
     await run(stub);
   } finally {
     reap();
     await stub.close();
     rmSync(home, { recursive: true, force: true });
+    rmSync(coreHome, { recursive: true, force: true });
   }
 
   console.log(failures === 0 ? '\nВсё сходится.' : `\nПровалов: ${failures}`);
@@ -519,6 +541,23 @@ async function run(stub) {
     'учёт знает, что кончился именно бюджет ключа',
     spend.body?.budget?.exhausted === true && spend.body?.budget?.exhaustedScope === 'key',
     JSON.stringify(spend.body?.budget ?? spend.status),
+  );
+  // 402 держит маршрут до слова человека (этап 11: отметка звена ядра, `clear-exhausted`):
+  // без снятия каждый следующий вызов этого контура — тот же 402.
+  const stuck = await gateway(port, '/v1/chat/completions', chat('stub-chat'));
+  check(
+    'после 402 маршрут держит отметку: следующий вызов — 402 без похода к контуру',
+    stuck.status === 402 && /снять отметку может только человек/.test(stuck.text),
+    `${stuck.status}: ${stuck.text.slice(0, 200)}`,
+  );
+  const cleared = await api(`/platforms/${encodeURIComponent(CONTOUR)}/spend/exhausted`, {
+    method: 'DELETE',
+    body: '{}',
+  });
+  check(
+    'человек снял отметку «бюджет исчерпан» той же дверью, что кнопка карточки',
+    cleared.status === 200 && cleared.body?.cleared === true,
+    JSON.stringify(cleared.body ?? cleared.status),
   );
 
   const limited = await gateway(port, '/v1/chat/completions', chat('stub-429'));

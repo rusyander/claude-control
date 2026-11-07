@@ -17,6 +17,19 @@ import { randomUUID7 } from '../../core-ask/core-ask.ts';
 import type { ChatEvent } from '../chat-events.ts';
 import type { RunOptions } from '../run-options/run-options.ts';
 import { CORE_CHAT_STOP_REASON, CoreChatRun, grantGlob, onDiskPath } from './core-run.ts';
+import {
+  ChatRunRegistry,
+  type RunFinished,
+  type RunNotice,
+} from '../ChatRunRegistry/ChatRunRegistry.ts';
+import type { Platform } from '@agentdeck/contracts';
+import { defaultOurRules, defaultPlatformRules } from '@agentdeck/contracts/platform';
+import { defaultPlatformTransport } from '@agentdeck/contracts/platform-transport';
+import { chooseRunModel } from '@agentdeck/contracts/platform-models';
+import { AppStore } from '../../../lib/app-store/app-store.ts';
+import { writePlatform } from '../../platform/store/store.ts';
+import { modelRulesFor } from '../../platform/models/models.ts';
+import { chatContourRoutes, coreGatewayRouteId } from '../../platform/routing/core-contour.ts';
 import type {
   CoreChatBook,
   CoreChatEntry,
@@ -24,6 +37,7 @@ import type {
   CorePermissionDesk,
 } from './core-run.types.ts';
 import { translate, TURN_ERROR_TEXT } from './translate.ts';
+import { foldSessionEvents } from './core-chat-history.ts';
 import { localizeText, serverText } from '../../../lib/server-texts/server-texts.ts';
 import { runErrorCode } from '../run-errors/run-errors.ts';
 
@@ -188,12 +202,18 @@ function fakeCore(opts: FakeOptions = {}) {
   };
 }
 
+/** Книга в памяти с тем же правилом, что файловая: `forget` снимает задачу, CLI помнит. */
 function memoryBook(): CoreChatBook & { entries: Map<string, CoreChatEntry> } {
   const entries = new Map<string, CoreChatEntry>();
+  const clis = new Map<string, string>();
   return {
     entries,
     get: (id) => entries.get(id),
-    set: (id, e) => void entries.set(id, e),
+    cliOf: (id) => clis.get(id),
+    set: (id, e) => {
+      entries.set(id, e);
+      if (e.cli) clis.set(id, e.cli);
+    },
     forget: (id) => void entries.delete(id),
   };
 }
@@ -254,7 +274,13 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
       { kind: 'usage', input: 10, output: 5, cacheRead: 100, cacheCreation: 7 },
     ]);
     expect(events.at(-1)).toMatchObject({ kind: 'done', sessionId: session, costUsd: 0 });
-    expect(book.entries.get(session)).toEqual({ taskId: core.taskId, stepId: core.stepId });
+    // Папка разговора — в книге (волна 3): по ней список чатов ставит разговор не-Claude CLI.
+    expect(book.entries.get(session)).toEqual({
+      taskId: core.taskId,
+      stepId: core.stepId,
+      cli: 'claude',
+      cwd: 'C:/work/proj',
+    });
   });
 
   // Проход 8: окно подписки сеанса ядра — событие `limit` ленты, как у прежнего исполнителя из
@@ -359,7 +385,11 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
   describe('слово посреди хода (steer): ядро доставит его новым ходом после текущего', () => {
     // Живой шаг, ход-6 идёт; ход-7 приходит «на ходу». Ядро доставляет его только на границе хода —
     // в виде сеанса это `user-text` с шапкой доставки ПОСЛЕ конца хода-6, затем ход-7 до своего конца.
-    const steered = async (deliver: 'after' | 'never' | 'rejected' | 'late-rejected') => {
+    // `wall` — часы панели и стены отправки ядра (`sentAt` в виде сеанса) для хода-6 и хода-7.
+    const steered = async (
+      deliver: 'after' | 'never' | 'rejected' | 'late-rejected',
+      wall?: { now: () => number; sent?: [number, number] },
+    ) => {
       const core = fakeCore({ hold: true });
       let refuse = (): void => undefined;
       const late = new Promise<void>((r) => (refuse = r));
@@ -379,7 +409,9 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
         },
         book,
         pollMs: 1,
+        ...(wall ? { now: wall.now } : {}),
       });
+      const sent = (i: 0 | 1): { sentAt?: number } => (wall?.sent ? { sentAt: wall.sent[i] } : {});
       const events: ChatEvent[] = [];
       const done = runner.start(opts({ sessionId: 'conv-s', prompt: 'ход-6' }), (e) =>
         events.push(e),
@@ -389,7 +421,7 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
       await vi.waitFor(() => expect(core.calls).toHaveLength(2));
       const s = core.sessions[0]!;
       core.write(s, [
-        { kind: 'user-text', data: { text: 'ход-6' } },
+        { kind: 'user-text', data: { text: 'ход-6', ...sent(0) } },
         { kind: 'assistant-text', data: { text: 'ответ на ход-6' } },
         { kind: 'turn-end', data: { isError: false } },
       ]);
@@ -399,6 +431,7 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
             kind: 'user-text',
             data: {
               text: `${HUMAN_ORIGIN_MARK} Message from the human to this step:\nход-7`,
+              ...sent(1),
             },
           },
           { kind: 'assistant-text', data: { text: 'ответ на ход-7' } },
@@ -417,6 +450,96 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
       expect(texts).toEqual(['ответ на ход-6', 'ответ на ход-7']);
       expect(events.filter((e) => e.kind === 'done')).toHaveLength(1);
       expect(events.at(-1)?.kind).toBe('done');
+    });
+
+    it('доставленное слово — граница хода: nextTurn с самим словом между ответами (core-chat-012)', async () => {
+      const { events, done } = await steered('after');
+      await done;
+      const flow = events
+        .filter((e) => e.kind === 'text' || e.kind === 'nextTurn')
+        .map((e) => (e.kind === 'text' ? e.text : `nextTurn:${e.prompt}`));
+      expect(flow).toEqual(['ответ на ход-6', 'nextTurn:ход-7', 'ответ на ход-7']);
+      const turn = events.find((e) => e.kind === 'nextTurn') as { at: unknown } | undefined;
+      expect(typeof turn?.at).toBe('number');
+    });
+
+    // Граница хода и история чужого CLI — одни часы: история ставит ходу стену отправки ядра
+    // (`sentAt`), лента прячет из неё ответы живого хода по `at` границы (`withoutLiveTurn`: ответ
+    // остаётся, только если он раньше границы). Граница по часам панели (позже отправки) оставляла
+    // ответ живого хода и в истории, и в пузыре — после F5 посреди хода он стоял дважды (F-01).
+    it('граница хода — стена отправки ядра: перечитанная история прячет ровно ответ живого хода (F-01)', async () => {
+      const SENT6 = 1_000_000;
+      const SENT7 = 1_009_000;
+      let clock = SENT7 + 500;
+      const { events, done, core } = await steered('after', {
+        now: () => clock++,
+        sent: [SENT6, SENT7],
+      });
+      await done;
+      const turn = events.find((e) => e.kind === 'nextTurn') as { at: number } | undefined;
+      expect(turn?.at).toBe(SENT7);
+      const page = await core.port.page(core.taskId, core.sessions[0]!, 0);
+      const history = foldSessionEvents('conv-s', page.events, undefined);
+      const answers = history
+        .filter((m) => m.role === 'assistant')
+        .map((m) => ({
+          text: m.blocks.map((b) => (b.type === 'text' ? b.text : '')).join(''),
+          before: Date.parse(m.timestamp) < turn!.at,
+        }));
+      expect(answers).toEqual([
+        { text: 'ответ на ход-6', before: true },
+        { text: 'ответ на ход-7', before: false },
+      ]);
+    });
+
+    it('вид сеанса без стены отправки (старое ядро) — граница по часам панели, как прежде', async () => {
+      const { events, done } = await steered('after', { now: () => 4_242 });
+      await done;
+      const turn = events.find((e) => e.kind === 'nextTurn') as { at: number } | undefined;
+      expect(turn?.at).toBe(4_242);
+    });
+
+    // Итог прогона в реестре: уведомление (Telegram, push) и планировщик конца читают накопленный
+    // ответ. Без сброса на границе хода они получали оба ответа одной склейкой (core-chat-012).
+    it('реестр: итог и уведомление — ответ хода слова, хвост — с границей, не склейкой (core-chat-012)', async () => {
+      const core = fakeCore({ hold: true });
+      const book = memoryBook();
+      core.seed('conv-s', book);
+      const runner = new CoreChatRun({ port: core.port, book, pollMs: 1 });
+      const registry = new ChatRunRegistry(() => runner);
+      const notices: RunNotice[] = [];
+      registry.setNotifier((notice) => notices.push(notice));
+      let finished: RunFinished | undefined;
+      registry.setHandoffPlanner((done) => {
+        finished = done;
+        return undefined;
+      });
+      try {
+        registry.start('chat-s', opts({ sessionId: 'conv-s', prompt: 'ход-6' }), {
+          projectPath: 'C:/work/proj',
+          sessionId: 'conv-s',
+        });
+        await vi.waitFor(() => expect(core.calls).toHaveLength(1));
+        expect(registry.steer('chat-s', 'conv-s', 'ход-7')).toBe(true);
+        await vi.waitFor(() => expect(core.calls).toHaveLength(2));
+        core.write(core.sessions[0]!, [
+          { kind: 'user-text', data: { text: 'ход-6' } },
+          { kind: 'assistant-text', data: { text: 'готов' } },
+          { kind: 'turn-end', data: { isError: false } },
+          {
+            kind: 'user-text',
+            data: { text: `${HUMAN_ORIGIN_MARK} Message from the human to this step:\nход-7` },
+          },
+          { kind: 'assistant-text', data: { text: 'готов' } },
+          { kind: 'turn-end', data: { isError: false } },
+        ]);
+        await vi.waitFor(() => expect(finished).toBeDefined());
+        expect(finished?.answer).toBe('готов');
+        expect(finished?.text).toBe('готов\n\nготов');
+        expect(notices.find((notice) => notice.kind === 'done')?.answer).toBe('готов');
+      } finally {
+        registry.stopAll();
+      }
     });
 
     it('слово ещё не доставлено — прогон ждёт его хода, «Остановить» остаётся у прогона', async () => {
@@ -614,6 +737,297 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
     expect(core.calls[2]!.fields).toMatchObject({ model: 'opus', effort: 'high' });
   });
 
+  // W3-17a: своего выбора CLI у чата нет — новый разговор идёт активным провайдером панели, начатый
+  // — тем CLI, которым начат (книга), даже если активный провайдер с тех пор сменился.
+  describe('W3-17a: the chat CLI — the active provider for a new chat, its own for a started one', () => {
+    const gateway = (cli: string, model = 'corp-xl') => [
+      {
+        adapter: cli,
+        route: { kind: 'gateway' as const, id: 'gateway:qa-contour' },
+        modelPattern: model,
+      },
+    ];
+
+    it('active codex: a new chat sets cli codex, the contour route is asked for codex, the book records codex', async () => {
+      const core = fakeCore({ turn: TURN });
+      const book = memoryBook();
+      const asked: Array<[string, string]> = [];
+      const carried: string[] = [];
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book,
+          pollMs: 1,
+          activeCli: () => 'codex',
+          routes: (pick, cli) => {
+            asked.push([pick, cli]);
+            return gateway(cli);
+          },
+          foreignCarry: ({ cli, routes }) => {
+            carried.push(`${cli}:${routes?.[0]?.adapter ?? '-'}`);
+            return { ok: true, carry: { session: {}, env: {} } };
+          },
+        }),
+        opts({ model: 'gpt-5-codex', effort: 'high' }),
+      );
+      expect(asked).toEqual([['gpt-5-codex', 'codex']]);
+      expect(carried).toEqual(['codex:codex']);
+      expect(core.calls.map((c) => c.kind)).toEqual([
+        'set-route',
+        'set-cli',
+        'set-model',
+        'launch',
+      ]);
+      expect(core.calls[1]!.fields).toMatchObject({ adapter: 'codex' });
+      expect(core.calls[0]!.fields).toMatchObject({ allowedRoutes: gateway('codex') });
+      expect(book.cliOf(core.sessions[0]!)).toBe('codex');
+    });
+
+    it('a chat recorded as codex resumes on codex while Claude is active; the Claude header model is not sent', async () => {
+      const core = fakeCore({ turn: TURN });
+      const book = memoryBook();
+      // Разговор начат Codex, его задача кончилась: книга помнит только CLI.
+      book.set('conv-codex', { taskId: 'old-task', stepId: 'old-step', cli: 'codex' });
+      book.forget('conv-codex');
+      const asked: Array<[string, string]> = [];
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book,
+          pollMs: 1,
+          activeCli: () => 'claude',
+          routes: (pick, cli) => {
+            asked.push([pick, cli]);
+            return undefined;
+          },
+        }),
+        opts({ sessionId: 'conv-codex', model: 'opus', effort: 'high' }),
+      );
+      expect(core.estimates[0]!.resume).toEqual({ adapter: 'codex', conversationId: 'conv-codex' });
+      // Контур спрашивается выбором как есть (его перевод, M-F1); маршрута контура нет — до CLI имя
+      // Claude не доходит.
+      expect(asked).toEqual([['opus', 'codex']]);
+      expect(core.calls.map((c) => c.kind)).toEqual(['set-cli', 'launch']);
+      expect(core.calls[0]!.fields).toMatchObject({ adapter: 'codex' });
+      expect(book.entries.get('conv-codex')).toMatchObject({ taskId: core.taskId, cli: 'codex' });
+    });
+
+    // Шапка нового чата при активном Qwen несла модель Claude из настроек (`chatModel`): ядро
+    // получало `set-model opus` для qwen. Мимо контура имя Claude другому CLI не уходит — модель
+    // маршрута; контур спрашивается выбором как есть (переводит он, M-F1).
+    it.each(['opus', 'fable', 'claude-opus-4-8[1m]', 'Sonnet'])(
+      'active qwen, new chat, header model %s (Claude), no contour → no set-model',
+      async (model) => {
+        const core = fakeCore({ turn: TURN });
+        const asked: Array<[string, string]> = [];
+        await run(
+          new CoreChatRun({
+            port: core.port,
+            book: memoryBook(),
+            pollMs: 1,
+            activeCli: () => 'qwen',
+            routes: (pick, cli) => {
+              asked.push([pick, cli]);
+              return undefined;
+            },
+          }),
+          opts({ model, effort: 'high' }),
+        );
+        expect(asked).toEqual([[model, 'qwen']]);
+        expect(core.calls.map((c) => c.kind)).toEqual(['set-cli', 'launch']);
+        expect(core.calls[0]!.fields).toMatchObject({ adapter: 'qwen' });
+      },
+    );
+
+    it('a started codex chat while Claude is active: the codex model of its header reaches set-model', async () => {
+      const core = fakeCore({ turn: TURN });
+      const book = memoryBook();
+      book.set('conv-codex', { taskId: 'old-task', stepId: 'old-step', cli: 'codex' });
+      book.forget('conv-codex');
+      await run(
+        new CoreChatRun({ port: core.port, book, pollMs: 1, activeCli: () => 'claude' }),
+        opts({ sessionId: 'conv-codex', model: 'gpt-5-codex', effort: 'high' }),
+      );
+      expect(core.calls.map((c) => c.kind)).toEqual(['set-cli', 'set-model', 'launch']);
+      expect(core.calls[1]!.fields).toMatchObject({ model: 'gpt-5-codex', effort: 'high' });
+    });
+
+    // Ревью W3-17a (M-F1): через контур модель — имя КОНТУРА (его каталог одинаков у любого CLI и
+    // несёт `claude-*`), и CLI его не видит: шлёт `set-model` перевод контура. Срезанный до контура
+    // выбор `claude-sonnet-4-5` чата qwen уходил моделью контура по умолчанию, выбор человека терялся.
+    it('active qwen through a contour: a claude-* model of the contour catalog reaches the contour and set-model', async () => {
+      const core = fakeCore({ turn: TURN });
+      const asked: Array<[string, string]> = [];
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book: memoryBook(),
+          pollMs: 1,
+          activeCli: () => 'qwen',
+          routes: (pick, cli) => {
+            asked.push([pick, cli]);
+            return gateway(cli, pick === 'claude-sonnet-4-5' ? 'claude-sonnet-4-5' : 'corp-xl');
+          },
+        }),
+        opts({ model: 'claude-sonnet-4-5', effort: 'high' }),
+      );
+      expect(asked).toEqual([['claude-sonnet-4-5', 'qwen']]);
+      expect(core.calls.map((c) => c.kind)).toEqual([
+        'set-route',
+        'set-cli',
+        'set-model',
+        'launch',
+      ]);
+      expect(core.calls[2]!.fields).toMatchObject({ model: 'claude-sonnet-4-5', effort: null });
+    });
+
+    // Контур без своей модели (`*`): имя уходит CLI как есть — тут правило «имя Claude другому CLI
+    // не уходит» в силе, как и на маршруте входа CLI.
+    it('active qwen, contour route without a model ("*"): a Claude name is still not sent', async () => {
+      const core = fakeCore({ turn: TURN });
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book: memoryBook(),
+          pollMs: 1,
+          activeCli: () => 'qwen',
+          routes: (_pick, cli) => gateway(cli, '*'),
+        }),
+        opts({ model: 'claude-sonnet-4-5', effort: 'high' }),
+      );
+      expect(core.calls.map((c) => c.kind)).toEqual(['set-route', 'set-cli', 'launch']);
+    });
+
+    // Ревью W3-17a (M-F1), настоящая дорога сервера: живой стаб-контур (`stub-platform.mjs`) каталога
+    // `claude-*` не несёт — его каталог фиксирован, а модель вне каталога ядро отказывает судом
+    // совместимости. Потому дорога «каталог контура несёт claude-*» доказана здесь: настоящее
+    // хранилище с активным контуром, настоящий перевод выбора (`chooseRunModel` по
+    // `modelRulesFor` — его делает реестр прогонов до хода) и настоящие `chatContourRoutes` (как в
+    // `chat-wiring.ts`) зависимостью хода; подменён только порт ядра. Контур «по возможности», стоит
+    // галочка самого qwen (`foreign:qwen`) — её и судит маршрут чата этого CLI.
+    it('active qwen, real contour store whose catalog carries claude-*: the pick reaches set-route and set-model', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'cc-core-run-contour-'));
+      try {
+        const dir = join(root, 'agentdeck');
+        mkdirSync(dir, { recursive: true });
+        const store = new AppStore(dir);
+        const platform: Platform = {
+          id: 'company',
+          title: 'Company',
+          driver: 'enterprise-platform',
+          baseUrl: 'https://api.example.com',
+          enabled: true,
+          mode: 'best-effort',
+          budgetUsd: 0,
+          capabilities: [],
+          targets: [],
+          consumers: ['foreign:qwen'],
+          projectPaths: [],
+          agents: [],
+          budgetSince: '',
+          toolShim: false,
+          contourPrompt: false,
+          defaultModel: 'corp-xl',
+          consumerModels: {},
+          modelMap: {},
+          rules: { platform: defaultPlatformRules(), ours: defaultOurRules() },
+          caCertPath: '',
+          transport: defaultPlatformTransport(),
+        };
+        writePlatform(store, platform);
+        store.updateSettings({ activePlatformId: platform.id });
+        store.savePlatformHealth(platform.id, {
+          ok: true,
+          checkedAt: '2026-11-06T10:00:00.000Z',
+          models: [
+            { id: 'corp-xl', kind: 'chat' },
+            { id: 'claude-sonnet-5-5', kind: 'chat' },
+          ],
+        } as never);
+        const routed = chooseRunModel(
+          modelRulesFor(store, platform, 'chat'),
+          'claude-sonnet-5-5',
+        ).model;
+        const core = fakeCore({ turn: TURN });
+        await run(
+          new CoreChatRun({
+            port: core.port,
+            book: memoryBook(),
+            pollMs: 1,
+            activeCli: () => 'qwen',
+            routes: (pick, cli) => chatContourRoutes(store, cli, pick),
+          }),
+          opts({ model: routed, effort: 'high' }),
+        );
+        expect(routed).toBe('claude-sonnet-5-5');
+        expect(core.calls.map((c) => c.kind)).toEqual([
+          'set-route',
+          'set-cli',
+          'set-model',
+          'launch',
+        ]);
+        expect(core.calls[0]!.fields).toMatchObject({
+          allowedRoutes: [
+            {
+              adapter: 'qwen',
+              route: { kind: 'gateway', id: coreGatewayRouteId('company') },
+              modelPattern: 'claude-sonnet-5-5',
+            },
+          ],
+        });
+        expect(core.calls[2]!.fields).toMatchObject({ model: 'claude-sonnet-5-5', effort: null });
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('a Claude chat keeps its Claude model whatever provider is active', async () => {
+      const core = fakeCore({ turn: TURN });
+      const book = memoryBook();
+      book.set('conv-claude', { taskId: 'old-task', stepId: 'old-step', cli: 'claude' });
+      book.forget('conv-claude');
+      await run(
+        new CoreChatRun({ port: core.port, book, pollMs: 1, activeCli: () => 'qwen' }),
+        opts({ sessionId: 'conv-claude', model: 'opus', effort: 'high' }),
+      );
+      expect(core.calls[0]!.fields).toMatchObject({ adapter: 'claude' });
+      expect(core.calls[1]!.fields).toMatchObject({ model: 'opus' });
+    });
+
+    it('an old book entry without a CLI resumes on claude even when another provider is active', async () => {
+      const core = fakeCore({ turn: TURN });
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book: memoryBook(),
+          pollMs: 1,
+          activeCli: () => 'qwen',
+        }),
+        opts({ sessionId: 'conv-old' }),
+      );
+      expect(core.estimates[0]!.resume).toEqual({ adapter: 'claude', conversationId: 'conv-old' });
+      expect(core.calls[0]!.fields).toMatchObject({ adapter: 'claude' });
+    });
+
+    it('a foreign CLI gets its own panel layer, never the Claude layer of the run options', async () => {
+      const core = fakeCore({ turn: TURN });
+      await run(
+        new CoreChatRun({
+          port: core.port,
+          book: memoryBook(),
+          pollMs: 1,
+          activeCli: () => 'qwen',
+          foreignCarry: () => ({
+            ok: true,
+            carry: { session: { append: 'строка о тестах qwen' }, env: {} },
+          }),
+        }),
+        opts({ platformAppend: 'блок набора Claude' }),
+      );
+      expect(core.estimates[0]!.session).toEqual({ append: 'строка о тестах qwen' });
+    });
+  });
+
   it('no contour route (no active contour or box unticked in best-effort) — no set-route', async () => {
     const core = fakeCore({ turn: TURN });
     await run(
@@ -777,6 +1191,30 @@ describe('CoreChatRun — /chat turn through core chat@1', () => {
         (error: unknown) => error as Error,
       );
       expect(runErrorCode(failed!.message)).toMatchObject({ code: 'core-chat-refused' });
+    });
+
+    // W3-17a: CLI без хука ядра (aider, continue) — экран чата объясняет код суда своей строкой;
+    // код в ошибке хода — код суда, а не исход шага `failed`.
+    it('a compat refusal carries the court code (no_core_hook), not the step outcome', async () => {
+      const core = fakeCore({ stepFailed: 'session road refused: compat refused: no_core_hook' });
+      const failed = await run(
+        new CoreChatRun({
+          port: core.port,
+          book: memoryBook(),
+          pollMs: 1,
+          activeCli: () => 'aider',
+        }),
+        opts(),
+      ).then(
+        () => undefined,
+        (error: unknown) => error as Error,
+      );
+      expect(core.calls[0]!.fields).toMatchObject({ adapter: 'aider' });
+      expect(runErrorCode(failed!.message)).toEqual({
+        code: 'core-chat-refused',
+        params: { code: 'no_core_hook' },
+        panel: true,
+      });
     });
   });
 

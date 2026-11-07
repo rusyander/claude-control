@@ -41,7 +41,7 @@ import { readConfigState } from './state.ts';
 
 const SECTIONS: ReadonlySet<string> = new Set(CONFIG_SECTIONS);
 
-export const QUEUE_FIELDS = ['slots', 'shareCap', 'agingMs', 'beatMs'] as const;
+export const QUEUE_FIELDS = ['slots', 'shareCap', 'agingMs', 'beatMs', 'sessionSlots'] as const;
 export type QueueField = (typeof QUEUE_FIELDS)[number];
 
 type ZodIssues = { issues: readonly { path: PropertyKey[]; message: string }[] };

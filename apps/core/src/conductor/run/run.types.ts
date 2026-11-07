@@ -7,6 +7,8 @@ import type { SendImage } from '@agentdeck/contracts/core/ask';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { PublishNext } from '../next/next.types.ts';
 import type { RoutingEnv, StepRouting } from '../scenario/index.ts';
+import type { SeatPort } from '../schedule/schedule.types.ts';
+import type { XlChildren } from '../split/xl-wait.ts';
 
 /**
  * Шов исполнителя дирижёра (этап 4, CD§9): исполнитель (`conductor/run/`) зовёт зоны только через
@@ -43,6 +45,8 @@ export type BriefSectionId =
   | 'failing'
   | 'findings'
   | 'external-edits'
+  | 'recon-map'
+  | 'previous-attempt'
   | 'human-message'
   | 'answer'
   | 'ownership'
@@ -184,6 +188,24 @@ export interface RunDeps {
   upkeepEveryMs?: number;
   /** Экономика этапа 5 (окно, продолжение, бриф, токены); нет — шаги идут, как на этапе 4. */
   economy?: RunEconomy;
+  /**
+   * Распределитель мест сеансов (этап 11, P141): шаг берёт место до сеанса и отдаёт его на конце,
+   * паузе и вопросе человеку. Нет — места не считаются (как до этапа 11).
+   */
+  allocator?: SeatPort;
+  /**
+   * Дети XL (Q-2 s11): родитель ждёт их и запускает части, чьи зависимости сданы. Нет порта —
+   * родитель XL кончается на запуске, как до Q-2.
+   */
+  xl?: XlPort;
+}
+
+/** Порт детей XL исполнителю: что знает журнал родителя и детей, и запуск следующей волны. */
+export interface XlPort {
+  /** Дети этой задачи; `null` — задача не родитель XL. Синхронно: суд зовёт его каждый круг. */
+  childrenOf(task: LiveTask): XlChildren | null;
+  /** Создать дочерние задачи частей `names` последнего деления (повтор находит созданных). */
+  launch(task: LiveTask, names: readonly string[]): Promise<void>;
 }
 
 /**

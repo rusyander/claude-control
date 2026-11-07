@@ -169,20 +169,11 @@ describe('авторежим прав чата', () => {
     expect((await send(PLAIN, { model: 'haiku' })).permissionMode).toBe('acceptEdits');
   });
 
-  // Раньше здесь проверялось, что прогон чужого CLI идёт в `acceptEdits`, — но
-  // этот прогон и был ошибкой: `ChatRunner` собирает argv Claude, и `codex`
-  // получал флаги Claude. Теперь отправка при чужом CLI отказывает
-  // (`run-routes.foreign-provider.integration.test.ts`), а «у чужого CLI нет
-  // авторежима» проверяет сам `supportsCliAutoMode` (`auto-mode.test.ts`).
-  it('чужой CLI: прогон Claude-путём не заводится — отказ с кодом', async () => {
+  // Чужой CLI (W3-17a): ход идёт прогоном ядра, CLI выбирает прогон по активному провайдеру.
+  // Авторежима CLI у Codex нет (`supportsCliAutoMode`, `auto-mode.test.ts`) — прогон его не
+  // получает, правку ведёт мост прав.
+  it('чужой CLI: ход уходит прогону ядра без авторежима CLI — acceptEdits', async () => {
     store.updateSettings({ provider: 'codex' });
-    const reply = await app.inject({
-      method: 'POST',
-      url: '/api/chat/send',
-      payload: { chatId: PLAIN, prompt: 'работай', projectPath: work, allowEdits: true },
-    });
-    expect(reply.statusCode).toBe(409);
-    expect(reply.json()).toMatchObject({ messageCode: 'chat-send-foreign-provider' });
-    expect(runs.some((item) => item.options.permissionPrompt?.runId === PLAIN)).toBe(false);
+    expect((await send(PLAIN)).permissionMode).toBe('acceptEdits');
   });
 });

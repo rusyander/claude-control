@@ -252,12 +252,16 @@ export async function probeOnStub(
   signal?: AbortSignal,
 ): Promise<ProbeTrace> {
   if (signal?.aborted) throw new Error('probe: aborted before start');
+  // Проба — не разговор человека: CLI, который сохранил бы её в своём хранилище, не замеряется —
+  // иначе панель показывает строку «AGENTDECK_BASE_PROBE <id>» в списке чатов.
+  if (!adapter.ephemeral) throw new Error(`probe: ${adapter.id} cannot run a traceless session`);
   const stub = await startStubModel({ script: () => 'ok' });
   const brief = `AGENTDECK_BASE_PROBE ${spec.sessionId}`;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const launched = await adapter.launch({
       ...spec,
+      ephemeral: true,
       endpoint: {
         channel: bind.channel,
         endpoint: {

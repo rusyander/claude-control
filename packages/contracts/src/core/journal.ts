@@ -55,6 +55,7 @@ export const JOURNAL_KINDS = Object.keys(JOURNAL_DATA_V1) as JournalKind[];
  */
 export const TELEMETRY_KINDS: readonly JournalKind[] = [
   'tool.event',
+  'tool.started',
   'turn.usage',
   'turn.cli-initiated',
 ];

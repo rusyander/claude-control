@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import type { ProgressAgent } from '@agentdeck/contracts';
-import { buildAgentTree, visibleNodes, type AgentTreeNode } from '@entities/AgentTree';
+import {
+  buildAgentTree,
+  visibleNodes,
+  type AgentTreeNode,
+  type TreeAgent,
+} from '@entities/AgentTree';
 import { nodeKey, treeKeyTarget } from './treeKeys';
 
-const agent = (id: string, parentId?: string): ProgressAgent => ({
+const agent = (id: string, parentId?: string): TreeAgent => ({
   id,
-  agentId: `agent-${id}`,
   kind: 'Explore',
   description: id,
   status: 'done',
@@ -67,10 +70,8 @@ describe('клавиатура дерева агентов', () => {
     expect(press('Tab', 'b1')).toBeUndefined();
   });
 
-  it('адрес узла — id субагента у CLI, без файла — id вызова', () => {
-    expect(nodeKey(find('a'))).toBe('agent-a');
-    expect(nodeKey({ agent: { ...agent('z'), agentId: undefined }, level: 1, children: [] })).toBe(
-      'z',
-    );
+  it('адрес узла — id вызова Agent (он же узел ядра)', () => {
+    expect(nodeKey(find('a'))).toBe('a');
+    expect(nodeKey({ agent: agent('z'), level: 1, children: [] })).toBe('z');
   });
 });

@@ -32,6 +32,8 @@ import type { RouteRegistry } from '../../routes/registry.ts';
 import { DEFAULT_NODE_ARGV } from '../session-road.ts';
 import { grantRequiredPort, launchLayerPort } from '../user-layer-wiring/launch-layer.ts';
 import type { ConductorWiringDeps } from './conductor-wiring.types.ts';
+import { createChildTasks, xlChildrenPort } from '../../conductor/split/index.ts';
+import type { XlPort } from '../../conductor/run/run.types.ts';
 import { processPin } from './session-start.ts';
 
 /**
@@ -45,7 +47,11 @@ import { processPin } from './session-start.ts';
  */
 
 const ok: HookVerdict = { ok: true };
-/** Слоты единиц, пока ёмкость не моделирует фаза 5. */
+/**
+ * Слоты единиц без распределителя мест (тесты проводки без него). С ним — действующая
+ * параллельность задачи (этап 11, P141): min(профиль, `queue.sessionSlots`); маршрут `local:own`
+ * держит своё одно место сам, деление его не знает.
+ */
 const UNIT_SLOTS = 2;
 const FOLD_CASE = foldsCaseAt(undefined);
 const OWNERSHIP_SIGNAL = 'ownership';
@@ -91,6 +97,22 @@ export function splitEnvFor(deps: ConductorWiringDeps): SplitEnv {
     envs.set(deps, env);
   }
   return env;
+}
+
+/**
+ * Порт детей XL исполнителям (Q-2 s11): родитель ждёт детей и запускает следующую волну той же
+ * средой деления (`splitEnvFor`), что и первую на запуске.
+ */
+export function xlPortFor(deps: ConductorWiringDeps): XlPort {
+  const env = splitEnvFor(deps);
+  return xlChildrenPort({
+    registry: deps.registry,
+    childTasks: (parent, splitId, units, only) =>
+      env.childTasks
+        ? env.childTasks(parent, splitId, units, only)
+        : createChildTasks(deps.registry, env, parent, splitId, units, only),
+    note: deps.note,
+  });
 }
 
 function buildSplitEnv(deps: ConductorWiringDeps): SplitEnv {
@@ -148,7 +170,14 @@ function buildSplitEnv(deps: ConductorWiringDeps): SplitEnv {
     },
     // Выученное — одно чтение ядра: оценка и бюджет токенов исполнителя видят одну таблицу.
     ...(deps.history ? { history: deps.history } : {}),
-    capacity: () => ({ slots: UNIT_SLOTS, minutes: null }),
+    capacity: (task) => ({ slots: unitSlots(deps, task), minutes: null }),
+    // Ожидание места первого сеанса на оценке ведущего (W3-16): занятость мест машины.
+    ...(deps.allocator ? { sessionOccupancy: deps.allocator.occupancy } : {}),
+    // Договор плана ведущего (этап 11): проверка куска — id реестра профиля его репозитория.
+    checksOf: async (repo) => {
+      const profile = await deps.verifier.profile.profileOf(repo);
+      return 'value' in profile ? profile.value.registry.checks.map((c) => c.id) : null;
+    },
     foldCase: FOLD_CASE,
     raise: (task, raise) => raiseHumanPoint(task, raise),
     // Слой человека на экране запуска: опись CLI разрешённого набора с тем же пином, что у сеанса.
@@ -161,7 +190,15 @@ function buildSplitEnv(deps: ConductorWiringDeps): SplitEnv {
     }),
     grantRequired: grantRequiredPort(deps.layout),
     ...(deps.taskEnv ? { taskEnv: deps.taskEnv } : {}),
+    // Дочерние задачи XL (W3-18): тот же путь оценки над этой же средой (`splitEnvFor` — одна на `deps`).
+    childTasks: (parent, splitId, units, only) =>
+      createChildTasks(deps.registry, splitEnvFor(deps), parent, splitId, units, only),
   };
+}
+
+/** Сколько единиц задачи идут разом — то же число, что держит распределитель мест. */
+function unitSlots(deps: ConductorWiringDeps, task?: LiveTask): number {
+  return deps.allocator ? deps.allocator.parallelism(task) : UNIT_SLOTS;
 }
 
 function section(text: string): BriefSection {
@@ -182,12 +219,13 @@ function outsideOf(lines: readonly JournalLine[], unitId: string): string[] {
 }
 
 /** Подсказка плану (02:65): области, менявшиеся чаще, и сколько единица там обычно идёт. */
-async function planHint(task: LiveTask, layout: ConductorWiringDeps['layout']): Promise<string> {
+async function planHint(task: LiveTask, deps: ConductorWiringDeps): Promise<string> {
+  const layout = deps.layout;
   const repos = task.state.created?.repos ?? [];
   const learned = await readLearnedDurations(layout.tasks, new Set([task.taskId]));
   const parts: string[] = [
     `Repos of this task (name a unit's repo by key): ${repos.map((r) => `${r.repoKey} = ${r.path}`).join('; ')}.`,
-    `Units run ${UNIT_SLOTS} at a time.`,
+    `Units run ${unitSlots(deps, task)} at a time.`,
   ];
   for (const r of repos) {
     const hist = await readHistory(r.path, r.baseRef, { commits: HISTORY_HINT_COMMITS });
@@ -293,7 +331,7 @@ export function splitHooksWith(deps: ConductorWiringDeps, env: SplitEnv): Conduc
       const task = live(s.taskId);
       if (!task) return { verdict: ok, sections: [] };
       if ((s.def.kind === 'plan' || s.def.kind === 'split') && task.state.task === 'estimating')
-        return { verdict: ok, sections: [section(await planHint(task, deps.layout))] };
+        return { verdict: ok, sections: [section(await planHint(task, deps))] };
       const unit = task.state.units[s.unitId];
       if (!unit || unit.ownedPaths.includes('**')) return { verdict: ok, sections: [] };
       const outside = outsideOf(linesOf(task), s.unitId);

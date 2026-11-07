@@ -135,7 +135,9 @@ export function replaySession(dir: string, normaliser: StreamNormaliser, from: n
       const shown = shownAt(send);
       if (shown >= from) {
         const text = normaliser.turnText?.(send.data) ?? sendText(send);
-        events.push({ offset: shown, kind: 'user-text', data: { text } });
+        // `sentAt` — стена отправки (`wall`): по ней панель ставит время хода в истории чата.
+        const data: JsonValue = send.wall === undefined ? { text } : { text, sentAt: send.wall };
+        events.push({ offset: shown, kind: 'user-text', data });
       }
     }
   };

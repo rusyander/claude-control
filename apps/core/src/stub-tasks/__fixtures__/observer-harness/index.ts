@@ -22,6 +22,7 @@ import { seedRequirements, toolDeps } from '../../../conductor/model-tools/__fix
 import { bindingOf } from '../../../conductor/model-tools/binding.ts';
 import { handleModelTool } from '../../../conductor/model-tools/model-tools.ts';
 import type { SessionBinding } from '../../../conductor/model-tools/model-tools.types.ts';
+import { ESTIMATE_HISTORY_SIGNAL } from '../../../conductor/estimate/estimate.ts';
 import { decideNext } from '../../../conductor/next/next.ts';
 import { createTaskRegistry } from '../../../conductor/tasks.ts';
 import {
@@ -277,6 +278,19 @@ export async function runStubTask(
     notes.push(`${event} ${JSON.stringify(data ?? {})}`);
   try {
     const task = await registry.create(CREATED);
+    // Числа оценки запуска — той же строкой, что пишет оценка дирижёра на создании (F3).
+    const estimateSeq = stub.estimate
+      ? task.append({
+          kind: 'signal',
+          actor: 'core',
+          data: {
+            signal: ESTIMATE_HISTORY_SIGNAL,
+            severity: 'info',
+            subject: 'estimate',
+            detail: JSON.stringify(stub.estimate),
+          },
+        }).seq
+      : null;
     seedRequirements(
       task,
       stub.input.requirements.map((r) => r.id),
@@ -541,8 +555,9 @@ export async function runStubTask(
     observer.detach();
     watch.detach(task.taskId);
     const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
+    // Строка оценки запуска — вход задачи (её пишет создание), а не сработавший сигнал.
     const signals = lines
-      .filter((l): l is JournalLine<'signal'> => l.kind === 'signal')
+      .filter((l): l is JournalLine<'signal'> => l.kind === 'signal' && l.seq !== estimateSeq)
       .map((l) => ({
         signal: l.data.signal,
         severity: l.data.severity,

@@ -6,6 +6,7 @@ import { newId } from '../../lib/ids/uuidv7.ts';
 import { END_REASON, type NextAction } from '../next/next.types.ts';
 import { stepTokens, tokenScope } from '../next/window.ts';
 import { decideRouting, routeStep, type StepRouting } from '../scenario/index.ts';
+import { dropSeat, seatAskOf, takeSeat } from '../schedule/lease.ts';
 import { runCoreStep } from './core-step.ts';
 import * as hook from './hooks.ts';
 import {
@@ -76,6 +77,11 @@ async function runStep(ctx: PerformCtx, stepId: string): Promise<void> {
   }
   if (!fresh && ctx.task.state.observerParks[stepId]) journalReroute(ctx.task, where, routing);
   s.routing = routing;
+  // Место сеанса (этап 11, P141) — до крючков брифа: ждущий шаг не собирает бриф на каждом
+  // пробуждении. Нет места — строка `schedule` с держателем, исполнитель спит до освобождения.
+  const seats = ctx.deps.allocator;
+  const ask = seatAskOf(ctx.task, s, routing.tier.route.id);
+  if (seats && !(await takeSeat(ctx.task, seats, ask))) return;
   const pre = await hook.preStep(ctx.deps.hooks, s);
   if (!pre.verdict.ok) {
     await failStep(ctx, stepId, `${END_REASON.hook}: ${pre.verdict.code} ${pre.verdict.reason}`);
@@ -98,8 +104,12 @@ async function runStep(ctx: PerformCtx, stepId: string): Promise<void> {
   const refused = await ctx.openSession(s, pre.sections);
   if (refused === null) {
     ctx.refusals.delete(stepId);
+    const opened = ctx.live.get(stepId)?.sessionId;
+    if (seats && opened) seats.bind(ctx.task.taskId, stepId, opened);
     return;
   }
+  // Отказ дороги места не держит: повтор шага встанет в очередь заново.
+  if (seats) dropSeat(ctx.task, seats, stepId, 'session refused');
   if (refused.startsWith(END_REASON.briefOverBudget)) {
     await failStep(ctx, stepId, refused);
     return;
@@ -366,6 +376,9 @@ export async function perform(ctx: PerformCtx, a: NextAction): Promise<void> {
       }
       return;
     }
+    case 'launch-children':
+      // Родитель XL (Q-2 s11): следующая волна детей; без порта суд этого действия не даёт.
+      return ctx.deps.xl?.launch(task, a.names);
     case 'finish-task':
       return finishTask(ctx, 'finish');
     case 'fail-task':

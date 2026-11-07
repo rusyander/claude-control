@@ -152,7 +152,7 @@ export function registerMediaRoutes(
   const wantsAgent = (value: unknown): boolean => value === '1' || value === 'true';
 
   /**
-   * Чем нарисуем и почему нет. Шлюз панели плану больше не нужен: контур — через звено
+   * Чем нарисуем и почему нет. Шлюз ядра плану больше не нужен: контур — через звено
    * ядра (C3b), и поднимать перед расчётом нечего.
    */
   app.get<{ Querystring: { agent?: string } }>('/api/media/images/plan', (request) =>

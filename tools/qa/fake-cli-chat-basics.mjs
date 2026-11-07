@@ -120,7 +120,23 @@ function pdfPages(path) {
   return (readFileSync(path, 'latin1').match(/\/Type\s*\/Page(?!s)/g) ?? []).length;
 }
 
-async function runTurn(content) {
+// Рамка хода — как у настоящего CLI с --replay-user-messages: command_lifecycle
+// queued → started → … result → completed по uuid строки stdin. Ядро (s10) по
+// started признаёт ход своим; без рамки ход «пришёл от CLI», и конца хода панель
+// не видела — ответ терялся до F5.
+const lifecycle = (command, state) =>
+  command && out({ type: 'command_lifecycle', command_uuid: command, state, uuid: randomUUID(), session_id: session });
+
+async function runTurn({ content, command }) {
+  lifecycle(command, 'started');
+  try {
+    await turnBody(content);
+  } finally {
+    lifecycle(command, 'completed');
+  }
+}
+
+async function turnBody(content) {
   record('user', { role: 'user', content });
   init();
   if (content.includes('СЛОМАЙСЯ')) {
@@ -197,7 +213,12 @@ createInterface({ input: process.stdin })
     try { message = JSON.parse(line); } catch { return; }
     if (message.type !== 'user') return;
     const content = message.message?.content;
-    queue.push(typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join(''));
+    const command = typeof message.uuid === 'string' ? message.uuid : undefined;
+    lifecycle(command, 'queued');
+    queue.push({
+      content: typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join(''),
+      command,
+    });
     void pump();
   })
   .on('close', () => { stdinEnded = true; void pump(); });

@@ -1,6 +1,6 @@
 <mxfile host="app.diagrams.net" version="24.7.7">
   <diagram id="p1" name="1. Путь запроса через контур">
-    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1110" pageHeight="1260" math="0" shadow="0">
+    <mxGraphModel dx="0" dy="0" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1110" pageHeight="1270" math="0" shadow="0">
       <root>
         <mxCell id="0"/>
         <mxCell id="1" parent="0"/>
@@ -16,20 +16,20 @@
         <mxCell id="p1:cli:icon" value="CLI" style="shape=card;fillColor=#FFFFFF;strokeColor=#43A047;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1B5E20;informational=1;" vertex="1" parent="p1:cli">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:gw" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Локальный шлюз панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель процесса самой панели на 127.0.0.1.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Адрес — /&lt;идентификатор контура&gt;/v1, отсюда требование к латинице.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="260" y="320" width="300" height="80" as="geometry"/>
+        <mxCell id="p1:gw" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#AD1457;text-align:left&quot;&gt;Локальный шлюз ядра&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель отдельного процесса ядра — хоста звеньев — на 127.0.0.1.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Адрес — /&lt;идентификатор контура&gt;/v1, отсюда требование к латинице.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="260" y="320" width="300" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:gw:icon" value="API" style="shape=hexagon;fillColor=#FFFFFF;strokeColor=#EC407A;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#AD1457;informational=1;" vertex="1" parent="p1:gw">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="p1:contour" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#37474F;text-align:left&quot;&gt;Контур: публичный API платформы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;/v1/models, /v1/chat/completions, /v1/embeddings.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Проверки контента работают в полосе запроса: отказ приходит статусом 451.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="260" y="510" width="300" height="80" as="geometry"/>
+          <mxGeometry x="260" y="520" width="300" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="p1:contour:icon" value="вне" style="shape=cloud;fillColor=#FFFFFF;strokeColor=#78909C;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#37474F;informational=1;" vertex="1" parent="p1:contour">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
         <mxCell id="p1:model" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1565C0;text-align:left&quot;&gt;Модель контура&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Та, что разрешена правами ключа: список приходит уже суженным.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Расход считает контур; панель показывает свою оценку и называет её оценкой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="260" y="700" width="300" height="90" as="geometry"/>
+          <mxGeometry x="260" y="710" width="300" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:model:icon" value="LLM" style="shape=process;fillColor=#FFFFFF;strokeColor=#42A5F5;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#1565C0;informational=1;" vertex="1" parent="p1:model">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
@@ -40,11 +40,11 @@
         <mxCell id="p1:key:icon" value="key" style="shape=cylinder3;backgroundOutline=1;size=7;fillColor=#FFFFFF;strokeColor=#FB8C00;html=1;whiteSpace=wrap;align=center;verticalAlign=bottom;fontSize=7;fontColor=#EF6C00;informational=1;" vertex="1" parent="p1:key">
           <mxGeometry x="10" y="10" width="40" height="50" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:off" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Панель выключена — шлюз закрыт&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;CLI, направленный на шлюз, останется без модели: он получит отказ. Тихого возврата в облако вендора не будет — это подписанный компромисс, а не сбой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="760" y="510" width="290" height="80" as="geometry"/>
+        <mxCell id="p1:off" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#B71C1C;text-align:left&quot;&gt;Шлюз не запущен — модели нет&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Пока хост звеньев ядра не запущен, CLI, направленный на шлюз, останется без модели: он получит отказ. Тихого возврата в облако вендора не будет — это подписанный компромисс, а не сбой.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="520" width="290" height="90" as="geometry"/>
         </mxCell>
         <mxCell id="p1:dialect" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#EF6C00;text-align:left&quot;&gt;Не всякий CLI умеет говорить со шлюзом&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Gemini CLI говорит на своём диалекте. В списке потребителей он стоит с этой причиной, а не молча не работает.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="1">
-          <mxGeometry x="760" y="700" width="290" height="70" as="geometry"/>
+          <mxGeometry x="760" y="710" width="290" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="edge:p1:cli:p1:gw" value="запрос по OpenAI-совместимому&lt;br&gt;протоколу" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:cli" target="p1:gw">
           <mxGeometry relative="1" x="0" y="0" as="geometry">
@@ -68,88 +68,88 @@
         <mxCell id="edge:p1:model:p1:cli" value="ответ возвращается тем же путём" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="p1:model" target="p1:cli">
           <mxGeometry relative="1" x="0" y="0" as="geometry">
             <Array as="points">
-            <mxPoint x="110" y="745"/>
+            <mxPoint x="110" y="755"/>
             <mxPoint x="110" y="170"/>
             </Array>
           </mxGeometry>
         </mxCell>
         <mxCell id="p1:legend:title" value="Обозначения" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#37474F;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="850" width="390" height="20" as="geometry"/>
+          <mxGeometry x="60" y="860" width="380" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw0" value="" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="880" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="890" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap0" value="потребитель: CLI или ассистент панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="880" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="890" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="910" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="920" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p1:legend:cap1" value="шлюз панели — единственное место, где ключ подставляется" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="910" width="330" height="20" as="geometry"/>
+        <mxCell id="p1:legend:cap1" value="шлюз ядра — единственное место, где ключ подставляется" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="920" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="940" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="950" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap2" value="внешняя система: контур компании" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="940" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="950" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw3" value="" style="rounded=1;arcSize=12;fillColor=#E3F2FD;strokeColor=#42A5F5;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="970" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="980" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap3" value="модель и другие службы контура" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="970" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="980" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw4" value="" style="rounded=1;arcSize=12;fillColor=#FFF3E0;strokeColor=#FB8C00;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1000" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1010" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap4" value="хранилище панели" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1000" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1010" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw5" value="" style="rounded=1;arcSize=12;fillColor=#FFFDE7;strokeColor=#F9A825;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1030" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1040" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap5" value="пояснение" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1030" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1040" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw6" value="" style="rounded=1;arcSize=12;fillColor=#FFEBEE;strokeColor=#E53935;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1060" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1070" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap6" value="ограничение, о котором сказано прямо" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1060" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1070" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw7" value="" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="60" y="1090" width="50" height="20" as="geometry"/>
+          <mxGeometry x="60" y="1100" width="50" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:cap7" value="значок формы: карточка, шлюз, облако, служба, хранилище" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1090" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1100" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#1565C0;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="60" y="1130" as="sourcePoint"/>
-            <mxPoint x="110" y="1130" as="targetPoint"/>
+            <mxPoint x="60" y="1140" as="sourcePoint"/>
+            <mxPoint x="110" y="1140" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="p1:legend:cap8" value="запрос вперёд" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1120" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1130" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#78909C;dashed=1;dashPattern=6 4;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="60" y="1160" as="sourcePoint"/>
-            <mxPoint x="110" y="1160" as="targetPoint"/>
+            <mxPoint x="60" y="1170" as="sourcePoint"/>
+            <mxPoint x="110" y="1170" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="p1:legend:cap9" value="ответ обратно" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1150" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1160" width="320" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p1:legend:sw10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;fontSize=9;fontColor=#37474F;labelBackgroundColor=#FFFFFF;endArrow=blockThin;endFill=1;jettySize=auto;strokeWidth=2;strokeColor=#6D4C41;sample=1;" edge="1" parent="1">
           <mxGeometry relative="1" as="geometry">
-            <mxPoint x="60" y="1190" as="sourcePoint"/>
-            <mxPoint x="110" y="1190" as="targetPoint"/>
+            <mxPoint x="60" y="1200" as="sourcePoint"/>
+            <mxPoint x="110" y="1200" as="targetPoint"/>
           </mxGeometry>
         </mxCell>
         <mxCell id="p1:legend:cap10" value="чтение из хранилища" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
-          <mxGeometry x="120" y="1180" width="330" height="20" as="geometry"/>
+          <mxGeometry x="120" y="1190" width="320" height="20" as="geometry"/>
         </mxCell>
       </root>
     </mxGraphModel>
@@ -315,7 +315,7 @@
         <mxCell id="p3:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Потребители: девять CLI и ассистент панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;В их конфигурации стоит только адрес локального шлюза вида http://127.0.0.1:5179/&lt;контур&gt;/v1. Ключа контура там нет.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
           <mxGeometry x="20" y="70" width="480" height="70" as="geometry"/>
         </mxCell>
-        <mxCell id="p3:gwl" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Локальный шлюз панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель процесса самой панели. Принимает запрос по OpenAI-совместимому протоколу, подставляет ключ и считает токены обеих сторон.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
+        <mxCell id="p3:gwl" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Локальный шлюз ядра&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Слушатель отдельного процесса ядра — хоста звеньев. Принимает запрос по OpenAI-совместимому протоколу, подставляет ключ и считает токены обеих сторон.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
           <mxGeometry x="20" y="160" width="480" height="70" as="geometry"/>
         </mxCell>
         <mxCell id="p3:driver" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#4527A0;text-align:left&quot;&gt;Реестр контуров и драйвер платформы&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Помнит адрес, режим и возможности контура. Драйвер знает диалект платформы: где у неё каталог моделей, эмбеддинги и агенты и как она отвечает на отказ.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#FFFFFF;strokeColor=#7E57C2;strokeWidth=1;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;informational=1;" vertex="1" parent="p3:panel">
@@ -492,7 +492,7 @@
         <mxCell id="p4:title" value="Вызов инструмента через прослойку" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=20;fontColor=#1A237E;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="30" width="760" height="30" as="geometry"/>
         </mxCell>
-        <mxCell id="p4:sub" value="Контур отбрасывает поле инструментов, поэтому шлюз панели объявляет их текстом и собирает вызов обратно из ответа." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
+        <mxCell id="p4:sub" value="Контур отбрасывает поле инструментов, поэтому шлюз ядра объявляет их текстом и собирает вызов обратно из ответа." style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=11;fontColor=#546E7A;" vertex="1" parent="1">
           <mxGeometry x="60" y="60" width="760" height="30" as="geometry"/>
         </mxCell>
         <mxCell id="p4:cli" value="&lt;div style=&quot;font-size:10px;font-weight:600;color:#1B5E20;text-align:left&quot;&gt;Claude Code в чате панели&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Шлёт запрос с полем инструментов, как вендору.&lt;/div&gt;&lt;div style=&quot;font-size:9px;text-align:left;margin-top:4px&quot;&gt;Вызов исполняет сам CLI: Write пишет файл, права спрашиваются как обычно.&lt;/div&gt;" style="rounded=1;arcSize=12;fillColor=#E8F5E9;strokeColor=#43A047;strokeWidth=2;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=6;fontSize=9;fontColor=#37474F;spacingLeft=50;informational=1;" vertex="1" parent="1">
@@ -563,7 +563,7 @@
         <mxCell id="p4:legend:sw1" value="" style="rounded=1;arcSize=12;fillColor=#FCE4EC;strokeColor=#EC407A;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">
           <mxGeometry x="60" y="940" width="50" height="20" as="geometry"/>
         </mxCell>
-        <mxCell id="p4:legend:cap1" value="шлюз панели и его прослойка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
+        <mxCell id="p4:legend:cap1" value="шлюз ядра и его прослойка" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=middle;fontSize=9;fontColor=#546E7A;verticalAlign=middle;sample=1;" vertex="1" parent="1">
           <mxGeometry x="120" y="940" width="280" height="20" as="geometry"/>
         </mxCell>
         <mxCell id="p4:legend:sw2" value="" style="rounded=1;arcSize=12;fillColor=#ECEFF1;strokeColor=#78909C;strokeWidth=2;html=1;sample=1;" vertex="1" parent="1">

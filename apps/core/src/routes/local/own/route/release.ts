@@ -141,7 +141,7 @@ export function createRelease(
       // Запуск не поднялся, а его дерево не снято доказанно (F-64): снять ещё раз под его меткой.
       const left = entry.startLeft;
       if (left) {
-        await stopServer(left.rid, () => stopStarted(left.root, left.rid));
+        await stopServer(left.rid, () => stopStarted(left.root, left.rid, left.since));
         if (!serverUp) delete entry.startLeft;
       }
       // Сервер записан, а в журнал не попал (ядро упало между ними): тоже наш, его rid — метка.

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { uuidv7 } from './ids.ts';
-import { stepDefId, type CoreStepKind, type StepKind } from './scenario.ts';
+import { LEAD_ROLES, reconMapSchema } from './lead.ts';
+import { stepDefId, TASK_CLASSES, type CoreStepKind, type StepKind } from './scenario.ts';
 
 /**
  * Инструменты модели — сервер MCP ядра `agentdeck` (03 §Model tools, F04 F10 F16). Схемы строгие:
@@ -146,6 +147,33 @@ export const confirmationSchema = z.strictObject({
 });
 export type Confirmation = z.infer<typeof confirmationSchema>;
 
+/**
+ * Кусок плана ведущего (этап 11, D6, P137): проверка, роль, критерии, входы от других кусков и
+ * спецификация механики. Все поля необязательны НАМЕРЕННО: пробелы судит `split-check` — каждый
+ * назван в одном отказе, а неполная спецификация понижает роль до `implement`, а не валит разбор.
+ */
+export const planPieceExt = z.strictObject({
+  /** id проверки куска (узкая, решаемая реестром). */
+  check: line(200).optional(),
+  role: z.enum(LEAD_ROLES).optional(),
+  /** id строк `requirement.extracted`, которые кусок закрывает (P134: одна нумерация). */
+  acRefs: z.array(uuidv7).max(200).optional(),
+  /** Что кусок берёт у другого: имя куска-зависимости и интерфейс. */
+  inputs: z
+    .array(z.strictObject({ from: line(200), iface: line(300) }))
+    .max(50)
+    .optional(),
+  /** Спецификация для роли `mechanical`: файлы, интерфейс, проверка. */
+  spec: z
+    .strictObject({
+      files: z.array(line(500)).max(200).optional(),
+      interface: line(4000).optional(),
+      check: line(200).optional(),
+    })
+    .optional(),
+});
+export type PlanPieceExt = z.infer<typeof planPieceExt>;
+
 const unitProposal = z.strictObject({
   name: line(200),
   ownedPaths: z.array(line(500)).min(1).max(200),
@@ -160,6 +188,7 @@ const unitProposal = z.strictObject({
   repo: line(500).optional(),
   /** Единица-контракт (G19): неявные рёбра ко всем единицам других репозиториев. */
   contract: z.boolean().optional(),
+  ...planPieceExt.shape,
 });
 
 /**
@@ -207,10 +236,19 @@ export const stepDoneSchema = z.strictObject({
   extracted: z.array(extractedRequirementSchema).max(200).optional(),
   requirementsReview: requirementsReviewSchema.optional(),
   confirmations: z.array(confirmationSchema).max(200).optional(),
+  /** Этап 11 (P136): карта разведки — только шаг `research`. */
+  map: reconMapSchema.optional(),
+  /**
+   * Этап 11 (P134): класс, который модель предлагает задаче, — только разведке и разбору. Ведущий
+   * принимает его, лишь когда он выше посчитанного по сигналам: модель класс не понижает.
+   */
+  classProposal: z.enum(TASK_CLASSES).optional(),
 });
 export type StepDoneCall = z.infer<typeof stepDoneSchema>;
 
 type KindBoundField =
+  | 'map'
+  | 'classProposal'
   | 'units'
   | 'reviewTargets'
   | 'findings'
@@ -225,6 +263,8 @@ type KindBoundField =
  * подтверждения — только ревью (G4).
  */
 export const STEP_DONE_KIND_FIELDS: Record<KindBoundField, readonly SessionStepKind[]> = {
+  map: ['research'],
+  classProposal: ['research', 'intake'],
   units: ['plan', 'split'],
   reviewTargets: ['intake'],
   findings: ['review'],

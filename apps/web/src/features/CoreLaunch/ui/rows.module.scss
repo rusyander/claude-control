@@ -19,9 +19,32 @@
   overflow-wrap: anywhere;
 }
 
+// Ссылка на ленту задачи: подчёркивание того же акцента темы, что и текст, а не цвет браузера.
+.feedLink {
+  color: var(--color-accent);
+}
+
 // Числа оценки: подпись над значением, колонки переносятся на узком экране.
 .facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--spacing-sm);
+}
+
+// Список без маркеров (ступени ролей на оценке): строки читаются подписью, не точкой.
+.plainList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+// Поле с кнопкой справа (ключ трекера → «Прочитать»): кнопка по нижнему краю поля.
+.inlineField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-xs);
+  align-items: end;
 }

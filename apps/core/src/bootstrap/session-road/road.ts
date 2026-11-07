@@ -40,6 +40,7 @@ import type { PermitContext } from '../../policy/permit/permit.types.ts';
 import type { SessionTokens } from '../../policy/session-tokens/session-tokens.ts';
 import type { RouteRegistry } from '../../routes/registry.ts';
 import { TREE_MARKER } from '../../session-host/host.ts';
+import { machineQueueDir } from '../allocator-wiring/machine.ts';
 import { PERMIT_SELF_TOOL, type SessionRuntime } from '../session-runtime.ts';
 import { compat as judgeCompat } from '../../routes/compat/compat.ts';
 import { modelRequired } from '../../routes/lease.ts';
@@ -288,8 +289,11 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
   };
   // Факты слоя сеансов: режим навыков, подагенты, опись — судье права и крану слоя.
   const layers = createSessionLayerBook();
+  // Очередь машины — тем же выбором, что у распределителя (`createAllocatorWiring`): переменная,
+  // дом, `~/.agentdeck/machine`; лежит вне дома ядра, а значит для выдачи мест то же, что он.
   const platform: PlatformDenyFacts = {
     coreHome: deps.layout.root,
+    machineQueue: machineQueueDir(deps.layout),
     tokenFiles: [deps.layout.token],
   };
   // Запреты платформы шага: серверы форжа человека — только чтение (`forge-mcp-read-only`, P82);
@@ -905,6 +909,7 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
       cwd: p.spec.cwd,
       skills: p.spec.layer.skills,
       layer,
+      spec: p.spec.layer,
     });
     layers.started(sessionId, inventory);
   }

@@ -37,16 +37,10 @@ import {
   type StatFile,
 } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
 import { readChatMessages } from '../../domains/chat/ChatHistory/ChatHistory.ts';
+import type { CoreChatHistory } from '../../domains/chat/core-run/core-chat-history.ts';
 import { projectsDir } from './paths.ts';
 import { continuationLink } from '../../lib/app-store/chat-links.ts';
 import type { TreeStartGate } from '../../domains/chat/tree-pause/tree-pause.ts';
-import type { CoreChatPort } from '../../domains/chat/core-run/core-run.types.ts';
-import {
-  startCoreForeignChat,
-  withRoutes,
-} from '../../domains/chat/core-foreign/core-foreign-start.ts';
-import type { ForeignCarryResolver } from '../../domains/chat/core-foreign/foreign-carry.ts';
-import { coreContourRoutes } from '../../domains/platform/routing/core-contour.ts';
 import { checkProjectDir } from '../../domains/projects/projects.ts';
 import { getActiveProvider, getActiveProviderId } from '../../providers/registry.ts';
 import { supportsCliAutoMode } from '../../providers/auto-mode/auto-mode.ts';
@@ -260,12 +254,13 @@ export function registerChatHandoffRoutes(
   deps: {
     runs: ChatRunRegistry;
     chains: HandoffChains;
-    /** Разговор чужого CLI заводится задачей ядра (`startCoreForeignChat`). */
-    coreChats: Pick<CoreChatPort, 'estimate' | 'command'>;
-    /** Слой панели разговору чужого CLI (G6): строка о тестах, набор для CLI. */
-    foreignCarry?: ForeignCarryResolver;
     /** Тумблеры прав сервера: продолжение наследует их у закрытого разговора. */
     session: ChatSession;
+    /**
+     * История разговоров не-Claude CLI из видов сеансов ядра: по ней перезапуск судит свежесть
+     * опоры у такого разговора — транскрипта Claude у него нет.
+     */
+    coreHistory?: Pick<CoreChatHistory, 'messages'>;
   },
 ): void {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
@@ -370,9 +365,11 @@ export function registerChatHandoffRoutes(
 
     // Свежесть — относительно последней реплики человека: всё, что агент записал
     // после неё, записано в этом разговоре. Разговор без транскрипта (черновик
-    // под временным ключом) считается несвежим: сравнивать не с чем.
+    // под временным ключом) считается несвежим: сравнивать не с чем. Разговор чужого CLI читается
+    // из истории ядра (книга знает его id) — иначе он всегда шёл бы просьбой обновить опору.
     const recent = sessionId
-      ? await readChatMessages(projectsDir(ctx), sessionId, { limit: 40 })
+      ? ((await deps.coreHistory?.messages(sessionId, { limit: 40, offset: 0 })) ??
+        (await readChatMessages(projectsDir(ctx), sessionId, { limit: 40 })))
       : undefined;
     const humans = (recent?.messages ?? []).filter((message) => message.role === 'user');
     const lastHuman = humans.at(-1);
@@ -485,8 +482,6 @@ export function continuationStarter(
   ctx: ServerContext,
   deps: {
     runs: ChatRunRegistry;
-    coreChats: Pick<CoreChatPort, 'estimate' | 'command'>;
-    foreignCarry?: ForeignCarryResolver;
     session: ChatSession;
   },
   selfBaseUrl: string,
@@ -507,14 +502,23 @@ export function continuationStarter(
   // (`run-routes.ts`), а не «Чат».
   const origin = assigned ? ('groups' as const) : undefined;
 
-  /** Прогон Claude — тот же путь, что и у обычной отправки в чат проекта. */
-  function startClaude(nextId: string, prompt: string, cwd: string): boolean {
+  /**
+   * Прогон продолжения — тот же путь, что и у обычной отправки в чат проекта, у ЛЮБОГО CLI:
+   * ход ведёт прогон ядра реестра (`CoreChatRun`), CLI — активный провайдер. Так разговор
+   * садится одинаково: вкладке — ключ `new-…`, прогон называет разговор id сеанса ядра, книга
+   * чата ядра его помнит — и он в списке, открывается заново, его история читается (этап 11,
+   * волна 3). Раньше чужой CLI заводил задачу ядра мимо реестра: ни id разговора, ни записи в
+   * книге — продолжение не появлялось в списке ни на компьютере, ни на телефоне.
+   */
+  function startRun(nextId: string, prompt: string, cwd: string): boolean {
     const settings = ctx.store.getSettings();
+    const foreign = provider.id !== 'claude';
     // Обе инициативы, общей склейкой: этап закроется и в продолжении, а если
     // в новой сессии задачи опять разойдутся — их будет кому развести. Брать
     // здесь только «свою» значило бы, что после первого же продолжения
-    // разделение задач молча перестаёт работать.
-    const initiative = initiativePrompt(settings);
+    // разделение задач молча перестаёт работать. Чужому CLI — без правила про
+    // AskUserQuestion: такого инструмента у него нет.
+    const initiative = initiativePrompt(settings, foreign ? { foreign: true } : {});
     // Тумблеры закрытого разговора — новому (см. планировщик).
     deps.session.inherit(source.fromAliases, nextId);
     // Назначение переезжает на продолжение — ДО запуска: без записи цепочка
@@ -539,11 +543,15 @@ export function continuationStarter(
     return deps.runs.start(
       nextId,
       {
-        prompt,
+        // Системной дописки прогон ядра чужому CLI не передаёт (у него свой слой,
+        // `foreignCarry`), поэтому инициатива едет текстом задания — ПОСЛЕ него:
+        // по первым словам список называет разговор, и названием должно остаться
+        // предложение прошлой сессии, а не одинаковая у всех вводная панели.
+        prompt: foreign && initiative ? `${prompt}\n\n${initiative}` : prompt,
         cwd,
-        // Команда — от того же снимка провайдера, по которому выбрана эта ветка
-        // (`provider.id === 'claude'` ниже), а не от настройки заново: иначе
-        // переключение CLI между ними дало бы чужой бинарь с флагами Claude.
+        // Команда — от того же снимка провайдера, по которому выбран CLI, а не от
+        // настройки заново: иначе переключение CLI между ними дало бы чужой бинарь
+        // с флагами Claude.
         command: providerCliCommand(provider),
         model,
         effort: source.effort || assigned?.effort || settings.chatEffort,
@@ -553,58 +561,13 @@ export function continuationStarter(
             : 'acceptEdits'
           : 'default',
         permissionPrompt: { runId: nextId, baseUrl: selfBaseUrl, tokenFile: apiTokenPath() },
-        ...(initiative ? { appendSystemPrompt: initiative } : {}),
+        ...(initiative && !foreign ? { appendSystemPrompt: initiative } : {}),
       },
       { projectPath: cwd, ...(origin ? { origin } : {}) },
     );
   }
 
-  /**
-   * Разговор чужого CLI — задача ядра `chat@1` с этим CLI (этап 10, F2c): своего исполнителя
-   * чужих CLI у панели больше нет. Ответ «заведено» синхронный, как у Claude выше (реестр тоже
-   * отвечает до первого события): ядро зовётся следом, его отказ — с кодом в журнал сервера,
-   * а задача, которую ядро успело завести, остаётся в его ленте со своим состоянием.
-   */
-  function startForeign(prompt: string, cwd: string, title?: string): boolean {
-    // Имя, а не ключ: ключ вида `new-1758…` в ленте задач читался бы как название.
-    // У чужого CLI инициатива — первая реплика, а не флаг запуска (`preface`).
-    const initiative = initiativePrompt(ctx.store.getSettings(), { foreign: true });
-    const model = source.model || assigned?.model;
-    // Галочка контура `foreign:<cli>` — тот же маршрут, что у прежнего исполнителя панели.
-    const routes = withRoutes(
-      coreContourRoutes(ctx.store, `foreign:${provider.id}`, provider.id, model ?? ''),
-    );
-    // Слой панели (G6): строка о тестах и набор для CLI; не переносится — разговор не заводится.
-    const carried = deps.foreignCarry?.({ cli: provider.id, cwd, ...routes });
-    if (carried && !carried.ok) {
-      app.log.warn({ cli: provider.id }, `foreign continuation: ${carried.reason}`);
-      return false;
-    }
-    void startCoreForeignChat(deps.coreChats, {
-      cli: provider.id,
-      cwd,
-      prompt,
-      title: title ?? 'Продолжение',
-      ...(model ? { model, effort: source.effort || assigned?.effort } : {}),
-      ...(initiative ? { preface: initiative } : {}),
-      ...routes,
-      ...(carried ? { carry: carried.carry } : {}),
-    })
-      .then((outcome) => {
-        if (!outcome.ok) {
-          app.log.warn(
-            { code: outcome.code, cli: provider.id },
-            `foreign continuation refused by the core: ${outcome.message}`,
-          );
-        }
-      })
-      .catch((error: unknown) =>
-        app.log.warn({ err: error, cli: provider.id }, 'foreign continuation: core unreachable'),
-      );
-    return true;
-  }
-
-  return ({ chatId: nextId, prompt, cwd, title }) => {
+  return ({ chatId: nextId, prompt, cwd }) => {
     // Продолжение идёт в том же каталоге, и набор проекта нужен ему ровно так
     // же, как исходному разговору: иначе после «чистой сессии» правила и скиллы
     // молча переставали действовать. Тумблер каталогов — только у Claude: чужой
@@ -618,13 +581,10 @@ export function continuationStarter(
             (error) => app.log.warn({ err: error }, 'group activation failed'),
           )
         : [];
-    const started =
-      provider.id === 'claude'
-        ? startClaude(nextId, prompt, cwd)
-        : startForeign(prompt, cwd, title);
+    const started = startRun(nextId, prompt, cwd);
     // Заметка — ПОСЛЕ старта: до него прогона в реестре нет, и сказать некуда.
-    // У чужого CLI его нет вовсе — `emitExternal` отвечает «некуда», и факт
-    // остаётся на странице «Наборы».
+    // У чужого CLI каталоги не включались — заметки нет, факт остаётся на
+    // странице «Наборы».
     const notice = started ? groupsActivatedNotice(activated) : undefined;
     if (notice) deps.runs.emitExternal(nextId, notice);
     return started;

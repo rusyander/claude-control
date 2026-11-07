@@ -49,17 +49,20 @@ const child = (go: string) => {
 describe('stopLeftover of a bare keeper number', () => {
   it('a keeper still exiting on its own is waited for: no leftover, the number is gone', async () => {
     const go = join(dir, 'go-1');
+    // Начало запуска, как его передаёт `startRouter`: поиск по метке не старше его.
+    const since = Date.now();
     const { pid } = child(go);
     hooks.afterStop = () => writeFileSync(go, '');
-    expect(await stopLeftover(pid, MARKER)).toBeUndefined();
+    expect(await stopLeftover(pid, MARKER, since)).toBeUndefined();
     expect(pidAlive(pid)).toBe(false);
   }, 30_000);
 
   it('a number still alive past the wait stays a leftover with its reason', async () => {
+    const since = Date.now();
     const { proc, pid } = child(join(dir, 'never'));
     hooks.afterStop = undefined;
     try {
-      expect(await stopLeftover(pid, MARKER)).toBe(
+      expect(await stopLeftover(pid, MARKER, since)).toBe(
         `keeper pid ${pid} alive after the stop, identity unread`,
       );
     } finally {

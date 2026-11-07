@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { Fact } from '@agentdeck/contracts/core/facts';
+import { TASK_CLASSES } from '@agentdeck/contracts/core/lead';
 import type { RoutePrice } from '@agentdeck/contracts/core/routes';
 import { taskViewSchema } from '@agentdeck/contracts/core/task-view';
 import { journalUsage } from '../bootstrap/economy-wiring/usage.ts';
 import { seedSession } from '../conductor/model-tools/__fixtures__/seed.ts';
+import { raiseHumanPoint } from '../conductor/human/raise.ts';
+import { classAsk, intakeAsk } from '../conductor/intake/index.ts';
 import { bindingOf } from '../conductor/model-tools/binding.ts';
 import { createTaskRegistry } from '../conductor/tasks.ts';
 import { P43_TURNS } from '../economy/price/__fixtures__/p43-turns.ts';
@@ -208,5 +211,37 @@ describe('task view for the panel (stage 9)', () => {
       expect((await stand.get(path, '')).status, path).toBe(401);
       expect((await stand.get(path, TOKENS.session)).status, path).toBe(401);
     }
+  });
+});
+
+describe('asks carry their dedupe key (stage 11, W3-18 class-ask edge)', () => {
+  it('the card ask and the class ask share source intake and differ only by key: intake:<id> vs classify:<id>', async () => {
+    const task = await createTaskRegistry(tempDir('view-asks-'), deps()).create(CREATED);
+    const card = {
+      goal: 'goal',
+      acceptance: [],
+      area: { paths: [], units: [] },
+      constraints: [],
+      unknowns: [],
+      sourceDigest: 'a'.repeat(64),
+    };
+    // Вопрос класса (`classify` в alwaysAsk) поднят раньше карточки: кнопка группы его не трогает.
+    const klass = raiseHumanPoint(task, classAsk(task.taskId, TASK_CLASSES[0], 'signals'));
+    const intake = raiseHumanPoint(task, intakeAsk(task.taskId, card));
+    if (klass.kind !== 'asked' || intake.kind !== 'asked') throw new Error('asks not raised');
+    const lines = readJournalLines(task.dir, task.taskId).lines;
+    const view = taskViewSchema.parse(
+      taskViewOf({
+        taskId: task.taskId,
+        state: task.state,
+        lines,
+        priceFor: () => MONEY,
+        attention: null,
+      }),
+    );
+    expect(view.asks.map((a) => [a.askId, a.source, a.dedupe, a.state])).toEqual([
+      [klass.askId, 'intake', `classify:${task.taskId}`, 'open'],
+      [intake.askId, 'intake', `intake:${task.taskId}`, 'open'],
+    ]);
   });
 });

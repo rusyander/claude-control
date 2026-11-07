@@ -320,6 +320,13 @@ export const ROWS: Readonly<Record<string, Row>> = {
   compare_providers: [['done', { left: 'claude', right: 'codex' }]],
   local_models_status: [['done']],
   kit_status: [['done']],
+  // Ядра у обхода нет: прокладка отвечает «ядро не запущено», отказ доходит до модели словами.
+  // Чтения ядра против живого ядра — actions-core.integration.test.ts.
+  core_tasks: [['failed']],
+  core_task: [['failed', { taskId: '01900000-0000-7000-8000-000000000001' }]],
+  core_report: [['failed', { taskId: '01900000-0000-7000-8000-000000000001' }]],
+  core_lead_settings: [['failed']],
+  core_agents: [['failed', { conversationId: 'sweep-chat' }]],
   read_env_passport: [['done']],
   // Сита: секрет в тексте выученного сита проверяет actions-sieves.integration.test.ts.
   read_sieves: [['done']],

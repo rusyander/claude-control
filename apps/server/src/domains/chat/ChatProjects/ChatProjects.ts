@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import type { ChatSummary } from '@agentdeck/contracts';
 import { readChats } from '../ChatHistory/ChatHistory.ts';
 import { isSandboxPath } from '../ChatArtifacts/ChatArtifacts.ts';
 import { BRAND_SLUG, LEGACY_BRAND_SLUG } from '../../../lib/brand.mjs';
@@ -77,11 +78,25 @@ export function isNonProject(path: string): boolean {
  * Проекты, сгруппированные из истории чатов. Отсортированы по свежести
  * последней активности. Внутри каждого — его чаты, тоже свежие первыми
  * (порядок наследуется из `readChats`, который уже сортирует по времени).
+ *
+ * `extra` — сводки разговоров не-Claude CLI из ядра (этап 11, волна 3): транскрипта у них нет,
+ * а список проектов телефона строится только отсюда — без них разговор qwen/opencode с телефона
+ * не открыть. Сводка с id, который уже есть в транскриптах, не дублируется.
  */
-export function listProjects(projectsDir: string): ProjectInfo[] {
+export function listProjects(
+  projectsDir: string,
+  extra: readonly ChatSummary[] = [],
+): ProjectInfo[] {
   const byPath = new Map<string, ProjectInfo>();
+  const own = readChats(projectsDir);
+  const chats =
+    extra.length === 0
+      ? own
+      : [...own, ...extra.filter((e) => !own.some((o) => o.id === e.id))].sort((a, b) =>
+          b.updatedAt.localeCompare(a.updatedAt),
+        );
 
-  for (const chat of readChats(projectsDir)) {
+  for (const chat of chats) {
     const path = chat.projectPath;
     if (!path) continue;
     // Песочницы панели, временные черновики агента и служебные подкаталоги — не проекты.

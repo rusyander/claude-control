@@ -14,12 +14,15 @@ const KINDS: readonly AuthorityKind[] = [
   'set-config',
   'save-scenario',
   'adopt-devices',
+  'learned-reset',
 ];
 const STRICT_FROM_SPEC: ReadonlySet<AuthorityKind> = new Set([
   'set-config',
   // Этап 9 (F6, F11): библиотека сценариев и ключи устройств — строго, как настройка ядра.
   'save-scenario',
   'adopt-devices',
+  // Этап 11 (P140): таблица обучения общая для всех задач машины — сброс ключа строго.
+  'learned-reset',
   'answer',
   'edit-requirements',
   'approve-split',

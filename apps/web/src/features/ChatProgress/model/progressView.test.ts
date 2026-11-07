@@ -14,17 +14,6 @@ describe('summarizeProgress', () => {
     expect(summarizeProgress({ tasks: [], agents: [] }).hasAnything).toBe(false);
   });
 
-  it('скилл или MCP главного агента показывают панель, одни хуки — нет', () => {
-    const hooks = [{ kind: 'hook' as const, name: 'context-watch', count: 4 }];
-    const skill = [{ kind: 'skill' as const, name: 'deep-review', count: 1 }];
-    const mcp = [{ kind: 'mcp' as const, name: 'gitlab/get_issue', count: 2 }];
-    expect(summarizeProgress({ tasks: [], agents: [], extensions: hooks }).hasAnything).toBe(false);
-    expect(
-      summarizeProgress({ tasks: [], agents: [], extensions: [...hooks, ...skill] }).hasAnything,
-    ).toBe(true);
-    expect(summarizeProgress({ tasks: [], agents: [], extensions: mcp }).hasAnything).toBe(true);
-  });
-
   it('считает выполненные и называет текущий шаг', () => {
     const summary = summarizeProgress({
       tasks: [

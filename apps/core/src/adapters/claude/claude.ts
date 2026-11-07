@@ -34,6 +34,7 @@ import {
 } from './permission.ts';
 import { claudeHookReader } from './hook-refusal.ts';
 import { CLAUDE_OUTCOME } from './outcome.ts';
+import { CLAUDE_TASKS } from './task-rule.ts';
 import {
   claudeConfigDir,
   layerHooks,
@@ -377,6 +378,9 @@ export function planClaude(
   if (carry?.localLayer?.plugin) args.push('--plugin-dir', carry.localLayer.plugin);
   if (spec.resume) args.push('--resume', spec.resume.conversationId);
   else if (UUID.test(spec.sessionId)) args.push('--session-id', spec.sessionId);
+  // Сеанс без следа (замер базы): транскрипт не ложится в `projects/` дома конфигурации —
+  // панель читает его оттуда, и проба вставала бы чатом в списке человека (флаг — только с `-p`).
+  if (spec.ephemeral) args.push('--no-session-persistence');
   // `none` (вопрос «ask»): встроенных инструментов нет вовсе — только `ToolSearch`, без него CLI
   // не загрузит отложенные инструменты моста панели; он трогает лишь состояние разговора.
   if (spec.tools === 'none') args.push('--tools', 'ToolSearch');
@@ -475,6 +479,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       ownsTranscript: claudeOwnsTranscript,
       // `--tools ToolSearch` (справка 2.1.310: «"" to disable all tools»): встроенных нет.
       toolsNone: true,
+      ephemeral: 'flag',
       // `--setting-sources user`: только источник человека из CLAUDE_CONFIG_DIR пина (песочница).
       userSourcesOnly: true,
       // Перенос слоя панели (G6): `--setting-sources a,b`, `--plugin-dir` на каждый, `--tools`.
@@ -498,6 +503,8 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       classifyError: classifyClaudeError,
       readWindow: readClaudeWindow,
       outcome: CLAUDE_OUTCOME,
+      // Субагенты и фон из строк задач потока (этап 11, P148): переходник объявляет backgroundFacts.
+      tasks: CLAUDE_TASKS,
       hookReader: claudeHookReader,
     },
     options,

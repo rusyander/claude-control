@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ActionKind, JournalLine } from '@agentdeck/contracts/core/journal';
+import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { RouteLease, RouteResource } from '@agentdeck/contracts/core/routes';
 import type { Scenario, StepDef, StepKind } from '@agentdeck/contracts/core/scenario';
 import type { SessionHandle } from '../../../adapters/index.ts';
@@ -157,6 +158,7 @@ export async function conduct(
       origin: null,
       launchPolicy: 'confirm',
       ciWait: false,
+      ...(cfg.lead ? { lead: cfg.lead } : {}),
     });
   }
   const live = task;
@@ -372,7 +374,7 @@ export async function conduct(
       cwd: copy,
       brief: briefFor({ stepId, copyRoot: copy, request: cfg.request }),
       deny: STEP_DENY,
-      tools: 'all',
+      tools: toolsOf(cfg),
       // Слой человека снимается там, где переходник это умеет; иначе (Qwen) его нет и так: дом CLI
       // — одноразовый каталог стенда, а не настоящий.
       layer: { hooks: cfg.layerMode ?? (adapter.caps.layerControl ? 'off' : 'on'), skills: 'on' },
@@ -514,6 +516,13 @@ export async function conduct(
   // Сессия, кончившаяся сама, исполнителем не снимается — дорога всё равно ищет её остаток.
   await port.release();
   return result(outcome);
+}
+
+/** Набор инструментов сессии: по умолчанию `all`; `by-step` — тем же правилом, что продукт. */
+function toolsOf(cfg: ChildConfig): 'all' | 'read-only' | 'none' {
+  if (cfg.tools === undefined) return 'all';
+  if (cfg.tools !== 'by-step') return cfg.tools;
+  return toolPlanFor(cfg.stepKind)?.builtins ?? 'read-only';
 }
 
 /** Одношаговый сценарий прогона: шаг `work` того вида, что задан стендом. */

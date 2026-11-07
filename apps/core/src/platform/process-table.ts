@@ -57,6 +57,39 @@ export function filetimeToMs(ticks: bigint): number {
 }
 
 /**
+ * Время старта процесса в мс Unix по его личности, даже когда его уже нет в таблице: строка
+ * таблицы, иначе сам токен `start` — FILETIME (win32), секунды `lstart` (darwin), тики с загрузки
+ * (linux; начало загрузки берётся из любой строки той же загрузки в `rows`). Токен не разобрать
+ * или загрузка другая — `undefined`: вызывающий тогда не сужает поиск.
+ */
+export function identityStartMs(
+  id: ProcessIdentity,
+  os: OsKind,
+  rows: readonly ProcessRow[],
+): number | undefined {
+  const row = rows.find((item) => item.pid === id.pid && item.start === id.start);
+  if (row) return Number.isFinite(row.startMs) ? row.startMs : undefined;
+  if (os === 'win32') {
+    if (!/^\d+$/.test(id.start)) return undefined;
+    const ticks = BigInt(id.start);
+    return ticks > 0n ? filetimeToMs(ticks) : undefined;
+  }
+  if (os === 'darwin') {
+    const seconds = /^(\d+):/.exec(id.start)?.[1];
+    return seconds === undefined ? undefined : Number(seconds) * 1000;
+  }
+  const own = /^([^:]+):(\d+)$/.exec(id.start);
+  if (!own) return undefined;
+  for (const item of rows) {
+    const peer = /^([^:]+):(\d+)$/.exec(item.start);
+    if (!peer || peer[1] !== own[1] || !Number.isFinite(item.startMs)) continue;
+    const bootMs = item.startMs - (Number(peer[2]) * 1000) / LINUX_CLK_TCK;
+    return bootMs + (Number(own[2]) * 1000) / LINUX_CLK_TCK;
+  }
+  return undefined;
+}
+
+/**
  * Откуда процессор пробы на этой ОС — пишется в причину `session.probe` (R4: тики Linux взяты
  * при CLK_TCK = 100, у Node нет API спросить его; в контейнере номера — его пространства имён).
  */

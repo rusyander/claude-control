@@ -202,17 +202,6 @@ describe('panel-agent actions: chat session, chat files, editor', () => {
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      coreChats: {
-        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-        estimate: async () => ({
-          ok: false as const,
-          code: 'no-core',
-          message: 'no core in this test',
-        }),
-        command: async () => {
-          throw new Error('no core in this test');
-        },
-      },
       session,
     });
     registerPanelAgentRoutes(app, ctx, {

@@ -12,7 +12,7 @@
  *   1. проба контура на чужом адресе — список моделей приходит, остальные
  *      возможности остаются «не объявлено» и НЕ превращаются ни в галку, ни в
  *      прочерк;
- *   2. запрос через локальный шлюз панели (`/<id>/v1/chat/completions`) —
+ *   2. запрос через локальный шлюз ядра (`/<id>/v1/chat/completions`) —
  *      живой ответ живой модели, потоком;
  *   3. не-потоковый вызов, переведённый шлюзом в потоковый (`forceStream`);
  *   4. учёт расхода: запрос попал в дневной итог контура;
@@ -322,14 +322,14 @@ async function run(model, home) {
     JSON.stringify(probeSeen),
   );
 
-  // ── 2. Шлюз панели над чужим шлюзом ──────────────────────────────────────
+  // ── 2. Шлюз ядра над чужим шлюзом ──────────────────────────────────────
   const settings = await api('/settings', {
     method: 'PATCH',
     body: JSON.stringify({
       platformGateway: { enabled: true, port: GATEWAY_PORT, forceStream: true },
     }),
   });
-  check('шлюз панели включён', settings.status === 200, JSON.stringify(settings.body));
+  check('шлюз ядра включён', settings.status === 200, JSON.stringify(settings.body));
 
   const restarted = await api('/platforms/gateway/restart', { method: 'POST', body: '{}' });
   const port = restarted.body?.status?.port ?? GATEWAY_PORT;
@@ -354,7 +354,7 @@ async function run(model, home) {
   });
   const streamText = await streamed.text();
   check(
-    'чужой шлюз ответил через шлюз панели потоком',
+    'чужой шлюз ответил через шлюз ядра потоком',
     streamed.status === 200,
     `${streamed.status}: ${streamText.slice(0, 200)}`,
   );

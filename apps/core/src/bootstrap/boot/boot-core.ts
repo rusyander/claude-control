@@ -10,8 +10,7 @@ import type {
 import { createAskBridgeBook, createAskTask, replayAsk } from '../../conductor/ask/index.ts';
 import { createTaskEnvBook } from '../../conductor/task-env/index.ts';
 import { failHalfMadeAnswers, type SplitEnv } from '../../conductor/estimate/index.ts';
-import { createTaskRegistry } from '../../conductor/tasks.ts';
-import { WindowBook } from '../../economy/window/index.ts';
+import { createTaskRegistry, type TaskRegistry } from '../../conductor/tasks.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { createClock, REAL_CLOCK, type CoreClock } from '../../platform/clock.ts';
 import { ensureCoreHome } from '../../platform/core-home.ts';
@@ -46,7 +45,10 @@ import { baseAtStart, createCliVersionReader } from '../economy-wiring/base-star
 import { bootEconomy } from '../economy-wiring/boot-economy.ts';
 import { createContextWiring } from '../economy-wiring/context.ts';
 import { createEconomyWiring } from '../economy-wiring/index.ts';
+import { learnedPortOf } from '../economy-wiring/learned-port.ts';
 import { createPollWiring } from '../forge-wiring/poll-wiring.ts';
+import { createAgentsWiring } from '../agents-wiring/index.ts';
+import { createAllocatorWiring } from '../allocator-wiring/index.ts';
 import { createObserverWiring } from '../observer-wiring/index.ts';
 import { processPin } from '../conductor-wiring/session-start.ts';
 import { createRouteWindows } from '../route-windows.ts';
@@ -149,8 +151,17 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     log.close();
     throw error;
   }
+  // Распределитель мест сеансов (этап 11): его проводка даёт книгу окон и порт `/v1/allocator`;
+  // реестр задач собирается ниже — проводка читает его через ячейку.
+  const registryCell: { current?: TaskRegistry } = {};
+  const allocator = createAllocatorWiring({
+    layout,
+    note,
+    registry: () => registryCell.current,
+    routes: () => routes,
+  });
   // Книга окон одна на ядро (G7): проводка экономики пишет в неё факты потока, health читает.
-  const windows = new WindowBook();
+  const windows = allocator.windowBook();
   // Проводка контекста одна: кран сверяет первый ход с ожиданием, которое ставит исполнитель.
   const context = createContextWiring({ homeRoot: layout.root });
   // Дорога сессии собирается позже (ей нужен порт API); кран слоя спрашивает её опись через ячейку.
@@ -207,6 +218,18 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     // Каждая задача, ставшая живой (открыта на загрузке, создана, открыта заново), — под наблюдателем.
     { onLive: (task) => observer.attach(task) },
   );
+  registryCell.current = registry;
+  // История агентов (этап 11): свёртка журнала задач для `/v1/*agents*`; маска — та же, что у журнала.
+  const agents = createAgentsWiring({
+    layout,
+    registry,
+    mask: dlpSecretMask,
+    note,
+    // Сторож фона (P148): та же проба жизни, что у задач; тишина вывода — по активному времени.
+    liveness: probe,
+    now: activeMono,
+    ...options.agents,
+  });
   const lockHolder = { leaseId: newId(), ...me, acquiredAt: Date.now() };
   const procsDeps = {
     isAlive: (id: { pid: number; start: string }) => probe.isAlive(id),
@@ -341,7 +364,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       ? startLocalFront({
           port: options.localFront.port,
           target: (stale) => localHold.target(stale),
-          // Кеш слота по разговорам — то, что делал `prepare(session)` шлюза панели.
+          // Кеш слота по разговорам — то, что делал `prepare(session)` прежнего шлюза в панели.
           slots: createSlotCache({ note }),
           ...(options.localFront.retryMs ? { retryMs: options.localFront.retryMs } : {}),
           note,
@@ -392,6 +415,19 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       contours: () => contoursPort,
       // Прокси защиты данных человека (C3c): состояние и такт по просьбе панели.
       dlpProxy: () => dlpPort,
+      // Этап 11: дерево агентов, места сеансов, активность своей модели — порты своих проводок.
+      agents: () => agents.port(),
+      allocator: () => allocator.port(),
+      // Этап 11 (P140): сброс ключа обучения — в кэш выученного, затем перечитать его.
+      learned: () =>
+        learnedPortOf({
+          tasksDir: layout.tasks,
+          note,
+          refresh: () => void economy.history().catch(() => undefined),
+        }),
+      localActivity: () => ({
+        control: async (request) => hopControl(await panel.hops.handle(), request),
+      }),
       localHold: () => ({
         hold: localHold,
         front: () =>
@@ -497,6 +533,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       // Форж проводок — из каталога, решённого здесь один раз: ядро в процессе теста с
       // `panelAppData` не читает настоящие настройки форжа человека.
       panelAppData: panel.appData,
+      // Места сеансов машины (этап 11, P141): одна очередь мест на ядро, порт — исполнителю.
+      allocator: allocator.conductor(),
       ...(options.loop === undefined ? {} : { loop: options.loop }),
     });
     splitEnv = conductor.split;
@@ -600,6 +638,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
               });
             },
             () => observer.stop(),
+            () => agents.stop(),
+            () => allocator.stop(),
             () => registry.closeAll(),
             () => configWiring?.dispose(),
             () => unregisterCore(layout.procs, bootId, procsDeps),
@@ -627,6 +667,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
         () => supervisor.close(),
         () => shutdownRoutes(routes, note),
         () => observer.stop(),
+        () => agents.stop(),
+        () => allocator.stop(),
         () => registry.closeAll(),
         () => configWiring?.dispose(),
         () => (registered ? unregisterCore(layout.procs, bootId, procsDeps) : undefined),

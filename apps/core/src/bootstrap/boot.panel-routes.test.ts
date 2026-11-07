@@ -30,7 +30,7 @@ const STATE = {
     dlp: { enabled: false },
     endpointProfiles: [
       { id: 'own-1', name: 'Свой', baseUrl: 'http://127.0.0.1:9/v1', apiKind: 'openai-compat' },
-      // Профиль контура — маршрут `gateway:`, второго через шлюз панели нет.
+      // Профиль контура — маршрут `gateway:`, второго через шлюз ядра нет.
       {
         id: 'contour-c1',
         baseUrl: 'http://127.0.0.1:9',
@@ -127,7 +127,7 @@ describe('boot: api-key and gateway routes from the panel app data (W2b)', () =>
       // Объявленное пресетом едет к звену: база его не знает.
       manifest: { anthropicMessages: 'messages' },
       // Правила тела верха (этап 10, C3): совместимому шлюзу полей не ставится; перевод в поток —
-      // общая настройка `platformGateway.forceStream`, без записи «да», как у шлюза панели прежде.
+      // общая настройка `platformGateway.forceStream`, без записи «да», как у прежнего шлюза в панели.
       requestRules: { forceStream: true, set: [], streamless: [] },
     });
     expect(routeHopFacts(profiles, 'gateway:c2').dlpRequired).toBe(false);

@@ -37,8 +37,9 @@ export function queueSectionOf(
   const section = view.doc.queue ?? {};
   const config = { ...defaults };
   for (const field of QUEUE_FIELDS) {
-    if (rejected.has(field)) config[field] = last[field];
-    else if (section[field] !== undefined) config[field] = section[field];
+    // `sessionSlots` (этап 11) необязательно: нет ни прежнего, ни своего — действует умолчание.
+    const value = rejected.has(field) ? last[field] : section[field];
+    if (value !== undefined) Object.assign(config, { [field]: value });
   }
   return { config, issues };
 }

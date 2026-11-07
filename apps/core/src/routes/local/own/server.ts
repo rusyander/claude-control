@@ -60,9 +60,10 @@ export interface RouterServerSpec {
   signal?: AbortLike;
   /**
    * Запуск не удался, а снятие того, что успело родиться, не доказано (остаток или таблица не
-   * прочитана): текст — освобождению, которое не отдаст слот за живым деревом (F-64).
+   * прочитана): текст — освобождению, которое не отдаст слот за живым деревом (F-64). `since` —
+   * начало запуска (мс Unix): раньше него процесса с этой меткой нет, повторное снятие ищет от него.
    */
-  onLeftover?: (text: string, root: ProcessIdentity | number) => void;
+  onLeftover?: (text: string, root: ProcessIdentity | number, since: number) => void;
 }
 
 export interface RunningRouter {
@@ -151,11 +152,15 @@ function leftoverOf(report: TreeStopReport): string | undefined {
 export async function stopStarted(
   root: ProcessIdentity | number,
   marker: string,
+  since?: number,
 ): Promise<TreeStopReport> {
   const known = typeof root !== 'number';
   return stopTree(known ? root : { pid: root, start: `${UNREAD_START}${root}` }, {
     group: known,
     marker: { name: TREE_MARKER_NAME, value: marker },
+    // Номер без старта — поиск по метке от начала запуска: нечитаемый старожил пользователя
+    // (PowerToys) иначе делал бы любое снятие недоказанным, и слот держался бы вечно.
+    ...(since === undefined ? {} : { bornAfterMs: since }),
   });
 }
 
@@ -170,8 +175,9 @@ export async function stopStarted(
 export async function stopLeftover(
   root: ProcessIdentity | number,
   marker: string,
+  since?: number,
 ): Promise<string | undefined> {
-  const report = await stopStarted(root, marker);
+  const report = await stopStarted(root, marker, since);
   const left = leftoverOf(report);
   if (left || typeof root !== 'number') return left;
   if (report.targeted.some((id) => id.pid === root)) return undefined;
@@ -191,12 +197,14 @@ export async function startRouter(spec: RouterServerSpec): Promise<RunningRouter
   writeFileAtomic(presetPath, presetIni(spec.models));
   const env = { ...helperEnv(), ...spec.env, [TREE_MARKER_NAME]: spec.marker };
   const failures: string[] = [];
+  // Метка одна на все попытки: процессы с ней рождаются не раньше этого мига.
+  const since = Date.now();
   // Неудачный запуск снят не доказанно — дальше не пробовать: второй сервер рядом с остатком.
   const stopped = async (root: ProcessIdentity | number): Promise<boolean> => {
-    const left = await stopLeftover(root, spec.marker);
+    const left = await stopLeftover(root, spec.marker, since);
     if (!left) return true;
     failures.push(`stop after the failed start: ${left}`);
-    spec.onLeftover?.(left, root);
+    spec.onLeftover?.(left, root, since);
     return false;
   };
   for (let attempt = 0; attempt < (spec.attempts ?? 3); attempt += 1) {

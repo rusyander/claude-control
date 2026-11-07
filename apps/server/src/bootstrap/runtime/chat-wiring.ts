@@ -7,12 +7,16 @@ import { appendLimitRun } from '../../domains/chat/limit-journal/limit-journal.t
 import { appendLoweredRun } from '../../domains/chat/lowered-journal/lowered-journal.ts';
 import { appendRunInput, moveRunInputs } from '../../domains/chat/run-input/run-input.ts';
 import { localLayerRun } from '../../domains/local-layer/local-layer.ts';
-import { coreContourRoutes } from '../../domains/platform/routing/core-contour.ts';
+import { chatContourRoutes } from '../../domains/platform/routing/core-contour.ts';
 import { createCoreCaller } from '../../domains/core-ask/core-ask.ts';
 import { createCoreChatBook } from '../../domains/chat/core-run/core-chat-book.ts';
 import { createCoreChatPort } from '../../domains/chat/core-run/core-chat-port.ts';
 import { CoreChatRun } from '../../domains/chat/core-run/core-run.ts';
-import type { CorePermissionDesk } from '../../domains/chat/core-run/core-run.types.ts';
+import type {
+  CoreChatRunDeps,
+  CorePermissionDesk,
+} from '../../domains/chat/core-run/core-run.types.ts';
+import { getActiveProviderId } from '../../providers/registry.ts';
 import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 
 /**
@@ -27,7 +31,12 @@ export interface ChatWiring {
   chatSession: ChatSession;
 }
 
-export function wireChat(ctx: ServerContext): ChatWiring {
+/** Слой панели разговору не-Claude CLI (W3-17a); runtime отдаёт его позже — зовётся при ходе. */
+export interface ChatWiringExtra {
+  foreignCarry?: CoreChatRunDeps['foreignCarry'];
+}
+
+export function wireChat(ctx: ServerContext, extra: ChatWiringExtra = {}): ChatWiring {
   /**
    * Ход чата Claude идёт задачей ядра (этап 10, F2, проход 3): своего процесса CLI у чата
    * панели нет. Ядро не запущено или отказало — ошибка хода с причиной, без отката на прежний
@@ -41,10 +50,23 @@ export function wireChat(ctx: ServerContext): ChatWiring {
     // Ответ человека записало ядро (команда браузера): карточка брокера снимается им же.
     settle: (runId, toolUseId, reply) => void chatSession.decidePermission(runId, toolUseId, reply),
   };
-  // Маршрут контура для чата Claude — по галочке «Чат» (а при обязательном контуре всегда),
-  // свежим на каждую задачу: тот же перевод выбора человека, что у агента тестов и чужих CLI.
-  const routes = (asked: string) => coreContourRoutes(ctx.store, 'chat', 'claude', asked);
-  const chatRuns = new ChatRunRegistry(() => new CoreChatRun({ port, book, desk, routes }));
+  // Маршрут контура — по галочке CLI разговора: Claude «Чат», другой CLI своя `foreign:<cli>` (а при
+  // обязательном контуре всегда), свежим на каждую задачу. CLI разговора (W3-17a): новый —
+  // активный провайдер, начатый — свой.
+  const routes = (asked: string, cli: string) => chatContourRoutes(ctx.store, cli, asked);
+  const activeCli = () => getActiveProviderId(ctx.store);
+  const foreignCarry = extra.foreignCarry;
+  const chatRuns = new ChatRunRegistry(
+    () =>
+      new CoreChatRun({
+        port,
+        book,
+        desk,
+        routes,
+        activeCli,
+        ...(foreignCarry ? { foreignCarry } : {}),
+      }),
+  );
   /**
    * Права и автоподтверждение чатов — один объект на сервер, а не на маршрут:
    * продолжение в чистой сессии заводит прогон мимо маршрута отправки, и

@@ -487,18 +487,7 @@ export function checkpointInside(cwd: string, checkpoint: string): string | unde
 }
 
 /** Запуск прогона продолжения; `false` — под этим ключом прогон уже идёт. */
-export type HandoffStart = (input: {
-  chatId: string;
-  prompt: string;
-  cwd: string;
-  /**
-   * Название для разговора, который придётся ЗАВЕСТИ. У Claude не нужно вовсе —
-   * там продолжение живёт под ключом, а имя приходит из транскрипта; у чужого
-   * CLI разговор заводится панелью, и без имени в списке оказывался бы ключ
-   * вида `new-1758…`. Знает его не всякий зовущий, поэтому необязательно.
-   */
-  title?: string;
-}) => boolean;
+export type HandoffStart = (input: { chatId: string; prompt: string; cwd: string }) => boolean;
 
 export interface StartHandoffInput {
   proposal: HandoffProposal;

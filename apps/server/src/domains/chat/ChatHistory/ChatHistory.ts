@@ -88,7 +88,7 @@ const TITLE_MAX = 70;
  * до разреза, остаётся как был: его прячет маска модели, а человеку список показывает
  * его собственные слова.
  */
-function cutTitle(text: string): string {
+export function cutTitle(text: string): string {
   if (text.length <= TITLE_MAX) return text;
   const cut = findSecretSpans(text).find((span) => span.start < TITLE_MAX && span.end > TITLE_MAX);
   if (!cut) return text.slice(0, TITLE_MAX);

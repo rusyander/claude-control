@@ -23,6 +23,7 @@ import { readApiToken } from '../../lib/api-token/api-token.ts';
 import { parseBody } from '../../lib/request-body.ts';
 import { errorBody } from '../../lib/server-text/server-text.ts';
 import { localError } from '../../domains/local-models/errors.ts';
+import { withHopActivity } from '../../domains/local-models/activity.ts';
 import type { Inject } from '../../domains/local-models/connect.ts';
 import type { LocalModels } from '../../domains/local-models/service.ts';
 import type { KitService } from '../../domains/kit/service.ts';
@@ -139,13 +140,18 @@ export function registerLocalModelsRoutes(
   });
 
   /**
-   * Что сервер моделей делает с запросом чата: этап, разбор промпта, токены ответа, тишина
-   * (L6). Дёшево: без `/props` и без опроса слотов — их держит присмотр за запросом, а
-   * спящий сервер опрос слотов разбудил бы. Плюс замер слоя против окна (ревью B1): действие
-   * подбирается, только когда слой не влезает, и по железу из кеша — карта опрашивается заново
-   * лишь по истечении его срока.
+   * Что сервер моделей делает с запросом чата (L6): какой сервер, последний отказ и — по ленте
+   * звена ядра (`/api/core/local/activity`, этап 11) — этап, разбор промпта, токены ответа,
+   * застой. Панель сама сервер не опрашивает: его опрашивает хост звеньев, и только пока
+   * запрос в полёте. Ядро молчит или прежней версии — ответ без этапа, чат судит по отказу.
    */
-  app.get('/api/local-models/activity', () => local.activity());
+  app.get('/api/local-models/activity', async (request) => {
+    const base = await local.activity();
+    const core = await injectFor(request)({ method: 'GET', url: '/api/core/local/activity' }).catch(
+      () => undefined,
+    );
+    return core?.status === 200 ? withHopActivity(base, core.body, Date.now()) : base;
+  });
 
   /** «Перезапустить» из чата: тот же сервер заново, теми же параметрами. */
   app.post('/api/local-models/server/restart', async (_request, reply) => {

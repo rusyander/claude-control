@@ -53,11 +53,11 @@ function setup(
 ): {
   deps: CarryDeps;
   chains: HandoffChains;
-  opened: { title: string; cwd: string; prompt: string }[];
+  opened: { cwd: string; prompt: string }[];
   notices: [string, string][];
 } {
   const chains = options.chains ?? new HandoffChains();
-  const opened: { title: string; cwd: string; prompt: string }[] = [];
+  const opened: { cwd: string; prompt: string }[] = [];
   const notices: [string, string][] = [];
   const deps: CarryDeps = {
     chains,
@@ -161,7 +161,6 @@ describe('carryChat', () => {
     expect(outcome).toMatchObject({ carried: true, chatId: 'new-1', chainDepth: 1 });
     expect(opened).toHaveLength(1);
     expect(opened[0]?.cwd).toBe(CWD);
-    expect(opened[0]?.title).toBe('Переименование · работа · продолжение');
     expect(opened[0]?.prompt).toContain('.agent/PROGRESS.md');
     expect(opened[0]?.prompt).toContain('Переименуй foo в bar');
   });
@@ -177,6 +176,8 @@ describe('carryChat', () => {
     expect(origin?.[0]).toBe('codex::work1');
     expect(origin?.[1]).toContain('не закрыт и не изменён');
     expect(origin?.[1]).toContain(`перенос 1 из ${HANDOFF_MAX_CHAIN}`);
+    // Имя продолжения — в заметке источника: по нему человек найдёт новый разговор.
+    expect(origin?.[1]).toContain('«Переименование · работа · продолжение»');
   });
 
   it('заметка, которой некуда лечь, не выдаётся за сказанную', async () => {

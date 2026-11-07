@@ -103,13 +103,29 @@ function dlpDialect(verdict: Exclude<Verdict, Refusal>): Dialect | undefined {
   return verdict.channel.via === 'login' ? undefined : verdict.channel.dialect;
 }
 
-function judge(c: CompatAdapterTriple, policy: CompatPolicy): Verdict {
-  const { adapter, route, model } = c;
+/** Что судье нужно от переходника до маршрута: заготовка ли он и есть ли где встать судье ядра. */
+export type CompatAdapterGate = Pick<CompatAdapter, 'built'> & {
+  caps: Pick<CompatAdapter['caps'], 'preToolHooks' | 'denyOverlay'>;
+};
+
+/**
+ * Первые проверки судьи — по одному переходнику, ни маршрут, ни набор их не меняют. Тот же суд
+ * зовёт `set-cli` до суда набора (W3-17a): CLI без судьи называется `no_core_hook`, а не
+ * «вне набора» — набор без маршрута входа такого CLI тут ни при чём.
+ */
+export function compatAdapterGate(adapter: CompatAdapterGate): RefusalCode | null {
   // Заготовка не запускается ни по какому маршруту: отказ раньше разрешений и фактов маршрута.
-  if (adapter.built === false) return { code: 'adapter_not_built' };
+  if (adapter.built === false) return 'adapter_not_built';
   // Ни хука до вызова, ни оверлея запретов (03:60, P81): судье ядра встать некуда — по фактам
   // возможностей, никогда по имени CLI. Чинит это только переходник, поэтому раньше набора.
-  if (!adapter.caps.preToolHooks && !adapter.caps.denyOverlay) return { code: 'no_core_hook' };
+  if (!adapter.caps.preToolHooks && !adapter.caps.denyOverlay) return 'no_core_hook';
+  return null;
+}
+
+function judge(c: CompatAdapterTriple, policy: CompatPolicy): Verdict {
+  const { adapter, route, model } = c;
+  const gate = compatAdapterGate(adapter);
+  if (gate) return { code: gate };
   if (!allowedBy(policy.allowed, c)) return { code: 'not_allowed' };
   // Сервер человека лежит — его поднимает только человек: свой код, а не «маршрут недоступен».
   if (unavailable(route)) {

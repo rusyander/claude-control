@@ -2,7 +2,7 @@ import type { OutgoingHttpHeaders, ServerResponse } from 'node:http';
 import { hopText as serverText } from '../texts.ts';
 
 /**
- * Ручка `/v1/responses` шлюза звена (MAP D; перенос из шлюза панели, этап 10) — диалект Codex.
+ * Ручка `/v1/responses` шлюза звена (MAP D; перенос из шлюза в панели, этап 10) — диалект Codex.
  * В звене перевод тот же, вход другой: мост `bridge.ts` получает переведённое тело прямо, а не
  * подменённый поток запроса, поэтому прежней обёртки запроса здесь нет.
  *

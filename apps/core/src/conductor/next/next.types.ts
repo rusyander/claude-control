@@ -1,6 +1,7 @@
 import type { WindowDecision } from '@agentdeck/contracts/core/economy';
 import type { Scenario } from '@agentdeck/contracts/core/scenario';
 import type { StepRecord, TaskFoldState } from '../../journal/reduce/reduce.types.ts';
+import type { XlChildren } from '../split/xl-wait.ts';
 
 /**
  * Типы `conductor/next` (02 §Conductor loop): чистый суд над свёрткой журнала и живыми фактами
@@ -22,7 +23,9 @@ export type RoundWhy =
 
 /**
  * Что дальше после отказа шага публикации (`step.ended.reason` = `publish-refused: <next>: …`):
- * `regate` — ядро перебазировало ветку, дерево сменилось, финальная проверка заново.
+ * `regate` — ядро перебазировало ветку, дерево сменилось, финальная проверка заново;
+ * `reintegrate` — голова единицы не в последнем зелёном слиянии интеграции (Q-1 s11): новый круг
+ * ворот интеграции, публикация ждёт его зелёного (`gates/integrated.ts`).
  */
 export const PUBLISH_NEXT = [
   'fix-step',
@@ -30,6 +33,7 @@ export const PUBLISH_NEXT = [
   'ask',
   'wait-forge',
   'regate',
+  'reintegrate',
 ] as const;
 export type PublishNext = (typeof PUBLISH_NEXT)[number];
 
@@ -102,6 +106,8 @@ export type NextAction =
    * `answered` — хвост после публикации сдан.
    */
   | { kind: 'end-unit'; unitId: string; event: UnitEndEvent; reason: string }
+  /** Родитель XL: части, чьи зависимости сданы, становятся дочерними задачами (Q-2 s11). */
+  | { kind: 'launch-children'; names: string[] }
   | { kind: 'finish-task' }
   | { kind: 'fail-task'; reason: string }
   | { kind: 'cancel-task'; reason: string }
@@ -133,10 +139,21 @@ export interface NextInput {
   /** Выученный предел токенов по `stepId` (p90 × 1.5, `economy/budget`); нет — только сценарий. */
   learnedTokens?: Readonly<Record<string, number>>;
   /**
+   * Шаги, ждущие места сеанса (этап 11, P141), с причиной: суд ждёт их, а не велит `run-step` на
+   * каждой строке задачи — иначе ждущая единица заслоняла бы соседей, держащих место. Сеанс,
+   * отдавший место на вопросе человеку и ждущий его назад, тоже стоит.
+   */
+  seats?: Readonly<Record<string, string>>;
+  /**
    * Стена сейчас — срок ожидания форжа (`publish.backoff`) считается по стене строки; нет —
    * срок считается истёкшим (чистый суд без часов не держит публикацию вечно).
    */
   nowMs?: number;
+  /**
+   * Дети XL этой задачи (Q-2 s11, `split/xl-wait.ts`): есть — родитель кончается по ним, а не
+   * на запуске; нет — задача не родитель XL.
+   */
+  children?: XlChildren;
 }
 
 /**

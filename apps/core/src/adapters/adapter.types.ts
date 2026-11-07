@@ -9,6 +9,7 @@ import type {
   SkillMode,
   UserLayerInventory,
 } from '@agentdeck/contracts/core/user-layer';
+import type { AgentEndHow, BgEndHow, BgKind } from '@agentdeck/contracts/core/agents';
 import type { SendImage } from '@agentdeck/contracts/core/ask';
 import type { LocalLayerCarry, SettingSource } from '@agentdeck/contracts/core/session-carry';
 import type { Identity } from '../session-host/protocol.ts';
@@ -89,6 +90,12 @@ export interface PlatformDenyFacts {
   coreHome: string;
   /** Файлы токенов вне дома ядра (токен панели, хранилище ключей форджа). */
   tokenFiles: readonly string[];
+  /**
+   * Очередь машины вне дома ядра (`allocator-wiring/machine.ts`: места сеансов, факты окна всех
+   * ядер) — ни чтения, ни правки: подложенный факт окна ставит отсрочку всей машине, мусорное или
+   * удалённое место останавливает выдачу либо отдаёт чужое место.
+   */
+  machineQueue?: string;
   /** Инструменты записи форджа по полному имени MCP (маски `mcp__<server>__*` допустимы). */
   forgeMcpTools?: readonly string[];
   /** Серверы MCP человека шага, говорящие с форжем (`adapters/forge/mcp-tools.ts`): только чтение. */
@@ -220,6 +227,18 @@ export interface SessionLayerCarry {
   localLayer?: LocalLayerCarry;
 }
 
+/**
+ * Как сеанс запущен на деле — для описи слоя (`inventory`): в `on` CLI исполняет хуки сам, и не
+ * только из файлов настроек — плагины набора панели (`carry.plugins`, `--plugin-dir`), локальный
+ * слой, включённые плагины человека; источники настроек сужены `sources` / `carry.settingSources`.
+ * Нет поля — опись слоя человека как есть (оценка, ключ замера), без того, что даёт сеанс.
+ */
+export interface InventorySession {
+  ran: LayerMode;
+  sources?: 'user';
+  carry?: SessionLayerCarry;
+}
+
 export interface SessionSpec {
   sessionId: string;
   /** Каталог сеанса в доме ядра. */
@@ -289,6 +308,11 @@ export interface SessionSpec {
   recorder?: { command: string; log: string };
   /** Рычаги экономии шага (`config.economy`, s10 p8; чат их не получает); нет — решает CLI. */
   economy?: SessionEconomy;
+  /**
+   * Сеанс без следа (замер базы): разговор CLI не ложится в хранилище человека — иначе проба
+   * встаёт строкой «AGENTDECK_BASE_PROBE …» в списке чатов панели. Как — `CliAdapter.ephemeral`.
+   */
+  ephemeral?: true;
 }
 
 /**
@@ -434,7 +458,70 @@ export type AdapterEvent =
       reason: string;
       cliInitiated: boolean;
     }
-  | { type: 'error'; code: AdapterErrorCode; detail: string };
+  | { type: 'error'; code: AdapterErrorCode; detail: string }
+  | AgentSpawnedEvent
+  | AgentEndedEvent
+  | BgStartedEvent
+  | BgEndedEvent;
+
+/**
+ * Субагент, запущенный сеансом (этап 11, P146): строка задачи CLI (`task_started`) + вход его
+ * вызова (модель, усилие, вводная). `kind: 'other'` — тип задачи, ядру незнакомый, назван в
+ * `subagentType`.
+ */
+export interface AgentSpawnedEvent {
+  type: 'agent.spawned';
+  cliTaskId: string;
+  toolUseId: string;
+  parentToolUseId: string | null;
+  kind: 'subagent' | 'other';
+  subagentType: string | null;
+  model: string | null;
+  effort: string | null;
+  background: boolean;
+  depth: number | null;
+  /** Вводная как её прислал CLI — без маски и обрезки: их делает запись журнала. */
+  brief: string | null;
+}
+
+export interface AgentEndedEvent {
+  type: 'agent.ended';
+  cliTaskId: string;
+  toolUseId: string;
+  how: AgentEndHow;
+  /** Итог CLI (`task_notification.usage`); `null` — не назван. */
+  usage: { totalTokens: number; toolUses: number; durationMs: number } | null;
+  summary: string | null;
+}
+
+/** Фоновая работа сеанса (P148): оболочка, монитор, незнакомый тип (`other`). */
+export interface BgStartedEvent {
+  type: 'bg.started';
+  itemId: string;
+  cliTaskId: string | null;
+  toolUseId: string;
+  parentToolUseId: string | null;
+  kind: BgKind;
+  /** Команда или описание без маски и обрезки — их делает запись журнала. */
+  excerpt: string;
+  outputFile?: string;
+  pid?: number;
+  /**
+   * Стена начала, как её назвал поток: время строки, выпустившей начало (результат вызова), или
+   * конец задачи, если она кончилась раньше результата. Нет — время записи.
+   */
+  startedAt?: number;
+}
+
+export interface BgEndedEvent {
+  type: 'bg.ended';
+  itemId: string;
+  how: BgEndHow;
+  exitCode?: number;
+  /** Стена конца, как её назвал CLI (`task_updated.patch.end_time`); нет — время записи. */
+  endedAt?: number;
+  summary?: string;
+}
 
 export type AdapterErrorCode = 'fresh-required' | 'model-error' | 'exited' | 'protocol';
 
@@ -454,6 +541,11 @@ export interface TurnUsage {
   model?: string;
   /** Ход подагента CLI (строка с `parent_tool_use_id`): своей сессии ядра у него нет. */
   subagent?: boolean;
+  /**
+   * Вызов-родитель хода (P149): строка — ход субагента этого вызова, `null` — главный контекст
+   * (строка CLI назвала `parent_tool_use_id: null`); нет поля — поток родителя не назвал.
+   */
+  parentToolUseId?: string | null;
   /**
    * Остаток хода: итог CLI (`result`) больше суммы сообщений хода — разница одной строкой,
    * чтобы свёртка сошлась с итогом CLI, не удваивая записанное.
@@ -529,6 +621,11 @@ export interface AdapterLadder {
   models: readonly string[];
   aliases: readonly (readonly string[])[];
   efforts: readonly string[];
+  /**
+   * Потолок автоматики (`CliRunFacts.autoCeiling`): эскалация и подъём по обучению выше этой
+   * модели не идут. Нет — модель сама не поднимается, только усилие.
+   */
+  autoCeiling?: string;
 }
 
 export interface CliAdapter {
@@ -591,6 +688,13 @@ export interface CliAdapter {
    */
   toolsNone?: true;
   /**
+   * Как переходник держит `SessionSpec.ephemeral` без следа: `flag` — доказанный флаг CLI не
+   * пишет разговор на диск вовсе; `session-home` — флага нет, но дом CLI свой у каждого сеанса
+   * (внутри `spec.dir`), хранилища человека разговор не касается. Нет — замер базы этот CLI не
+   * запускает: проба оставила бы чат в его хранилище.
+   */
+  ephemeral?: 'flag' | 'session-home';
+  /**
    * Переходник умеет `layer.sources = 'user'` (этап 10, F6) — доказанным флагом CLI: только слой
    * человека из дома конфигурации пина, без проекта и предков. Нет — дорога отказывает до запуска.
    */
@@ -600,6 +704,12 @@ export interface CliAdapter {
    * отказ дороги `session-carry-unsupported` с его именем, а не тихая потеря.
    */
   sessionCarry?: { readonly [K in keyof SessionLayerCarry]?: true };
+  /**
+   * Переходник издаёт `agent.*` / `bg.*` из строк задач своего потока (этап 11, P148) — доказанным
+   * случаем набора соответствия (`background-facts.test.ts`, P121). Нет — субагенты и фон этого
+   * CLI в дереве агентов не видны, а не «их не было».
+   */
+  backgroundFacts?: true;
   /** Слой чтения CLI с закреплённым окружением задачи (`SessionSpec.env.pin`); без IO. */
   readLayer(pin: Record<string, string>): ReadLayer;
   /**
@@ -607,7 +717,12 @@ export interface CliAdapter {
    * для `layer.changed`, решения `layer-run`, ключа замера базы, кандидатов безымянного отказа
    * хука и модели определения подагента. Нет метода — опись неизвестна (`null`), не «пусто».
    */
-  inventory?(pin: Record<string, string>, cwd: string, repoLayer: boolean): UserLayerInventory;
+  inventory?(
+    pin: Record<string, string>,
+    cwd: string,
+    repoLayer: boolean,
+    session?: InventorySession,
+  ): UserLayerInventory;
   /**
    * Серверы MCP человека в конфиге самого CLI (P73, s10 p7) — предложения строгого списка шага,
    * в порядке CLI пользователь/проект. Нет метода — CLI предложений не даёт (не «пусто»).

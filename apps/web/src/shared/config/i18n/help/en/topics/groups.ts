@@ -21,7 +21,13 @@ export const groupsEn: typeof groupsRu = {
     whatCore: 'The core runs tasks',
     whatCoreText:
       'The top of the page lists core tasks: each shows its title, state and a link to its ' +
-      'timeline. A new task starts right here: the launch form shows the estimate before the start.',
+      'timeline. A new task starts right here: the launch form shows the estimate before the start. ' +
+      'Groups of tasks are now built by the core: several items (tracker tickets, for example) ' +
+      'with the “Several items” source and “As a group” become a task per item sharing one ' +
+      'group, each run by the same lead as a single task. The group launch button launches all ' +
+      'its tasks; one that did not launch is named with the reason, and a retry launches only ' +
+      'it — that is also how a launch interrupted midway is finished. An XL goal becomes child ' +
+      'tasks once the split is approved — see the “Core tasks” help, section “The lead”.',
     whatReadOnly: 'Former groups are read only',
     whatReadOnlyText:
       'Former groups can no longer be run, edited, switched on or created. A card shows the name, ' +

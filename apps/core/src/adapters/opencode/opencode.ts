@@ -245,6 +245,8 @@ export function createOpencodeAdapter(options: RpcAdapterOptions = {}): RpcAdapt
       layer: opencodeLayer,
       refuse: refuseOpencode,
       plan: planOpencode,
+      // Флага без записи у ACP opencode нет; хранилище — под своими XDG_*_HOME сеанса.
+      ephemeral: 'session-home',
       toolsNone: true,
       dialectInput: ({ spec, permit }): AcpDialectData => ({
         cli: opencodeRunFacts.id,

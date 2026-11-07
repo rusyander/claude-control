@@ -118,7 +118,7 @@ export const contourEn: Record<ContourMessageCode, string> = {
   'contour-tools-no-call': 'The model answered without calling a tool.',
   'contour-tools-failed': 'The tools probe did not pass: {{reason}}.',
   'contour-required-gateway-down':
-    "The contour «{{title}}» is required, and the panel's gateway is down — the run was not started, so that it would not slip into the vendor cloud. Press «Start the gateway» on the contour card (the «Contour» section) or switch the provider back to the default one.",
+    'The contour «{{title}}» is required, and the core gateway is down — the run was not started, so that it would not slip into the vendor cloud. Press «Start the gateway» on the contour card (the «Contour» section) or switch the provider back to the default one.',
   'contour-required-no-token':
     'The contour «{{title}}» is required, and its key is not saved — the run was not started, so that it would not slip into the vendor cloud. Save the key («Configure» on the contour card → the «Key» step) or switch the provider back to the default one.',
   'contour-required-cli-config':

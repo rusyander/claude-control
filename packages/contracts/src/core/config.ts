@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { commandIssues, commandProofSchema, type CommandIssue } from './commands.ts';
 import { registryId, uuidv7 } from './ids.ts';
 import { GRANT_OPS } from './journal-data.ts';
+import { LEAD_PARALLELISM_MAX, leadSectionSchema } from './lead.ts';
 import { SESSION_STEP_KINDS } from './model-tools.ts';
 
 /**
@@ -25,6 +26,7 @@ export const CONFIG_SECTIONS = [
   'cliPaths', // этап 9 (F9): явный путь к CLI переходника, выигрывает у поиска
   'mcpPicks', // s10 p7 (P73): какие серверы MCP человека отданы виду шага
   'economy', // s10 p8: рычаги экономии шагов задачи (порт рычагов групп панели)
+  'lead', // этап 11 (D11): профиль ведения — умолчания машины и правки по проектам
 ] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
@@ -100,6 +102,8 @@ export const QUEUE_LIMITS = {
   shareCap: { min: 0, max: 1, integer: false },
   agingMs: { min: 0, max: 24 * 3_600_000, integer: true },
   beatMs: { min: 50, max: 600_000, integer: true },
+  /** Этап 11 (P141): места сеансов задач на машине; не больше предела параллельности ведущего. */
+  sessionSlots: { min: 0, max: LEAD_PARALLELISM_MAX, integer: true },
 } as const;
 const queueField = (f: keyof typeof QUEUE_LIMITS) => {
   const { min, max, integer } = QUEUE_LIMITS[f];
@@ -111,6 +115,7 @@ export const queueSectionSchema = z.looseObject({
   shareCap: queueField('shareCap'),
   agingMs: queueField('agingMs'),
   beatMs: queueField('beatMs'),
+  sessionSlots: queueField('sessionSlots'),
 });
 
 // ── новые разделы этапа 7 ────────────────────────────────────────────────────────────────
@@ -188,6 +193,7 @@ export const CONFIG_SECTION_SCHEMAS = {
   cliPaths: cliPathsSchema,
   mcpPicks: mcpPicksSchema,
   economy: economySectionSchema,
+  lead: leadSectionSchema,
 } as const satisfies Record<ConfigSection, z.ZodType>;
 
 export const coreConfigSchema = z.strictObject({
@@ -203,6 +209,7 @@ export const coreConfigSchema = z.strictObject({
   cliPaths: cliPathsSchema.optional(),
   mcpPicks: mcpPicksSchema.optional(),
   economy: economySectionSchema.optional(),
+  lead: leadSectionSchema.optional(),
 });
 export type CoreConfig = z.infer<typeof coreConfigSchema>;
 

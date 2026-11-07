@@ -77,6 +77,8 @@ export interface RpcAdapterDef<I extends object = object> {
   transcriptPresent?: CliAdapter['transcriptPresent'];
   /** План снимает все встроенные инструменты CLI при `spec.tools === 'none'` (`CliAdapter.toolsNone`). */
   toolsNone?: true;
+  /** Сеанс без следа (`CliAdapter.ephemeral`); план и вход диалекта читают `spec.ephemeral` сами. */
+  ephemeral?: CliAdapter['ephemeral'];
   /** Вход диалекта из запуска — только данные: он же ложится в `rpc-view.json` каталога сеанса. */
   dialectInput(context: RpcLaunchContext): I;
   /** Диалект по входу: один путь у живого насоса и у повтора вида сеанса. */
@@ -125,6 +127,7 @@ export function createRpcAdapter<I extends object>(
     ...(def.ownsTranscript ? { ownsTranscript: def.ownsTranscript } : {}),
     ...(def.transcriptPresent ? { transcriptPresent: def.transcriptPresent } : {}),
     ...(def.toolsNone ? { toolsNone: true as const } : {}),
+    ...(def.ephemeral ? { ephemeral: def.ephemeral } : {}),
     readLayer: (pin) => def.readLayer(pin),
     ...(def.mcpSource ? { mcpSource: def.mcpSource } : {}),
     bindEndpoint: (channel, endpoint, limits) => def.bindEndpoint(channel, endpoint, limits),

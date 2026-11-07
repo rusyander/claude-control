@@ -1,5 +1,6 @@
 import type { CommandKind } from '@agentdeck/contracts/core/commands';
 import type { DecisionClassId } from '@agentdeck/contracts/core/decisions';
+import type { EstimateReply } from '@agentdeck/contracts/core/estimate';
 import type { ActionKind, JournalDataV1, JournalKind } from '@agentdeck/contracts/core/journal';
 import type { ModelToolName } from '@agentdeck/contracts/core/model-tools';
 import type { DialectId } from '@agentdeck/stub-model';
@@ -246,4 +247,9 @@ export interface StubTask {
   routeWindowTokens?: number;
   /** `grantRequired` конфига ядра для репозитория задачи (P130); нет — пусто. */
   grantRequired?: { globs: string[]; ops: ('edit' | 'exec-db')[] }[];
+  /**
+   * Оценка запуска (этап 11, F3): строка `estimate-history` на создании, как её пишет оценка
+   * дирижёра; нет — строки нет (расход сверх оценки молчит, судить не с чем).
+   */
+  estimate?: EstimateReply['estimate'];
 }

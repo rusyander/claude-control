@@ -129,6 +129,7 @@ describe('panel-agent actions: projects & chat', () => {
     const entries = new Map<string, CoreChatEntry>();
     const book = {
       get: (id: string) => entries.get(id),
+      cliOf: (id: string) => entries.get(id)?.cli,
       set: (id: string, entry: CoreChatEntry) => void entries.set(id, entry),
       forget: (id: string) => void entries.delete(id),
     };

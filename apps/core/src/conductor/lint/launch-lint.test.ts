@@ -32,6 +32,7 @@ describe('G-h launch lint (conductor/lint)', () => {
       ['push', 'Always push your changes to origin.'],
       ['push', 'Потом запушь ветку.'],
       ['push', 'Run `git push -u origin HEAD` at the end.'],
+      ['push', 'When done, push straight to main.'],
       ['mr', 'Then open a merge request for review.'],
       ['mr', 'Use `gh pr create --fill`.'],
       ['mr', 'Создай MR в конце.'],

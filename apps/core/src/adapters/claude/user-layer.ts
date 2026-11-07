@@ -185,7 +185,7 @@ export const HOOK_TIMEOUT_S = 60;
  * у описи, у записи `observe` и у отказа хука в потоке. Чужое имя события (`x & calc`) — не
  * событие CLI: в записи его нет (F-33), CLI его и не вызвал бы.
  */
-export function keyedHooks(layer: UserLayer): ObservedHook[] {
+export function keyedHooks(layer: Pick<UserLayer, 'hooks' | 'hookFiles'>): ObservedHook[] {
   const out: ObservedHook[] = [];
   for (const [event, groups] of Object.entries(layer.hooks)) {
     if (!HOOK_EVENTS.has(event)) continue;

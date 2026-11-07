@@ -1,8 +1,10 @@
 import type { FastifyReply } from 'fastify';
 import { join } from 'node:path';
 import { isUuidv7 } from '@agentdeck/contracts/core/ids';
+import { isGroupItem } from '../conductor/intake/index.ts';
 import type { TaskRegistry } from '../conductor/tasks.ts';
 import type { JournalLine } from '@agentdeck/contracts/core/journal';
+import type { TaskListItem } from '@agentdeck/contracts/core/panel-api';
 import { linesAfter } from '../journal/read-view.ts';
 import type { TaskFoldState } from '../journal/reduce/reduce.types.ts';
 import { apiError } from './errors.ts';
@@ -16,6 +18,36 @@ import { apiError } from './errors.ts';
 export interface TaskRead {
   state: TaskFoldState;
   lines: JournalLine[];
+}
+
+/**
+ * Список задач с фильтром группы (этап 11, W3-18): `groupId` — пункты одной группы (тот же набор,
+ * что `group.taskIds` ответа оценки, `isGroupItem`), `parentTaskId` — дочерние задачи XL. Поля связи
+ * строка несёт всегда, с фильтром и без (ревью N-1): они в сводке реестра, второго чтения нет.
+ */
+export function taskListOf(
+  registry: TaskRegistry,
+  query: { groupId?: string; parentTaskId?: string },
+): TaskListItem[] {
+  return registry
+    .list()
+    .filter(
+      (item) =>
+        (query.groupId === undefined || isGroupItem(item, query.groupId)) &&
+        (query.parentTaskId === undefined || item.parentTaskId === query.parentTaskId),
+    );
+}
+
+/** Строка запроса списка: только строки, пустая — как нет фильтра. */
+export function taskListQuery(query: unknown): { groupId?: string; parentTaskId?: string } {
+  const q = (query ?? {}) as Record<string, unknown>;
+  const pick = (v: unknown) => (typeof v === 'string' && v.length > 0 ? v : undefined);
+  const groupId = pick(q.groupId);
+  const parentTaskId = pick(q.parentTaskId);
+  return {
+    ...(groupId !== undefined ? { groupId } : {}),
+    ...(parentTaskId !== undefined ? { parentTaskId } : {}),
+  };
 }
 
 export function readTask(

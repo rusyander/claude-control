@@ -4,6 +4,24 @@ import type { ChatMessage } from '@agentdeck/contracts';
 import type { QueuedMessage } from '@shared/lib/agent-runs';
 
 /**
+ * Пузырь ушедшего сообщения поверх текущих оптимистичных — ровно один на `sent.id`.
+ * Буфер прогона после переподключения отдают заново с нулевого seq: `nextTurn` прошлых ходов
+ * приходят ещё раз, и без проверки их пузыри вставали в ленту дублями.
+ */
+export function withQueuedBubble(
+  current: ChatMessage[],
+  sent: QueuedMessage,
+  timestamp: string,
+): ChatMessage[] {
+  const id = `pending-queue-${sent.id}`;
+  if (current.some((message) => message.id === id)) return current;
+  return [
+    ...current,
+    { id, role: 'user', blocks: [{ type: 'text', text: sent.prompt }], timestamp },
+  ];
+}
+
+/**
  * Ушедшее из очереди сообщение — в ленту сразу, как обычную свою реплику.
  *
  * Пока агент занят, дописанное живёт пузырём-призраком «Уйдёт следующим». В
@@ -21,14 +39,7 @@ export function useQueuedAsPending(
   useEffect(() => {
     if (!sent || sent.id === seenRef.current) return;
     seenRef.current = sent.id;
-    setPending((current) => [
-      ...current,
-      {
-        id: `pending-queue-${sent.id}`,
-        role: 'user',
-        blocks: [{ type: 'text', text: sent.prompt }],
-        timestamp: new Date().toISOString(),
-      },
-    ]);
+    const timestamp = new Date().toISOString();
+    setPending((current) => withQueuedBubble(current, sent, timestamp));
   }, [sent, setPending]);
 }

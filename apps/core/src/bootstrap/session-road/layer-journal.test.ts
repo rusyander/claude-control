@@ -76,10 +76,15 @@ async function stand() {
   const dir = join(root, 'session');
   for (const d of [config, cwd, dir]) mkdirSync(d, { recursive: true });
   writeFileSync(join(config, 'CLAUDE.md'), 'one\n');
-  const base = (layer: LayerRun, sessionId = newId()): LayerStartInput => {
+  const base = (
+    layer: LayerRun,
+    sessionId = newId(),
+    spec: LayerStartInput['spec'] = {},
+  ): LayerStartInput => {
     const stepId = newId();
     startSession(task, stepId, sessionId);
     return {
+      spec,
       task,
       stepId,
       sessionId,
@@ -113,6 +118,29 @@ async function stand() {
 }
 
 describe('journalLayerStart', () => {
+  it('the start inventory lists hooks of the session plugins (panel kit) and hashes their file', async () => {
+    const s = await stand();
+    const kit = join(s.root, 'kit');
+    mkdirSync(join(kit, 'hooks'), { recursive: true });
+    mkdirSync(join(kit, '.claude-plugin'), { recursive: true });
+    writeFileSync(join(kit, '.claude-plugin', 'plugin.json'), '{"name":"agentdeck-kit"}');
+    const group = { matcher: 'Agent|Task', hooks: [{ type: 'command', command: 'node run.mjs' }] };
+    writeFileSync(
+      join(kit, 'hooks', 'hooks.json'),
+      JSON.stringify({ hooks: { PreToolUse: [group] } }),
+    );
+    const on = run({ asked: 'on', ran: 'on' });
+    const bare = journalLayerStart(s.base(on));
+    const withKit = journalLayerStart(s.base(on, newId(), { carry: { plugins: [kit] } }));
+    expect(bare?.hooks.map((h) => h.key)).toEqual([]);
+    expect(withKit?.hooks.map((h) => [h.key, h.matcher])).toEqual([
+      ['agentdeck-kit:PreToolUse.0.0', 'Agent|Task'],
+    ]);
+    // Набор в сеансе — другой слой: хеш другой, `layer.changed` пишется.
+    expect(withKit?.hash).not.toBe(bare?.hash);
+    expect(lines(s.task).filter((l) => l.kind === 'layer.changed')).toHaveLength(2);
+  });
+
   it('layer.changed on the first session of a CLI and on a changed hash only; decision every session', async () => {
     const s = await stand();
     journalLayerStart(s.base(run()));

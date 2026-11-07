@@ -1,6 +1,12 @@
+import type { ReconMap } from '@agentdeck/contracts/core/lead';
 import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { BriefPart } from './brief.types.ts';
-import type { FindingRef, HandoffInput, NotebookRef } from './sections.types.ts';
+import type {
+  FindingRef,
+  HandoffInput,
+  NotebookRef,
+  PreviousAttemptRef,
+} from './sections.types.ts';
 
 /**
  * Секции брифа, что собирает ядро само (порт логики панели, панель не импортируется):
@@ -96,6 +102,76 @@ const titleOf = (title: string): string => {
   const first = title.trim().split('\n')[0]?.replace(/\s+/g, ' ').trim() ?? '';
   return first.length > TITLE_MAX ? `${first.slice(0, TITLE_MAX - 1)}…` : first;
 };
+
+/** Байты текста карты разведки в брифе (корзина `recon` 3k минус заголовок и запас). */
+export const RECON_BRIEF_BYTES = 2600;
+/** Файлов карты в брифе; остальные — числом. */
+export const RECON_FILES_LISTED = 10;
+/** Предел секции прошлой попытки. */
+export const PREVIOUS_ATTEMPT_BYTES = 600;
+
+/**
+ * Карта разведки для шага плана (W2-7, P136): строки карты целиком, файлы — путь и причина (не
+ * больше `RECON_FILES_LISTED`), тесты и владельцы — числом и первыми именами. Тел файлов здесь нет
+ * никогда: карта — указатель, модель открывает файлы сама. Строки сверх бюджета выпадают ЦЕЛИКОМ, и
+ * секция говорит, сколько их не показано (не обрезка посреди строки, 03:136).
+ */
+export function reconMapPart(map: ReconMap, stepId: string): BriefPart | null {
+  const wanted: string[] = [`Recon map (step ${stepId}):`, ...map.lines.map((l) => `- ${l}`)];
+  if (map.files.length > 0) {
+    wanted.push(`Files (${map.files.length}):`);
+    for (const f of map.files.slice(0, RECON_FILES_LISTED)) wanted.push(`- ${f.path}: ${f.why}`);
+    const more = map.files.length - RECON_FILES_LISTED;
+    if (more > 0) wanted.push(`+${more} more files in the recon step record.`);
+  }
+  if (map.tests.length > 0) wanted.push(`Tests (${map.tests.length}): ${map.tests.join(', ')}`);
+  if (map.owners.length > 0) wanted.push(`Owners: ${map.owners.join(', ')}`);
+  const kept: string[] = [];
+  let used = 0;
+  let omitted = 0;
+  for (const line of wanted) {
+    const size = bytesOf(line) + 1;
+    if (omitted > 0 || used + size > RECON_BRIEF_BYTES) {
+      omitted++;
+      continue;
+    }
+    kept.push(line);
+    used += size;
+  }
+  if (kept.length <= 1) return null;
+  if (omitted > 0) kept.push(`(${omitted} more map lines omitted: read the recon step record.)`);
+  return { id: 'recon-map', text: kept.join('\n'), from: FROM };
+}
+
+/**
+ * Чем кончилась прошлая попытка шага (W2-10): запись провала — по id, причина — одной строкой.
+ * Пересказа провала нет: модель открывает запись сама, а бриф остаётся в 600 байтах.
+ */
+export function previousAttemptPart(ref: PreviousAttemptRef): BriefPart | null {
+  const why = ref.why.replace(/\s+/g, ' ').trim();
+  if (why === '' && ref.recordId === null) return null;
+  const head = [
+    `Previous attempt of step ${ref.stepId} failed`,
+    ref.recordId ? ` (record ${ref.recordId})` : '',
+    ref.tier ? `; now running at tier ${ref.tier}` : '',
+    '.',
+  ].join('');
+  // Запас — ровно то, что ляжет вокруг причины: «\nWhy: » и многоточие обрезки (3 байта UTF-8).
+  const room = PREVIOUS_ATTEMPT_BYTES - bytesOf(head) - bytesOf('\nWhy: …');
+  // Режем по кодовым точкам, а не по единицам UTF-16: срез посреди суррогатной пары оставил бы
+  // одинокую половину, и в бриф ушёл бы «�» вместо символа.
+  let reason = '';
+  let used = 0;
+  for (const ch of why) {
+    const size = bytesOf(ch);
+    if (used + size > room) break;
+    reason += ch;
+    used += size;
+  }
+  if (reason !== why) reason = `${reason.trimEnd()}…`;
+  const text = reason === '' ? head : `${head}\nWhy: ${reason}`;
+  return { id: 'previous-attempt', text, from: FROM };
+}
 
 /** Открытые находки: номер и заголовок; тело — в файле находок копии. */
 export function findingsPart(findings: readonly FindingRef[], file: string): BriefPart | null {

@@ -14,7 +14,7 @@ import {
   livenessNow,
   RUNNER_BYTES,
 } from './__fixtures__/fake-gpu.ts';
-import { ownDir } from './__fixtures__/own-options.ts';
+import { ownDir, realStartToken } from './__fixtures__/own-options.ts';
 import {
   liveRunners,
   recorder,
@@ -120,13 +120,15 @@ describe('P10 local:own — the core dies mid-lease, the model server and the sl
       { rid: 'slot', kind: 'model-slot', ref: 'slot:gpu', release: 'task-end' },
       { rid: 'srv', kind: 'model-server', ref: '', release: 'task-end' },
     ];
+    // Старт прошлого сервера — токен настоящего вида и старше чужого процесса: номер переиспользован.
+    const oldStart = await realStartToken();
     const server = {
-      identity: { pid: foreignPid, start: 'not-its-start' },
+      identity: { pid: foreignPid, start: oldStart },
       origin: 'http://127.0.0.1:9',
       port: 9,
       marker: 'srv',
     };
-    resources[1]!.ref = `pid ${foreignPid} start not-its-start ${server.origin}`;
+    resources[1]!.ref = `pid ${foreignPid} start ${oldStart} ${server.origin}`;
     mkdirSync(workDir, { recursive: true });
     writeFileSync(
       join(workDir, 'lease.json'),

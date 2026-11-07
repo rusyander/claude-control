@@ -41,11 +41,13 @@ export function McpPicksCard() {
   const reply = offers.data;
   const kinds = useMemo(() => (reply ? pickKinds(reply) : []), [reply]);
   const [draft, setDraft] = useState<PicksDraft>({});
-  // Черновик заново из настройки при каждом её чтении (после записи — тоже): правки не копятся
-  // поверх чужой записи, а 409 показывает, что настройку изменили.
+  // Черновик заново из настройки, когда меняется записанный выбор MCP (после записи — тоже):
+  // правки не копятся поверх чужой записи, а 409 показывает, что настройку изменили. Новое чтение
+  // без смены выбора (запись ведения соседней карточкой) несохранённую отметку не трогает.
+  const stored = reply ? JSON.stringify(draftOf(config.data, kinds)) : null;
   useEffect(() => {
-    if (reply) setDraft(draftOf(config.data, kinds));
-  }, [config.data, kinds, reply]);
+    if (stored !== null) setDraft(JSON.parse(stored) as PicksDraft);
+  }, [stored]);
 
   let body;
   if (offers.isLoading || config.isLoading) {
@@ -69,7 +71,11 @@ export function McpPicksCard() {
         draft={draft}
         canSave={!!config.data}
         saving={save.isPending}
-        onDraft={setDraft}
+        onDraft={(next) => {
+          // Правка после записи: «Сохранено» уже не про то, что на экране.
+          if (save.isSuccess) save.reset();
+          setDraft(next);
+        }}
         onSave={() => {
           if (config.data) save.mutate({ view: config.data, draft, kinds });
         }}

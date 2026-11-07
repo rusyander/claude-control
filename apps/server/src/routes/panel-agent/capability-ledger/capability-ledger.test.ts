@@ -49,6 +49,15 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'POST /api/core/review-link': 'human:rights',
   'POST /api/core/supervisor/restart': 'human:consent',
   'POST /api/core/supervisor/autostart': 'human:consent',
+  // Этап 11 (P151): оценка СОЗДАЁТ задачу (была `internal:preview`); запись настройки и
+  // сценариев ядра (были `gap:P3`) — кнопки человека.
+  'POST /api/core/estimate': 'human:rights',
+  'POST /api/core/config': 'human:rights',
+  'POST /api/core/scenarios': 'human:rights',
+  // Этап 11, W3-19 (новые строки): сброс ключа обучения ведущего — кнопка человека в настройках;
+  // выгрузка журнала агентов задачи — файл человеку, как выгрузка разговора.
+  'POST /api/core/learned/reset': 'human:rights',
+  'GET /api/core/tasks/:id/agents/export': 'human:download',
   // Решение владельца 30.09: перезапуск dev-сервера обрывает живые ходы.
   'POST /api/dev-restart': 'human:dev-restart',
   // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.

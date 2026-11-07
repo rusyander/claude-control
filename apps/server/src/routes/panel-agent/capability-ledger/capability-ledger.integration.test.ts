@@ -52,6 +52,24 @@ const ROGUES: AnyPanelAction[] = [
   rogue('rogue_core_command', {
     route: () => ({ method: 'POST', url: '/api/core/commands', body: { kind: 'pause' } }),
   }),
+  // Оценка ядра СОЗДАЁТ задачу (этап 11, P151): до правки строка `internal:preview` пускала её
+  // при сборке карточки любого действия, а исполнение отказывало «не выдано» вместо «человек».
+  rogue('rogue_core_estimate', {
+    route: () => ({ method: 'POST', url: '/api/core/estimate', body: { title: 't' } }),
+  }),
+  rogue('rogue_core_estimate_prep', {
+    route: async (_input, inject) => {
+      await inject({ method: 'POST', url: '/api/core/estimate', body: { title: 't' } });
+      return { method: 'GET', url: '/api/projects' };
+    },
+  }),
+  // Запись настройки и сценариев ядра — кнопка человека, а не «ещё не сделано» (`gap:P3`).
+  rogue('rogue_core_config', {
+    route: () => ({ method: 'POST', url: '/api/core/config', body: {} }),
+  }),
+  rogue('rogue_core_scenario', {
+    route: () => ({ method: 'POST', url: '/api/core/scenarios', body: {} }),
+  }),
   // Маршрута нет в реестре вовсе — закрыто по умолчанию.
   rogue('rogue_unknown', { route: () => ({ method: 'POST', url: '/api/nowhere' }) }),
   // Маршрут есть, но отдан другому действию (`save_rule`).
@@ -109,6 +127,9 @@ describe('capability ledger in the panel-agent executor', () => {
     app.post('/api/chat/:chatId/auto-approve', count('POST /api/chat/:chatId/auto-approve'));
     app.post('/api/nowhere', count('POST /api/nowhere'));
     app.post('/api/core/commands', count('POST /api/core/commands'));
+    app.post('/api/core/estimate', count('POST /api/core/estimate'));
+    app.post('/api/core/config', count('POST /api/core/config'));
+    app.post('/api/core/scenarios', count('POST /api/core/scenarios'));
     app.post('/api/rules', count('POST /api/rules'));
     app.delete('/api/projects/:id', count('DELETE /api/projects/:id'));
     app.get('/api/env/reveal', count('GET /api/env/reveal', { value: 'x' }));
@@ -181,16 +202,21 @@ describe('capability ledger in the panel-agent executor', () => {
       /human’s \(POST chat\/:chatId\/auto-approve\)/,
     ],
     ['rogue_core_command', 'POST /api/core/commands', /human’s \(POST core\/commands\)/],
+    ['rogue_core_estimate', 'POST /api/core/estimate', /human’s \(POST core\/estimate\)/],
+    ['rogue_core_estimate_prep', 'POST /api/core/estimate', /human’s \(POST core\/estimate\)/],
+    ['rogue_core_config', 'POST /api/core/config', /human’s \(POST core\/config\)/],
+    ['rogue_core_scenario', 'POST /api/core/scenarios', /human’s \(POST core\/scenarios\)/],
     ['rogue_unknown', 'POST /api/nowhere', /POST nowhere, which is not in the ledger/],
     ['rogue_borrow', 'POST /api/rules', /POST rules is not granted to rogue_borrow/],
     ['rogue_prep_write', 'POST /api/rules', /rogue_prep_write may only read POST rules/],
   ])('%s: refused before %s ran', async (name, route, text) => {
     const result = await call(name);
+    // Счётчик первым: отказ, прозвучавший после исполненного маршрута, — тоже красное.
+    expect(hits[route] ?? 0).toBe(0);
     expect(result.outcome).toBe('failed');
     expect(result.message).toMatch(text);
     expect(result.message).toContain('Nothing was executed.');
     expect(result.message).not.toMatch(/\/api\//);
-    expect(hits[route] ?? 0).toBe(0);
   });
 
   it.each([

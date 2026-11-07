@@ -17,7 +17,7 @@ import { bindingOf } from '../conductor/model-tools/binding.ts';
 import { handleModelTool } from '../conductor/model-tools/model-tools.ts';
 import { runAction } from '../conductor/outbox.ts';
 import { ACTION_READ_CLASS, reconcileTask } from '../conductor/reconcile.ts';
-import { deps, openFresh, tempDir } from '../journal/__fixtures__/journal-harness.ts';
+import { deps, fakeClock, openFresh, tempDir } from '../journal/__fixtures__/journal-harness.ts';
 import { STALE_MS } from '../journal/lease.ts';
 import { readJournalLines } from '../journal/read-lines.ts';
 import { resume, type LiveTask } from '../journal/resume.ts';
@@ -251,6 +251,8 @@ function worldFor(kind: ActionKind): World {
   if (kind === 'process-start') {
     const name = 'AGENTDECK_STUB_TASK_MARK';
     const value = newId();
+    // Мир родился до эффекта: процесс старше него метку не несёт (та же граница, что у сверки).
+    const scope = { bornAfterMs: Date.now() };
     return {
       target: 'stub-task sleeper',
       hint: `${name}=${value}`,
@@ -263,7 +265,16 @@ function worldFor(kind: ActionKind): World {
       },
       // Помеченные процессы в таблице ОС: второй запуск сверкой был бы вторым живым процессом.
       count: async () => {
-        const found = await sweepMarker(name, value);
+        const found = await sweepMarker(
+          name,
+          value,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          scope,
+        );
         if ('unknown' in found) throw new Error(found.unknown);
         return 'absent' in found ? 0 : found.value.length;
       },
@@ -286,7 +297,10 @@ describe('outbox crash inside every action (P86)', () => {
       .filter(([, , , p]) => !READ_BY_FORGE.includes(p.action))
       .map(([id, i, task, p]) => [p.action, p.cut, id, i, task, p] as const),
   )('%s killed %s: the new core reconciles by fact', async (kind, cut, _id, _i, _task, probe) => {
-    const fresh = await openFresh();
+    // Часы журнала — настоящие: сверка `process-start` судит таблицу процессов ОС по времени
+    // `action.started`, и поддельное время из прошлого делает «младше действия» каждый процесс
+    // машины — закрытый чужой (PowerToys с правами администратора) уводил её в «неизвестно».
+    const fresh = await openFresh(undefined, deps({ clock: fakeClock(Date.now()) }));
     const world = worldFor(kind);
     let task: LiveTask | undefined;
     try {

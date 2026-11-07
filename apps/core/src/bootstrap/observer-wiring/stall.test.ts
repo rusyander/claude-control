@@ -315,6 +315,36 @@ describe('stage 8 stall near-misses: quiet that is not a stall (F9, F13)', () =>
     expect(moves(out).slice(-1)).toEqual(['silent:live→quiet']);
   });
 
+  it('stage 11 stall near-miss: agent/bg lifecycle rows after a permission question do not answer it; only turn progress does', async () => {
+    const r = await rig();
+    r.ev(TURN);
+    r.ev({ type: 'permit.request', requestId: 'p1', raw: {} });
+    r.ev({
+      type: 'bg.started',
+      itemId: 'b1',
+      cliTaskId: 'b1',
+      toolUseId: 'tu_bg',
+      parentToolUseId: null,
+      kind: 'background-shell',
+      excerpt: 'npm run dev',
+    });
+    r.ev({ type: 'bg.ended', itemId: 'b1', how: 'exit', exitCode: 0 });
+    r.ev({
+      type: 'agent.ended',
+      cliTaskId: 'a1',
+      toolUseId: 'tu_agent',
+      how: 'completed',
+      usage: null,
+      summary: null,
+    });
+    await at(r, 30 * MIN);
+    expect(moves(r)).toEqual(['spawned:starting→live']);
+    // Ответ пришёл: поток пошёл дальше (текст хода) — ожидания права больше нет, тишина считается.
+    r.ev({ type: 'text.delta', text: 'ok' });
+    await at(r, 32 * MIN);
+    expect(moves(r).slice(-1)).toEqual(['silent:live→quiet']);
+  });
+
   it('stage 8 stall near-miss: an open human question on the step is waiting for a human, not silence', async () => {
     const r = await rig();
     r.ev(TURN);

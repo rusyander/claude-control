@@ -53,3 +53,26 @@ describe('human points — path classes match absolute and ./ targets (F-46, F-0
     expect(decideHumanPoint(ask({ kind: 'path', target }, true), policy)).toMatchObject({ point });
   });
 });
+
+describe('human points — the intake card confirmation names item 10, like launch (P133)', () => {
+  const core = (
+    source: HumanPointInput['source'],
+    point: HumanPointInput['point'],
+  ): HumanPointInput => ({
+    ...ask(null, false),
+    source,
+    point,
+  });
+
+  it('intake naming item 10 is accepted, intake naming another item is refused', () => {
+    expect(decideHumanPoint(core('intake', 10), policy)).toMatchObject({
+      point: 10,
+      reason: 'intake names item 10',
+    });
+    expect(decideHumanPoint(core('intake', 8), policy)).toMatchObject({
+      point: null,
+      refused: true,
+      reason: 'intake may name items 10, not 8',
+    });
+  });
+});

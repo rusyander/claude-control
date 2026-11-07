@@ -1,6 +1,8 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { factReason, hasValue } from '../../../../platform/os-kind.ts';
+import { identityOfPid } from '../../../../platform/process-identity.ts';
 import type { OwnRouteOptions } from '../own.ts';
 import { fakeGpu, GIB, RUNNER_BYTES } from './fake-gpu.ts';
 
@@ -8,6 +10,18 @@ import { fakeGpu, GIB, RUNNER_BYTES } from './fake-gpu.ts';
 // перезапущенное ядро обязано видеть тот же каталог аренд, ту же память и тот же сервер.
 
 export const ROUTER = fileURLToPath(new URL('./fake-router.mjs', import.meta.url));
+
+/**
+ * Токен старта настоящего вида для личности сервера в записи аренды на диске: старт этого
+ * процесса теста (FILETIME, секунды `lstart`, тики загрузки). Сервер с ним и чужим номером —
+ * мёртвый по личности, как у ядра в работе. Выдуманный токен (`'gone'`) не даёт порога поиску по
+ * метке, и любой нечитаемый процесс пользователя (PowerToys) делал бы остановку недоказанной.
+ */
+export async function realStartToken(): Promise<string> {
+  const self = await identityOfPid(process.pid);
+  if (!hasValue(self)) throw new Error(`own identity unread: ${factReason(self)}`);
+  return self.value.start;
+}
 
 export interface OwnDir {
   dir: string;

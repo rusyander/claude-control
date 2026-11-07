@@ -7,8 +7,6 @@ export const chatEn: Record<ChatMessageCode, string> = {
     'The turn has already ended — the mid-turn message was not sent; the panel will send it the usual way.',
   'run-group-paused':
     'The group is paused — the queued message was not sent so as not to wake it. It stays in the queue.',
-  'chat-send-foreign-provider':
-    '{{provider}} is the active CLI: this route runs only the Claude chat. The message was not sent — write in the {{provider}} chat on the computer or switch the active CLI to Claude.',
   'run-empty-prompt': 'The message is empty — nothing to send.',
   'run-unsupported-upload':
     'Unsupported attachments: {{names}}. The message was not sent. Allowed extensions: {{supported}}.',
@@ -136,7 +134,5 @@ export const chatEn: Record<ChatMessageCode, string> = {
   'chat-keep-session-gone':
     'The new conversation is no longer running — there is no turn to move back to the old one.',
   'chat-pin-invalid': 'The pinned field must be true or false',
-  'agent-id-invalid': 'Invalid subagent id',
-  'agent-not-found': 'Subagent not found',
   'chat-pin-child': 'A group chat is pinned together with its parent',
 };

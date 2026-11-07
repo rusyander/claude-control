@@ -71,17 +71,6 @@ describe('перезапуск переполненного разговора',
     registerChatHandoffRoutes(app, ctx, {
       runs: registry,
       chains: new HandoffChains(),
-      coreChats: {
-        // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-        estimate: async () => ({
-          ok: false as const,
-          code: 'no-core',
-          message: 'no core in this test',
-        }),
-        command: async () => {
-          throw new Error('no core in this test');
-        },
-      },
       session: new ChatSession(registry),
     });
     await app.ready();

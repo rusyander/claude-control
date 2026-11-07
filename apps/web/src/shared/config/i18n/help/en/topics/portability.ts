@@ -146,9 +146,11 @@ export const portabilityEn = {
         'transcript, which the panel never writes into — it can only speak into a ' +
         'RUNNING run, and a conversation without one says so in the outcome instead ' +
         'of passing it over in silence. A new conversation at another CLI is a core ' +
-        '“chat” task with that CLI in the same directory, visible in “Core chat”. Its ' +
+        '“chat” task with that CLI in the same directory: a new conversation in the chat ' +
+        'list (and on the phone) that survives a page reload and reopens from the list in ' +
+        'the same session. Its ' +
         'feed is the core journal, and the panel does not write into it: the task ' +
-        'itself tells about the carry. Its session gets what a panel turn would: the ' +
+        'itself tells about the carry, without the panel’s service instructions to the model. Its session gets what a panel turn would: the ' +
         'Tests section line when the directory is a project with tests, and the panel ' +
         'kit for that CLI — Qwen Code gets its own settings directory, Codex the rules ' +
         'as text after the core brief. Groups bound to the directory are not ' +

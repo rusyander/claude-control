@@ -2,7 +2,7 @@ import type { PlatformGatewayEvent, PlatformViolationAction } from '@agentdeck/c
 import type { HopTraceEntry } from '../host.types.ts';
 
 /**
- * След запроса контура в форме, которую читала карточка шлюза панели (`PlatformGatewayEvent`).
+ * След запроса контура в форме, которую читала карточка шлюза ядра (`PlatformGatewayEvent`).
  * Строится из той же строки следа звена (`HopTraceEntry`) плюс фактов кадров контура — второго
  * источника истины у следа нет. Тел, ключей и текста, на котором сработали проверки, здесь нет.
  */

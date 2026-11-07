@@ -58,6 +58,10 @@ export interface ChatSession {
   pending: ChatMessage[];
   setPending: Dispatch<SetStateAction<ChatMessage[]>>;
   refresh: (id?: string) => void;
+  /** «Новый чат» в открытом проекте: черновик в его каталоге (W3-17a — в `/chat`, не `/core/chat`). */
+  enterProjectDraft: () => void;
+  /** «Новый чат» без проекта: чистый лист в песочнице. */
+  startNewChat: () => void;
   openChat: (chat: ChatSummary) => void;
   /** Открыть разговор по ключу — когда на руках только id, а не сам чат. */
   openChatById: (id: string) => void;
@@ -268,6 +272,20 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.sessionId, isRunning, chats, activeChat]);
 
+  const startNewChat = (): void => {
+    // Разговор, которого вкладка ждала из списка, больше не нужен: человек
+    // только что сказал, что хочет чистый лист, и доехавший список не должен
+    // подменять его прежним разговором.
+    restoreRef.current = undefined;
+    setActiveChat(undefined);
+    const draft = `new-${Date.now()}`;
+    setDraftId(draft);
+    setPreview(undefined);
+    setPending([]);
+    workspace.rememberView(getWorkspaceState().activeTabId, draft);
+    writeUrl(undefined);
+  };
+
   const openChat = (chat: ChatSummary): void => {
     setActiveChat(chat);
     setDraftId(undefined);
@@ -394,6 +412,8 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     pending,
     setPending,
     refresh,
+    enterProjectDraft,
+    startNewChat,
     openChat,
     openChatById,
     openProject,

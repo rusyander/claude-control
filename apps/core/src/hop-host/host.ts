@@ -9,7 +9,8 @@ import { allocatePort, isReserved, LOOPBACK } from '../platform/ports.ts';
 import { createLivenessProbe, identityOfPid } from '../platform/process-identity.ts';
 import { registerServer, unregisterServer } from '../platform/procs-file.ts';
 import { ensureTokenFile } from '../platform/token-file.ts';
-import { rulesFrom, type HopContext } from './context.ts';
+import { createActivityBook, type ActivityOptions } from './activity/activity.ts';
+import { maskingOn, rulesFrom, upstreamAuth, upstreamUrl, type HopContext } from './context.ts';
 import { CONTOUR_SPEND_FILE, ContourBook } from './contour-book/contour-book.ts';
 import { panelContours } from './contour-book/panel-state.ts';
 import { adoptPanelSummarized } from './gateway/summarized-ledger/summarized-ledger.ts';
@@ -47,6 +48,8 @@ export interface HopHostDeps {
   price?: PriceOf;
   fetchImpl?: typeof fetch;
   now?: () => number;
+  /** Пределы ленты хода локальных маршрутов (тесты сокращают шаг опроса и предел застоя). */
+  activity?: ActivityOptions;
 }
 
 export interface RunningHopHost {
@@ -185,6 +188,17 @@ export async function startHopHost(
       thinkTail: new ThinkTailModels(stateDir),
       now,
       ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+      activity: createActivityBook({
+        ...deps.activity,
+        now,
+        ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
+        // Лента зовёт их только на запросе — к тому времени `ctx` уже собран.
+        links: {
+          url: upstreamUrl,
+          auth: (entry, credential) => upstreamAuth(ctx, entry, credential),
+          masking: maskingOn,
+        },
+      }),
     };
     let recorded: Partial<HopPorts> = {};
     try {
@@ -254,6 +268,7 @@ export async function startHopHost(
     const close = (): Promise<void> =>
       (closed ??= (async () => {
         clearInterval(flushTimer);
+        ctx.activity?.stop();
         ctx.spend.flush();
         ctx.contours.flush();
         await userGateway?.stop();

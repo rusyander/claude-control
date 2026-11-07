@@ -50,6 +50,29 @@ const JSON_DETAIL: Record<string, string> = {
     model: 'stub-model',
     rids: ['r-1', 'r-2'],
   }),
+  'intake-lint': JSON.stringify([
+    {
+      rule: 'push',
+      source: 'PROJ-12',
+      line: 4,
+      text: 'push to main',
+      instead: 'the core publishes',
+    },
+  ]),
+  'lead-session-wait': JSON.stringify({
+    waitMs: 240000,
+    why: '5 session(s) must end first, 4 at a time: 2 × median 120000 ms over 3 sessions',
+    capacity: 4,
+    holders: 6,
+    slotWaiters: 2,
+    medianMs: 120000,
+    samples: 3,
+  }),
+  'xl-children': JSON.stringify({ taskIds: ['t-1', 't-2'], problems: [] }),
+  'integration-conflict': JSON.stringify({
+    files: ['iface.ts'],
+    between: ['agentdeck/api', 'agentdeck/web'],
+  }),
 };
 
 describe('сигнал на экране', () => {
@@ -88,6 +111,30 @@ describe('сигнал на экране', () => {
     });
   });
 
+  it('линт приёма: «источник:строка правило» — подпись, текст строки — значение', () => {
+    const { detail } = signalView(sig('intake-lint', JSON_DETAIL['intake-lint']!));
+    expect(detail).toEqual({
+      form: 'facts',
+      facts: [{ label: 'PROJ-12:4 push', value: 'push to main' }],
+    });
+  });
+
+  it('дочерние задачи XL и конфликт интеграции: списки задач, файлов и веток', () => {
+    expect(signalView(sig('xl-children', JSON_DETAIL['xl-children']!)).detail).toEqual({
+      form: 'facts',
+      facts: [{ key: 'tasks', items: ['t-1', 't-2'] }],
+    });
+    expect(
+      signalView(sig('integration-conflict', JSON_DETAIL['integration-conflict']!)).detail,
+    ).toEqual({
+      form: 'facts',
+      facts: [
+        { key: 'files', items: ['iface.ts'] },
+        { key: 'branches', items: ['agentdeck/api', 'agentdeck/web'] },
+      ],
+    });
+  });
+
   it('слой пользователя: режим просил → вышло, счёт предупреждений и грантов, подмены списком', () => {
     const { detail } = signalView(sig('user-layer-report', JSON_DETAIL['user-layer-report']!));
     expect(detail).toEqual({
@@ -120,6 +167,43 @@ describe('сигнал на экране', () => {
         { key: 'minutes', value: '12' },
         { key: 'tokens', value: '34000' },
         { key: 'spread', value: '20000–50000' },
+      ],
+    });
+  });
+
+  it('ожидание места сеанса: минуты, места, медиана и образцы; «не оценено» — без минут, с причиной ядра', () => {
+    const view = signalView(sig('lead-session-wait', JSON_DETAIL['lead-session-wait']!));
+    expect(view.known).toBe(true);
+    expect(view.title.key).toBe('coreTimeline.signals.titles.lead-session-wait');
+    expect(view.detail).toEqual({
+      form: 'facts',
+      facts: [
+        { key: 'waitMinutes', value: '4' },
+        { key: 'seats', value: '6 + 2 / 4' },
+        { key: 'medianMinutes', value: '2' },
+        { key: 'samples', value: '3' },
+        {
+          key: 'reasons',
+          items: ['5 session(s) must end first, 4 at a time: 2 × median 120000 ms over 3 sessions'],
+        },
+      ],
+    });
+    // Истории сеансов нет: ожидание `null` — строки минут нет, причина объясняет пустоту.
+    const unknown = JSON.stringify({
+      waitMs: null,
+      why: '4 of 4 seats taken or queued, no finished session in history',
+      capacity: 4,
+      holders: 4,
+      slotWaiters: 0,
+      medianMs: null,
+      samples: 0,
+    });
+    expect(signalView(sig('lead-session-wait', unknown)).detail).toEqual({
+      form: 'facts',
+      facts: [
+        { key: 'seats', value: '4 + 0 / 4' },
+        { key: 'samples', value: '0' },
+        { key: 'reasons', items: ['4 of 4 seats taken or queued, no finished session in history'] },
       ],
     });
   });

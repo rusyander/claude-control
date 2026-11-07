@@ -1,14 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@shared/api/query-keys';
 import type { CommandKind } from '@agentdeck/contracts/core/commands';
 import type { EstimateFields, EstimateReply } from '@agentdeck/contracts/core/estimate';
 import type { GrantConfirmation } from '@agentdeck/contracts/core/user-layer';
+import type { TaskReply } from '@agentdeck/contracts/core/panel-api';
 import {
   type CommandDraft,
   type CoreFailure,
+  coreGet,
   failureOf,
   failureOfOutcome,
+  failureReason,
+  newUuidv7,
+  sendCoreCommand,
   useCoreCommand,
   useCoreTaskEvents,
   useCoreTaskView,
@@ -16,6 +21,8 @@ import {
 import type { ReviewLinkRefused } from '@agentdeck/contracts/core/review-link';
 import { postEstimate, postReviewLink } from '../api/launchApi';
 import type { EstimateAttempt, LaunchFold, UnitDraft } from './launch.types';
+import { type GroupLaunchRow, type GroupSendResult, launchGroup } from './groupLaunch';
+import { useGroupIntake } from './useGroupIntake';
 import { attemptFor } from './launchDraft';
 import { reviewAttemptFor, reviewLinkRefusalOf, type ReviewLinkFields } from './reviewLinkDraft';
 import {
@@ -57,8 +64,15 @@ export function useLaunchFlow() {
   const [launched, setLaunched] = useState(false);
   const [reviewAttempt, setReviewAttempt] = useState<EstimateAttempt | null>(null);
   const [reviewRefusal, setReviewRefusal] = useState<ReviewLinkRefused | null>(null);
+  const [groupRows, setGroupRows] = useState<GroupLaunchRow[] | null>(null);
+  // Ключи команд запуска группы между нажатиями: повтор после частичного отказа — тем же `cmdId`.
+  const groupCmdIds = useRef(new Map<string, string>());
 
   const taskId = reply?.taskId;
+  const groupIds = reply?.group?.taskIds ?? [];
+  const grouped = groupIds.length > 1;
+  // Карточки приёма группы — одной кнопкой, пока группа не запущена (ведущий спрашивает каждую).
+  const intake = useGroupIntake(grouped ? groupIds : [], grouped && !launched);
   const stream = useCoreTaskEvents(taskId, (event) =>
     setFold((f) => foldLaunchLine(f, lineOfEvent(event))),
   );
@@ -78,6 +92,9 @@ export function useLaunchFlow() {
       setEdit(null);
       setLaunched(false);
       setCommandFailure(null);
+      setGroupRows(null);
+      groupCmdIds.current = new Map();
+      intake.reset();
     }
     setReply(got);
     // Оценка создала задачу (G5): список задач рядом с запуском (страница групп, `/core`)
@@ -165,13 +182,58 @@ export function useLaunchFlow() {
     await send('edit-split', fields as unknown as CommandDraft['fields'], 'edit-split');
   };
 
-  const blockers = reply
+  const taskBlockers = reply
     ? launchBlockers({ reply, fold, viewState: view?.state ?? null, splitDirty: dirty })
     : [];
   const launchWith = launchCommand(fold);
+  // Группа: запущенная задача 0 не закрывает кнопку — остальные задачи ещё могут ждать запуска.
+  const blockers = grouped ? taskBlockers.filter((b) => b !== 'launched') : taskBlockers;
+  const canLaunch = grouped
+    ? blockers.length === 0 && !launched
+    : launchWith !== null && blockers.length === 0;
+
+  const sendGroupCommand = async (
+    id: string,
+    next: { kind: CommandKind; fields: CommandDraft['fields'] },
+    cmdId: string,
+  ): Promise<GroupSendResult> => {
+    try {
+      const why = failureOfOutcome(await sendCoreCommand({ ...next, taskId: id, cmdId }));
+      return why === null ? { ok: true } : { ok: false, reason: failureReason(why), keep: false };
+    } catch (error) {
+      const why = failureOf(error);
+      return { ok: false, reason: failureReason(why), keep: KEEP_ATTEMPT.has(why.kind) };
+    }
+  };
+
+  /** Группа: каждая задача — та же команда запуска, по очереди; отказ одной не держит остальные. */
+  const launchAllOfGroup = async () => {
+    setBusy('launch');
+    setCommandFailure(null);
+    try {
+      const rows = await launchGroup(
+        groupIds,
+        {
+          view: async (id) => (await coreGet<TaskReply>('/tasks/:id', { id })).view ?? null,
+          send: (id, next, cmdId) => sendGroupCommand(id, next, cmdId),
+          newId: () => newUuidv7(),
+        },
+        groupCmdIds.current,
+      );
+      setGroupRows(rows);
+      if (rows.every((r) => r.status === 'started')) setLaunched(true);
+    } finally {
+      setBusy(null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.core.tasks });
+      for (const id of groupIds)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.core.task(id) });
+    }
+  };
 
   const launch = async () => {
-    if (!launchWith || blockers.length > 0) return;
+    if (!canLaunch) return;
+    if (grouped) return launchAllOfGroup();
+    if (!launchWith) return;
     if (await send(launchWith.kind, launchWith.fields, 'launch')) setLaunched(true);
   };
 
@@ -197,9 +259,16 @@ export function useLaunchFlow() {
     confirmGrant,
     granting,
     blockers,
-    canLaunch: launchWith !== null && blockers.length === 0,
+    /** Задача 0 отказана или уже идёт: её деление и гранты только для чтения (группа — тоже). */
+    closed: taskBlockers.includes('refused') || taskBlockers.includes('launched'),
+    canLaunch,
     launch,
     launched,
+    /** Группа: сколько задач запускает кнопка (`0` — одиночная задача). */
+    groupSize: grouped ? groupIds.length : 0,
+    groupRows,
+    /** Группа: подтверждение карточек приёма всех задач одной кнопкой. */
+    intake,
     busy,
     commandFailure,
   };

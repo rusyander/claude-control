@@ -39,9 +39,11 @@ function toolUses(body) {
 /**
  * Сессия шага: если шагу предложен `check` — дважды одна и та же проверка (прогон, затем повтор
  * записи на том же дереве), потом один `step_done`. Инструменты ядра у CLI отложены — сначала
- * `ToolSearch select:`; у сессий без маркера шага — короткий текст.
+ * `ToolSearch select:`; у сессий без маркера шага — короткий текст. `research` — поля `step_done`
+ * только шагу разведки (карта годится лишь ему, `STEP_DONE_KIND_FIELDS`); шаг узнаётся по строке
+ * брифа «(research, step …)».
  */
-export function stepDoneScript({ checkArgv = null, extra = {} } = {}) {
+export function stepDoneScript({ checkArgv = null, extra = {}, research = null } = {}) {
   return (ctx) => {
     const body = ctx.request.body ?? {};
     const text = JSON.stringify(body);
@@ -61,7 +63,14 @@ export function stepDoneScript({ checkArgv = null, extra = {} } = {}) {
       const args =
         need === 'check'
           ? { argv: checkArgv }
-          : { stepId, outcome: 'done', requirements: [], summary: 'stub step done', ...extra };
+          : {
+              stepId,
+              outcome: 'done',
+              requirements: [],
+              summary: 'stub step done',
+              ...extra,
+              ...(research && text.includes('(research, step ') ? research : {}),
+            };
       return { tool: { name: full, args } };
     }
     const loaded = used.some(
@@ -486,19 +495,43 @@ async function main() {
           );
           return { seqs, hidden };
         }
+        // Журнал после отчёта ещё дописывается: маршрут сессии отпускает аренду и пишет
+        // `resource.verified` (сервер остановлен, порт свободен) уже после `ended`. Снимок,
+        // взятый один раз до сверок, отставал на эту строку. Сверка берёт журнал заново и
+        // ждёт, пока лента его догонит; строка, дописанная посреди сверки, — повтор.
+        async function settled() {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            const now = journal();
+            const tail = now.at(-1).seq;
+            await until(
+              'лента догнала журнал',
+              async () =>
+                Number(
+                  await page
+                    .locator('[data-core-timeline]')
+                    .getAttribute('data-last-seq')
+                    .catch(() => 0),
+                ) >= tail,
+              30,
+            );
+            const seen = await rowsSeen();
+            if (journal().length === now.length) return { now, ...seen };
+          }
+          throw new Error('журнал задачи не утих за три сверки');
+        }
         async function checkRows(when) {
-          const { seqs, hidden } = await rowsSeen();
+          const { now, seqs, hidden } = await settled();
           const unique = new Set(seqs).size === seqs.length;
           const ordered = seqs.every((s, i) => i === 0 || s > seqs[i - 1]);
-          const known = new Set(lines.map((l) => l.seq));
+          const known = new Set(now.map((l) => l.seq));
           check(
             `${when}: строки ленты уникальны и по порядку журнала`,
             unique && ordered && seqs.every((s) => known.has(s)),
             `строк ${seqs.length}, уникальных ${new Set(seqs).size}`,
           );
           check(
-            `${when}: строки + скрытые = весь журнал (${lines.length})`,
-            seqs.length + hidden === lines.length,
+            `${when}: строки + скрытые = весь журнал (${now.length})`,
+            seqs.length + hidden === now.length,
             `строк ${seqs.length} + скрытых ${hidden}`,
           );
           return seqs;
@@ -695,10 +728,13 @@ async function main() {
           30,
         );
         const reloaded = await checkRows('после перезагрузки');
+        // Строка, дописанная ядром между сверками, видна только второй — сравнение до неё.
+        const liveTail = liveSeqs.at(-1) ?? 0;
+        const reloadedThen = reloaded.filter((s) => s <= liveTail);
         check(
           'перезагрузка: те же строки, что до неё',
-          JSON.stringify(reloaded) === JSON.stringify(liveSeqs),
-          `${reloaded.length} против ${liveSeqs.length}`,
+          JSON.stringify(reloadedThen) === JSON.stringify(liveSeqs),
+          `${reloadedThen.length} против ${liveSeqs.length}`,
         );
 
         const en = await stand.api('/settings', { method: 'PATCH', body: { language: 'en' } });

@@ -1,70 +1,13 @@
 import type { coreChatRu } from './ru.ts';
 
-/** English texts of the chat through the task core (stage 10); typed against the Russian module. */
+/** English texts of the core's launch refusal line in the `/chat` feed (stage 11, W3-17a); typed against the Russian module. */
 export const coreChatEn: typeof coreChatRu = {
-  title: 'Chat through the core',
-  subtitle:
-    'The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation.',
-  start: {
-    heading: 'New chat',
-    pickProject: 'Panel project',
-    project: 'Project folder',
-    projectHint:
-      'Starting the chat is your permission for the CLI to work in this folder; no copy is made.',
-    cli: 'CLI',
-    cliHint: 'The chat runs on the CLI you pick, with that CLI’s default model.',
-    resumeHeading: 'Continue the conversation through the core',
-    resumeNote:
-      'Conversation {{id}} continues with the same history. The core first checks that a conversation with this id belongs to this folder; otherwise it refuses and names the reason.',
-    cliResumeHint: 'The conversation continues on the CLI it started on.',
-    message: 'First message',
-    messagePlaceholder: 'What to do or ask',
-    submit: 'Start chat',
-    problems: {
-      project: 'Name the project folder.',
-      text: 'Write the first message.',
-      resume: 'Conversation id {{id}} is not valid: it contains characters that are not allowed.',
-    },
-    failed: 'The chat did not start: {{reason}}',
-    carryRefused:
-      'the panel layer (Tests line, panel kit, our-layer flags) does not fit the core session — {{detail}}',
-  },
-  thread: {
-    empty: 'The CLI session is starting — the first words will appear here.',
-    you: 'You',
-    model: 'Model',
-    sending: 'sending…',
-    tool: 'Tool',
-    toolRunning: 'running',
-    toolDone: 'done',
-    toolFailed: 'error',
-    permission: 'Permission request',
-    error: 'Session error',
-    turnFailed: 'The turn ended with an error',
-  },
-  composer: {
-    label: 'Message',
-    placeholder: 'Your message to the CLI',
-    send: 'Send',
-    end: 'Close chat',
-    endHint: 'Close the conversation: the chat step is handed in, the core task ends.',
-  },
-  status: {
-    answering: 'The model is answering…',
-    waiting: 'Waiting for your message',
-    closed: 'Chat closed',
-    dropped: 'The stream dropped — reconnecting…',
-    missing: 'The core has no such task.',
-    refused: 'The core did not serve the stream (code {{status}}).',
-    'launch-refused': 'The core refused to launch the CLI',
-  },
   launchRefused: {
     no_core_hook:
       'This CLI does not run through the core: it has no core hook — neither a pre-tool check nor deny rules — so the core cannot judge its actions ({{code}}).',
     adapter_not_built:
       'The core adapter for this CLI is not ready yet — chat through the core does not run for it ({{code}}).',
     other: 'The core refused to launch the CLI: {{code}} {{setting}}',
-    failed: 'The chat did not start — the core ended the step without a session: {{reason}}',
     kitHooks:
       'The chat did not start: this step runs your layer’s hooks as «{{mode}}» (narrowed by the scenario or a contour rule), and the panel kit adds its hooks only while they are on. Remove the hook narrowing from the contour rule, or switch the kit for this CLI to «Yours only» and turn its guards off on the «Panel kit» page.',
     kitMcp:
@@ -84,9 +27,4 @@ export const coreChatEn: typeof coreChatRu = {
     carryUnsupported:
       'The chat did not start: the {{adapter}} CLI cannot take part of the panel layer into the core session ({{fields}}: the kit, the local layer or a settings narrowing). Start the chat in Claude Code, or turn that part off for this CLI.',
   },
-  openTask: 'Core task',
-  newChat: 'New chat',
-  continueInCore: 'Continue through the core',
-  continueInCoreHint:
-    'Continue this conversation as a core chat in the project folder, with the same history; the core first checks that the conversation belongs to this folder.',
 };

@@ -9,11 +9,13 @@ import { runTask } from '../../conductor/run/run.ts';
 import type {
   ConductorHooks,
   RunEconomy,
+  XlPort,
   RunHandle,
   SessionEvents,
   StepCtx,
 } from '../../conductor/run/run.types.ts';
 import { decideRouting, presetOf, readLibraryScenario } from '../../conductor/scenario/index.ts';
+import type { SeatPort } from '../../conductor/schedule/index.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
@@ -41,9 +43,13 @@ export interface LoopsDeps {
   options?: LoopOptions;
   /** Экономика исполнителя ядра (этап 5): окно, продолжение, бриф и пакет ревью, бюджет. */
   economy?: RunEconomy;
+  /** Места сеансов (этап 11): каждый `runTask` берёт место шагу до сеанса. */
+  allocator?: SeatPort;
   measureBase?: RoadPortDeps['measureBase'];
   /** Значения окружения задачи (этап 10, F6): только память, имена — в `task.created.session`. */
   taskEnv?: { get(taskId: string): Readonly<Record<string, string>> | undefined };
+  /** Дети XL (Q-2 s11): родитель ждёт их и запускает следующую волну. */
+  xl?: XlPort;
 }
 
 export interface Loops {
@@ -303,6 +309,8 @@ export function startLoops(deps: LoopsDeps): Loops {
       now: Date.now,
       note: deps.note,
       ...(deps.economy ? { economy: deps.economy } : {}),
+      ...(deps.allocator ? { allocator: deps.allocator } : {}),
+      ...(deps.xl ? { xl: deps.xl } : {}),
       ...(options.upkeepEveryMs === undefined ? {} : { upkeepEveryMs: options.upkeepEveryMs }),
     });
     deps.note('loop.started', { taskId: task.taskId, resumed: resumed.size });

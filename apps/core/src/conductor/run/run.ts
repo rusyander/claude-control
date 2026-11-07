@@ -24,6 +24,16 @@ import type {
   StepCtx,
 } from './run.types.ts';
 import { stepWindows, windowWakeMs } from './windows.ts';
+import {
+  dropAllSeats,
+  dropSeat,
+  parkSeat,
+  pruneSeatWaits,
+  seatWaits,
+  seatsFreed,
+  unparkSeat,
+  waitsForSeat,
+} from '../schedule/lease.ts';
 
 /** Строка журнала пинга прогрева: subject — сессия, detail — причины и числа решения E. */
 export const KEEP_WARM_SIGNAL = 'keep-warm';
@@ -71,6 +81,12 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
     w?.();
   };
   const unsubscribe = task.subscribe(() => wake());
+  // Место где-то на машине освободилось (этап 11, P141): ждущие шаги пробуют снова.
+  const seats = deps.allocator;
+  const unseat = seats?.subscribe(() => {
+    seatsFreed(task);
+    wake();
+  });
 
   /**
    * Конец задачи — общий путь `closeTask`, кто бы её ни кончил: дирижёр (`finishTask`) или
@@ -90,6 +106,7 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
           live.delete(stepId);
           if (!e.ended) await deps.sessions.end(e.sessionId, 'tree');
         }
+        if (seats) dropAllSeats(task, seats, 'task ended');
         liveVersion += 1;
       },
     });
@@ -141,6 +158,9 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
       ended: () => {
         if (!entry) return;
         entry.ended = true;
+        // Сеанс кончился сам: место — сразу, не через три удара. Снятый нами (`endSession`) уже
+        // не в `live` — его место отпускает снимающий, а не поздний конец прежнего сеанса шага.
+        if (seats && live.get(s.stepId) === entry) dropSeat(task, seats, s.stepId, 'session ended');
         liveVersion += 1;
         wake();
       },
@@ -229,8 +249,18 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
   const deliverIdle = async (): Promise<void> => {
     for (const [stepId, entry] of live) {
       if (entry.ended || !entry.turnEnd || entry.checkedSeq === task.state.seq) continue;
+      // Сеанс отдал место на вопросе: слово ждёт, пока место не вернётся (P141).
+      if (seats && waitsForSeat(task, stepId)) continue;
+      const out = pendingDeliveries(readHumanLedger(task), stepId);
+      if (seats && out.length > 0 && !(await unparkSeat(task, seats, stepId))) continue;
       entry.checkedSeq = task.state.seq;
-      await sendAll(stepId, entry, pendingDeliveries(readHumanLedger(task), stepId));
+      await sendAll(stepId, entry, out);
+    }
+    // Сеанс стоит в конце хода на открытом вопросе человеку — место отдаётся (P141).
+    for (const [stepId, e] of seats ? live : []) {
+      if (e.ended || e.warming || e.turnEnd === null || e.toolsOpen > 0) continue;
+      if (Object.values(task.state.asks).some((a) => a.state === 'open' && a.stepId === stepId))
+        parkSeat(task, seats!, stepId, e.sessionId);
     }
   };
 
@@ -404,6 +434,8 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
         ([stepId, f]) => f.turnEnd !== null && !hooked.has(`${stepId}:${f.turnEnd.seq}`),
       );
       if (unseen) continue;
+      if (seats) pruneSeatWaits(task, seats);
+      const children = deps.xl?.childrenOf(task) ?? null;
       const decision = decideNext({
         state: task.state,
         scenario: ctx.scenario,
@@ -412,6 +444,8 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
         live: liveFacts,
         ...(windows ? { windows } : {}),
         ...(economy?.learnedTokens ? { learnedTokens: learnedOf(economy, ctx.scenario) } : {}),
+        ...(seats ? { seats: seatWaits(task) } : {}),
+        ...(children ? { children } : {}),
       });
       const action = decision.action;
       const key = JSON.stringify(action);
@@ -478,6 +512,7 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
     async stop(sessions = 'end') {
       stopped = true;
       unsubscribe();
+      unseat?.();
       if (timer) clearTimeout(timer);
       if (upkeepTimer) clearTimeout(upkeepTimer);
       if (windowTimer) clearTimeout(windowTimer);
@@ -492,6 +527,8 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
         live.delete(stepId);
         if (!e.ended) await deps.sessions.end(e.sessionId, 'soft');
       }
+      // Места — после сеансов; `stop('keep')` их держит: хосты живы, их прикрепит следующее ядро.
+      if (seats) dropAllSeats(task, seats, 'runner stopped');
     },
     wake,
     idle() {

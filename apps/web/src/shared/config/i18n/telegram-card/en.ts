@@ -60,7 +60,7 @@ export const telegramCardEn: typeof telegramCardRu = {
     ownerIdHint: 'Your numeric Telegram id; usually the same as above.',
     budget: 'Contour budget running out',
     budgetHint:
-      'The contour is the panel gateway to models. We write when spending nears the limit you set for it.',
+      'The contour is the core gateway to models. We write when spending nears the limit you set for it.',
     token: 'Replace the bot token',
     forget: 'Forget key',
     checkNow: 'Check connection',

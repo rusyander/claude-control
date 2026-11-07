@@ -40,6 +40,10 @@ export const integrationsEn: Record<IntegrationsMessageCode, string> = {
   'request-xray-no-key': 'Request rejected: Xray issued no key for this pair ({{field}}).',
   'request-jira-project-key-missing':
     'Request rejected: no Jira project key specified ({{field}}).',
+  'request-tracker-key-missing': 'Request rejected: a tracker issue key is required ({{field}}).',
+  'request-tracker-key-invalid':
+    'Request rejected: a tracker issue key like PROJ-12 is required ({{field}}).',
+  'integration-issue-empty': '{{system}} returned no issue {{key}}: the response body is empty.',
   'request-xray-refused': 'Request rejected: Xray refused: {{failure}} ({{field}}).',
   'request-webhook-url-missing': 'Request rejected: no webhook address specified ({{field}}).',
   'request-webhook-url-unparsed':

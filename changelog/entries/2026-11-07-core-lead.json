@@ -1,0 +1,202 @@
+{
+  "title": {
+    "ru": "Ядро ведёт задачу от постановки до плана, группа идёт тем же путём, один чат для любого CLI и история агентов из журнала ядра",
+    "en": "The core leads a task from intake to plan, a group follows the same path, one chat for every CLI and agent history from the core journal"
+  },
+  "summary": {
+    "ru": "Постановка из любого источника собирается в одну карточку, ядро определяет класс задачи, строит план и подбирает профиль ведения; запуск — одной задачей или группой, и группа ведётся тем же алгоритмом, что и одиночная задача. Чат один для всех CLI: история, список, продолжение в другом CLI и слово посреди хода работают одинаково. Окно «Агенты» и агент панели читают дерево агентов из журнала ядра.",
+    "en": "An intake from any source becomes one card, the core classifies the task, builds a plan and picks a lead profile; a launch runs as one task or as a group, and a group is led by the same algorithm as a single task. There is one chat for every CLI: history, list, continuation in another CLI and a word mid-turn behave the same. The «Agents» window and the panel agent read the agent tree from the core journal."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ведение задачи ядром: постановка из текста, трекера или нескольких пунктов собирается в одну карточку с критериями приёмки, ядро определяет класс задачи (при сомнении спрашивает в ленте), строит план и делит крупную задачу на части со сборкой в конце. В форме запуска появился блок «Ведение задачи»: профиль задаёт параллельность (2, 4 или 6), настройки сохраняются для проекта.",
+        "en": "Task leading by the core: an intake from text, a tracker or several items becomes one card with acceptance criteria, the core classifies the task (asks in the feed when unsure), builds a plan and splits a large task into parts with an integration step at the end. The launch form has a «Task leading» block: the profile sets parallelism (2, 4 or 6), settings are saved per project."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Запуск «одной задачей» или «группой»: группа из «Нескольких пунктов» становится набором задач с общей группой, у каждой своя карточка; «Подтвердить карточки группы» подтверждает все карточки одной кнопкой, «Запустить группу» запускает все задачи группы. Если задачи ждут ответа о классе, блок запуска называет их число и даёт ссылки на ленты, где выбирается класс.",
+        "en": "Launch «as one task» or «as a group»: a group from «Several items» becomes a set of tasks sharing one group, each with its own card; «Confirm the group cards» confirms every card with one button, «Launch the group» starts every task of the group. When tasks wait for a class answer, the launch block names how many and links the feeds where the class is chosen."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Оценка перед запуском показывает ожидание места для первого сеанса: «сразу — место свободно», «≈ N с», «≈ N мин» или «не оценено».",
+        "en": "The pre-launch estimate shows the wait for the first session slot: «none — a slot is free», «≈ N s», «≈ N min» or «not estimated»."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Окно «Агенты» строится по журналу ядра для любого CLI: дерево сеансов и субагентов, фоновые команды («идёт», «завершён (код N)», «фоном: N»), команда, хвост вывода и цепочка владельцев; фоновая работа без живого владельца помечается «осиротел». Расход, которого нет в журнале, показан как «неизвестно», а не ноль. Агент панели читает то же дерево. В «Плане агента» чата субагенты, о которых знает только ядро (чат другого CLI, вложенные субагенты), подписаны словом «субагент».",
+        "en": "The «Agents» window is built from the core journal for every CLI: the tree of sessions and subagents, background commands («running», «finished (code N)», «in background: N»), the command, the output tail and the owner chain; background work with no live owner is marked «orphaned». Spend missing from the journal shows as «unknown», not zero. The panel agent reads the same tree. In the chat «Agent plan», subagents only the core knows about (another CLI chat, nested subagents) are labelled «subagent» in the interface language."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Один чат для всех CLI: история разговоров других CLI хранится так же, как у основного, — список на компьютере и телефоне, перезагрузка страницы, повторное открытие в том же сеансе. Продолжение разговора и перенос в другой CLI появляются в списке и открываются в том же сеансе; служебные инструкции в ленту продолжения не попадают.",
+        "en": "One chat for every CLI: conversations of other CLIs are kept like the main one's — the list on desktop and phone, page reload, reopening in the same session. A continuation and a carry to another CLI appear in the list and reopen in the same session; service instructions stay out of the continuation feed."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Локальная модель показывает стадию запроса: запуск, загрузка, очередь, чтение промпта с прогрессом, генерация. Без движения 20 секунд — «молчит», без движения 2 минуты на видеокарте или 10 минут на процессоре — запрос считается зависшим, рядом кнопка перезапуска.",
+        "en": "A local model shows the request stage: starting, loading, queued, reading the prompt with progress, generating. No movement for 20 seconds shows «silent»; no movement for 2 minutes on a GPU or 10 minutes on a CPU marks the request stalled, with a restart button beside it."
+      },
+      "area": {
+        "ru": "Локальные модели",
+        "en": "Local models"
+      },
+      "images": ["local-stages-before.png", "local-stages-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Сообщение посреди хода больше не прячет предыдущий ответ и не дублируется после перезагрузки; на телефоне оно остаётся отдельным сообщением, и ответ на него показан отдельно. Субагенты других CLI появляются в «Плане агента».",
+        "en": "A message sent mid-turn no longer hides the previous answer and is not duplicated after a reload; on the phone it stays a separate message with its own answer. Subagents of other CLIs appear in «Agent plan»."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["next-turn-before.png", "next-turn-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ожидание места для сеанса в ленте задачи показано своим заголовком и полями вместо сырого сигнала; отказы трекера в английском интерфейсе — на английском; повтор сорвавшегося запуска группы больше не принимает части крупной задачи за пункты группы.",
+        "en": "The session slot wait has its own title and fields in the task feed instead of a raw signal; tracker refusals are in English on the English UI; retrying a failed group launch no longer mistakes the parts of a large task for group items."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      },
+      "images": ["session-wait-before.png", "session-wait-after.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Карточки ведения задачи и MCP-серверов больше не стирают несохранённые правки друг друга; критерии приёмки берутся только из своего поля; исправлено чтение ключа задачи трекера.",
+        "en": "The task-leading and MCP server cards no longer wipe each other's unsaved edits; acceptance criteria come only from their own field; reading the tracker issue key is fixed."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "В чате с Qwen ответы одного хода больше не склеиваются в одно слово, родной вызов инструмента через маршрут с маскированием данных снова доходит до CLI, а текст субагента не подмешивается в ответ. Замер базы контекста больше не оставляет в списке чатов служебную строку: этот сеанс CLI запускается без сохранения разговора.",
+        "en": "In a Qwen chat the answers of one turn no longer run together into one word, a native tool call through the data-masking route reaches the CLI again, and subagent text no longer leaks into the answer. Measuring the context base no longer leaves a service line in the chat list: that CLI session runs without saving the conversation."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Шапка чата с другим CLI (Qwen, OpenCode и остальные) больше не обещает «Через контур», когда ход идёт мимо контура: подпись следует галочке этого CLI в настройках контура, а не галочке «Чат». Сервер и страница решают это по одному правилу.",
+        "en": "The chat header for another CLI (Qwen, OpenCode and the rest) no longer promises «Through the contour» when the turn bypasses the contour: the caption follows that CLI's own tick in the contour settings, not the «Chat» tick. The server and the page decide it by one rule."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "local-stages-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: пока модель читает промпт, написано, что запрос к ней не идёт",
+        "en": "Before: while the model reads the prompt, the line says no request is running"
+      }
+    },
+    {
+      "file": "local-stages-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: стадия «читает промпт» с прогрессом в токенах",
+        "en": "After: the «reading the prompt» stage with progress in tokens"
+      }
+    },
+    {
+      "file": "next-turn-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: ответ на второе сообщение пропал, следом сразу идёт дописка посреди хода",
+        "en": "Before: the answer to the second message is gone, the mid-turn message follows right after it"
+      }
+    },
+    {
+      "file": "next-turn-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: ответ на второе сообщение на своём месте, дописка ждёт своего ответа",
+        "en": "After: the answer to the second message stays in place, the mid-turn message waits for its own answer"
+      }
+    },
+    {
+      "file": "session-wait-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: ожидание места показано как неизвестный сигнал с сырыми полями",
+        "en": "Before: the slot wait is shown as an unknown signal with raw fields"
+      }
+    },
+    {
+      "file": "session-wait-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: «Ожидание места для первого сеанса» с минутами, местами и сеансами в истории",
+        "en": "After: «Waiting for a slot for the first session» with minutes, slots and sessions in history"
+      }
+    },
+    {
+      "file": "header-contour-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: в контуре отмечен только «Чат», а шапка чата Qwen обещает ход через контур",
+        "en": "Before: only «Chat» is ticked in the contour, yet the Qwen chat header promises a turn through the contour"
+      }
+    },
+    {
+      "file": "header-contour-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: ход Qwen идёт мимо контура, и шапка ничего не обещает — модель выбирает сам CLI",
+        "en": "After: the Qwen turn bypasses the contour and the header promises nothing — the CLI picks the model"
+      }
+    }
+  ]
+}

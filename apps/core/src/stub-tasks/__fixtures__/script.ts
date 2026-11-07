@@ -12,7 +12,8 @@ import type { Move, StubTask, TimedMove } from './stub-tasks.types.ts';
  *   ядра — точное имя или хвост `__<имя>` (`mcp__agentdeck__step_done`). Имена аргументов — из
  *   схемы инструмента в запросе (`file_path` / `absolute_path` / `path`).
  * - Боковые запросы CLI (заголовок разговора, извлечение памяти) инструмента оболочки не
- *   объявляют: им короткий текст, ход не тратится.
+ *   объявляют: им короткий текст, ход не тратится. Исключение — набор только для чтения (шаг
+ *   разведки): чтение без записи и оболочки — главный цикл (`mainLoop`).
  */
 
 /** Метки брифа: шаг и копию модель-заглушка читает из системного промпта, как читала бы модель. */
@@ -381,10 +382,20 @@ export function moveAt(
   return undefined;
 }
 
+/**
+ * Главный цикл CLI: объявлена оболочка — или набор только для чтения (чтение без записи и без
+ * оболочки): сессия шага разведки/ревью оболочки не получает по виду шага (P73), и без второго
+ * признака каждый её запрос считался бы боковым — ход не наступал бы никогда.
+ */
+function mainLoop(tools: readonly DeclaredTool[]): boolean {
+  if (findBuiltin(tools, 'shell')) return true;
+  return findBuiltin(tools, 'read') !== undefined && findBuiltin(tools, 'write') === undefined;
+}
+
 /** Сценарий задачи для `startStubModel({ script })` / `createStubRoute({ script })`. */
 export function scriptFor(task: Pick<StubTask, 'moves'>, closing = 'done'): StepFn {
   return (ctx) => {
-    if (!findBuiltin(ctx.info.tools, 'shell')) return { text: SIDE_REPLY };
+    if (!mainLoop(ctx.info.tools)) return { text: SIDE_REPLY };
     const move = moveAt(task.moves, assistantTurns(ctx.dialect, ctx.request.body));
     if (!move) return { text: closing };
     if (move === 'turn-end') return { text: TURN_END_TEXT };

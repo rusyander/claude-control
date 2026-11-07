@@ -34,6 +34,7 @@ export function ChatModelPicker({
   defaultModel,
   defaultEffort,
   models,
+  cli,
   consumer = 'chat',
   projectPath,
   onModelChange,
@@ -65,8 +66,11 @@ export function ChatModelPicker({
   // (решение по контуру №4) — молча данные в облако вендора не уезжают.
   const bypass = platformBypassCaption(plan.data);
 
+  // Разговор другого CLI (W3-17a): алиасы Claude ему чужие — только «по умолчанию» и его каталог.
+  const claude = !cli || cli === 'claude';
   // Как подписать пункт «по умолчанию»: показываем, что именно придёт из настроек.
-  const defaultModelName = defaultModel ? modelLabel(defaultModel) : t('chat.modelClaudeDefault');
+  const ownDefault = claude ? t('chat.modelClaudeDefault') : t('chat.modelCliDefault');
+  const defaultModelName = defaultModel ? modelLabel(defaultModel) : ownDefault;
   const defaultEffortName = defaultEffort
     ? t(`chat.effort_${defaultEffort}`)
     : t('chat.effortAuto');
@@ -76,7 +80,7 @@ export function ChatModelPicker({
   // Алиасы + конкретные модели каталога; выбранное значение остаётся в списке,
   // даже если каталог не скачался.
   const modelOptions = withCurrentValue(
-    modelSelectOptions(models ?? [], MODEL_OPTIONS, (value) =>
+    modelSelectOptions(models ?? [], claude ? MODEL_OPTIONS : [''], (value) =>
       value ? modelLabel(value) : t('chat.fromSettings', { value: defaultModelName }),
     ),
     model,

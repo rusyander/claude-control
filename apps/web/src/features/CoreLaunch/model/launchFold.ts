@@ -116,14 +116,14 @@ export function grantRows(
   });
 }
 
-const AFTER_LAUNCH = new Set<TaskState>([
+export const AFTER_LAUNCH = new Set<TaskState>([
   'running',
   'paused',
   'waiting-window',
   'publishing',
   'done',
 ]);
-const ENDED = new Set<TaskState>(['cancelled', 'failed']);
+export const ENDED = new Set<TaskState>(['cancelled', 'failed']);
 
 export interface LaunchGateInput {
   reply: Pick<EstimateReply, 'state' | 'grants'>;

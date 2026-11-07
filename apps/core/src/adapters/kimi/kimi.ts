@@ -231,6 +231,8 @@ export function createKimiAdapter(options: RpcAdapterOptions = {}): RpcAdapter {
       layer: kimiLayer,
       refuse: refuseKimi,
       plan: planKimi,
+      // Флага без записи у ACP Kimi нет; сеансы — под своим KIMI_CODE_HOME сеанса.
+      ephemeral: 'session-home',
       resume: kimiResume,
       ownsTranscript: kimiOwnsTranscript,
       transcriptPresent: kimiTranscriptPresent,

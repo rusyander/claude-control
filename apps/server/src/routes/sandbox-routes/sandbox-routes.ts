@@ -8,7 +8,7 @@ import {
   isSandboxExpired,
   markSandboxBusy,
   markSandboxFree,
-  removeSandbox,
+  removeSandboxSettled,
   sandboxPaths,
   type SandboxSelection,
 } from '../../domains/sandbox/SandboxConfig.ts';
@@ -125,8 +125,8 @@ export function registerSandboxRoutes(
     },
   );
 
-  app.delete<{ Params: { id: string } }>('/api/sandbox/:id', (request) => {
-    removeSandbox(request.params.id);
+  app.delete<{ Params: { id: string } }>('/api/sandbox/:id', async (request) => {
+    await removeSandboxSettled(request.params.id);
     return { ok: true };
   });
 

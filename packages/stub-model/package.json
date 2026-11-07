@@ -16,6 +16,10 @@
     "./scenarios/panel-agent": {
       "types": "./src/scenarios/panel-agent.d.mts",
       "default": "./src/scenarios/panel-agent.mjs"
+    },
+    "./scenarios/llama-slots": {
+      "types": "./src/scenarios/llama-slots.d.mts",
+      "default": "./src/scenarios/llama-slots.mjs"
     }
   },
   "scripts": {

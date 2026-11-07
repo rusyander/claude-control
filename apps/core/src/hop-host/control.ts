@@ -10,10 +10,9 @@ import {
 } from '@agentdeck/contracts/core/hops';
 import { rulesHashOf } from '@agentdeck/dlp/rules-hash';
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
-import { contourIdOf, contourRouteId } from './contour-book/record.ts';
+import { contourIdOf } from './contour-book/record.ts';
 import { rulesOf, type HopContext } from './context.ts';
 import {
-  noteSummarized,
   summarizedInRun,
   summarizedMessageIds,
   summarizedReport,
@@ -61,7 +60,7 @@ const OPS: readonly Op[] = [
   'dlp-proxy',
   'contours',
   'contour-spend',
-  'contour-record',
+  'activity',
 ];
 
 function fail(op: Op, code: string, detail: string): Failure {
@@ -175,8 +174,6 @@ export async function answerControl(deps: ControlDeps, message: unknown): Promis
       };
     case 'contour-spend':
       return { op: 'contour-spend', ok: true, records: ctx.contours.records() };
-    case 'contour-record':
-      return recordContour(ctx, request);
     case 'contour-run': {
       const toolCalls = toolCallsSince(ctx.contours.snapshot().events, request.since);
       return {
@@ -192,6 +189,9 @@ export async function answerControl(deps: ControlDeps, message: unknown): Promis
         ok: true,
         messageIds: [...summarizedMessageIds(ctx.stateDir)],
       };
+    case 'activity':
+      // Ход локальных маршрутов: без ленты в контексте — пустой список.
+      return { op: 'activity', ok: true, routes: ctx.activity?.snapshot() ?? [] };
   }
 }
 
@@ -213,31 +213,6 @@ function toolCallsSince(
     calls += (event.toolCalls ?? 0) + (event.nativeCalls ?? 0);
   }
   return requests > 0 ? calls : undefined;
-}
-
-/**
- * Запись снаружи (проверки чтения; шлюз панели, славший её, снят) — в тот же учёт, что и запросы звена. Отказ по бюджету
- * держит и маршрут звена: сеанс ядра на том же контуре не пойдёт в исчерпанный ключ.
- */
-function recordContour(
-  ctx: HopContext,
-  request: Extract<HopControlMessage, { op: 'contour-record' }>,
-): HopControlReply {
-  const { platformId } = request;
-  if (request.event) ctx.contours.event(request.event as unknown as PlatformGatewayEvent);
-  if (request.usage) ctx.contours.usage(platformId, request.usage, new Date(ctx.now()));
-  if (request.exhausted) {
-    const at = new Date(request.exhausted.at);
-    const { scope, level } = request.exhausted;
-    ctx.contours.exhausted(
-      platformId,
-      at,
-      scope ? { scope, ...(level ? { level } : {}) } : undefined,
-    );
-    ctx.spend.markExhausted(contourRouteId(platformId), at.getTime());
-  }
-  if (request.summarized) noteSummarized(ctx.stateDir, { platformId, ...request.summarized });
-  return { op: 'contour-record', ok: true };
 }
 
 /**

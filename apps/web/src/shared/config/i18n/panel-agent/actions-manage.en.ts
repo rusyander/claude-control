@@ -43,4 +43,9 @@ export const panelActionsManageEn: Record<keyof typeof panelActionsManageRu, str
   stop_session: 'Stop a session outside the panel',
   delete_backup: 'Delete a backup',
   scaffold_plugin: 'Create a plugin skeleton',
+  core_tasks: 'Core tasks',
+  core_task: 'Core task',
+  core_report: 'Core task report',
+  core_lead_settings: 'Core lead settings',
+  core_agents: 'Core agents',
 };

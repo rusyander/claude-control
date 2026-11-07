@@ -1,6 +1,7 @@
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { BASE_PIN_SIGNAL, parseBasePin } from '../estimate/base-pin.ts';
+import { isIntegrationUnit } from '../gates/integrated.ts';
 import type { CopySetupDecision } from './copy.types.ts';
 
 /**
@@ -178,5 +179,10 @@ export function pinnedBaseOf(task: LiveTask, unitId: string): string | undefined
 export function reviewBaseOf(task: LiveTask, unitId: string): string | undefined {
   const pinned = pinnedBaseOf(task, unitId);
   if (!pinned) return undefined;
+  // Единица интеграции (W3-18b): её копия — уже слияние голов, дифф от неё пуст; ревьюер видит
+  // общий дифф всех единиц — от приколотой базы задачи в этом репозитории.
+  const unit = task.state.units[unitId];
+  if (isIntegrationUnit(unit))
+    return task.state.created?.repos.find((r) => r.repoKey === unit?.repoKey)?.baseRef ?? pinned;
   return task.state.created?.review?.reviewBase ?? pinned;
 }

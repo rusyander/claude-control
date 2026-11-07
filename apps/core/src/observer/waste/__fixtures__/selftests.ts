@@ -6,14 +6,15 @@ import { WASTE_FAIL_REPEAT } from '../fail-repeat.ts';
 import { WASTE_POLL } from '../poll.ts';
 import { WASTE_REFUSAL_REPEAT } from '../refusal-repeat.ts';
 import { WASTE_REREAD } from '../reread.ts';
+import { S1, STEP } from './ids.ts';
+import { SPEND_SELFTESTS } from './spend-over-estimate.ts';
 
 /**
  * Пары самопроверки предикатов расточительства (P33): журнал, где сигнал выходит, и его
  * почти-двойник, где молчит. Их гоняет `waste.test.ts` (и каталог, когда найдёт файлы сам).
  */
 
-export const STEP = '01900000-0000-7000-8000-0000000000c2';
-export const S1 = '01900000-0000-7000-8000-0000000000d2';
+export { S1, STEP };
 export const CWD = '/copy';
 export const FP_A = `sha256:${'a'.repeat(64)}`;
 export const FP_B = `sha256:${'b'.repeat(64)}`;
@@ -130,4 +131,5 @@ export const SELFTESTS: SelftestPair[] = [
     // Почти-двойник: два разных отказа.
     silent: lines([refused('git'), refused('curl')]),
   },
+  ...SPEND_SELFTESTS,
 ];

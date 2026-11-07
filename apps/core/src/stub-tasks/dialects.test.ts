@@ -8,6 +8,7 @@ import {
 } from '@agentdeck/stub-model';
 import { afterEach, describe, expect, it } from 'vitest';
 import { STUB_TASKS } from './__fixtures__/library/index.ts';
+import { RESEARCH_READ_ONLY } from './__fixtures__/library/stage11-f.ts';
 import { STALLED_STREAM } from './__fixtures__/library/waste.ts';
 import {
   briefFor,
@@ -329,6 +330,21 @@ describe('stub tasks over the shared stub model', () => {
       expect(side.read(await post(vocab.path, side.body()))).toEqual({ text: SIDE_REPLY });
       const main = conversation(dialect, system, task.input.request, declared(vocab));
       expect(main.read(await post(vocab.path, main.body()))).toEqual(
+        expected(task.moves[0]!, vocab),
+      );
+    },
+  );
+
+  it.each(['anthropic-messages', 'openai-chat', 'openai-responses'] as const)(
+    'a read-only tool set (read, no write, no shell: research step, P73) is the main loop (%s): the move is spent',
+    async (dialect) => {
+      const task = RESEARCH_READ_ONLY.find((t) => t.id === 'research-tools-read-only')!;
+      stub = await startStubModel({ script: scriptFor(task) });
+      const vocab = VOCAB[dialect];
+      const system = briefFor({ stepId: VALUES.stepId, copyRoot: VALUES.copy, request: 'map' });
+      const readOnly = declared(vocab, false).filter((t) => t.name !== vocab.write.name);
+      const recon = conversation(dialect, system, task.input.request, readOnly);
+      expect(recon.read(await post(vocab.path, recon.body()))).toEqual(
         expected(task.moves[0]!, vocab),
       );
     },

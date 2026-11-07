@@ -9,6 +9,7 @@ import {
 } from './os-kind.ts';
 import { livenessIn } from './process-identity.ts';
 import {
+  identityStartMs,
   osProcessTable,
   type ProcessIdentity,
   type ProcessRow,
@@ -42,6 +43,11 @@ export interface TreeStopOptions {
   known?: readonly ProcessIdentity[];
   /** Метка окружения дерева (`AGENTDECK_TREE=<id>`), по которой ищутся переродители. */
   marker?: { name: string; value: string };
+  /**
+   * Нижняя граница рождения дерева (мс Unix), когда личность корня её не даёт (номер без старта):
+   * метку запуска несут только процессы, рождённые после него. Нет — поиск без порога.
+   */
+  bornAfterMs?: number;
   /** POSIX: корень — лидер своей группы (`detached`), группе уходит сигнал целиком. */
   group?: boolean;
   /** Номер, который не снимается ни при каком снимке (по умолчанию — сам процесс). */
@@ -164,10 +170,11 @@ export async function stopTree(
     return { targeted: [], sweepFound: [], residual: [root], unknown: factReason(first) };
   // Метку несёт и строка запуска того, кто её ищет (`grep AGENTDECK_TREE=…` в `ps -E`
   // неотличим от окружения): потомок дерева не старше корня — старший не наш. Тот же порог
-  // снимает подозрение с закрытого своего процесса старше корня (ssh-agent на Linux).
-  const rootStartMs = first.value.find(
-    (row) => row.pid === root.pid && row.start === root.start,
-  )?.startMs;
+  // снимает подозрение с закрытого своего процесса старше корня (ssh-agent на Linux). Корень уже
+  // умер — порог из его личности: иначе поиск шёл бы по всем процессам пользователя, и один
+  // нечитаемый старожил (PowerToys на Windows) делал бы остановку мёртвого сервера недоказанной.
+  // Личность без старта (номер хранителя) — граница запуска от вызывающего.
+  const rootStartMs = identityStartMs(root, os, first.value) ?? options.bornAfterMs;
   const scope = rootStartMs === undefined ? {} : { bornAfterMs: rootStartMs };
   // Поиск по метке, который не ответил (чтение окружения/таблицы упало, поиск бросил), — не
   // «никого нет» (F-64): иначе остановка выглядела бы чистой, и слот отдавался при живой сироте.

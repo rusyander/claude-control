@@ -83,7 +83,11 @@ import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.t
 import { reapPanelAgentOrphans } from '../../domains/panel-agent/processes/processes.ts';
 import { createCoreCaller } from '../../domains/core-ask/core-ask.ts';
 import { createCoreChatPort } from '../../domains/chat/core-run/core-chat-port.ts';
-import type { CoreChatPort } from '../../domains/chat/core-run/core-run.types.ts';
+import { coreChatBookPath } from '../../domains/chat/core-run/core-chat-book.ts';
+import {
+  createCoreChatHistory,
+  type CoreChatHistory,
+} from '../../domains/chat/core-run/core-chat-history.ts';
 import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 import {
   projectTestsBusy,
@@ -96,14 +100,6 @@ import {
   createForeignCarry,
   type ForeignCarryResolver,
 } from '../../domains/chat/core-foreign/foreign-carry.ts';
-import {
-  createChatStartCarry,
-  type ChatStartCarry,
-} from '../../domains/chat/core-run/chat-start-carry.ts';
-import {
-  coreContourRoutes,
-  type CoreContourRoutes,
-} from '../../domains/platform/routing/core-contour.ts';
 import { carryOfTestsRoute } from '../../domains/chat/core-run/session-carry.ts';
 import { ActivatingTestRunRegistry } from '../activating-test-runs/activating-test-runs.ts';
 import { wireChat } from './chat-wiring.ts';
@@ -151,20 +147,10 @@ export interface Runtime {
   treePause: TreePause;
   /** Записанные вопросы деревьев; отмена плана разделения снимает вопросы групп. */
   pendingAsks: PendingAsks;
-  /**
-   * Ручки ядра для разговора чужого CLI, который заводит сервер (продолжение, перенос): задача
-   * ядра `chat@1` с этим CLI (этап 10, F2c). Своего исполнителя чужих CLI у панели нет.
-   */
-  coreChats: Pick<CoreChatPort, 'estimate' | 'command'>;
+  /** История разговоров не-Claude CLI чата из видов сеансов ядра (этап 11, волна 3). */
+  coreHistory: CoreChatHistory;
   /** Слой панели разговору чужого CLI через ядро (G6): строка о тестах, набор для CLI. */
   foreignCarry: ForeignCarryResolver;
-  /** Слой панели чату ядра, начатому из веба (G13): Claude — сборка реестра, чужой CLI — G6. */
-  chatStartCarry: ChatStartCarry;
-  /**
-   * Маршрут контура чата, начатого из веба (G13): тот же потребитель, что у хода реестра чата
-   * («Чат», `chat-wiring.ts`) и у чата чужого CLI (`foreign:<cli>`). Веб шлёт его `set-route`.
-   */
-  chatStartRoutes: (cli: string) => CoreContourRoutes | undefined;
   /** Прокси защиты данных; поднимается отдельно, если включён в настройках. */
   dlpProxy: DlpProxy;
   /** Шлюз контуров глазами панели: слушает шлюз человека у ядра, здесь его карточка (C3d). */
@@ -241,7 +227,10 @@ export function createRuntime(
     },
   });
   // Реестр прогонов чата, права сессии и журналы прогонов (`chat-wiring.ts`).
-  const { chatRuns, chatSession } = wireChat(ctx);
+  // Слой чужого CLI заводится ниже (`foreignCarry`); ход зовёт его уже после сборки (W3-17a).
+  const { chatRuns, chatSession } = wireChat(ctx, {
+    foreignCarry: (input) => foreignCarry(input),
+  });
   // Прогоны тестов — третий такой объект: агент ходит по кейсам минутами, и
   // оборванный при выходе панели процесс остался бы висеть с полным доступом.
   //
@@ -620,6 +609,9 @@ export function createRuntime(
     void coreRelay?.stop();
   };
 
+  // Одни ручки ядра на разговоры, что заводит сервер, и на историю разговоров чужого CLI.
+  const coreChatPort = createCoreChatPort(createCoreCaller(() => coreHomeOf()));
+
   return {
     projectRunner,
     chatRuns,
@@ -636,17 +628,10 @@ export function createRuntime(
     handoffChains,
     treePause,
     pendingAsks,
-    coreChats: createCoreChatPort(createCoreCaller(() => coreHomeOf())),
+    coreHistory: createCoreChatHistory(coreChatPort, () =>
+      coreChatBookPath(ctx.location.paths.appData),
+    ),
     foreignCarry,
-    chatStartCarry: createChatStartCarry({
-      claude: (cwd) => chatRuns.carryFor(cwd),
-      foreign: foreignCarry,
-      foreignRoutes: (cli) => coreContourRoutes(ctx.store, `foreign:${cli}`, cli),
-    }),
-    chatStartRoutes: (cli) =>
-      cli === 'claude'
-        ? coreContourRoutes(ctx.store, 'chat', 'claude')
-        : coreContourRoutes(ctx.store, `foreign:${cli}`, cli),
     dlpProxy,
     platformGateway,
     contours,

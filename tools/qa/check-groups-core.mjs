@@ -301,12 +301,12 @@ await runOnStand(
       await form.waitFor({ timeout: 15_000 });
       // Список сценариев перечитывается после записи: пока новой версии в нём нет, `<select>`
       // показывает первый вариант. Ждём ответа списка до 10 с, а не судим по первому кадру.
+      // Поле сценария — по подписи: в форме есть и другие `<select>` (выбор источника задачи).
       const want = ref ? `library:${ref.id}@${ref.version}` : '';
       let selected = '';
       for (let i = 0; i < 40 && selected !== want; i += 1) {
         selected = await form
-          .locator('select')
-          .first()
+          .getByLabel('Сценарий', { exact: true })
           .inputValue()
           .catch(() => '');
         if (selected !== want) await page.waitForTimeout(250);

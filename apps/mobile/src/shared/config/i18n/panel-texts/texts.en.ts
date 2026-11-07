@@ -151,7 +151,7 @@ export const panelTextsEn: PanelTextDictionary = {
   'value-probe-never': 'never checked',
   'value-happens-rollback':
     'applications of “{{previous}}” are rolled back, then a probe and a smoke request',
-  'value-happens-probe': 'a probe and a smoke request through the panel gateway',
+  'value-happens-probe': 'a probe and a smoke request through the core gateway',
   'value-file-shape':
     '{{path}} will be rewritten whole in the panel format (2-space indent): some diff lines change only indentation, not values',
   'note-rule-group-off':
@@ -243,6 +243,11 @@ export const panelTextsEn: PanelTextDictionary = {
   'journal-compare-providers': 'CLI comparison',
   'journal-local-models-status': 'Local models: status',
   'journal-kit-status': 'Panel kit: status',
+  'journal-core-tasks': 'Core tasks',
+  'journal-core-task': 'Core task',
+  'journal-core-report': 'Core task report',
+  'journal-core-lead-settings': 'Core lead settings',
+  'journal-core-agents': 'Core agents',
   'journal-env-passport': 'Environment passport',
   'journal-list-plugins': 'List of plugins',
   'journal-list-available-plugins': 'Plugin catalog',

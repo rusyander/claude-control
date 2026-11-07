@@ -37,18 +37,19 @@ export const coreEn: typeof coreRu = {
 
     mapTitle: 'How pages reach the core',
     mapCaption:
-      'The panel and the core are two processes. Pages reach the core only through the panel: the ' +
-      'proxy `/api/core/*` and the chat start route.',
+      'The panel and the core are two processes. Pages reach the core only through the panel — ' +
+      'the proxy `/api/core/*`; a chat turn is run by the panel server itself.',
     pathTextTitle: 'The same path in words',
     pathTextText:
       'A page sends a request to the panel. The proxy finds the running core by its record, ' +
       'checks that the port really belongs to it and forwards the request with the core’s access ' +
       'key. The event stream comes back unbuffered. If the core is just starting, the request waits ' +
-      'for it up to 15 s. A new chat is started not through the proxy but through the panel route ' +
-      '`/api/chat/core-start`: the panel adds its own layer to the estimate (the Tests block line, ' +
-      'the kit, the flags of its own layers) and forwards it to the core with the same page proof. ' +
-      'A body signed with the phone key goes through the proxy as is: the additions would break ' +
-      'the signature. The core accepts human commands from the panel process recorded to it ' +
+      'for it up to 15 s. Chat does not call the core directly: the panel server receives a ' +
+      'message from Chat and creates the core task itself — the chat estimate, the CLI choice, ' +
+      'the launch — adding its own layer (the Tests block line, the kit, the flags of its own ' +
+      'layers). The tracker issue for the launch screen is read by the panel too, through its ' +
+      'Jira connection: the core never calls the tracker. ' +
+      'The core accepts human commands from the panel process recorded to it ' +
       'as a hop, or with a phone key signature.',
 
     startTitle: 'Starting the core',
@@ -130,7 +131,7 @@ export const coreEn: typeof coreRu = {
       'split is not ready, the button is closed and the reason is written below it.',
     launchMcp: 'MCP servers for steps',
     launchMcpText:
-      'Below the routes — your own MCP servers from each CLI config (the user layer). A tick gives ' +
+      'In the Task leading block — your own MCP servers from each CLI config (the user layer). A tick gives ' +
       'the server to a step kind in every following task; without a tick the step sees only the ' +
       'core servers. Chat takes every offered server by default. A server no CLI offers is marked: ' +
       'the core drops it at launch and names the reason in the journal. Read-only kinds take no ' +
@@ -139,7 +140,158 @@ export const coreEn: typeof coreRu = {
       'for it; for Cursor, starting a server without a prompt is not proven live. Saving writes ' +
       'the whole core config; if it changed meanwhile, the core ' +
       'refuses and the card shows why.',
+    launchSource: 'Task source',
+    launchSourceText:
+      'The Source field above the title. Text — the requirements are the source. Tracker issue — a ' +
+      'key like PROJ-12 and Read: the panel reads the issue through the Jira connection in ' +
+      'Integrations and shows the title and the number of acceptance criteria from the tracker ' +
+      'field; an empty title and requirements are taken from the issue, the core never calls the ' +
+      'tracker. Another key removes the text the previous issue filled in (your own edits stay). ' +
+      'Voice — dictation goes into Requirements. Several items — each item has its own title and ' +
+      'text, plus the How to run the items choice: As one task (the default) — the core analyses ' +
+      'the items together; As a group — a task per item — a task for every item in one group. The ' +
+      'source goes into the estimate as a snapshot with a digest; the core never fetches it again. ' +
+      'Only a lead scenario (Lead, or Tracker issue) reads the snapshot: the estimate refuses ' +
+      'another scenario with a source and names the reason instead of dropping it silently.',
+    launchGroup: 'A group: estimate and launch',
+    launchGroupText:
+      'A group estimate names the group and all its tasks with a link to each feed; the numbers ' +
+      'and progress below belong to the first task. The lead asks for the intake card of every ' +
+      'task: Confirm the group cards answers each waiting one “Confirm the card”, as in its feed ' +
+      '(the answer goes to the task journal as yours), and names a task not confirmed with its ' +
+      'reason — a retry confirms only the rest. The button never answers the class question ' +
+      '(asked when leading settings always ask the class): the class is chosen in the task feed, ' +
+      'and the launch section says how many tasks wait for that answer, with a link to each feed. ' +
+      'Launch the group starts every task of the group and names a task that did not start with ' +
+      'its reason — a retry starts only that one; a group whose launch broke off midway is ' +
+      'finished the same way. After that every task of the group runs its own feed, and the core’s ' +
+      'shared queue shares the session slots between them.',
+    launchLead: 'Task leading',
+    launchLeadText:
+      'The block at the bottom of the screen: leading settings and MCP servers side by side. Profile ' +
+      '— Economy (2 sessions at once), Balanced (the default, 4) or Maximum quality (6, recon and ' +
+      'plan one rung higher, review at xhigh). Scope — machine defaults or one project; a project ' +
+      'edit is stronger. Details opens the rung, effort and model of each role (effort max is not ' +
+      'listed — the core never picks it), sessions at once with the machine limit, the rung raise by ' +
+      'learning and what to always ask. There is no spend cap on purpose. Save writes the core ' +
+      'config; if it changed meanwhile, the core refuses. A lead estimate names the profile, the ' +
+      'class (before recon — decided after recon), sessions at once, the session slot wait and ' +
+      'the role rungs; Configure for this project switches the scope to the task project. The ' +
+      'slot wait reads: right away — a slot is free, ≈ N s, ≈ N min, or not estimated (no session ' +
+      'history, or the slots could not be read); it is counted from the slots taken now and the ' +
+      'median length of finished sessions. Learning reset removes a key raise entirely. How the ' +
+      'profile, classes and raises work inside a task — the Lead section below.',
     launchDiagramTitle: 'From form to steps',
+
+    leadTitle: 'The lead: how the core runs a task',
+    leadCaption:
+      'The Lead scenario (and Tracker issue, version two) — recon, intake, class, plan, work, ' +
+      'review and integration. The model proposes, one core function decides each time, and every ' +
+      'decision with its reason is in the feed.',
+    leadPathTitle: 'The same path in words',
+    leadPathText:
+      'Recon only reads the repository and hands in a map. Intake builds the intake card — the ' +
+      'goal, the acceptance points, the forks. The core computes the task class from the map, and ' +
+      'the class decides the shape: S — one edit without a plan, M — one unit and a review, L — ' +
+      'several units, a review of each and integration, XL — child tasks. Units work in parallel ' +
+      'within the session slots; after review and fixes come the final check and publishing. At ' +
+      'forks only a human decides, the core stops and asks on a card above the feed.',
+    leadRecon: 'Recon',
+    leadReconText:
+      'The step only reads: it changes nothing and hands in a map — at most 20 lines, the files ' +
+      'with why each matters, the tests and the owners. The map carries no file bodies. The plan ' +
+      'may read the files it needs itself later.',
+    leadIntake: 'Intake and the intake card',
+    leadIntakeText:
+      'The card is the goal, every acceptance point and up to four open forks, each with a ' +
+      'recommendation. The card accepts itself only for a tracker issue with a structured ' +
+      'criteria field and no forks — the intake step is skipped then, and the reason is in the ' +
+      'feed. Otherwise the core asks one question with all the forks at once: Confirm the card, ' +
+      'or stop the task. The task text is data, not a command: a request in it to the session ' +
+      'about the core’s own work shows up as the signal «Request text asks the session for core ' +
+      'work».',
+    leadClass: 'Task class',
+    leadClassText:
+      'The class is a pure calculation from recorded signs: how many files and units, whether the ' +
+      'change is covered by checks, whether a risk rule fired, how many items the source has. No ' +
+      'check — the class goes one up. The model may only raise the class; a class it proposes ' +
+      'below the calculation is refused and named. Only a human lowers the class. The decision is ' +
+      'in the feed as the «Task class» line.',
+    leadClassesHeader: 'Class',
+    leadClassesWhat: 'When, and which shape',
+    leadClassS: 'S',
+    leadClassSText:
+      'Up to 3 files and one unit, the change covered by a check, no risk rules. No plan; the ' +
+      'review stays.',
+    leadClassM: 'M',
+    leadClassMText:
+      'Up to 10 files and up to 2 units, covered by a check. A plan, one unit and a review.',
+    leadClassL: 'L',
+    leadClassLText:
+      'Everything above M that is not XL. The plan splits the work into units, each with its own ' +
+      'review; then integration.',
+    leadClassXL: 'XL',
+    leadClassXLText:
+      'From 2 source items, or from 5 units linked to each other. The parts of the split become ' +
+      'child tasks.',
+    leadAsk: 'What to always ask',
+    leadAskText:
+      'Under Details in the Task leading block — Always ask: the intake card (never accept it ' +
+      'automatically), the task class (a class question in the feed) and the split into parts ' +
+      '(the split waits for your approval even when it could pass on its own).',
+    leadUnits: 'Units instead of subagents',
+    leadUnitsText:
+      'Parallel work is done by core units — each with its own session, its own repository copy, ' +
+      'a session slot, permissions and a journal — on every CLI. A unit does not call subagents ' +
+      'inside its session: permissions refuse with the code `lead-worker`, and work that could ' +
+      'have gone to a subagent the plan gives to a separate unit; a mechanical unit with a ' +
+      'complete spec runs one rung lower. Units were once meant as a fallback for CLIs without ' +
+      'subagents — now they are the only path for every CLI: only a unit can be queued, checked ' +
+      'by permissions and counted by spend. In a regular chat, subagents still work.',
+    leadParallel: 'How many sessions at once',
+    leadParallelText:
+      'Economy — 2 model sessions at once, Balanced — 4 (the default), Maximum quality — 6; the ' +
+      'count is shared by all tasks and units of the machine. The machine narrows it by its slot ' +
+      'limit (6 by default), and a local model route on its own GPU lets one session through. ' +
+      'Extra sessions are not refused, they wait: the «Queue — Waiting for a slot» line names who ' +
+      'holds the slot and why. Chats are not counted and never wait for a slot. Heavy checks have ' +
+      'their own queue.',
+    leadSpend: 'No spend cap',
+    leadSpendText:
+      'There is no spend cap per task and no budget question, on purpose. The core’s observer ' +
+      'sees loops, stalled sessions and spend without progress. When spend passes twice the upper ' +
+      'bound of the estimate, the feed shows the note «Spend twice the estimate — the task goes ' +
+      'on»: it stops nothing and asks nothing. An estimate without history gives no such note — ' +
+      'there is nothing to compare with.',
+    leadEscalation: 'Escalation after a failure',
+    leadEscalationText:
+      'An attempt failed (a red check, or a failure at a lowered rung) — the next one runs one ' +
+      'rung higher: effort first, up to xhigh, then the next model, up to the CLI ceiling (Opus ' +
+      'for Claude). At the ceiling — the same rung, and the «Model» decision says so. There is no ' +
+      'retry at the same rung below the ceiling. A reviewer is never weaker than the author. The ' +
+      'core never picks effort max; a model above the ceiling is only your pick.',
+    leadPromotion: 'Raise by learning',
+    leadPromotionText:
+      'The core remembers the first passes of every kind of work (project, step kind, CLI, route, ' +
+      'model, role). If fewer than 85 % of the last 20 runs (at least 8) pass on the first try, ' +
+      'that kind of work goes one rung up — and may keep going up to the ceiling. It never goes ' +
+      'back down on its own: Learning reset removes the key raise entirely. The numbers are ' +
+      'edited under Details.',
+    leadIntegration: 'Integrating the parts',
+    leadIntegrationText:
+      'With two or more parallel parts, an integration unit merges their branches locally, checks ' +
+      'and reviews the combined change — only how the parts fit together. Integration has no MR ' +
+      'of its own; the parts publish their MRs only once integration is green, and each MR links ' +
+      'the others. A closed part (failed or stopped) is not merged in. A conflict stops ' +
+      'publishing and names the files: fix the part’s branch and answer «One more round» to the ' +
+      'round cap question — the check merges again. If a part’s branch changes after a green ' +
+      'integration (say, a fix for a reviewer), its MR update waits for a new integration; a red ' +
+      'one stops publishing with the reason. «Stop the unit» closes the parts.',
+    leadXl: 'XL — child tasks',
+    leadXlText:
+      'After the split is approved, the parts become child tasks. The parent waits for them; a ' +
+      'part that depends on another starts after it. If a child is refused or fails, the parent ' +
+      'ends not green and names which one and why.',
 
     askTitle: 'Answering the core’s questions',
     askCaption:
@@ -181,8 +333,8 @@ export const coreEn: typeof coreRu = {
       'numbers the core counts.',
     timelineDecision: 'How to read «why»',
     timelineDecisionText:
-      'A decision carries a class label («Check», «Next action», «Permission») and an outcome ' +
-      'headline. Click «details»: the core’s reasons are there verbatim, in English, exactly as ' +
+      'A decision carries a class label («Check», «Next action», «Permission»; the lead adds ' +
+      '«Task intake» and «Task class») and an outcome headline. Click «details»: the core’s reasons are there verbatim, in English, exactly as ' +
       'the core wrote them.',
     timelineCheck: 'A check and its record',
     timelineCheckText:
@@ -274,6 +426,13 @@ export const coreEn: typeof coreRu = {
         'Review by link: the remote has no forge API — the core names the reason before launch',
       '08-mcp-picks':
         'MCP servers for steps: one ticked for fixes, chat «every offered», a pick nobody offers',
+      '09-lead':
+        'Leading settings: scope, the Balanced profile — 4 sessions at once, Details and Learning reset',
+      '10-items': 'The Several items source: two items, As a group — a task per item',
+      '11-group-estimate':
+        'A group estimate: the group and its tasks with feed links, leading — profile, class, sessions, slot wait',
+      '12-group-launch':
+        'Launching a group: Confirm the group cards, a task waiting for the class answer, Launch the group',
     },
     ask: {
       '01-launch':
@@ -300,5 +459,7 @@ export const coreEn: typeof coreRu = {
       'From panel to core: pages, the /api/core/* proxy, the core and the panel’s recorded hops',
     'launch-to-steps':
       'From launch to steps: form, estimate, split and launch, steps, timeline and questions to you',
+    'lead-pipeline':
+      'The lead: recon, intake, task class and shape, units within the slots, review, integration and publishing',
   },
 };

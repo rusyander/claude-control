@@ -32,6 +32,7 @@ export const PRESET_TITLES: Record<PresetId, TitlePair> = {
   chat: { ru: 'Чат', en: 'Chat' },
   ask: { ru: 'Вопрос модели', en: 'Model question' },
   'review-link': { ru: 'Ревью MR по ссылке', en: 'MR review by link' },
+  lead: { ru: 'Ведущий', en: 'Lead' },
 };
 
 /**
@@ -40,11 +41,14 @@ export const PRESET_TITLES: Record<PresetId, TitlePair> = {
  */
 export const STEP_TITLES: Record<string, TitlePair> = {
   intake: { ru: 'Разбор запроса', en: 'Intake' },
+  recon: { ru: 'Разведка', en: 'Recon' },
   plan: { ru: 'План', en: 'Plan' },
   work: { ru: 'Работа', en: 'Work' },
   review: { ru: 'Ревью', en: 'Review' },
   fix: { ru: 'Правки по ревью', en: 'Review fixes' },
   'final-gate': { ru: 'Финальная проверка', en: 'Final check' },
+  'integration-gate': { ru: 'Проверка интеграции', en: 'Integration check' },
+  'integration-review': { ru: 'Ревью интеграции', en: 'Integration review' },
   publish: { ru: 'Публикация', en: 'Publish' },
   'answer-reviewers': { ru: 'Ответы ревьюерам', en: 'Reviewer replies' },
   report: { ru: 'Отчёт', en: 'Report' },

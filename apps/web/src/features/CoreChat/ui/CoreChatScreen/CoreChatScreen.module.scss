@@ -1,8 +1,0 @@
-// Экран чата держит высоту колонки: лента прокручивается сама, композер прижат вниз.
-.screen {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  flex: 1;
-  min-height: 0;
-}

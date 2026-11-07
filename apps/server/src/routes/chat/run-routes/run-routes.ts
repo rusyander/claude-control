@@ -6,6 +6,12 @@ import { initiativePrompt } from '../../../domains/chat/initiative/initiative.ts
 import { linkedChildAppend } from '../../../domains/chat/group-run-lines/group-run-lines.ts';
 import { genTimeSink } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
 import type { ChatRunRegistry } from '../../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
+import {
+  coreChatBookKnows,
+  coreChatBookPath,
+  coreChatCliOf,
+  coreChatOfTask,
+} from '../../../domains/chat/core-run/core-chat-book.ts';
 import { CORE_PERMIT_TOOL } from '../../../domains/chat/core-run/core-run.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
@@ -35,8 +41,7 @@ import {
 import { expandAssignedModel } from '../../../domains/model-cascade/model-cascade.ts';
 import { loweredWorkPrompt } from '@agentdeck/contracts/model-cascade';
 import { providerCliCommand } from '../../../providers/cli/cli.ts';
-import { getActiveProvider } from '../../../providers/registry.ts';
-import type { ConfigProvider } from '../../../providers/types/types.ts';
+import { getActiveProvider, getProvider } from '../../../providers/registry.ts';
 import { supportsCliAutoMode } from '../../../providers/auto-mode/auto-mode.ts';
 import type { ChatAutoModeView } from '@agentdeck/contracts';
 import { estimateStepCost } from '../../../domains/analytics/pricing.ts';
@@ -91,27 +96,6 @@ const refuse = (
  * сроку или истёк срок брокера (`ChatPermissions.ts`). 410 — запрос был, но его
  * больше нет; телефон и вкладка показывают текст по `messageCode`.
  */
-/**
- * Отправка, когда активен чужой CLI. Этот маршрут — чат Claude: аргументы
- * собирает адаптер Claude в ядре под `claude` (`--output-format stream-json
- * --include-partial-messages --permission-prompt-tool …`), и раньше он брал
- * команду активного провайдера — телефон при активном Qwen запускал `qwen` с
- * флагами Claude. Тихо уйти в Claude тоже нельзя: человек выбрал другой CLI.
- * Поэтому честный отказ с кодом — телефон и вкладка показывают его своим языком.
- */
-const refuseForeignProvider = (reply: FastifyReply, provider: ConfigProvider): FastifyReply =>
-  refuse(
-    reply,
-    409,
-    'provider_not_claude',
-    `Активен ${provider.name}: этот маршрут запускает только чат Claude. Сообщение не отправлено — пишите в чат ${provider.name} на компьютере или переключите активный CLI на Claude.`,
-    {
-      provider: provider.id,
-      messageCode: 'chat-send-foreign-provider',
-      params: { provider: provider.name },
-    },
-  );
-
 const refuseExpired = (reply: FastifyReply): FastifyReply =>
   refuse(
     reply,
@@ -257,10 +241,14 @@ export function registerChatRunRoutes(
         effort,
         lowered,
       } = body;
-      // Провайдер — один снимок на весь запрос: и отказ, и команда запуска ниже
-      // читают его, а не настройку заново (переключение посреди запроса не
-      // должно дать бинарь одного CLI с аргументами другого).
-      const provider = getActiveProvider(ctx.store);
+      // Провайдер хода — один снимок на весь запрос (переключение посреди запроса не должно дать
+      // бинарь одного CLI с аргументами другого). Начатый разговор идёт тем CLI, которым начат
+      // (книга чата ядра, W3-17a), новый — активным: по нему разворачивается алиас модели и
+      // судится авторежим, иначе разговор Claude при активном Qwen разворачивал `sonnet` по
+      // каталогу Qwen, то есть никак.
+      const provider = sessionId
+        ? getProvider(coreChatCliOf(coreChatBookPath(ctx.location.paths.appData), sessionId))
+        : getActiveProvider(ctx.store);
       const queuedByServer = Boolean(request.headers[QUEUED_SEND_HEADER]);
 
       // Это сообщение агент уже получил, а клиент ответа не узнал и досылает его
@@ -298,9 +286,6 @@ export function registerChatRunRoutes(
           delivered();
           return reply.code(202).send({ steered: true, runId });
         }
-        // Слово идущему ходу выше — не новый запуск, его чужой CLI не касается.
-        // Очередь же потом запустит прогон — её при чужом CLI не принимаем.
-        if (provider.id !== 'claude') return refuseForeignProvider(reply, provider);
         // Просили не отказывать (ответ из хаба ребёнку, чей прогон вкладка не
         // знает): сообщение ждёт конца хода на сервере и уходит тем же маршрутом
         // — со всеми его проверками, — а не теряется в 409.
@@ -322,7 +307,8 @@ export function registerChatRunRoutes(
         });
       }
 
-      if (provider.id !== 'claude') return refuseForeignProvider(reply, provider);
+      // Чужой CLI активен — ход идёт им же (W3-17a): CLI нового разговора — активный провайдер,
+      // начатого — тот, которым он начат (книга чата ядра, `core-run`). Отказа «только Claude» нет.
 
       // Досылка без человека — очередь вкладки по концу хода, автоповтор — группу
       // на паузе не будит: через 3 с после «Паузы» из хаба вкладка дослала ответ
@@ -393,9 +379,14 @@ export function registerChatRunRoutes(
       // голым «Запрос не выполнен». Имя проверяется целиком, а не после чистки:
       // поиск транскрипта выбрасывает лишние знаки и нашёл бы чужой разговор.
       // Пустая строка — «сессии нет», как и раньше: CLI её тоже не продолжает.
+      // Разговор не-Claude CLI транскрипта Claude не пишет (W3-17a): его знает книга чата ядра.
       if (
         sessionId &&
-        !(/^[A-Za-z0-9-]+$/.test(sessionId) && findTranscript(projectsDir(ctx), sessionId))
+        !(
+          /^[A-Za-z0-9-]+$/.test(sessionId) &&
+          (findTranscript(projectsDir(ctx), sessionId) ||
+            coreChatBookKnows(coreChatBookPath(ctx.location.paths.appData), sessionId))
+        )
       ) {
         return refuse(
           reply,
@@ -600,8 +591,7 @@ export function registerChatRunRoutes(
           name,
           fork,
           cwd,
-          // Команда запуска — Claude: чужой CLI отсечён выше, а снимок провайдера
-          // тот же, что прошёл проверку.
+          // Команда CLI хода — из того же снимка провайдера; сам CLI запускает ядро.
           command: providerCliCommand(provider),
           // Модель и глубина продумывания — выбор пользователя в шапке чата.
           // Пусто — берём назначение этого чата, если оно у него есть: чат,
@@ -706,6 +696,23 @@ export function registerChatRunRoutes(
       await streamRun(registry, reply, chatId, fromSeq, startedAt);
     },
   );
+
+  /**
+   * Разговор задачи ядра по книге чата (W3-17a): старая ссылка `/core/chat?id=<задача>` ведёт в
+   * `/chat` на тот же разговор. Задача, которой книга не помнит, — `chatId: null`, не ошибка.
+   */
+  app.get<{ Params: { taskId: string } }>('/api/chat/core-task/:taskId', (request) => ({
+    chatId:
+      coreChatOfTask(coreChatBookPath(ctx.location.paths.appData), request.params.taskId) ?? null,
+  }));
+
+  /**
+   * CLI начатого разговора по книге чата (W3-17a): шапка чата берёт каталог моделей этого CLI, а
+   * не активного провайдера. Разговор, которого книга не знает, — Claude (так его продолжит ход).
+   */
+  app.get<{ Params: { chatId: string } }>('/api/chat/core-cli/:chatId', (request) => ({
+    cli: coreChatCliOf(coreChatBookPath(ctx.location.paths.appData), request.params.chatId),
+  }));
 
   /** Идущие прогоны — клиент подхватывает их после перезагрузки страницы. */
   app.get('/api/chat/active', () => registry.active());

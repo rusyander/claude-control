@@ -2,6 +2,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { chatKeys } from './ChatApi.constants';
 import { apiClient } from '@shared/api/client';
 import { useRef, useEffect } from 'react';
+import { useTurnBoundaryRefresh } from './useTurnBoundaryRefresh';
 
 /**
  * Как часто опрос отпечатка вправе перечитывать СПИСОК разговоров (мс).
@@ -35,8 +36,14 @@ export function useChatAutoRefresh(
    * история — значит, экономить на её перечитывании больше нельзя (см. ниже).
    */
   isStalled = false,
+  /**
+   * Начало текущего хода прогона (`turnAt`): чат на ядре ведёт слово «на ходу» новым ходом того
+   * же прогона. Новая граница перечитывает переписку — см. `useTurnBoundaryRefresh`.
+   */
+  turnAt?: number,
 ): void {
   const queryClient = useQueryClient();
+  useTurnBoundaryRefresh(chatId, turnAt);
 
   const { data } = useQuery({
     queryKey: chatKeys.version(chatId ?? ''),

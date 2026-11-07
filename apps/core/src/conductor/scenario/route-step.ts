@@ -51,16 +51,29 @@ export interface RoutingEnv {
   tier?: Partial<
     Pick<
       TierInput,
-      'ladders' | 'learnedLowerFailed' | 'paidOnRefusal' | 'registry' | 'author' | 'lowerFailedHere'
+      'ladders' | 'learnedRaise' | 'paidOnRefusal' | 'registry' | 'author' | 'lowerFailedHere'
     >
   >;
+  /**
+   * Факты одного шага (этап 11, D21, F1): роль и строка роли ведущего, прошлая неудачная попытка
+   * (эскалация), автор для ревьюера, ключ проекта и класс задачи для обучения. Поверх `tier`.
+   */
+  step?(
+    state: TaskFoldState,
+    step: { stepId: string | null; unitId: string | null; def: StepDef },
+  ): Partial<TierInput>;
 }
 
-/** Сессии задачи с id шага сценария, на котором они шли. */
-export function sessionsOf(state: TaskFoldState): ContinuationSession[] {
+/**
+ * Сессии задачи с id шага сценария, на котором они шли. С `unitId` — только сессии шагов этой
+ * единицы (этап 11, P141): сессия другой единицы идёт в её копии, и «продолжить» её значило бы
+ * снять чужой живой сеанс — параллельные единицы задачи шли бы по одной.
+ */
+export function sessionsOf(state: TaskFoldState, unitId?: string | null): ContinuationSession[] {
   return Object.entries(state.sessions).flatMap(([sessionId, s]) => {
     const step = state.steps[s.stepId];
     if (!step) return [];
+    if (unitId != null && step.unitId !== unitId) return [];
     return [
       {
         sessionId,
@@ -109,6 +122,7 @@ export function decideRouting(
     ...(env.windows ? { windows: env.windows } : {}),
     ...(created?.paidOnRefusal === undefined ? {} : { paidOnRefusal: created.paidOnRefusal }),
     ...env.tier,
+    ...env.step?.(state, step),
   });
   if (!contoured.ok) tier.reasons.unshift(contoured.reason);
   else tier.reasons.push(...contoured.applied.map((a) => `${a.path}: ${a.reason}`));
@@ -121,7 +135,7 @@ export function decideRouting(
   }
   if (!created) tier.reasons.unshift('task is not created');
   if (!tier.ok) return { tier, continuation: null };
-  const sessions = sessionsOf(state);
+  const sessions = sessionsOf(state, step.unitId);
   const candidate = candidateOf(sessions, step.def.id);
   const extra = candidate ? env.continuation?.(candidate) : undefined;
   const unitState = step.unitId ? (state.units[step.unitId]?.state ?? null) : null;
@@ -145,10 +159,13 @@ export function routeStep(
 ): StepRouting {
   const routing = decideRouting(task.state, step, env);
   const unit = step.unitId ? { unitId: step.unitId } : {};
+  // `stepId` в конверте строки `tier`: по нему следующая попытка шага находит ступень прошлой
+  // (эскалация), а выученное — ключ шага (этап 11).
   task.append({
     kind: 'decision',
     actor: 'core',
     ...unit,
+    ...(step.stepId ? { stepId: step.stepId } : {}),
     data: { decisionId: newId(), ...tierDecisionBody(routing.tier) },
   });
   if (routing.continuation)

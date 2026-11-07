@@ -89,7 +89,7 @@ export interface PlatformRoutingDeps {
    * под ответ, один вызов за раз) — по контуру: у чужих контуров пусто. Без него
    * Claude Code не знает окна локальной модели, не сжимает историю вовремя, и
    * сервер молча обрезает начало запроса. Ответ — на каждый запуск: окно меняется
-   * вместе с перезапуском сервера моделей. `route` — идёт ли прогон через шлюз панели
+   * вместе с перезапуском сервера моделей. `route` — идёт ли прогон через шлюз ядра
    * (контур) или прямо на сервер моделей (переключатель Claude): от этого зависит,
    * можно ли включать поиск инструментов (L7).
    */
@@ -669,9 +669,10 @@ export function listConsumerOptions(platform: Platform): PlatformConsumerOption[
   ];
 
   for (const provider of listProviders()) {
-    // В списке только те, у кого чат В ПАНЕЛИ действительно есть: чат чужого
-    // CLI поднимается неинтерактивным флагом (`oneShotArgs`), и провайдер без
-    // него стоял бы галочкой, за которой не запускается ничего.
+    // Галочка `foreign:<cli>` ведёт разговоры этого CLI в едином чате
+    // (`chatConsumerOf`, `core-contour.ts`); в списке только провайдеры с
+    // неинтерактивным запуском (`oneShotArgs`) — то же правило, что у
+    // `providerOf`, иначе галочка стояла бы за CLI, которого панель не поднимает.
     if (provider.id === 'claude' || !provider.assistant?.oneShotArgs) continue;
     const id = foreignConsumerId(provider.id);
     const reason = routeReason(provider);

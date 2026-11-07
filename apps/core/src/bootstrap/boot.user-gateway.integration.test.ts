@@ -16,7 +16,7 @@ import { userGatewayPortOf } from './user-gateway-wiring.ts';
 /**
  * Шлюз человека на НАСТОЯЩЕЙ загрузке ядра (этап 10): контуры — из каталога данных панели
  * (временный), ключ контура — в её зашифрованном хранилище, хост звеньев настоящий, верх —
- * `@agentdeck/stub-model`. Прежний шлюз панели изображает чужой слушатель на том же порту:
+ * `@agentdeck/stub-model`. Прежний шлюз в панели изображает чужой слушатель на том же порту:
  * ядро ждёт, берёт порт, как только его отпустили, и CLI человека ходит по тому же адресу.
  */
 
@@ -82,7 +82,7 @@ beforeAll(async () => {
     contour('off', { enabled: false }),
   ]);
   for (const id of ['c1', 'c2', 'c3', 'off']) setStoredKey(appData, `platform:${id}`, CONTOUR_KEY);
-  // Прежний шлюз панели: держит порт, отвечает сам.
+  // Прежний шлюз в панели: держит порт, отвечает сам.
   foreign = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ from: 'panel-gateway' }));

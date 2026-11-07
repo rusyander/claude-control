@@ -97,6 +97,12 @@ export interface BootApiDeps {
   ask?: ApiDeps['ask'];
   /** Ревью MR по ссылке (этап 10, F8): проводка дирижёра, пока он жив. */
   reviewLink?: ApiDeps['reviewLink'];
+  /** Этап 11: дерево агентов, места сеансов, активность своей модели (порты проводок). */
+  agents?: ApiDeps['agents'];
+  allocator?: ApiDeps['allocator'];
+  localActivity?: ApiDeps['localActivity'];
+  /** Этап 11 (P140): сброс ключа обучения человеком — порт проводки экономики. */
+  learned?: ApiDeps['learned'];
 }
 
 export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
@@ -116,6 +122,8 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       ...(deps.reconcile ? { reconcile: deps.reconcile } : {}),
       ...(deps.publisher ? { publisher: deps.publisher } : {}),
       ...(deps.ladders ? { modelRank: ladderRank(deps.ladders) } : {}),
+      // Суд `set-cli` по возможностям переходника до набора (W3-17a): тот же реестр, что у сеансов.
+      ...(deps.adapters ? { adapterOf: (id: string) => deps.adapters?.get(id) } : {}),
     },
     tokens: {
       core: deps.coreToken,
@@ -157,6 +165,10 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
     ...(deps.dlpProxy ? { dlpProxy: deps.dlpProxy } : {}),
     ...(deps.ask ? { ask: deps.ask } : {}),
     ...(deps.reviewLink ? { reviewLink: deps.reviewLink } : {}),
+    ...(deps.agents ? { agents: deps.agents } : {}),
+    ...(deps.allocator ? { allocator: deps.allocator } : {}),
+    ...(deps.localActivity ? { localActivity: deps.localActivity } : {}),
+    ...(deps.learned ? { learned: deps.learned } : {}),
     // Ключи телефона в устройства ядра (G9): тот же дом и журнал, что у чтения списка выше.
     devices: () => devicesPort,
   });

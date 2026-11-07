@@ -1,8 +1,8 @@
 import type { AgentTreeNode } from '@entities/AgentTree';
 
-/** Адрес узла в разметке: id субагента у CLI, без файла — id вызова `Agent`. */
+/** Адрес узла в разметке: id вызова `Agent` — он же узел субагента у ядра. */
 export function nodeKey(node: AgentTreeNode): string {
-  return node.agent.agentId ?? node.agent.id;
+  return node.agent.id;
 }
 
 /** Что сделать по клавише на узле дерева. */

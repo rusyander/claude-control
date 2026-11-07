@@ -1,5 +1,10 @@
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
-import type { SplitCheckDecision, SplitDeliverable } from '../split-check/index.ts';
+import type { PlanPieceExt } from '@agentdeck/contracts/core/model-tools';
+import type {
+  SplitCheckDecision,
+  SplitDeliverable,
+  SplitPlanContract,
+} from '../split-check/index.ts';
 
 /** Предложенная единица, как её пишет `split.proposed` (02:65-68). */
 export type ProposedUnit = JournalDataV1['split.proposed']['units'][number];
@@ -15,6 +20,11 @@ export interface ProposalSource {
 export interface SplitFlowInput {
   deliverable: SplitDeliverable;
   knownFiles?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Договор плана ведущего (этап 11, D6): куски плана по имени (проверка, роль, критерии, входы,
+   * спецификация — `split.proposed` их не несёт) и что судить. Нет — только правила P39.
+   */
+  plan?: { contract: SplitPlanContract; pieces: Readonly<Record<string, PlanPieceExt>> };
 }
 
 /** Решение по одному предложению: строка `decision` и `split.decided` уже в журнале. */

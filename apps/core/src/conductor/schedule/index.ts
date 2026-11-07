@@ -6,4 +6,9 @@ export type {
   ScheduleDecision,
   ScheduleInput,
   ScheduleRow,
+  SeatAnswer,
+  SeatAsk,
+  SeatBlock,
+  SeatHolder,
+  SeatPort,
 } from './schedule.types.ts';

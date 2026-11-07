@@ -30,9 +30,10 @@
  *   5. агент тестов — задача ядра: галочка «Тесты» даёт ей маршрут контура
  *      (`coreContourRoutes`), и процесс, который поднимает ядро, получает адрес
  *      звена ядра без ключа контура;
- *   6. чат чужого CLI — задача ядра (`startCoreForeignChat`, этап 10): с отмеченной
- *      галочкой `foreign:<cli>` её процесс получает адрес звена ядра — в переменных,
- *      которые задокументированы у ЭТОГО CLI, — а со снятой идёт своим входом CLI;
+ *   6. чат чужого CLI — ход реестра чата, как у Claude (этап 11, W3-17a: сборка сервера
+ *      `wireChat` → `CoreChatRun`, `panel-chat-turn.mjs`): с отмеченной галочкой «Чат» процесс
+ *      получает адрес звена ядра — в переменных, которые задокументированы у ЭТОГО CLI, — а со
+ *      снятой при «по возможности» идёт своим входом CLI;
  *   7. снятые нами слои (Т8) доезжают до argv процесса флагами, сервер MCP человека
  *      пропадает из строгого списка ядра, дописка панели к системному промпту не
  *      уезжает в бриф, а конфиг брокера прав едет. Слои на месте — флагов снятия нет,
@@ -41,13 +42,13 @@
  *      `apps/core/src/adapters/claude/claude.carry.live.integration.test.ts`;
  *   8. (помощник формы — вопрос ядра с этапа 10, F2b; его маршрут проверяют
  *      проверки `core-ask/one-shot`, здесь его нет);
- *   9. Kimi Code, Goose и OpenCode (X7) — задачи ядра тем же стартером: процесс получает
+ *   9. Kimi Code, Goose и OpenCode (X7) — ходы того же реестра чата: процесс получает
  *      адрес звена ядра в ТЕХ переменных, которые задокументированы у каждого
  *      (`packages/providers`), без ключа контура. Что настоящий CLI с этим окружением
  *      идёт в шлюз — `check-run-endpoint-cli.mjs`;
  *  10. запасной путь «Codex» (владелец 06.10): контур драйвером `openai-compat`
  *      с облачным адресом OpenAI ведёт тот же `claude` — чат, группа разделения
- *      и агент тестов получают адрес шлюза панели, модель OpenAI и
+ *      и агент тестов получают адрес шлюза ядра, модель OpenAI и
  *      заглушку ключа; ни ключа, ни облачного адреса в процессе нет.
  *
  * Запуск: node tools/qa/check-platform-run-env.mjs
@@ -323,13 +324,12 @@ async function main() {
     await import('../../apps/server/src/domains/project-tests/runs/runs.ts');
   const { createGroup, upsertCase } =
     await import('../../apps/server/src/domains/project-tests/store/store.ts');
-  const { startCoreForeignChat, withRoutes } =
-    await import('../../apps/server/src/domains/chat/core-foreign/core-foreign-start.ts');
+  const { panelChatRuns, startPanelChat } = await import('./panel-chat-turn.mjs');
   const { bootCore } = await import('../../apps/core/src/bootstrap/boot.ts');
   const { createCoreCaller } = await import('../../apps/server/src/domains/core-ask/core-ask.ts');
   const { createCoreChatPort } =
     await import('../../apps/server/src/domains/chat/core-run/core-chat-port.ts');
-  const { coreContourRoutes } =
+  const { chatContourRoutes, coreContourRoutes } =
     await import('../../apps/server/src/domains/platform/routing/core-contour.ts');
   const { reapCoreSessions } = await import('./throwaway-stand.mjs');
   ({ npmCmdShim } = await import('../../apps/core/src/platform/__fixtures__/shims.ts'));
@@ -355,6 +355,7 @@ async function main() {
   const foreignDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-'));
   const foreignOffDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-off-'));
   const foreignBestDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-best-'));
+  const foreignOwnDir = mkdtempSync(join(tmpdir(), 'cc-t3-foreign-own-'));
   const localDir = mkdtempSync(join(tmpdir(), 'cc-t3-local-'));
   // Конфиги Kimi и Goose — временные: проверка читает их (настройка мимо контура)
   // и не должна зависеть от конфигов человека на этой машине.
@@ -804,12 +805,14 @@ async function main() {
     }
     testRuns.stopAll();
 
-    // ── 4. Чат чужого CLI: галочка `foreign:<cli>` ───────────────────────────
-    // Мастер показывает эту галочку наравне с остальными, и до правки ревью Т3
-    // она была нарисованной: маршрут считался, а до запуска не доходил вовсе.
-    // Чат чужого CLI — задача ядра (этап 10, F2c): сервер заводит её стартером
-    // `startCoreForeignChat`, галочка — разрешённый набор задачи (`set-route` до `set-cli`).
-    const foreignTasks = [];
+    // ── 4. Чат чужого CLI: галочка «Чат» ─────────────────────────────────────
+    // Чат чужого CLI — ход того же реестра чата, что у Claude (этап 11, W3-17a): сборка сервера
+    // `wireChat` → `CoreChatRun`, CLI — активный провайдер, маршрут — галочка «Чат» активного
+    // контура (`set-route` до `set-cli`). Своя книга разговоров у сборки — в своём каталоге, чтобы
+    // не затирать книгу реестра Claude выше (обе пишут файл целиком).
+    const wiredData = join(appData, 'wired-chat');
+    const wiredRuns = await panelChatRuns({ appData: wiredData, store, coreHome: gateway.home() });
+    const foreignKeys = [];
     /** Хвост журнала задачи ядра — почему процесс не поднялся. */
     const journalTail = (taskId, count = 12) => {
       try {
@@ -827,18 +830,18 @@ async function main() {
         return [`журнал не прочитан: ${error}`];
       }
     };
-    /** Чат чужого CLI так, как его заводит сервер (продолжение, перенос). */
+    /** Новый чат CLI так, как его заводит панель (отправка, продолжение, перенос). */
     const startForeign = async (cli, dir) => {
       gitRepo(dir);
-      const outcome = await startCoreForeignChat(corePort, {
+      const outcome = await startPanelChat(wiredRuns, {
+        appData: wiredData,
+        store,
         cli,
         cwd: dir,
         prompt: 'привет',
-        title: `run-env ${cli}`,
-        ...withRoutes(coreContourRoutes(store, `foreign:${cli}`, cli)),
       }).catch((error) => ({ ok: false, code: 'core-unreachable', message: String(error) }));
-      if (outcome.ok) foreignTasks.push(outcome.taskId);
-      else console.log(`      ${cli}: ядро отказало: ${outcome.code} ${outcome.message}`);
+      if (outcome.ok) foreignKeys.push(outcome.key);
+      else console.log(`      ${cli}: ход отказан: ${outcome.code} ${outcome.message}`);
       return outcome;
     };
     /** Адрес звена ядра с путём диалекта (`/v1`): свой порт хоста звеньев, не шлюз человека. */
@@ -846,7 +849,7 @@ async function main() {
       const match = /^(http:\/\/127\.0\.0\.1:\d+)(\/.*)?$/.exec(url ?? '');
       return Boolean(match) && isHopLink(match[1]);
     };
-    writePlatform(store, { ...platform, consumers: [`foreign:${FOREIGN}`] });
+    writePlatform(store, { ...platform, consumers: ['chat'] });
 
     const sentOn = await startForeign(FOREIGN, foreignDir);
     check(sentOn.ok, 'чат чужого CLI заведён задачей ядра с маршрутом контура');
@@ -868,10 +871,10 @@ async function main() {
     // модели оставался `*`, сеанс отказывал «needs a concrete model» — галочка ничего не решала, а
     // прогон падал. Теперь сервер задаёт маршрут контура с моделью контура и при снятой галочке,
     // и процесс ОБЯЗАН подняться с адресом звена ядра — «процесса нет» больше не зелёное.
-    writePlatform(store, { ...platform, consumers: ['chat'] });
+    // Снята именно «Чат»: другая галочка («Тесты») стоит и чату ничего не решает.
+    writePlatform(store, { ...platform, consumers: ['tests'] });
     check(
-      coreContourRoutes(store, `foreign:${FOREIGN}`, FOREIGN)?.[0]?.route.id ===
-        `gateway:${CONTOUR}`,
+      chatContourRoutes(store, FOREIGN)?.[0]?.route.id === `gateway:${CONTOUR}`,
       'обязательный контур: со снятой галочкой сервер всё равно задаёт чату чужого CLI маршрут контура',
     );
     const sentOff = await startForeign(FOREIGN, foreignOffDir);
@@ -894,11 +897,13 @@ async function main() {
     // «По возможности»: галочка решает. Снятая — маршрута контура нет, задача идёт набором ядра по
     // умолчанию, то есть своим входом CLI, и адреса звена в процессе нет. Политику контура ядро
     // читает один раз на загрузку (`boot-core.ts`), поэтому смена режима — с перезапуском ядра.
-    writePlatform(store, { ...platform, mode: 'best-effort', consumers: ['chat'] });
+    // «Чат» — галочка разговоров Claude: чат qwen ведёт его собственная `foreign:qwen`
+    // (`chatConsumerOf`), и стоящая «Чат» его в контур уводить не должна.
+    writePlatform(store, { ...platform, mode: 'best-effort', consumers: ['chat', 'tests'] });
     await restartCore();
     check(
-      coreContourRoutes(store, `foreign:${FOREIGN}`, FOREIGN) === undefined,
-      '«по возможности»: со снятой галочкой сервер маршрута контура чату чужого CLI не задаёт',
+      chatContourRoutes(store, FOREIGN) === undefined,
+      '«по возможности»: галочка qwen снята («Чат» стоит) — сервер маршрута контура чату qwen не задаёт',
     );
     const sentBest = await startForeign(FOREIGN, foreignBestDir);
     const foreignBest = sentBest.ok ? await waitForCoreDump(foreignBestDir, 30) : undefined;
@@ -916,14 +921,40 @@ async function main() {
       bestLeases.length > 0 && bestLeases.every((line) => line.includes('cli-login:')),
       `«по возможности», галочка снята: арендован маршрут входа CLI (аренд ${bestLeases.length})`,
     );
+
+    // «По возможности», стоит только `foreign:qwen` (так её ставит подключение локальной модели):
+    // чат qwen идёт через контур, хотя «Чат» снята. Режим тот же — ядро не перезапускается.
+    writePlatform(store, { ...platform, mode: 'best-effort', consumers: [`foreign:${FOREIGN}`] });
+    check(
+      chatContourRoutes(store, FOREIGN)?.[0]?.route.id === `gateway:${CONTOUR}`,
+      '«по возможности», стоит только галочка qwen: сервер задаёт чату qwen маршрут контура',
+    );
+    const sentOwn = await startForeign(FOREIGN, foreignOwnDir);
+    const foreignOwn = sentOwn.ok ? await waitForCoreDump(foreignOwnDir, 30) : undefined;
+    const ownUrl = foreignOwn?.env.get('OPENAI_BASE_URL') ?? '';
+    const ownLeases = leasesOf(sentOwn);
+    if (sentOwn.ok && !foreignOwn)
+      for (const line of journalTail(sentOwn.taskId)) console.log(`      ${line}`);
+    check(
+      Boolean(foreignOwn) && hopBase(ownUrl) && !foreignOwn.raw.includes(SECRET),
+      `«по возможности», галочка qwen: процесс поднялся через звено ядра без ключа контура: ${
+        foreignOwn ? `адрес ${ownUrl || '—'}` : 'процесса нет'
+      }`,
+    );
+    check(
+      ownLeases.length > 0 && ownLeases.every((line) => line.includes(`gateway:${CONTOUR}`)),
+      `«по возможности», галочка qwen: арендован только маршрут контура (аренд ${ownLeases.length})`,
+    );
     writePlatform(store, { ...platform, consumers: ['chat'] });
+    // Разделы ниже ведут Claude: активный провайдер — как до этого раздела.
+    store.updateSettings({ provider: 'claude' });
     await restartCore();
 
     // ── 6а. Запасной путь «Codex»: совместимый шлюз в облаке OpenAI ──────────
     // Решение владельца 06.10: без отдельного движка — контур с облачным
     // OpenAI-совместимым адресом гонит тот же `claude` на модель OpenAI. Драйвер
     // и адрес шлюза в окружение прогона не входят: процесс видит только шлюз
-    // панели, модель — флагом. Провод к такому шлюзу — `check-platform-wire`, §13.
+    // ядра, модель — флагом. Провод к такому шлюзу — `check-platform-wire`, §13.
     const openai = {
       ...platform,
       driver: 'openai-compat',
@@ -1172,10 +1203,10 @@ async function main() {
     process.env.KIMI_CODE_HOME = join(cliHomes, 'kimi-home');
     process.env.APPDATA = join(cliHomes, 'appdata');
     mkdirSync(process.env.KIMI_CODE_HOME, { recursive: true });
-    // Чат каждого — задача ядра тем же стартером, что в §4: адрес — звено ядра в переменных,
+    // Чат каждого — ход того же реестра чата, что в §4: адрес — звено ядра в переменных,
     // задокументированных у этого CLI (`packages/providers`), ключ — заглушка звена.
     const sendTo = async (id, dir) => {
-      writePlatform(store, { ...platform, consumers: [`foreign:${id}`] });
+      writePlatform(store, { ...platform, consumers: ['chat'] });
       const sent = await startForeign(id, dir);
       check(sent.ok, `${id}: чат заведён задачей ядра с маршрутом контура`);
       return { sent, dump: sent.ok ? await waitForCoreDump(dir, 30) : undefined };
@@ -1245,9 +1276,9 @@ async function main() {
     // Прежняя строка «Kimi с [secondary_model] в конфиге человека — отказ без процесса» снята:
     // сеанс ядра конфиг человека не читает (свой дом Kimi на сеанс), и настройке в нём уводить
     // прогон мимо контура неоткуда; обход канала судит ядро (`compat`, `bypass_setting`).
-    for (const id of foreignTasks) {
-      await corePort.command(id, 'cancel', { reason: 'run-env check done' }).catch(() => undefined);
-    }
+    // «Остановить» человека: прогон снимает задачу ядра (`CoreChatRun.stop` → `cancel`).
+    for (const key of foreignKeys) wiredRuns.stop(key);
+    store.updateSettings({ provider: 'claude' });
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -1270,6 +1301,7 @@ async function main() {
       foreignDir,
       foreignOffDir,
       foreignBestDir,
+      foreignOwnDir,
       localDir,
       cliHomes,
       ...Object.values(endpointDirs),

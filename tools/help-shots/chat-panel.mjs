@@ -11,8 +11,8 @@
  * `deferred` — прежние вызовы, которые решает только человек: плашка «Ждёт
  * решения» и карточка прав, ставшая записью D-n.
  *
- * `agents` — план агента: дерево субагентов, значки скиллов, хуков и MCP и окно
- * с их хронологией; транскрипт настоящий, а не подменённый (см. `chat-agents.mjs`).
+ * `agents` — план агента и окно «Агенты»: узлы ядра разговора, субагент подробно и
+ * осиротевшая фоновая работа (подмена проверена схемами ядра, см. `chat-agents.mjs`).
  *
  * Разделены они не по объёму, а по входу: `basics` читают подряд с первого дня,
  * остальные — когда до них дошло дело.
@@ -34,7 +34,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { openScenario, applyShotLanguage, warmFront } from './kit.mjs';
 import { panelEnv, reapPanelCores } from './panel-core.mjs';
-import { shootBasics } from './chat-basics.mjs';
+import { BASICS_ONLY, shootBasics } from './chat-basics.mjs';
 import { shootDeferred } from './chat-deferred.mjs';
 import { shootAgents } from './chat-agents.mjs';
 
@@ -122,7 +122,8 @@ try {
       const basics = openScenario('chat', 'basics');
       console.log('\nсценарий basics');
       await shootBasics(browser, WEB, basics, home);
-      basics.finish();
+      // Пересъёмка части кадров (`FRAMES`) не снимает с учёта остальные.
+      basics.finish({ keepUnshot: BASICS_ONLY.size > 0 });
     }
 
     if (!only || only === 'deferred') {
@@ -135,7 +136,7 @@ try {
     if (!only || only === 'agents') {
       const agents = openScenario('chat', 'agents');
       console.log('\nсценарий agents');
-      await shootAgents(browser, WEB, agents, home);
+      await shootAgents(browser, WEB, agents);
       agents.finish();
     }
   } finally {

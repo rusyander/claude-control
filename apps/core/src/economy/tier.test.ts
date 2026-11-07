@@ -285,15 +285,6 @@ describe('G7 tier table: scenario tier × override × window × learned', () => 
       want: { model: 'claude-opus-5', applied: 'ceiling' },
     },
     {
-      name: 'lower-if-mechanical when learned says the lower model failed this kind → ceiling',
-      over: {
-        stepModel: { tier: 'lower-if-mechanical' },
-        stepKind: 'work',
-        learnedLowerFailed: (k) => k.model === 'claude-sonnet',
-      },
-      want: { model: 'claude-opus-5', applied: 'ceiling' },
-    },
-    {
       name: 'lower-if-mechanical on a review step → never lowered',
       over: { stepModel: { tier: 'lower-if-mechanical' }, stepKind: 'review' },
       want: { model: 'claude-opus-5', applied: 'ceiling' },

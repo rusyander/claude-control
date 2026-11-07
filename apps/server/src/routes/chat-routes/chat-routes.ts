@@ -4,9 +4,9 @@ import { apiTokenPath } from '../../lib/api-token/api-token.ts';
 import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
 import type { ChatSession } from '../../domains/chat/ChatSession/ChatSession.ts';
+import type { CoreChatHistory } from '../../domains/chat/core-run/core-chat-history.ts';
 import { registerChatTranscriptRoutes } from '../chat/transcript-routes/transcript-routes.ts';
 import { registerChatBrowseRoutes } from '../chat/browse-routes.ts';
-import { registerSubagentRoutes } from '../chat/subagent-routes/subagent-routes.ts';
 import { registerChatRunRoutes } from '../chat/run-routes/run-routes.ts';
 import { registerChatArtifactRoutes } from '../chat/artifact-routes.ts';
 import { registerChatCliRoutes } from '../chat/cli-routes/cli-routes.ts';
@@ -57,6 +57,8 @@ export function registerChatRoutes(
   outsideTurnEnded?: (sessionId: string) => void,
   /** Журнал сжатий контура из звена ядра (C3b) — подпись «контур сжал историю» в ленте. */
   summarizedIds?: () => Promise<Set<string>>,
+  /** История разговоров не-Claude CLI из видов сеансов ядра — лента, список и опрос. */
+  coreHistory?: CoreChatHistory,
 ): void {
   registerChatTranscriptRoutes(
     app,
@@ -64,9 +66,9 @@ export function registerChatRoutes(
     (chatId) => registry.isProcessAlive(chatId),
     awaitsYou,
     summarizedIds,
+    coreHistory,
   );
-  // Ход субагента — узел дерева агентов (`subagent-routes.ts`).
-  registerSubagentRoutes(app, ctx, registry);
+  // История агентов и ход субагента — у ядра (`/api/core/agents`, этап 11 W3-17), транскрипты не читаются.
   registerChatBrowseRoutes(app, ctx);
   registerChatRunRoutes(app, ctx, registry, session, heldOf);
   registerChatArtifactRoutes(app, ctx);

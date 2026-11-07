@@ -39,6 +39,10 @@ export const integrationsRu: Record<IntegrationsMessageCode, string> = {
     'Запрос не принят: токен Xray задаётся парой «clientId:clientSecret» через двоеточие ({{field}}).',
   'request-xray-no-key': 'Запрос не принят: Xray не выдал ключ по этой паре ({{field}}).',
   'request-jira-project-key-missing': 'Запрос не принят: не указан ключ проекта Jira ({{field}}).',
+  'request-tracker-key-missing': 'Запрос не принят: нужен ключ задачи трекера ({{field}}).',
+  'request-tracker-key-invalid':
+    'Запрос не принят: нужен ключ задачи трекера вида PROJ-12 ({{field}}).',
+  'integration-issue-empty': '{{system}} не вернула задачу {{key}}: тело ответа пустое.',
   'request-xray-refused': 'Запрос не принят: Xray отказал: {{failure}} ({{field}}).',
   'request-webhook-url-missing': 'Запрос не принят: не указан адрес вебхука ({{field}}).',
   'request-webhook-url-unparsed': 'Запрос не принят: адрес вебхука не разобрался ({{field}}).',

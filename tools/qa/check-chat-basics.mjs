@@ -125,7 +125,8 @@ await runOnStand(
       let sawUser = false;
       let sawPartial = false;
       let sawFinal = false;
-      for (let i = 0; i < 80 && !sawFinal; i += 1) {
+      // 30 с: холодный старт сеанса ядра сам по себе ~7 с (проба 07.11), ответ течёт ещё ~3 с.
+      for (let i = 0; i < 300 && !sawFinal; i += 1) {
         const now = await lines();
         sawUser ||= now.includes(ping);
         sawPartial ||= now.includes('П') || now.includes('Пон');

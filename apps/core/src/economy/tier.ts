@@ -1,12 +1,23 @@
-import { EFFORT_NEVER, PLANNING_KINDS, effortRank, modelRank, topEffort } from './tier-ladder.ts';
+import type { LearnedKey } from '@agentdeck/contracts/core/economy';
+import type { ModelTier } from '@agentdeck/contracts/core/scenario';
+import {
+  EFFORT_NEVER,
+  PLANNING_KINDS,
+  defaultRoleOf,
+  effortRank,
+  modelRank,
+  topEffort,
+} from './tier-ladder.ts';
+import { isOverride, overrideFor, type Picked } from './tier-override.ts';
+import { applyEscalation, applyPromotion, settleApplied } from './tier-raise.ts';
 import type {
   AllowedRoute,
-  OverrideRow,
   PickSource,
-  TierApplied,
+  RoleSource,
   TierDecision,
   TierInput,
   TierLadder,
+  TierPick,
   TierSkip,
 } from './tier.types.ts';
 import { routeWait } from './window/index.ts';
@@ -36,40 +47,10 @@ const sameRoute = (a: AllowedRoute, b: AllowedRoute): boolean =>
   a.route.id === b.route.id &&
   a.modelPattern === b.modelPattern;
 
+export { overrideFor };
+
 const label = (r: AllowedRoute): string =>
   `${r.adapter}/${r.route.kind}:${r.route.id}/${r.modelPattern}`;
-
-type Field = OverrideRow['field'];
-interface Picked {
-  value: string | null;
-  source: PickSource | null;
-}
-
-/**
- * Правка поля: шаг уже единицы, единица уже задачи; внутри уровня — последняя строка. Последняя
- * строка уровня со значением `null` снимает правку этого уровня — решает уровень шире.
- */
-export function overrideFor(
-  rows: readonly OverrideRow[],
-  field: Field,
-  ids: { taskId: string; unitId: string | null; stepId: string | null },
-): Picked {
-  const levels = [
-    { scope: 'step', id: ids.stepId, source: 'override-step' },
-    { scope: 'unit', id: ids.unitId, source: 'override-unit' },
-    { scope: 'task', id: ids.taskId, source: 'override-task' },
-  ] as const;
-  for (const level of levels) {
-    if (level.id === null) continue;
-    const last = rows
-      .filter((r) => r.field === field && r.scope === level.scope && r.scopeId === level.id)
-      .reduce<OverrideRow | null>((max, r) => (max === null || r.seq > max.seq ? r : max), null);
-    if (last?.value) return { value: last.value, source: level.source };
-  }
-  return { value: null, source: null };
-}
-
-const isOverride = (s: PickSource | null): boolean => s !== null && s.startsWith('override-');
 
 /** Маршруты шага внутри набора задачи; шаг без списка берёт весь набор. */
 function candidatesOf(input: TierInput): { candidates: AllowedRoute[]; dropped: AllowedRoute[] } {
@@ -134,19 +115,11 @@ export function lowerModel(
   return null;
 }
 
-interface Pick {
-  route: AllowedRoute;
-  model: string | null;
-  modelSource: PickSource;
-  effort: string | null;
-  effortSource: PickSource;
-  applied: TierApplied;
-  warnings: string[];
-}
-
-/** Уровень сценария над выбранной моделью: подъём усилия плана или понижение механики. */
-function applyLevel(input: TierInput, pick: Pick, reasons: string[]): void {
-  const level = input.stepModel.tier;
+/**
+ * Уровень над выбранной моделью — строки роли, иначе сценария: подъём усилия плана или понижение
+ * механики.
+ */
+function applyLevel(input: TierInput, level: ModelTier, pick: TierPick, reasons: string[]): void {
   const ladder = input.ladders?.[pick.route.adapter];
   const kind = input.stepKind;
   if (level === 'raise-for-planning') {
@@ -156,7 +129,7 @@ function applyLevel(input: TierInput, pick: Pick, reasons: string[]): void {
       );
       return;
     }
-    if (isOverride(pick.effortSource)) return;
+    if (pick.effortHuman) return;
     const top = topEffort(ladder);
     if (top === null) {
       reasons.push('tier raise-for-planning: no effort ladder for this adapter');
@@ -172,21 +145,13 @@ function applyLevel(input: TierInput, pick: Pick, reasons: string[]): void {
   }
   if (level !== 'lower-if-mechanical') return;
   const why: string[] = [];
-  if (isOverride(pick.modelSource)) why.push('model is the user override');
+  if (pick.modelHuman) why.push('model is the user override');
   if (kind === 'review') why.push('a reviewer is never lowered (reviewer ≥ author)');
   if (input.stepChecks?.mid === 'none') why.push('no mid checks verify a lowered step');
   if (input.lowerFailedHere)
     why.push('this step already failed at the lower tier: redo at ceiling');
   const lower = lowerModel(ladder, pick.model, pick.route.modelPattern);
   if (lower === null) why.push('no lower rung on the ladder inside the route pattern');
-  else if (
-    input.learnedLowerFailed?.({
-      adapter: pick.route.adapter,
-      routeId: pick.route.route.id,
-      model: lower,
-    })
-  )
-    why.push(`learned: ${lower} failed this step kind before`);
   if (why.length > 0 || lower === null) {
     reasons.push(`tier lower-if-mechanical kept at ceiling: ${why.join('; ')}`);
     return;
@@ -201,7 +166,7 @@ function applyLevel(input: TierInput, pick: Pick, reasons: string[]): void {
  * Ревьюер не слабее автора (03:139, P35). Правка человека побеждает с одним предупреждением;
  * иначе модель и усилие поднимаются до автора, а модель автора вне шаблона маршрута — отказ.
  */
-function reviewerFloor(input: TierInput, pick: Pick, reasons: string[]): string | null {
+function reviewerFloor(input: TierInput, pick: TierPick, reasons: string[]): string | null {
   const author = input.author;
   if (input.stepKind !== 'review' || !author) return null;
   const ladder = input.ladders?.[pick.route.adapter];
@@ -213,7 +178,7 @@ function reviewerFloor(input: TierInput, pick: Pick, reasons: string[]): string 
     const weaker = ra !== null && (rr === null ? pick.model !== author.model : rr < ra);
     if (weaker) {
       below.push(`model ${pick.model ?? 'cli default'} < ${author.model}`);
-      if (isOverride(pick.modelSource)) overridden = true;
+      if (pick.modelHuman) overridden = true;
       else if (modelMatches(pick.route.modelPattern, author.model)) {
         pick.model = author.model;
         pick.modelSource = 'author';
@@ -226,7 +191,7 @@ function reviewerFloor(input: TierInput, pick: Pick, reasons: string[]): string 
   const er = effortRank(ladder, pick.effort);
   if (ea !== null && (er === null || er < ea)) {
     below.push(`effort ${pick.effort ?? 'cli default'} < ${author.effort}`);
-    if (isOverride(pick.effortSource)) overridden = true;
+    if (pick.effortHuman) overridden = true;
     else {
       pick.effort = author.effort;
       pick.effortSource = 'author';
@@ -239,8 +204,8 @@ function reviewerFloor(input: TierInput, pick: Pick, reasons: string[]): string 
 }
 
 /** Усилие, выбранное не человеком, никогда не `max`: ступень ниже, до потолка подъёма. */
-function clampEffort(input: TierInput, pick: Pick, reasons: string[]): void {
-  if (pick.effort !== EFFORT_NEVER || isOverride(pick.effortSource)) return;
+function clampEffort(input: TierInput, pick: TierPick, reasons: string[]): void {
+  if (pick.effort !== EFFORT_NEVER || pick.effortHuman) return;
   const top = topEffort(input.ladders?.[pick.route.adapter]);
   reasons.push(`effort ${EFFORT_NEVER} is never chosen by the core: ${top ?? 'cli default'}`);
   pick.effort = top;
@@ -275,7 +240,13 @@ export function decideTier(input: TierInput): TierDecision {
     (r) => !skipped.some((s) => s.route === r) && !paidBlocked.includes(r),
   );
   const adapter = overrideFor(input.overrides, 'adapter', ids);
-  const model = overrideFor(input.overrides, 'model', ids);
+  const row = input.roleRow ?? null;
+  // Модель строки роли — выбор человека в настройках ведущего: ниже правки, выше потолка задачи.
+  const modelOverride = overrideFor(input.overrides, 'model', ids);
+  const model: Picked =
+    modelOverride.value === null && row?.row.model
+      ? { value: row.row.model, source: row.source }
+      : modelOverride;
   const effort = overrideFor(input.overrides, 'effort', ids);
   const failed: string[] = [];
   if (candidates.length === 0) failed.push('no allowed route for this step');
@@ -318,20 +289,53 @@ export function decideTier(input: TierInput): TierDecision {
   const first = chosen.pick as { model: string | null; source: PickSource };
   let effortSource: PickSource = 'cli-default';
   if (effort.source) effortSource = effort.source;
+  else if (row?.row.effort) effortSource = row.source;
   else if (input.stepModel.effort) effortSource = 'step';
-  const pick: Pick = {
+  const pick: TierPick = {
     route: chosen.route,
     model: first.model,
     modelSource: first.source,
-    effort: effort.value ?? input.stepModel.effort ?? null,
+    effort: effort.value ?? row?.row.effort ?? input.stepModel.effort ?? null,
     effortSource,
     applied: 'ceiling',
     warnings: [],
+    modelHuman: model.value !== null,
+    effortHuman: effort.value !== null,
   };
-  applyLevel(input, pick, reasons);
+  const role = input.role !== undefined ? input.role : defaultRoleOf(input.stepKind);
+  const baseModel = pick.model;
+  const project = input.project ?? null;
+  const learnedKey: LearnedKey | null =
+    project === null || input.stepKind === undefined
+      ? null
+      : {
+          project,
+          stepKind: input.stepKind,
+          adapter: pick.route.adapter,
+          route: pick.route.route.id,
+          model: pick.model,
+          ...(role ? { role } : {}),
+        };
+  const level = row?.row.tier ?? input.stepModel.tier;
+  if (row) reasons.push(`role ${role ?? 'none'}: ${row.source} row ${level}`);
+  // Эскалация шагает от ступени прошлой попытки — уровень её уже решил.
+  if (!input.escalation) applyLevel(input, level, pick, reasons);
+  const promotion = applyPromotion(input, pick, learnedKey, reasons, modelMatches);
+  const preEscalation = { model: pick.model, effort: pick.effort };
+  const escalation = applyEscalation(input, pick, reasons, modelMatches);
+  // Источник «эскалация» — только когда она сдвинула выбор: у потолка или вне шаблона выбор тот
+  // же, и его по-прежнему назвала строка роли или сценарий.
+  const escalated =
+    escalation !== null &&
+    (pick.model !== preEscalation.model || pick.effort !== preEscalation.effort);
+  if (promotion || escalation) settleApplied(input, pick, baseModel);
   const floor = reviewerFloor(input, pick, reasons);
   if (floor !== null) return refuse([floor]);
   clampEffort(input, pick, reasons);
+  let roleSource: RoleSource = row ? row.source : 'scenario';
+  if (promotion && promotion.rungs > 0) roleSource = 'learned-promotion';
+  if (escalated) roleSource = 'escalation';
+  if (pick.modelHuman || pick.effortHuman) roleSource = 'human';
   // Платный маршрут выбран — потому что подписки в наборе шага нет или человек его назвал.
   const viaKey = pick.route.route.kind === 'api-key';
   reasons.push(
@@ -354,10 +358,15 @@ export function decideTier(input: TierInput): TierDecision {
       model: pick.modelSource,
       effort: pick.effortSource,
     },
-    asked: input.stepModel.tier,
+    asked: level,
     applied: pick.applied,
     warnings: pick.warnings,
     learning: override ? 'override' : 'counted',
+    role,
+    roleSource,
+    escalation,
+    promotion,
+    learnedKey,
     dropped: [...dropped, ...unregistered],
     skipped,
     alternatives,

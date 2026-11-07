@@ -102,11 +102,7 @@ export interface CarryDeps extends CarryPlanDeps {
    * (прогон не пошёл, хранилище не завело, задание не ушло) приезжали одним
    * пустым ответом, и исход переноса оставался без единого слова.
    */
-  readonly open: (input: {
-    title: string;
-    cwd: string;
-    prompt: string;
-  }) => CarryOpened | Promise<CarryOpened>;
+  readonly open: (input: { cwd: string; prompt: string }) => CarryOpened | Promise<CarryOpened>;
   /**
    * Заметка в ленту разговора по его ключу. `false` — сказать было некуда: у
    * Claude лента это транскрипт самого CLI, и панель говорит только в живой
@@ -181,7 +177,7 @@ export async function carryChat(source: CarrySourceChat, deps: CarryDeps): Promi
   const depth = deps.chains.depth(aliases) + 1;
   const title = continuationTitle(source.title, depth);
 
-  const opened = await deps.open({ title, cwd: source.cwd, prompt });
+  const opened = await deps.open({ cwd: source.cwd, prompt });
   // Отказ цели НАЗЫВАЕТСЯ. Прежде три разные беды — прогон не пошёл, хранилище
   // не завело разговор, задание в заведённый разговор не ушло — приезжали одним
   // «не перенесено» без причины, и человеку нечем было отличить неполадку CLI

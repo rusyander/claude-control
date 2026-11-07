@@ -1,4 +1,5 @@
 import type { JournalLine } from '@agentdeck/contracts/core/journal';
+import type { LeadSection } from '@agentdeck/contracts/core/lead';
 import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import type { BriefPart } from '../../context/brief/index.ts';
 import { tokensOf } from '../../context/base/index.ts';
@@ -18,6 +19,7 @@ import { readJournalLines } from '../../journal/read-lines.ts';
 import { allowedRoutesOf } from '../../journal/reduce/fold-view.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
+import { routingFacts, type RoutingFactsDeps } from './routing-facts.ts';
 
 /**
  * Порт экономики исполнителя (этап 5, W): судьи у владельцев — окно (L, `WindowBook`), модель,
@@ -67,6 +69,11 @@ export interface RunEconomyDeps {
    * нет — окно, названное сессией в `turn.usage`; нет и его — правило 60 % продолжения не судит.
    */
   windowOf?(routeId: string, model: string | null): number | null;
+  /**
+   * Факты шага суда `tier` (этап 11, `routing-facts.ts`): раздел ведущего, политика машины, подъём
+   * по обучению. Нет — роль, эскалация и автор всё равно из журнала, строки роли без правок.
+   */
+  facts?: RoutingFactsDeps;
   recheckMs?: number;
   keepWarmTickMs?: number;
 }
@@ -150,10 +157,18 @@ export function createRunEconomy(deps: RunEconomyDeps): RunEconomy {
     const routes = [...new Set(allowedRoutesOf(task.state).map((r) => r.route.id))];
     let lines: JournalLine[] | null = null;
     const contour = deps.contour?.();
+    // Раздел ведущего читается с диска один раз на проход суда (как строки журнала выше): строка
+    // роли и порог подъёма каждого шага прохода судят по одному чтению настройки ядра.
+    let section: { value: LeadSection | undefined } | null = null;
+    const facts = deps.facts && {
+      ...deps.facts,
+      leadSection: () => (section ??= { value: deps.facts?.leadSection?.() }).value,
+    };
     return {
       windows: routes.flatMap((id) => deps.windows.decide(id, now)),
       ...(contour ? { contour } : {}),
       ...(deps.ladders ? { tier: { ladders: deps.ladders } } : {}),
+      step: (state, step) => routingFacts(state, (lines ??= linesOf(task)), step, facts),
       continuation: (candidate) => {
         const read = (lines ??= linesOf(task));
         const present = transcriptOf(task, candidate, read);

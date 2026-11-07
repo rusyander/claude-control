@@ -237,6 +237,32 @@ function argumentsDelta(delta: Record<string, Json>): { index: number; text: str
   return undefined;
 }
 
+/**
+ * Несёт ли кадр потока что-то кроме текста своего канала. У OpenAI первый кадр вызова — id,
+ * тип и имя при `arguments: ""`, первый кадр ответа — роль при пустом `content`; причина
+ * остановки и расход тоже едут в кадре с текстом. Такой кадр нельзя выбросить, даже когда весь
+ * его текст удержан подстановкой: без заголовка вызова клиент получает аргументы без имени и
+ * отвергает ответ целиком. У Anthropic кадр текста — только индекс и кусок: имя вызова живёт в
+ * `content_block_start`, который идёт мимо подстановки.
+ */
+export function deltaCarriesMore(event: Json, kind: DlpApiKind): boolean {
+  if (kind === 'anthropic' || !isRecord(event) || !Array.isArray(event.choices)) return false;
+  if (event.choices.length > 1 || event.usage != null) return true;
+  const choice = event.choices[0];
+  if (!isRecord(choice) || !isRecord(choice.delta)) return false;
+  if (choice.finish_reason != null) return true;
+  for (const [key, value] of Object.entries(choice.delta)) {
+    if (key === 'content' || value == null) continue;
+    if (key !== 'tool_calls' || !Array.isArray(value)) return true;
+    if (value.length > 1) return true;
+    const call = value[0];
+    if (!isRecord(call)) continue;
+    if (call.id != null || call.type != null) return true;
+    if (isRecord(call.function) && call.function.name != null) return true;
+  }
+  return false;
+}
+
 /** Тот же кадр с подменённым текстом — для выпуска наружу. */
 export function withDeltaText(event: Json, kind: DlpApiKind, text: string): Json {
   if (!isRecord(event)) return event;

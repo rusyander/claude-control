@@ -9,7 +9,7 @@ import {
   findTranscript,
 } from '../../../domains/chat/ChatHistory/ChatHistory.ts';
 import { genTimesById } from '../../../domains/chat/gen-time-ledger/gen-time-ledger.ts';
-import { readChatProgressWithTree } from '../../../domains/chat/subagent-tree/subagent-tree.ts';
+import { readChatProgress } from '../../../domains/chat/ChatProgress/ChatProgress.ts';
 import { searchChats } from '../../../domains/chat/ChatSearch/ChatSearch.ts';
 import { listProjects } from '../../../domains/chat/ChatProjects/ChatProjects.ts';
 import { buildChatExport, type ExportFormat } from '../../../domains/chat/ChatExport/ChatExport.ts';
@@ -26,6 +26,7 @@ import { sendConditional } from '../../../lib/conditional-get/conditional-get.ts
 import { projectsDir } from '../paths.ts';
 import { chatActiveMs } from '../../../domains/chat/chat-active-time/chat-active-time.ts';
 import { createLimitShareReader } from '../../../domains/chat/limit-journal/limit-journal.ts';
+import type { CoreChatHistory } from '../../../domains/chat/core-run/core-chat-history.ts';
 
 /**
  * Группа в работе: идёт ход, ждёт человека или доводит фоновую команду.
@@ -46,6 +47,11 @@ export function registerChatTranscriptRoutes(
    * ядра (C3b). Читатель не бросает: ядро молчит — пусто, лента без подписи, но не встаёт.
    */
   summarizedIds: () => Promise<Set<string>> = () => Promise.resolve(new Set()),
+  /**
+   * История разговоров не-Claude CLI из видов сеансов ядра (этап 11, волна 3): их транскрипта
+   * панель не читает. Нет — такие разговоры живут только во вкладке, как было до волны 3.
+   */
+  coreHistory?: CoreChatHistory,
 ): void {
   // Тарифы достаёт слой маршрутов: кэш прайса и свои цены пользователя видны
   // только отсюда. Отдаём функцию, а не снимок, — правка цен подхватывается
@@ -67,8 +73,16 @@ export function registerChatTranscriptRoutes(
    * Ответ условный (ETag): список перечитывается на каждое событие наблюдателя
    * и по возврату в окно, а меняется реже, чем спрашивается.
    */
-  app.get('/api/chats', (request, reply) => {
-    const chats = readChats(projectsDir(ctx));
+  app.get('/api/chats', async (request, reply) => {
+    // Разговоры не-Claude CLI — сводками из ядра рядом со сводками транскриптов, тем же порядком.
+    const foreign = coreHistory ? await coreHistory.summaries().catch(() => []) : [];
+    const own = readChats(projectsDir(ctx));
+    const chats =
+      foreign.length === 0
+        ? own
+        : [...own, ...foreign.filter((chat) => !own.some((o) => o.id === chat.id))].sort((a, b) =>
+            b.updatedAt.localeCompare(a.updatedAt),
+          );
     const links = ctx.store.getChatLinks();
     // Разговоры деревьев на паузе — фишка в списке. Считается по записям паузы
     // и связям, а не по реестру: остановленный прогон из реестра УШЁЛ, и ничем
@@ -263,9 +277,11 @@ export function registerChatTranscriptRoutes(
   );
 
   /** Проекты, с которыми работал Claude Code, — для таба «Проекты» в чате. */
-  app.get('/api/chats/projects', (request, reply) =>
-    sendConditional(request, reply, listProjects(projectsDir(ctx))),
-  );
+  app.get('/api/chats/projects', async (request, reply) => {
+    // Разговоры не-Claude CLI — в своих проектах, как в `/api/chats`: по этому списку их находит телефон.
+    const foreign = coreHistory ? await coreHistory.summaries().catch(() => []) : [];
+    return sendConditional(request, reply, listProjects(projectsDir(ctx), foreign));
+  });
 
   /**
    * Лента переписки окном. По умолчанию — последние сообщения; более ранние
@@ -277,6 +293,11 @@ export function registerChatTranscriptRoutes(
     async (request) => {
       const limit = clampInt(request.query.limit, DEFAULT_MESSAGE_PAGE, 1, MAX_MESSAGE_PAGE);
       const offset = clampInt(request.query.offset, 0, 0, Number.MAX_SAFE_INTEGER);
+      // Разговор не-Claude CLI транскрипта у панели не имеет — его лента из видов сеансов ядра.
+      if (coreHistory && !findTranscript(projectsDir(ctx), request.params.chatId)) {
+        const core = await coreHistory.messages(request.params.chatId, { limit, offset });
+        if (core) return { ...core, messages: core.messages.map(withStepCost) };
+      }
       const page = await readChatMessages(projectsDir(ctx), request.params.chatId, {
         limit,
         offset,
@@ -300,9 +321,13 @@ export function registerChatTranscriptRoutes(
    *
    * Нет файла — нули: разговор ещё не начат, и это не ошибка.
    */
-  app.get<{ Params: { chatId: string } }>('/api/chats/:chatId/version', (request) => {
+  app.get<{ Params: { chatId: string } }>('/api/chats/:chatId/version', async (request) => {
     const path = findTranscript(projectsDir(ctx), request.params.chatId);
-    if (!path) return { mtimeMs: 0, size: 0 };
+    if (!path) {
+      // Разговор не-Claude CLI: отпечаток — стена последнего хода и байты вывода его сеансов.
+      const core = await coreHistory?.version(request.params.chatId).catch(() => undefined);
+      return core ?? { mtimeMs: 0, size: 0 };
+    }
 
     try {
       const stats = statSync(path);
@@ -318,9 +343,9 @@ export function registerChatTranscriptRoutes(
    * Только чтение — план принадлежит агенту, панель его не правит.
    */
   app.get<{ Params: { chatId: string } }>('/api/chat/:chatId/progress', (request) => {
-    // Субагенты — деревом: вложенные, потерянные в середине большого файла, с
-    // моделью, вызовами и расходом каждого (по их собственным транскриптам).
-    const progress = readChatProgressWithTree(projectsDir(ctx), request.params.chatId);
+    // Субагенты — вызовы главного разговора; их дерево, модель, расход и фон — у ядра
+    // («Агенты», `/api/core/agents`), транскрипты субагентов панель не читает (этап 11 W3-17).
+    const progress = readChatProgress(projectsDir(ctx), request.params.chatId);
     // Фон в транскрипте числится идущим и после смерти процесса: уведомление об
     // обрыве пишет только СЛЕДУЮЩИЙ процесс. Правду знает реестр.
     return {
@@ -339,15 +364,22 @@ export function registerChatTranscriptRoutes(
       const { chatId } = request.params;
       const format: ExportFormat = request.query.format === 'json' ? 'json' : 'md';
 
-      const page = await readChatMessages(projectsDir(ctx), chatId, {
-        limit: Number.MAX_SAFE_INTEGER,
-      });
+      const all = { limit: Number.MAX_SAFE_INTEGER, offset: 0 };
+      // Разговор не-Claude CLI выгружается из видов сеансов ядра, как его лента.
+      const core = findTranscript(projectsDir(ctx), chatId)
+        ? undefined
+        : await coreHistory?.messages(chatId, all).catch(() => undefined);
+      const page = core ?? (await readChatMessages(projectsDir(ctx), chatId, all));
       if (page.messages.length === 0)
         return reply
           .code(404)
           .send({ message: 'Разговор не найден', messageCode: 'conversation-not-found' });
 
-      const title = readChats(projectsDir(ctx)).find((chat) => chat.id === chatId)?.title;
+      const listed =
+        core && coreHistory
+          ? await coreHistory.summaries().catch(() => [])
+          : readChats(projectsDir(ctx));
+      const title = listed.find((chat) => chat.id === chatId)?.title;
       const file = buildChatExport(page.messages, format, title);
       const safeId = chatId.replace(/[^a-zA-Z0-9-]/g, '') || 'chat';
 

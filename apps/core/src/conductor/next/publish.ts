@@ -1,6 +1,7 @@
 import type { Scenario, StepDef } from '@agentdeck/contracts/core/scenario';
 import { publicationOf } from '../../journal/reduce/publish.ts';
 import type { TaskFoldState, UnitRecord } from '../../journal/reduce/reduce.types.ts';
+import { integratedGate } from '../gates/integrated.ts';
 import { endCode, latest } from './attempts.ts';
 import {
   END_REASON,
@@ -78,6 +79,8 @@ function afterRefusal(
   const { state } = input;
   const unitId = view.unitId;
   if (remedied(view, last)) return retry(unitId, def, last);
+  // Сюда доходит только при зелёных воротах `integrated` нового круга (`publishStep` выше).
+  if (next === 'reintegrate') return retry(unitId, def, last);
   if (next === 'wait-forge') {
     // Ждёт только публикация этой единицы (P77): срок — от стены строки `publish.backoff`.
     const backoff = publicationOf(state, unitId).backoff;
@@ -169,6 +172,11 @@ export function publishStep(
   if (behind.length > 0) {
     return { kind: 'wait', reason: `publish order: waits for unit ${behind.join(', ')}` };
   }
+  // Ворота `integrated` (W3-18b): единица с интеграцией публикуется только после её зелёного.
+  const integrated = integratedGate(state, unitId);
+  if (integrated?.kind === 'red')
+    return { kind: 'end-unit', unitId, event: 'close', reason: integrated.reason };
+  if (integrated?.kind === 'wait') return { kind: 'wait', reason: integrated.reason };
   const last = latest(view, def.id);
   if (!last) return { kind: 'start-step', unitId, stepDefId: def.id, round: 0, why: 'first' };
   if (last.rec.state === 'failed' && endCode(last.rec) === END_REASON.publishRefused) {

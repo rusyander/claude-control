@@ -29,6 +29,10 @@ export const SIGNAL_SUBJECTS = [
   'command',
   'resource',
   'route',
+  'task',
+  'agent',
+  'split',
+  'unit',
 ] as const;
 export type SignalSubject = (typeof SIGNAL_SUBJECTS)[number];
 
@@ -90,6 +94,20 @@ export const SIGNAL_VIEW = {
   stall: prose('session'),
   'resource-leak': prose('resource'),
   window: prose('route'),
+  // Этап 11 (P143, P148, P149): расход сверх оценки — на задачу; фон и чужой расход — на узел агента.
+  'spend-over-estimate': prose('task'),
+  'spend-misattributed': prose('agent'),
+  'bg-orphan': prose('agent'),
+  'bg-hang': prose('agent'),
+  'child-outlived-parent': prose('agent'),
+  // Этап 11 (W2-6, P36): приём ведущего — линт тела источника (строки) и отложенная карточка.
+  'intake-lint': json('task'),
+  'intake-deferred': prose('task'),
+  // Этап 11 (W3-16, P141): ожидание места первого сеанса ведущего — числа на оценке.
+  'lead-session-wait': json('phase'),
+  // Этап 11 (W3-18, W3-18b): дочерние задачи XL на запуске деления; конфликт слияния голов единиц.
+  'xl-children': json('split'),
+  'integration-conflict': json('unit'),
 } as const satisfies Record<string, SignalViewDef>;
 
 export type SignalId = keyof typeof SIGNAL_VIEW;
@@ -117,6 +135,13 @@ export const SIGNAL_FACT_KEYS = [
   'sources',
   'grants',
   'changes',
+  'tasks',
+  'files',
+  'branches',
+  'waitMinutes',
+  'seats',
+  'medianMinutes',
+  'samples',
 ] as const;
 export type SignalFactKey = (typeof SIGNAL_FACT_KEYS)[number];
 
@@ -256,6 +281,42 @@ const FACTS: { [S in JsonSignal]: (v: unknown) => SignalFact[] | null } = {
       ...fact('model', v.model),
       ...list('resources', strs(v.rids)),
     ];
+  },
+  // Линт приёма: строки источника, которые просят сессию о работе ядра — где, правило, текст.
+  'intake-lint': (v) => {
+    if (!Array.isArray(v)) return null;
+    return v.filter(isObj).map((r) => ({
+      label: `${scalar(r.source) ?? '?'}:${scalar(r.line) ?? '?'} ${scalar(r.rule) ?? '?'}`,
+      value: scalar(r.text) ?? '',
+    }));
+  },
+  // Ожидание места сеанса (`SessionWait` ядра): минуты ожидания, места «держат + ждут / ёмкость»,
+  // медиана сеанса и число образцов; `why` — проза ядра, она же объясняет пустое ожидание.
+  'lead-session-wait': (v) => {
+    if (!isObj(v)) return null;
+    const min = (ms: unknown) =>
+      typeof ms === 'number' && Number.isFinite(ms) ? Math.round(ms / 6000) / 10 : undefined;
+    const counts = [v.holders, v.slotWaiters, v.capacity].map(scalar);
+    const seats = counts.every((c) => c !== undefined)
+      ? `${counts[0]} + ${counts[1]} / ${counts[2]}`
+      : undefined;
+    return [
+      ...fact('waitMinutes', min(v.waitMs)),
+      ...fact('seats', seats),
+      ...fact('medianMinutes', min(v.medianMs)),
+      ...fact('samples', v.samples),
+      ...list('reasons', strs([v.why])),
+    ];
+  },
+  // Дочерние задачи XL: их id и отказы запуска (прозой ядра).
+  'xl-children': (v) => {
+    if (!isObj(v)) return null;
+    return [...list('tasks', strs(v.taskIds)), ...list('problems', strs(v.problems))];
+  },
+  // Конфликт интеграции: файлы конфликта и пара веток единиц, чьи головы не слились.
+  'integration-conflict': (v) => {
+    if (!isObj(v)) return null;
+    return [...list('files', strs(v.files)), ...list('branches', strs(v.between))];
   },
 };
 

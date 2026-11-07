@@ -99,7 +99,7 @@ export interface ProviderEndpointFile {
    *
    * Оба здешних CLI «OpenAI-совместимы», но ручки у них разные: Continue идёт в
    * `/chat/completions`, а Codex с версии, снявшей `wire_api = "chat"`
-   * (`openai/codex#7782`), умеет только `/responses`. Шлюз панели обслуживает
+   * (`openai/codex#7782`), умеет только `/responses`. Шлюз ядра обслуживает
    * четыре маршрута, и `responses` среди них нет
    * (`@agentdeck/contracts/platform-gateway-routes`, `GATEWAY_ROUTES`).
    *

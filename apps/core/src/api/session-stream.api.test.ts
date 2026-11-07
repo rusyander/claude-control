@@ -22,7 +22,7 @@ afterEach(async () => {
   stand = undefined;
 });
 
-function seedSession(s: Stand, adapter: string, fixture: string | null): string {
+function seedSession(s: Stand, adapter: string, fixture: string | null, wall?: number): string {
   const task = s.registry.live(s.taskId)!;
   const sessionId = newId();
   task.append({
@@ -57,7 +57,7 @@ function seedSession(s: Stand, adapter: string, fixture: string | null): string 
     const data = JSON.stringify({ type: 'user', message: { role: 'user', content: 'hello one' } });
     writeFileSync(
       join(dir, IO_RECORD),
-      `${JSON.stringify({ t: 'send', cmdId: A, uuid: A, at: 0, data })}\n`,
+      `${JSON.stringify({ t: 'send', cmdId: A, uuid: A, at: 0, ...(wall === undefined ? {} : { wall }), data })}\n`,
     );
   }
   return sessionId;
@@ -98,6 +98,23 @@ describe('GET /v1/tasks/:id/sessions/:sid/stream (stage 10)', () => {
       const tail = await page(stand, sid, mid);
       expect(tail.body.events[0]?.offset).toBe(mid);
       expect(tail.body.events.some((e) => e.kind === 'user-text')).toBe(false);
+    },
+  );
+
+  // Этап 11, волна 3: история чата не-Claude CLI ставит время хода по стене отправки — вид
+  // называет её у хода человека (`sentAt`); запись без стены — ход без времени, как прежде.
+  it.each(['claude', 'qwen'])(
+    '%s: the human turn carries the wall clock of its send (`sentAt`), none without one',
+    async (adapter) => {
+      stand = await startStand(undefined, { adapters: createAdapterRegistry() });
+      const stamped = seedSession(stand, adapter, fixturePath(adapter, 'basic'), 1_762_400_000_000);
+      expect((await page(stand, stamped)).body.events[0]).toEqual({
+        offset: 0,
+        kind: 'user-text',
+        data: { text: 'hello one', sentAt: 1_762_400_000_000 },
+      });
+      const bare = seedSession(stand, adapter, fixturePath(adapter, 'basic'));
+      expect((await page(stand, bare)).body.events[0]?.data).toEqual({ text: 'hello one' });
     },
   );
 

@@ -6,6 +6,7 @@ import type { JournalLine } from '@agentdeck/contracts/core/journal';
 import type { SessionStreamPage } from '@agentdeck/contracts/core/session-stream';
 import type { TaskView } from '@agentdeck/contracts/core/task-view';
 import type { ChatPermissionReply } from '../ChatPermissions/ChatPermissions.ts';
+import type { CarryOutcome } from './session-carry.ts';
 
 /** Оценка ядра: задача заведена и ждёт запуска, или отказ с причиной ядра дословно. */
 export type CoreEstimateOutcome =
@@ -58,11 +59,18 @@ export interface CoreChatPort {
 export interface CoreChatEntry {
   taskId: string;
   stepId: string;
+  /** CLI, которым разговор начат (W3-17a); нет — прежняя запись, а все они начаты Claude. */
+  cli?: string;
+  /** Папка разговора (волна 3): по ней список чатов ставит разговор не-Claude CLI в его проект. */
+  cwd?: string;
 }
 
 /** Книга разговоров: id разговора CLI → задача ядра. Переживает перезапуск панели. */
 export interface CoreChatBook {
+  /** Живая задача разговора; кончилась (`forget`) — `undefined`, хотя CLI разговора помнится. */
   get(conversationId: string): CoreChatEntry | undefined;
+  /** CLI разговора — переживает конец задачи: продолжение идёт тем же CLI. */
+  cliOf(conversationId: string): string | undefined;
   set(conversationId: string, entry: CoreChatEntry): void;
   forget(conversationId: string): void;
 }
@@ -91,12 +99,28 @@ export interface CoreChatRunDeps {
   waitMs?: number;
   now?: () => number;
   /**
-   * Маршрут контура потребителя «Чат» на этот ход (`coreContourRoutes(store, 'chat', 'claude')`):
+   * Маршрут контура потребителя «Чат» на этот ход для CLI разговора (`coreContourRoutes(store,
+   * 'chat', cli)`):
    * читается заново на каждую новую задачу — выбор человека на карточке контура меняется между
    * ходами. Нет или `undefined` — набор ядра по умолчанию, как у чата без контура. `asked` — модель
    * хода: шаблон маршрута несёт её перевод контуром, и `set-model` шлёт его (s10 G7).
    */
-  routes?: (asked: string) => AskFields['routes'];
+  routes?: (asked: string, cli: string) => AskFields['routes'];
+  /**
+   * Активный провайдер панели (`getActiveProviderId`, W3-17a): CLI нового разговора. Своего выбора
+   * CLI у чата нет — переключатель провайдера в боковой панели и есть этот выбор. Нет — `claude`.
+   */
+  activeCli?: () => string;
+  /**
+   * Слой панели разговору не-Claude CLI (G6, `createForeignCarry`): строка о тестах и набор ЭТОГО
+   * CLI. Сборка реестра (`RunOptions`) — слой Claude: плагин, источники и флаги чужому CLI ядро
+   * отказало бы. Нет — разговор чужого CLI идёт без слоя панели.
+   */
+  foreignCarry?: (input: {
+    cli: string;
+    cwd: string;
+    routes?: NonNullable<AskFields['routes']>;
+  }) => CarryOutcome;
   /**
    * Где панель кладёт вложения чата (`sandboxRoot()` по умолчанию): файлы под ним уходят ядру
    * байтами, остальные пути остаются в тексте хода (s10 G11).

@@ -38,5 +38,5 @@ export async function fetchNonce(page: string = pageLoadId()): Promise<string> {
 export async function sendCoreCommand(draft: CommandDraft): Promise<CommandOutcome> {
   const page = pageLoadId();
   const nonce = await fetchNonce(page);
-  return corePost<CommandOutcome>('/commands', commandEnvelope(draft, nonce, page));
+  return corePost<CommandOutcome>('/commands', commandEnvelope(draft, nonce, page, draft.cmdId));
 }

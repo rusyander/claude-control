@@ -7,6 +7,7 @@ import {
   REPORT_POINTS,
   WINDOW_VERDICTS,
 } from './journal-data.ts';
+import { LEAD_PROFILES, TASK_CLASSES } from './lead.ts';
 import { routeSchema } from './route-schema.ts';
 import { scenarioRefSchema } from './scenario.ts';
 import { ASK_STATES, SESSION_STATES, STEP_STATES, TASK_STATES } from './states.ts';
@@ -91,6 +92,11 @@ export const askViewSchema = z.strictObject({
   state: z.enum(ASK_STATES),
   point: nonNeg,
   source: z.enum(HUMAN_ASK_SOURCES),
+  /**
+   * Ключ вопроса (`human.asked.dedupe`): у вопросов ведущего он различает карточку приёма
+   * (`intake:<taskId>`) и класс (`classify:<taskId>`) одного источника `intake`. `null` — без ключа.
+   */
+  dedupe: z.string().nullable(),
   stepId: uuidv7.nullable(),
   lateAnswer: z.boolean(),
   answer: z.string().nullable(),
@@ -163,6 +169,25 @@ export const taskViewSchema = z.strictObject({
   split: splitViewSchema.nullable(),
   /** Что ждёт человека (живой исполнитель задачи), `null` — ничего или задача не исполняется. */
   attention: z.string().nullable(),
+  /** Этап 11 (P135): класс задачи ведущего; нет — класс ещё не решён или задача не ведущего. */
+  class: z.enum(TASK_CLASSES).optional(),
+  /** Этап 11 (P144): профиль ведения задачи. */
+  profile: z.enum(LEAD_PROFILES).optional(),
+  groupId: z.string().min(1).max(200).optional(),
+  /** Этап 11 (P135, W3-18): дочерняя задача XL — задача-родитель (`task.created.parentTaskId`). */
+  parentTaskId: uuidv7.optional(),
+  /**
+   * Этап 11 (P141): шаг ждёт места сеанса — кто держит место и с каких пор. `holder.sessionId`
+   * `null` — держатель ещё не открыл сеанс (место выдано, хост запускается).
+   */
+  waiting: z
+    .strictObject({
+      for: z.literal('session'),
+      holder: z.strictObject({ taskId: uuidv7, sessionId: uuidv7.nullable() }),
+      since: nonNeg,
+    })
+    .nullable()
+    .optional(),
 });
 
 export type UsageView = z.infer<typeof usageViewSchema>;

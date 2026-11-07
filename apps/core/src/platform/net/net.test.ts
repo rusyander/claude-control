@@ -1,7 +1,10 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { CORP_ROOT_PEM } from './__fixtures__/corp-root.ts';
 import { createCaFetch, createCaStreamFetch, readCaCert } from './ca-fetch.ts';
 import {
   isLocalhostName,
@@ -19,7 +22,11 @@ import {
  * проверяется разбором файла.
  */
 
-const PEM = join(import.meta.dirname, '__fixtures__', 'corp-root.pem');
+// Корень пишется файлом во временную папку: ядро читает путь, а `.pem` в репозиторий не попадает.
+const pemDir = mkdtempSync(join(tmpdir(), 'core-net-ca-'));
+const PEM = join(pemDir, 'corp-root.pem');
+writeFileSync(PEM, CORP_ROOT_PEM);
+afterAll(() => rmSync(pemDir, { recursive: true, force: true }));
 const url = (raw: string): URL => new URL(raw);
 
 function codeOf(error: unknown): string | undefined {

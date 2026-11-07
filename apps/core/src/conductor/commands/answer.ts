@@ -1,5 +1,7 @@
 import { nextState, STEP_MACHINE } from '@agentdeck/contracts/core/states';
+import { leadConfigOf, settleLeadAnswer } from '../classify/index.ts';
 import { humanChannel } from '../human/channel.ts';
+import { leadAnswerFits } from '../intake/index.ts';
 import { readHumanLedger } from '../human/ledger.ts';
 import { answerKey } from '../next/answers.ts';
 import { settleReconcileAnswer } from '../reconcile.ts';
@@ -33,6 +35,15 @@ export const applyAnswer: ApplyCommand = async (task, command, env) => {
       command.cmdId,
       'unknown-option',
       `answer is none of the reconcile options: ${ask.options.join(' | ')}`,
+    );
+  }
+  // Вопрос карточки или класса ведущего (этап 11): ответ вне вариантов оставил бы оценку ждать.
+  if (open && leadAnswerFits(task.taskId, ask.dedupe, answer) === false) {
+    return reject(
+      task,
+      command.cmdId,
+      'unknown-option',
+      `answer is none of the options: ${ask.options.join(' | ')}`,
     );
   }
   // Истёкший: машина вопроса знает поздний ответ (`expired` → тот же); снятый — нет, там только
@@ -77,10 +88,19 @@ export const applyAnswer: ApplyCommand = async (task, command, env) => {
       : settleReconcileAnswer(task, { actionId: reconcileOf, answer, cause: answered.seq });
   if (reconcile === 'recheck' && reconcileOf !== null)
     env.reconcile?.()?.recheck(task.taskId, reconcileOf);
+  const lead = open
+    ? await settleLeadAnswer(
+        task,
+        { askId, dedupe: ask.dedupe, answer, cause: answered.seq },
+        env.split(),
+        leadConfigOf(env.layout),
+      )
+    : undefined;
   return applied(task, command.cmdId, {
     askId,
     late: String(!open),
     resumed: String(resumed),
     ...(reconcile ? { reconcile } : {}),
+    ...(lead ? { lead } : {}),
   });
 };

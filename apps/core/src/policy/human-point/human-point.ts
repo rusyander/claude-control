@@ -109,6 +109,8 @@ const SOURCE_POINTS: Record<HumanAskSource, readonly NamedPoint[] | null> = {
   budget: [7],
   'scenario-step': [8],
   launch: [10],
+  // Этап 11 (P133): подтверждение карточки приёма — часть вопроса запуска, тот же пункт 10.
+  intake: [10],
 };
 
 export function decideHumanPoint(

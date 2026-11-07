@@ -90,7 +90,8 @@ const parkedThenEnded = (end: 'exited' | 'host-dead') => [
 
 describe('reduce v11 (stage 8 close: observer park survives a restart)', () => {
   it('reducer version moved with the state shape', () => {
-    expect(REDUCER_VERSION).toBe(11);
+    // v12 (этап 11) форму v11 не меняет: версия только растёт.
+    expect(REDUCER_VERSION).toBeGreaterThanOrEqual(11);
     expect(initialState(TASK).observerParks).toEqual({});
   });
 

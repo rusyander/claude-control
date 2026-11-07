@@ -10,6 +10,7 @@ import type {
   ScenarioListing,
   ScenarioOption,
 } from './launch.types';
+import { emptySource, requestFallback, type SourceFields } from './launchSource';
 
 /**
  * Модель формы запуска: черновик → поля оценки (та же схема, что разбирает ядро) → ключ повтора.
@@ -56,6 +57,7 @@ export function emptyDraft(): LaunchDraft {
     scenario: { kind: 'preset', id: DEFAULT_PRESET },
     // CI не ждём, пока человек не попросил сам (07:25, R:S1-09).
     ciWait: false,
+    source: emptySource(),
   };
 }
 
@@ -70,6 +72,8 @@ const FIELD_OF_PATH: Record<string, DraftField> = {
   request: 'request',
   repos: 'repos',
   scenario: 'scenario',
+  source: 'source',
+  sources: 'source',
 };
 
 /**
@@ -81,10 +85,11 @@ const FIELD_OF_PATH: Record<string, DraftField> = {
 export function fieldsOf(
   draft: LaunchDraft,
   language?: string,
+  source: SourceFields = {},
 ): { ok: true; fields: EstimateFields } | { ok: false; problems: DraftProblem[] } {
   const candidate = {
     title: draft.title.trim(),
-    request: draft.request.trim(),
+    request: draft.request.trim() || requestFallback(source),
     repos: draft.repos
       .map((r) => ({ path: r.path.trim(), baseRef: r.baseRef.trim() || null }))
       .filter((r) => r.path.length > 0),
@@ -92,6 +97,7 @@ export function fieldsOf(
     launchPolicy: LAUNCH_POLICY,
     ciWait: draft.ciWait,
     ...(language ? { lang: language.startsWith('en') ? ('en' as const) : ('ru' as const) } : {}),
+    ...source,
   };
   const problems: DraftProblem[] = [];
   if (draft.scenario.kind === 'preset' && draft.scenario.id === FORGE_ONLY_PRESET)

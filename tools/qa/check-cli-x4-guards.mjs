@@ -7,7 +7,7 @@
  * разговор заводился и падал на первом вопросе невнятным «нет ни ключа, ни CLI».
  * Стало: 409 с кодом (`plugins-provider-unsupported`, `sandbox-provider-unsupported`) и ни
  * одного запуска. Разговор чужого CLI панель больше не заводит ни у одного CLI (этап 10, F2c: чат
- * идёт задачей ядра `/core/chat`) — `POST /api/provider-chat/chats` отвечает 410
+ * идёт задачей ядра в едином чате `/chat`, этап 11) — `POST /api/provider-chat/chats` отвечает 410
  * `provider-chat-core`, и тоже без запуска.
  *
  * Проверка идёт в настоящий экземпляр панели (`apps/server/src/index.ts`) на

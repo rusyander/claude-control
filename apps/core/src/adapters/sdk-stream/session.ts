@@ -548,6 +548,8 @@ export class SdkSession {
     const detail = exit
       ? `code ${String(exit.code)}${exit.refused ? `, refused: ${exit.refused}` : ''}${exit.unknown ? `, stop unproven: ${exit.unknown}` : ''}${stderr ? `; ${stderr.slice(-400)}` : ''}`
       : 'exit record unreadable';
+    // Задачи CLI, чей конец назван только `task_updated`, и ждущие `bg.started` — до конца сеанса.
+    this.emit(this.normaliser.flushTasks());
     this.emit([{ type: 'error', code, detail }]);
     this.finished = true;
     for (const pending of this.drainQueued()) pending.fail(new Error('session ended'));

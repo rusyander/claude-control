@@ -2,24 +2,28 @@ export {
   agentState,
   buildAgentTree,
   visibleNodes,
-  agentCounts,
-  agentTokenTotal,
+  withCoreFacts,
   shortModel,
 } from './model/agentTree';
 export { openAgentPane, closeAgentPane, getAgentPane, useAgentPane } from './model/agentPane';
-export { useAgentTranscript, useAgentExtensions, agentTreeKeys } from './api/agentTreeApi';
-export { AgentTranscript } from './ui/AgentTranscript/AgentTranscript';
-export { extensionTotals, mergeSummaries } from './model/extensions';
-export { ExtensionChips } from './ui/AgentExtensions/ExtensionChips';
-export { AgentExtensionsModal } from './ui/AgentExtensions/AgentExtensionsModal';
-export { AgentHistoryButton } from './ui/AgentHistory/AgentHistoryButton';
+export { agentTreeKeys, useCoreAgents } from './api/agentTreeApi';
+export {
+  NO_FILTERS,
+  buildCoreTree,
+  nodeLook,
+  ownerOf,
+  runningBackground,
+  isBgItem,
+  LOOK_TONE,
+  workerNodes,
+} from './model/coreAgents';
+export { AgentNodePane } from './ui/AgentNodePane/AgentNodePane';
+export { AgentHistoryButton, AgentHistoryCard } from './ui/AgentHistory/AgentHistoryButton';
 export { AgentHistoryModal } from './ui/AgentHistory/AgentHistoryModal';
-export { useAgentHistory } from './api/agentTreeApi';
-export { historyAgentState, hasHistory } from './model/agentHistory';
 export type {
   AgentState,
   AgentTreeNode,
-  AgentCounts,
   AgentPaneTarget,
+  TreeAgent,
 } from './model/agentTree.types';
-export type { ExtensionTotals } from './model/extensions.types';
+export type { AgentFilters, CoreTreeNode, NodeLook } from './model/coreAgents.types';

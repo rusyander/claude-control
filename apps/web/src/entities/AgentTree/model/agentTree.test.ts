@@ -1,15 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { ProgressAgent } from '@agentdeck/contracts';
-import {
-  agentCounts,
-  agentState,
-  agentTokenTotal,
-  buildAgentTree,
-  shortModel,
-  visibleNodes,
-} from './agentTree';
+import type { AgentNode } from '@agentdeck/contracts/core/agents';
+import { agentState, buildAgentTree, shortModel, visibleNodes, withCoreFacts } from './agentTree';
+import type { TreeAgent } from './agentTree.types';
 
-const agent = (id: string, extra: Partial<ProgressAgent> = {}): ProgressAgent => ({
+const agent = (id: string, extra: Partial<TreeAgent> = {}): TreeAgent => ({
   id,
   kind: 'Explore',
   description: id,
@@ -77,28 +71,115 @@ describe('состояние субагента', () => {
     expect(agentState(agent('f', { status: 'failed' }), true, true)).toBe('failed');
   });
 
-  it('счёт карточки группы: идущие и все остальные исходы', () => {
-    const agents = [
-      agent('run', { status: 'running' }),
-      agent('ok'),
-      agent('bad', { status: 'failed' }),
-      agent('stop', { status: 'failed', stopped: true }),
-      agent('nested', { parentId: 'run' }),
-    ];
-    expect(agentCounts(agents, false, true)).toEqual({ total: 5, running: 1, finished: 4 });
-    // Процесс умер — идущий оборван, он тоже закончил.
-    expect(agentCounts(agents, false, false)).toEqual({ total: 5, running: 0, finished: 5 });
-  });
-
-  it('расход одним числом и короткое имя модели', () => {
-    expect(
-      agentTokenTotal(
-        agent('t', { tokens: { input: 10, output: 5, cacheRead: 100, cacheCreation: 1 } }),
-      ),
-    ).toBe(116);
-    expect(agentTokenTotal(agent('t'))).toBe(0);
+  it('короткое имя модели', () => {
     expect(shortModel('claude-haiku-4-5-20251001')).toBe('haiku-4-5');
     expect(shortModel('claude-sonnet-4-5')).toBe('sonnet-4-5');
     expect(shortModel(undefined)).toBeUndefined();
+  });
+});
+
+const SESSION = '019a0000-0000-7000-8000-000000000003';
+const core = (nodeId: string, over: Partial<AgentNode> = {}): AgentNode => ({
+  nodeId,
+  parentId: SESSION,
+  taskId: '019a0000-0000-7000-8000-000000000001',
+  kind: 'subagent',
+  status: 'completed',
+  stepId: null,
+  unitId: null,
+  sessionId: SESSION,
+  model: null,
+  background: false,
+  startedAt: 1_000,
+  endedAt: 61_000,
+  spend: { tokens: null, windowShare: null },
+  counts: { toolCalls: 0, files: 0, refusals: 0, escalations: 0, children: 0 },
+  signals: [],
+  briefExcerpt: null,
+  returnExcerpt: null,
+  ...over,
+});
+
+describe('withCoreFacts — факты ядра поверх строк транскрипта', () => {
+  it('узел с тем же id даёт модель, вызовы, расход и конец; сессия ядра — не родитель', () => {
+    const [row] = withCoreFacts(
+      [agent('a')],
+      [core('a', { model: 'claude-sonnet-4-5', spend: { tokens: 900, windowShare: null } })],
+    );
+    expect(row).toMatchObject({ model: 'claude-sonnet-4-5', toolCalls: 0, spendTokens: 900 });
+    expect(row?.endedAt).toBe(new Date(61_000).toISOString());
+    expect(row?.parentId).toBeUndefined();
+  });
+
+  it('расход null — поля нет (не ноль); идущему конец не ставится', () => {
+    const [row] = withCoreFacts(
+      [agent('a', { status: 'running' })],
+      [core('a', { status: 'running', endedAt: null })],
+    );
+    expect(row && 'spendTokens' in row).toBe(false);
+    expect(row?.endedAt).toBeUndefined();
+  });
+
+  it('вложенные уровни — под родителем, по порядку запуска; фон и сеансы — нет', () => {
+    const rows = withCoreFacts(
+      [agent('a')],
+      [
+        core('a'),
+        core('a2', { parentId: 'a', startedAt: 9_000, status: 'killed' }),
+        core('a1', { parentId: 'a', startedAt: 5_000, briefExcerpt: 'Проверка\nещё' }),
+        core('a1x', { parentId: 'a1', startedAt: 6_000, status: 'lost' }),
+        core('bg', { kind: 'background-shell', parentId: 'a', background: true }),
+        core(SESSION, { kind: 'unit-session', parentId: null }),
+      ],
+    );
+    expect(rows.map((row) => row.id)).toEqual(['a', 'a1', 'a1x', 'a2']);
+    const roots = buildAgentTree(rows);
+    expect(roots.map((root) => root.agent.id)).toEqual(['a']);
+    expect(roots[0]?.children.map((child) => child.agent.id)).toEqual(['a1', 'a2']);
+    expect(roots[0]?.children[0]?.children[0]?.agent.id).toBe('a1x');
+    expect(rows[1]).toMatchObject({ description: 'Проверка', status: 'done', parentId: 'a' });
+    expect(agentState(rows[2] as TreeAgent, false)).toBe('lost');
+    expect(agentState(rows[3] as TreeAgent, false)).toBe('stopped');
+  });
+
+  // Чат чужого CLI (qwen, opencode): транскрипта Claude у него нет, строк из транскрипта — ни одной,
+  // и дерево ядра — единственное дерево его субагентов. Прежде верхний субагент (родитель — сеанс
+  // ядра) отбрасывался, и «План агента» у такого чата был пуст (F-07).
+  it('строк транскрипта нет (чужой CLI) — верхние субагенты ядра встают корнями, вложенные под ними', () => {
+    const rows = withCoreFacts(
+      [],
+      [
+        core('q2', { startedAt: 8_000, status: 'running', endedAt: null }),
+        core('q1', { startedAt: 3_000, briefExcerpt: 'Проверка qwen\nдальше' }),
+        core('q1a', { parentId: 'q1', startedAt: 4_000 }),
+        core('bg', { kind: 'background-shell', parentId: 'q1', background: true }),
+        core(SESSION, { kind: 'unit-session', parentId: null }),
+      ],
+    );
+    expect(rows.map((row) => row.id)).toEqual(['q1', 'q1a', 'q2']);
+    expect(rows[0]).toMatchObject({ description: 'Проверка qwen', status: 'done' });
+    expect(rows[0]?.parentId).toBeUndefined();
+    expect(rows[2]).toMatchObject({ status: 'running' });
+    const roots = buildAgentTree(rows);
+    expect(roots.map((root) => root.agent.id)).toEqual(['q1', 'q2']);
+    expect(roots[0]?.children.map((child) => child.agent.id)).toEqual(['q1a']);
+    // Строке только из ядра — тип узла для подписи словарём; строке транскрипта — нет.
+    expect(rows.map((row) => row.coreKind)).toEqual(['subagent', 'subagent', 'subagent']);
+    const [named] = withCoreFacts([agent('a')], [core('a')]);
+    expect(named?.coreKind).toBeUndefined();
+  });
+
+  it('верхний субагент ядра, чьей строки в транскрипте ещё нет, добавляется; строка Claude не двоится', () => {
+    const rows = withCoreFacts(
+      [agent('a')],
+      [core('a', { model: 'claude-haiku-4-5' }), core('z', { startedAt: 2_000 })],
+    );
+    expect(rows.map((row) => row.id)).toEqual(['a', 'z']);
+    expect(rows[0]).toMatchObject({ model: 'claude-haiku-4-5' });
+  });
+
+  it('узлов ядра нет — строки как есть', () => {
+    const rows = [agent('a', { status: 'running' })];
+    expect(withCoreFacts(rows, [])).toEqual(rows);
   });
 });

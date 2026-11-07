@@ -118,11 +118,11 @@ export async function shootActivate({ page, web, panel, shots }) {
   let area = await frameArea(page, await mark(page, STAND_TITLE, 'stand-card'));
   await activate.shot(page, '01-smoke-ok', { clip: area });
 
-  // Живой запрос через шлюз панели: два символа, чтобы доказать путь, а не
+  // Живой запрос через шлюз ядра: два символа, чтобы доказать путь, а не
   // потратить бюджет. Адрес берётся у шлюза — занятый порт он отдаёт соседу.
   const gateway = await fetch(`${panel}/api/platforms/gateway`).then((r) => r.json());
   const address = gateway?.status?.address || '';
-  if (!address) throw new Error(`шлюз панели не поднят: ${JSON.stringify(gateway).slice(0, 300)}`);
+  if (!address) throw new Error(`шлюз ядра не поднят: ${JSON.stringify(gateway).slice(0, 300)}`);
   const answer = await fetch(`${address}/${STAND_ID}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -134,7 +134,7 @@ export async function shootActivate({ page, web, panel, shots }) {
     }),
   });
   console.log(`  живой запрос через шлюз: ${answer.status}`);
-  if (!answer.ok) throw new Error('контур не ответил через шлюз панели');
+  if (!answer.ok) throw new Error('контур не ответил через шлюз ядра');
 
   // Расход шлюз копит и сбрасывает на диск раз в несколько секунд
   // (`SPEND_FLUSH_MS`): снятый сразу кадр совпадал с кадром до запроса. Цены у

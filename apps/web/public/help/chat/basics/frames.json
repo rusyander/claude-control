@@ -9,18 +9,18 @@
       "masked": 0,
       "width": 1440,
       "height": 900,
-      "shotAt": "2026-11-03T14:33:56.678Z",
-      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работает 1 агент Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Новый чат Проект панели — Панель заказов — C:/work/orders-panel Папка проекта Начало чата — ваше разрешение CLI работать в этой папке; копия проекта не делается. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider Чат идёт тем CLI, который вы выбрали; модель — по умолчанию этого CLI. Первое сообщение Начать чат «Сборка релиза» ждёт вашего ответа Открыть чат ×",
+      "shotAt": "2026-11-07T08:58:13.320Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Совет от Деки Агент в другом проекте закончил или ждёт ответа? Об этом скажут звук и уведомление — смотреть в экран не обязательно. Следующий совет Панель заказов C:/work/orders-panel Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. «Сборка релиза» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "01-project-empty.en.png",
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-11-03T14:35:08.870Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 1 agent working Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. New chat Panel project — Панель заказов — C:/work/orders-panel Project folder Starting the chat is your permission for the CLI to work in this folder; no copy is made. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider The chat runs on the CLI you pick, with that CLI’s default model. First message Start chat “Сборка релиза” is waiting for your answer Open the chat ×",
+        "shotAt": "2026-11-07T08:58:44.744Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 A tip from Decky Enter sends the message, Shift+Enter starts a new line. Next tip Панель заказов C:/work/orders-panel A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. “Сборка релиза” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "7a97f96e0d9143b8",
-          "text": "601170283bc95223"
+          "png": "ca3d509f91ceabc0",
+          "text": "2bcd50209d9fbe14"
         }
       },
       "dark": {
@@ -28,11 +28,11 @@
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-11-03T14:36:13.409Z",
-        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Дека работает 1 агент Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Новый чат Проект панели — Панель заказов — C:/work/orders-panel Папка проекта Начало чата — ваше разрешение CLI работать в этой папке; копия проекта не делается. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider Чат идёт тем CLI, который вы выбрали; модель — по умолчанию этого CLI. Первое сообщение Начать чат «Сборка релиза» ждёт вашего ответа Открыть чат ×",
+        "shotAt": "2026-11-07T08:59:20.151Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 CLAUDE.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека работает 1 агент Чаты Панель заказов Новый чат По названию По сообщениям Показано 4 из 4 СЕЙЧАС РАБОТАЮТ Формат выгрузки orders-panel 10 сент. 2026 г. · 4 РАНЬШЕ Экспорт заказов в CSV orders-panel 10 сент. 2026 г. · 4 Сборка релиза orders-panel 10 сент. 2026 г. · 4 Импорт прайса orders-panel 10 сент. 2026 г. · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» feature/orders-export Изменено файлов: 4 · +128 −31 · впереди на 2 Совет от Деки Файл можно бросить прямо в поле ввода — он уйдёт вложением к сообщению. Следующий совет Панель заказов C:/work/orders-panel Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. «Сборка релиза» ждёт вашего ответа Открыть чат × Сообщение Enter — отправить, Shift+Enter — перенос строки",
         "seal": {
-          "png": "68350401cef87a81",
-          "text": "924f3ab8f444c1bc"
+          "png": "6c18967068d28259",
+          "text": "8d0fd18b1ad08fc6"
         }
       },
       "darkEn": {
@@ -40,16 +40,16 @@
         "masked": 0,
         "width": 1440,
         "height": 900,
-        "shotAt": "2026-11-03T14:37:19.910Z",
-        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Decky 1 agent working Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. New chat Panel project — Панель заказов — C:/work/orders-panel Project folder Starting the chat is your permission for the CLI to work in this folder; no copy is made. CLI Claude Code Codex (OpenAI) Gemini CLI Qwen Code Continue Goose Kimi Code Cursor OpenCode Aider The chat runs on the CLI you pick, with that CLI’s default model. First message Start chat “Сборка релиза” is waiting for your answer Open the chat ×",
+        "shotAt": "2026-11-07T08:59:54.317Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 CLAUDE.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky 1 agent working Chats Панель заказов New chat By title In messages Showing 4 of 4 RUNNING NOW Формат выгрузки orders-panel Sep 10, 2026 · 4 EARLIER Экспорт заказов в CSV orders-panel Sep 10, 2026 · 4 Сборка релиза orders-panel Sep 10, 2026 · 4 Импорт прайса orders-panel Sep 10, 2026 · 4 Панель заказов C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 Chat settings Project code Tests Environment Editor Dev server To Projects feature/orders-export Changed files: 4 · +128 −31 · ahead by 2 A tip from Decky Project tabs can be dragged with the mouse, and Alt+←/→ on a tab moves it one step. Next tip Панель заказов C:/work/orders-panel A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. “Сборка релиза” is waiting for your answer Open the chat × Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "be11fb8d0dce3d35",
-          "text": "601170283bc95223"
+          "png": "31a7577d9adf4596",
+          "text": "5d0e2c5a01fd3c81"
         }
       },
       "seal": {
-        "png": "9d694c4199e97421",
-        "text": "924f3ab8f444c1bc"
+        "png": "23722239db7add5b",
+        "text": "57269954af444348"
       }
     },
     {

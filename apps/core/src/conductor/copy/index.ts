@@ -31,3 +31,9 @@ export { mirrorLocalLayer } from './mirror.ts';
 export { DEFAULT_EXCLUDE, DEFAULT_INCLUDE, planMirror } from './mirror-plan.ts';
 export { removeUnitCopy, type CopyRemoveInput, type CopyRemoveResult } from './remove.ts';
 export { LOCKFILES, setupCopy, type SetupDeps, type SetupInput } from './setup.ts';
+export {
+  headOutsideIntegration,
+  INTEGRATION_CONFLICT_SIGNAL,
+  integrationBaseOf,
+  remergeIntegration,
+} from './integration-base.ts';

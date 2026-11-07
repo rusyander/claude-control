@@ -1,30 +1,30 @@
 /**
- * Чат панели через ядро `/core/chat` (этап 10, F2, проход 2) — настоящая дорога: одноразовая панель,
- * своё ядро, настоящие CLI из PATH человека (`CLIS`, по умолчанию `claude,qwen,codex`) против
- * сценария `packages/stub-model` в трёх диалектах — anthropic-messages, openai-chat,
- * openai-responses (модель — единственное, что подменено). Браузер ходит через прокладку панели; ответы ядра не
- * перехватываются. Единственный засев мимо экрана — маршрут и модель задачи (`set-route`,
- * `set-model`): экран чата их не выбирает, это настройка; засев идёт прямо в ядро в тот миг, когда
- * экран шлёт `set-cli`, и запрос экрана уходит дальше без изменений.
+ * Единый чат `/chat` на ядре (этап 11, W3-17a; прежде этап 10, F2) — настоящая дорога: одноразовая
+ * панель, своё ядро, настоящие CLI из PATH человека против `packages/stub-model` (модель —
+ * единственное, что подменено): claude — сценарий `chatScript` по адресу модели из окружения
+ * стенда, чужой CLI (`--foreign=`, по умолчанию qwen) — через одноразовый контур (стаб-контур
+ * `stub-platform.mjs` за шлюзом ядра стенда), ключа вендора нет нигде. Браузер ходит через
+ * прокладку панели; ответы ядра не перехватываются.
  *
- * Что видно, для каждого CLI:
- *   - новый чат = задача ядра: адрес `?id=<taskId>`, в журнале `session.started` этого CLI с
- *     `cwd` = корень проекта (на месте, без копии);
- *   - процесс CLI — потомок хоста сеансов ядра, а не сервера панели;
- *   - ответ модели и строка инструмента (чтение файла проекта, результат вернулся в ответ) на экране;
- *   - второй ход человека (`message-to-step`) доходит и получает ответ;
- *   - жёсткий перезапуск панели: лента та же, ни один ход не потерян и не повторён, следующий ход
- *     после перезапуска получает ответ;
- *   - «Закрыть» (`end-chat`) — задача кончается, композера нет;
- *   - чужой CLI (не claude): «Новый» в чате этого провайдера ведёт на `/core/chat?cli=<cli>`, старый
- *     разговор панели (`/api/provider-chat/chats`) не заводится.
+ * Что видно:
+ *   - прежний разговор claude в `/chat` продолжается задачей ядра на месте (`panelChat`: ходы,
+ *     «на ходу», «Остановить», ход после остановки, правка вне проекта, основы чата);
+ *   - «Новый чат» остаётся в `/chat` (не `/core/chat`), выбора CLI и «Продолжить через ядро» нет;
+ *     ход нового чата при активном Claude — сеанс claude, ответ на экране;
+ *   - активный провайдер — чужой CLI: новый чат в `/chat` отвечает через него (сеанс этого CLI в
+ *     журнале ядра, запрос дошёл до контура, модель claude его не видела);
+ *   - активный снова Claude: тот же чат продолжается своим CLI, а не Claude;
+ *   - чужой CLI через контур, в настройках модель Claude из каталога контура: запертая шапка, `set-model`
+ *     и запрос в контур несут её перевод картой контура, а не модель контура по умолчанию;
+ *   - CLI без хука ядра (`--refused=`, по умолчанию aider,continue), контура нет: строка отказа ядра
+ *     с кодом `no_core_hook` в ленте (суд совместимости `set-cli` раньше набора), композера нет,
+ *     прежний исполнитель не позван, процесса CLI под панелью нет;
+ *   - старый адрес `/core/chat?project=X&cli=…` приводит в `/chat?project=X` (CLI снят, вкладка
+ *     проекта открыта), `/core/chat?id=<задача>` — в разговор этой задачи.
  *
- * Отказ (`REFUSED`, по умолчанию `aider,continue`): CLI без хука ядра — экран называет отказ ядра
- * с кодом `no_core_hook`, композера нет, старый исполнитель не вызван, под панелью нет процесса CLI.
- *
- * `BEFORE=1` — прежняя дорога для кадров «до»: чат `/chat` панели, CLI — ребёнок сервера панели.
- * Запуск: `node tools/qa/check-core-chat.mjs` (стенд свой, `pnpm dev` не нужен; CLI, которого нет
- * в PATH, — его часть «не проверено»). `SHOTS=<dir>` — кадры в обеих темах.
+ * Запуск: `node tools/qa/check-core-chat.mjs [--foreign=qwen] [--refused=aider,continue]
+ * [--panel-chat=0]` (стенд свой, `pnpm dev` не нужен; CLI, которого нет в PATH, — его часть «не
+ * проверено»). `SHOTS=<dir>` — кадры в обеих темах.
  * Код выхода: 0 — сходится, 1 — провал, 2 — не проверено.
  */
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -219,41 +219,43 @@ function ancestry(pid, table) {
 
 async function main() {
   const { chromium } = await import('playwright');
-  const { runOnStand, NotChecked, wait } = await import('./throwaway-stand.mjs');
-  const { uuidv7 } = await import('./core-scenario-stand.mjs');
+  const { runOnStand, NotChecked, wait, freePort } = await import('./throwaway-stand.mjs');
+  const { startStubPlatform } = await import('./stub-platform.mjs');
+  const { openProjectChat, dismissAccess } = await import('./chat-walk.mjs');
 
   const SHOTS = process.env.SHOTS || '';
-  const BEFORE = process.env.BEFORE === '1';
   const cliAt = (name) => {
     const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [name], {
       encoding: 'utf8',
     });
     return r.status === 0 ? r.stdout.split(/\r?\n/)[0].trim() : '';
   };
-  // CLI, чей чат идёт через ядро до конца, и CLI, которым ядро отказывает по имени (`no_core_hook`:
-  // поставить хук ядра некуда). Порядок — порядок прогона; бинарь CLI ищется по имени образа.
   const list = (v, dflt) =>
     (v ?? dflt)
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-  // Аргументы `--clis=<…> --refused=<…> --panel-chat=0` сильнее окружения: кейс блока «Тесты»
+  // Аргументы `--foreign=<cli> --refused=<…> --panel-chat=0` сильнее окружения: кейс блока «Тесты»
   // связывается с файлом и своими аргументами (`automation.testName`), а не с окружением.
   const arg = (name) => {
     const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
     return hit === undefined ? undefined : hit.slice(name.length + 3);
   };
-  const CLIS = list(arg('clis') ?? process.env.CLIS, 'claude,qwen,codex');
+  const FOREIGN = (arg('foreign') ?? process.env.FOREIGN ?? 'qwen').trim();
+  // Выбор модели через контур (M-F1): имя Claude из каталога контура и его перевод картой контура.
+  const CONTOUR_PICK = 'claude-sonnet-5-5';
+  // Цель перевода — модель каталога контура: иную ядро отказывает судом совместимости (model_absent).
+  const CONTOUR_PICKED = 'stub-reasoning';
   const PANEL_CHAT = (arg('panel-chat') ?? process.env.PANEL_CHAT) !== '0';
   const REFUSED = list(arg('refused') ?? process.env.REFUSED, 'aider,continue');
   const IMAGE = { continue: 'cn' };
   const found = Object.fromEntries(
     // Каталог claude — в PATH стенда всегда (сам claude заслоняет заглушка стенда): чат `/chat`
-    // идёт через него, а предпроверка оценки ядра ищет CLI разрешённых маршрутов задачи (вход
-    // CLI: claude, qwen). Без него строка aider/goose (их каталог `~/.local/bin` без claude)
-    // вставала на оценке «claude/qwen not found» и до проверяемого отказа не доходила; continue
-    // проходил только потому, что `cn` лежит рядом с claude.cmd (живой прогон 02.11).
-    [...new Set([...CLIS, ...REFUSED, 'claude'])].map((cli) => [cli, cliAt(IMAGE[cli] ?? cli)]),
+    // идёт через него, а предпроверка оценки ядра ищет CLI разрешённых маршрутов задачи.
+    [...new Set([FOREIGN, ...REFUSED, 'claude'].filter(Boolean))].map((cli) => [
+      cli,
+      cliAt(IMAGE[cli] ?? cli),
+    ]),
   );
   const extraPath = [
     ...new Set(
@@ -268,36 +270,17 @@ async function main() {
   };
   let repo = '';
   let file = '';
-  let trace = '';
-  /** Последние запросы к заглушке: диалект, инструменты, хвост сообщений — причина провала. */
-  const traceTail = (n = 4) => {
-    try {
-      return readFileSync(trace, 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .slice(-n)
-        .map((l) => {
-          const r = JSON.parse(l);
-          const msgs = r.body?.messages ?? [];
-          return `${r.kind ?? ''} ${r.dialect ?? ''} → ${r.reply ?? ''} ${r.scriptError ?? ''} ${JSON.stringify(msgs.slice(-2)).slice(0, 600)}`;
-        })
-        .join('\n    ');
-    } catch (error) {
-      return `следа нет: ${error.message}`;
-    }
-  };
 
   async function shoot(page, name) {
     if (!SHOTS) return;
     mkdirSync(SHOTS, { recursive: true });
-    const tag = BEFORE ? 'BEFORE' : 'AFTER';
     for (const theme of ['light', 'dark']) {
       await page.evaluate((t) => {
         document.documentElement.dataset.theme = t;
         document.documentElement.style.colorScheme = t;
       }, theme);
       await page.waitForTimeout(200);
-      await page.screenshot({ path: join(SHOTS, `${name}-${theme}_${tag}.png`) });
+      await page.screenshot({ path: join(SHOTS, `${name}-${theme}_AFTER.png`) });
     }
     await page.evaluate(() => {
       document.documentElement.dataset.theme = 'light';
@@ -305,12 +288,8 @@ async function main() {
     });
   }
 
-  // «До»: прежний чат панели зовёт CLI сам — его модель та же заглушка, по адресу из окружения
-  // панели; ответ придержан, чтобы процесс CLI успели застать в таблице процессов.
-  //
-  // «После» та же заглушка — модель входа CLI (`cli-login`) в окружении стенда: чат `/chat` панели
-  // идёт задачей ядра, а маршрут задачи без засева — вход CLI, т.е. claude с адресом и ключом из
-  // окружения ядра (у входа CLI звена нет, окружение доезжает как есть). Путь файла заглушка узнаёт
+  // Модель claude — заглушка по адресу из личного settings.json стенда (`seedClaudeEnv`): маршрут
+  // задачи без контура — вход CLI, т.е. claude с этим адресом и ключом. Путь файла заглушка узнаёт
   // после засева стенда (`panelFile`).
   const { startStubModel } = await import('../../packages/stub-model/src/index.mjs');
   let panelFile = 'notes.txt';
@@ -318,7 +297,7 @@ async function main() {
   // Тела запросов к модели чата `/chat` целиком: что дошло до модели (модель, усилие, байты
   // вложений, вызовы чтения) — свидетельство основ чата (`core-chat-basics-steps.mjs`).
   const panelBodies = [];
-  const beforeStub = await startStubModel({
+  const panelStub = await startStubModel({
     script: (ctx) => {
       const words = messagesOf(ctx.request.body).map(wordsOf).filter(Boolean);
       panelTrace.push(words.at(-1) ?? '');
@@ -326,26 +305,23 @@ async function main() {
         said: words.filter((w) => /ход-\d+/.test(w)).at(-1) ?? '',
         body: ctx.request.body,
       });
-      const reply = chatScript({ file: panelFile })(ctx);
-      return BEFORE ? { ...reply, holdMs: 20_000 } : reply;
+      return chatScript({ file: panelFile })(ctx);
     },
   });
-  const stubEnv = { ANTHROPIC_BASE_URL: beforeStub.baseUrl, ANTHROPIC_API_KEY: 'stand-stub-key' };
+  const stubEnv = { ANTHROPIC_BASE_URL: panelStub.baseUrl, ANTHROPIC_API_KEY: 'stand-stub-key' };
+  // Контур чужого CLI: стаб-контур (`stub-platform.mjs`, сценарий `contour` общей заглушки) за
+  // шлюзом ядра стенда на своём порту. Ключ — заглушка, собранная из кусков.
+  const contour = await startStubPlatform({ port: 0 });
+  const gatewayPort = await freePort();
 
   await runOnStand(
     {
       label: 'core-chat',
       extraPath,
       env: stubEnv,
-      core: {
-        stub: [
-          {
-            name: 'stand',
-            script: { module: SELF, export: 'chatScript', args: [{ file: '__FILE__' }] },
-          },
-        ],
-      },
-      seed: ({ root, coreHome }) => {
+      core: true,
+      settings: { platformGateway: { enabled: true, port: gatewayPort, forceStream: true } },
+      seed: ({ root }) => {
         repo = join(root, 'repo');
         file = join(repo, 'notes.txt');
         mkdirSync(repo, { recursive: true });
@@ -356,63 +332,137 @@ async function main() {
         panelFile = file;
         git(repo, ['add', '.']);
         git(repo, ['commit', '-qm', 'init']);
-        // Путь файла и след заглушки известны только после создания дома стенда.
-        const cfgPath = join(coreHome, 'config.json');
-        const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
-        cfg.routes.stub[0].script.args[0].file = file;
-        trace = join(root, 'stub-trace.jsonl');
-        cfg.routes.stub[0].trace = trace;
-        writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
       },
     },
     async (stand, check) => {
       const browser = await chromium.launch();
       try {
-        if (BEFORE) await before(stand, check, browser);
-        else {
-          // Прежний чат `/chat`: старый разговор продолжает задача ядра (этап 10, F2, проход 3).
-          if (PANEL_CHAT) {
-            if (found.claude) await panelChat(stand, check, browser);
-            else console.log('  ~ claude не найден в PATH — чат /chat через ядро не проверен');
-          }
-          for (const cli of CLIS) {
-            if (!found[cli]) {
-              console.log(`  ~ ${cli} не найден в PATH — его часть не проверена`);
-              continue;
-            }
-            // Провал одного CLI не снимает строки остальных: каждый — свой вердикт.
-            await after(stand, check, browser, cli).catch((error) =>
-              check(`${cli}: сценарий дошёл до конца`, false, error?.stack ?? String(error)),
-            );
-          }
-          // Отказ по имени не зависит от бинаря: ядро отказывает раньше процесса.
-          for (const cli of REFUSED) await refused(stand, check, browser, cli);
-          // Пустой `CLIS=` с чатом /chat или со строками отказа — прогон только их, проверено то,
-          // что он прогнал.
-          const othersOnly =
-            CLIS.length === 0 && ((PANEL_CHAT && found.claude) || REFUSED.length > 0);
-          if (!othersOnly && !CLIS.some((cli) => found[cli])) {
-            throw new NotChecked(`ни одного из ${CLIS.join(', ')} нет в PATH`);
-          }
-        }
+        if (!found.claude)
+          throw new NotChecked('claude нет в PATH — чат /chat через ядро не проверен');
+        seedClaudeEnv(stand);
+        // Прежний разговор `/chat`: продолжение задачей ядра (этап 10, F2, проход 3).
+        if (PANEL_CHAT) await panelChat(stand, check, browser);
+        // Провал одной части не снимает строки остальных: каждая — свой вердикт.
+        const part = (name, run) =>
+          run().catch((error) =>
+            check(`${name}: сценарий дошёл до конца`, false, error?.stack ?? String(error)),
+          );
+        const claudeChat = await part('новый чат claude', () =>
+          newClaudeChat(stand, check, browser),
+        );
+        // CLI без хука ядра — БЕЗ контура (W3-17a): набор задачи тогда только маршруты входа CLI, и
+        // `set-cli` судит переходник судом совместимости раньше набора — отказ по имени
+        // (`no_core_hook`), а не «вне набора». Отказ не зависит от бинаря: ядро отказывает раньше
+        // процесса.
+        for (const cli of REFUSED)
+          await part(`${cli}: отказ`, () => refusedChat(stand, check, browser, cli));
+        // Контур «Чат» — маршрут чужого CLI без входа доводит до его сеанса контур.
+        if (found[FOREIGN]) await part('контур «Чат»', () => activateContour(stand, check));
+        if (found[FOREIGN]) await part(FOREIGN, () => foreignChat(stand, check, browser));
+        if (found[FOREIGN])
+          await part(`${FOREIGN}: выбор через контур`, () => contourPick(stand, check, browser));
+        else console.log(`  ~ ${FOREIGN} не найден в PATH — чат чужого CLI не проверен`);
+        await part('старый адрес /core/chat', () => oldAddress(stand, check, browser, claudeChat));
       } finally {
         await browser.close();
-        await beforeStub?.close();
+        await panelStub.close();
+        await contour.close();
       }
     },
   );
 
-  /** Активный CLI раздела чата — настройка человека: правится из браузера, как кнопкой. */
-  async function setProvider(page, provider) {
+  /**
+   * Вход claude стенда — адрес и ключ в `env` личного settings.json, как у человека со своим
+   * адресом модели: пин задачи ядра несёт только дом и CLAUDE_CONFIG_DIR, окружение стенда
+   * (`stubEnv`) до CLI ядра не доходит, а личный слой ядро передаёт как есть.
+   */
+  function seedClaudeEnv(stand) {
+    const settingsPath = join(stand.cfg, 'settings.json');
+    const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
+    writeFileSync(
+      settingsPath,
+      `${JSON.stringify({ ...settings, env: { ...settings.env, ...stubEnv } }, null, 2)}\n`,
+    );
+  }
+
+  /** Задачи ядра стенда — каталоги дома ядра. */
+  function coreTasks(stand) {
+    try {
+      return readdirSync(join(stand.coreHome, 'tasks'));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Журнал задачи ядра строками. */
+  function coreJournal(stand, taskId) {
+    const dir = join(stand.coreHome, 'tasks', taskId);
+    const name = readdirSync(dir).find((f) => f.endsWith('.jsonl'));
+    return readFileSync(join(dir, name), 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l));
+  }
+
+  /** Новые задачи ядра после `before` — ждёт до 90 с. */
+  async function newTasks(stand, before) {
+    for (let i = 0; i < 90; i++) {
+      const fresh = coreTasks(stand).filter((t) => !before.includes(t));
+      if (fresh.length > 0) return fresh;
+      await wait(1000);
+    }
+    return [];
+  }
+
+  /**
+   * Сеансы задачи по журналу ядра: CLI и каталог. Здесь и ниже — объявления функциями, не `const`:
+   * сценарий стенда выше зовёт их до этих строк (иначе TDZ).
+   */
+  function sessionsOf(stand, taskId) {
+    return coreJournal(stand, taskId)
+      .filter((l) => l.kind === 'session.started')
+      .map((l) => l.data ?? {});
+  }
+
+  /** Значения правок модели задачи (`override.set` поля `model`, их пишет `set-model`). */
+  function modelOverrides(stand, taskId) {
+    return coreJournal(stand, taskId)
+      .filter((l) => l.kind === 'override.set' && l.data?.field === 'model')
+      .map((l) => String(l.data?.value ?? ''));
+  }
+
+  /** Имя модели Claude — алиас выбора или `claude-*` (то же правило, что `core-run/model-fit.ts`). */
+  function isClaudeModel(value) {
+    const bare = String(value).trim();
+    return /^(fable|opus|sonnet|haiku)(\[[^\]]*\])?$/i.test(bare) || /^claude-/i.test(bare);
+  }
+
+  /** Пункты выбора модели в шапке чата: значение и подпись. */
+  async function modelOptions(page) {
+    const select = page.locator('select[aria-label="Модель"]').first();
+    await select.waitFor({ timeout: 30_000 }).catch(() => undefined);
+    return select
+      .locator('option')
+      .evaluateAll((options) => options.map((o) => ({ value: o.value, label: o.textContent })))
+      .catch(() => []);
+  }
+
+  /** Активный CLI раздела чата — настройка человека: правится из браузера, как переключателем. */
+  function setProvider(page, provider) {
+    return patchSettings(page, { provider });
+  }
+
+  /** Настройки панели — из браузера, как их правит человек. */
+  async function patchSettings(page, change) {
     const patch = () =>
-      page.evaluate(async (p) => {
+      page.evaluate(async (body) => {
         const res = await fetch('/api/settings', {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ provider: p }),
+          body: JSON.stringify(body),
         });
         return res.status;
-      }, provider);
+      }, change);
     // Холодный Vite на первом заходе перезагружает страницу после оптимизации зависимостей —
     // fetch посреди перезагрузки обрывается «Failed to fetch». Повтор после загрузки, не больше трёх.
     const attempt = async (n) => {
@@ -427,127 +477,23 @@ async function main() {
       }
     };
     const status = await attempt(1);
-    if (status !== 200) throw new Error(`настройка provider=${provider}: ${status}`);
+    if (status !== 200) throw new Error(`настройки ${JSON.stringify(change)}: ${status}`);
   }
 
-  /**
-   * Сколько разговоров у прежнего исполнителя чужого CLI — тихий откат на него виден здесь.
-   * Объявление функцией, не `const`: сценарий выше зовёт её до этой строки (иначе TDZ).
-   */
-  async function oldForeignChats(stand) {
-    const r = await stand.api('/provider-chat/chats');
-    return Array.isArray(r.body) ? r.body.length : (r.body?.chats?.length ?? -1);
+  /** «Новый чат» боковой панели `/chat`. */
+  async function clickNewChat(page) {
+    await page.getByRole('button', { name: 'Новый чат', exact: true }).first().click();
+    await wait(1000);
   }
 
-  /**
-   * Вход человека в чат чужого CLI: раздел «Чат» с этим CLI активным, кнопка «Новый» — она ведёт в
-   * чат ядра с этим CLI, а не заводит разговор прежнего исполнителя (`ProviderChatRun`).
-   */
-  async function foreignEntry(stand, check, page, cli) {
-    await page.goto(`${stand.webUrl}/settings`);
-    await setProvider(page, cli);
-    const chatsBefore = await oldForeignChats(stand);
-    await page.goto(`${stand.webUrl}/chat`);
-    const fresh = page.getByRole('button', { name: 'Новый', exact: true }).first();
-    await fresh.waitFor({ timeout: 90_000 });
-    await fresh.click();
-    const moved = await page
-      .waitForURL(/\/core\/chat/, { timeout: 15_000 })
+  /** Текст на экране в пределах срока. */
+  function shownOn(page, text, seconds = 180) {
+    return page
+      .getByText(text)
+      .first()
+      .waitFor({ timeout: seconds * 1000 })
       .then(() => true)
       .catch(() => false);
-    const url = new URL(page.url());
-    const picked = moved
-      ? await page
-          .locator('[data-core-chat-cli] select')
-          .inputValue({ timeout: 30_000 })
-          .catch(() => '')
-      : '';
-    check(
-      `${cli}: «Новый» в чате ${cli} открывает чат ядра с этим CLI (${url.pathname}${url.search}, выбран ${picked || '—'})`,
-      moved && url.searchParams.get('cli') === cli && picked === cli,
-    );
-    const chatsAfter = await oldForeignChats(stand);
-    check(
-      `${cli}: прежний исполнитель разговор не завёл (${chatsBefore} → ${chatsAfter})`,
-      // -1 — список не прочитан: без числа «не изменилось» ничего не доказывает.
-      chatsBefore >= 0 && chatsAfter === chatsBefore,
-    );
-    if (moved) await shoot(page, `core-chat-${cli}-entry`);
-    await setProvider(page, 'claude');
-  }
-
-  /**
-   * CLI без хука ядра: чат начинается задачей ядра, и ядро отказывает по имени — экран называет
-   * отказ, композера нет; прежний исполнитель не зовётся, процесса CLI под панелью нет.
-   */
-  async function refused(stand, check, browser, cli) {
-    const page = await stand.newPage(browser, { width: 1440, height: 1100 });
-    await seedOnSetCli(stand, page, cli);
-    // Прежний исполнитель заводился только POST /api/provider-chat/chats. Список его разговоров при
-    // активном Claude не читается (-1 → -1 прошло бы всегда), поэтому считаются сами запросы страницы.
-    const legacyPosts = [];
-    page.on('request', (request) => {
-      if (request.method() === 'POST' && request.url().includes('/api/provider-chat/chats'))
-        legacyPosts.push(request.url());
-    });
-    await page.goto(
-      `${stand.webUrl}/core/chat?cli=${encodeURIComponent(cli)}&project=${encodeURIComponent(repo)}`,
-    );
-    await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
-    const picked = await page.locator('[data-core-chat-cli] select').inputValue();
-    check(`${cli}: форма начинает с ${cli} из адреса (${picked})`, picked === cli);
-    await page.locator('[data-core-chat-first] textarea').fill('ход-1: привет');
-    await page.locator('[data-core-chat-submit]').click();
-    await page.waitForURL(/[?&]id=/, { timeout: 60_000 }).catch(() => null);
-    const taskId = new URL(page.url()).searchParams.get('id');
-    const named = page.locator('[data-core-chat-launch-refused]');
-    const seen = await named
-      .waitFor({ timeout: 120_000 })
-      .then(() => true)
-      .catch(() => false);
-    const text = seen ? await named.innerText() : '';
-    check(
-      `${cli}: ядро отказало по имени, экран называет отказ (задача ${taskId ?? '—'}: «${text.replace(/\s+/g, ' ').slice(0, 160)}»)`,
-      !!taskId && seen && text.includes('no_core_hook'),
-      // Пустой экран без отказа (форма висит на «Запустить») ничего не называл: хвосты журналов
-      // панели и ядра — где встала оценка.
-      [
-        await page
-          .locator('[data-core-chat-screen], [data-core-chat-start-failed]')
-          .first()
-          .innerText({ timeout: 2_000 })
-          .catch(() => ''),
-        seen
-          ? ''
-          : `панель: ${stand.log().slice(-1200)}\n    ядро: ${stand.coreLog().slice(-1200)}`,
-      ]
-        .filter(Boolean)
-        .join('\n    '),
-    );
-    check(
-      `${cli}: композера нет — писать в отказанный чат нечего`,
-      (await page.locator('[data-core-chat-composer]').count()) === 0,
-    );
-    check(
-      `${cli}: прежний исполнитель не позван (POST /api/provider-chat/chats: ${legacyPosts.length})`,
-      legacyPosts.length === 0,
-      legacyPosts.join('\n    '),
-    );
-    const image = IMAGE[cli] ?? cli;
-    const table = processTable();
-    const underPanel = [...table].filter(
-      ([pid, row]) =>
-        new RegExp(`\\b${image}(\\.exe|\\.cmd)?\\b`, 'i').test(row.command) &&
-        !/powershell/i.test(row.command) &&
-        ancestry(pid, table).includes(stand.serverPid()),
-    );
-    check(
-      `${cli}: процесса ${image} под сервером панели нет`,
-      underPanel.length === 0,
-      underPanel.map(([pid, row]) => `${pid}: ${row.command.slice(0, 120)}`).join('\n    '),
-    );
-    await shoot(page, `core-chat-${cli}-refused`);
-    await page.close();
   }
 
   /**
@@ -563,22 +509,8 @@ async function main() {
    */
   async function panelChat(stand, check, browser) {
     const { randomUUID } = await import('node:crypto');
-    const { openProjectChat } = await import('./chat-walk.mjs');
-    const tasks = () => {
-      try {
-        return readdirSync(join(stand.coreHome, 'tasks'));
-      } catch {
-        return [];
-      }
-    };
-    const journalOf = (taskId) => {
-      const dir = join(stand.coreHome, 'tasks', taskId);
-      const name = readdirSync(dir).find((f) => f.endsWith('.jsonl'));
-      return readFileSync(join(dir, name), 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l));
-    };
+    const tasks = () => coreTasks(stand);
+    const journalOf = (taskId) => coreJournal(stand, taskId);
     const conv = randomUUID();
     const transcript = () => {
       const projects = join(stand.cfg, 'projects');
@@ -588,15 +520,6 @@ async function main() {
       }
       return '';
     };
-    // Вход claude стенда — адрес и ключ в `env` личного settings.json, как у человека со своим
-    // адресом модели: пин задачи ядра несёт только дом и CLAUDE_CONFIG_DIR, окружение стенда
-    // (`stubEnv`) до CLI ядра не доходит, а личный слой ядро передаёт как есть.
-    const settingsPath = join(stand.cfg, 'settings.json');
-    const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
-    writeFileSync(
-      settingsPath,
-      `${JSON.stringify({ ...settings, env: { ...settings.env, ...stubEnv } }, null, 2)}\n`,
-    );
     // Старый разговор: настоящий claude, окружение стенда, модель — заглушка.
     const env = {
       ...Object.fromEntries(
@@ -637,13 +560,7 @@ async function main() {
     await page.goto(`${stand.webUrl}/chat?id=${conv}`);
     const input = page.locator('textarea[data-chat-input]');
     await input.waitFor({ timeout: 90_000 });
-    const shown = (text, seconds = 180) =>
-      page
-        .getByText(text)
-        .first()
-        .waitFor({ timeout: seconds * 1000 })
-        .then(() => true)
-        .catch(() => false);
+    const shown = (text, seconds = 180) => shownOn(page, text, seconds);
     check(
       '/chat: старый разговор открыт, прежний ответ на экране',
       await shown('ответ на ход-4', 60),
@@ -652,14 +569,7 @@ async function main() {
       await input.fill(text);
       await input.press('Enter');
     };
-    const newTask = async (before) => {
-      for (let i = 0; i < 90; i++) {
-        const fresh = tasks().filter((t) => !before.includes(t));
-        if (fresh.length > 0) return fresh;
-        await wait(1000);
-      }
-      return [];
-    };
+    const newTask = (before) => newTasks(stand, before);
 
     // Ход 5: задача ядра с продолжением разговора.
     const before5 = tasks();
@@ -905,7 +815,6 @@ async function main() {
     );
     await shoot(page, 'panel-chat-core-outside-refused');
     // Основы чата (chat-001, chat-003, chat-009) — тем же живым шагом ядра.
-    const { dismissAccess } = await import('./chat-walk.mjs');
     await basicsSteps({
       stand,
       page,
@@ -921,299 +830,451 @@ async function main() {
     await page.close();
   }
 
-  /** Прежняя дорога: `/chat` панели, CLI — ребёнок сервера панели. Только кадры и родословная. */
-  async function before(stand, check, browser) {
-    const page = await stand.newPage(browser);
-    await page.goto(`${stand.webUrl}/chat`);
-    const input = page.locator('textarea[data-chat-input]');
-    await input.waitFor({ timeout: 90_000 });
-    await shoot(page, 'chat-new');
-    await input.fill('ход-1: привет');
-    await input.press('Enter');
-    // CLI прежнего чата — процесс с адресом заглушки в окружении не виден по команде; ищем
-    // процессы claude, чья цепочка предков доходит до сервера панели стенда.
-    let chain = [];
-    let seen = [];
-    for (let i = 0; i < 30 && chain.length === 0; i++) {
-      const table = processTable();
-      seen = [];
-      for (const [pid, row] of table) {
-        if (!/claude/i.test(row.command) || /powershell/i.test(row.command)) continue;
-        const up = ancestry(pid, table);
-        if (up.includes(stand.serverPid())) chain = up;
-        seen.push(`${up.join('←')}: ${row.command.slice(0, 120)}`);
-      }
-      if (chain.length === 0) await wait(500);
-    }
-    if (chain.length === 0)
-      console.log(`  ~ сервер ${stand.serverPid()}; claude-процессы:\n    ${seen.join('\n    ')}`);
+  /**
+   * «Новый чат» при активном Claude: остаётся в `/chat`, выбора CLI и «Продолжить через ядро» нет,
+   * ход — задача ядра с сеансом claude, ответ на экране. Возвращает разговор и задачу — по ним
+   * проверяется старый адрес `/core/chat?id=`.
+   */
+  async function newClaudeChat(stand, check, browser) {
+    const page = await openProjectChat(stand, browser, repo, 'repo');
+    await clickNewChat(page);
+    const url = new URL(page.url());
     check(
-      `до: CLI чата — потомок сервера панели (${chain.join(' ← ') || 'не найден'})`,
-      chain.length > 0,
+      `Claude: «Новый чат» остался в /chat (${url.pathname}${url.search})`,
+      url.pathname === '/chat',
     );
-    await wait(3000);
-    await shoot(page, 'chat-sent');
+    check(
+      'в /chat нет выбора CLI и кнопки «Продолжить через ядро»',
+      (await page.locator('[data-core-chat-cli], [data-chat-continue-in-core]').count()) === 0,
+    );
+    const input = page.locator('textarea[data-chat-input]');
+    const before = coreTasks(stand);
+    await input.fill('ход-21: новый чат');
+    await input.press('Enter');
+    const fresh = await newTasks(stand, before);
+    const answered = await shownOn(page, 'ответ на ход-21');
+    const sessions = fresh[0] ? sessionsOf(stand, fresh[0]) : [];
+    check(
+      `Claude: ход нового чата — задача ядра (${fresh.join(',') || 'нет'}) с сеансом claude, ответ на экране`,
+      fresh.length === 1 && answered && sessions.some((s) => s.adapter === 'claude'),
+      JSON.stringify(sessions).slice(0, 300),
+    );
+    // id разговора встаёт в адрес после первого ответа.
+    let conv = null;
+    for (let i = 0; i < 20 && !conv; i++) {
+      conv = new URL(page.url()).searchParams.get('id');
+      if (!conv) await wait(500);
+    }
+    await shoot(page, 'one-chat-claude-new');
+    await page.close();
+    return { conv, taskId: fresh[0] };
   }
 
   /**
-   * Засев маршрута и модели в миг `set-cli` экрана: задача уже есть, запуск ещё не отправлен; запрос
-   * экрана уходит дальше без изменений. Маршрут заглушки разрешён ровно этому CLI.
+   * CLI без хука ядра активным провайдером: новый чат в `/chat`, ход — ядро отказывает по имени.
+   * В ленте строка отказа с кодом, композера нет, прежний исполнитель не зовётся, процесса CLI под
+   * панелью нет.
    */
-  async function seedOnSetCli(stand, page, cli) {
-    const token = readFileSync(join(stand.coreHome, 'token'), 'utf8').trim();
-    const coreRow = () =>
-      JSON.parse(readFileSync(join(stand.coreHome, 'procs.json'), 'utf8')).cores.at(-1);
-    const direct = async (method, path, body) => {
-      const res = await fetch(`${coreRow().url}${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${token}`,
-          ...(body ? { 'content-type': 'application/json' } : {}),
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-      const text = await res.text();
-      return { status: res.status, text };
-    };
-    const proof = async () => {
-      const id = uuidv7();
-      const minted = JSON.parse((await direct('GET', `/v1/nonce?page=${id}`)).text);
-      return { nonce: minted.nonce, page: id };
-    };
-    const seedCommand = async (taskId, kind, fields) =>
-      direct('POST', '/v1/commands', {
-        cmdId: uuidv7(),
-        kind,
-        target: { taskId },
-        fields,
-        proof: await proof(),
-      });
-    const seeded = [];
-    await page.route(/\/api\/core\/commands$/, async (route) => {
-      const body = route.request().postDataJSON();
-      if (body?.kind === 'set-cli') {
-        const taskId = body.target.taskId;
-        const r = await seedCommand(taskId, 'set-route', {
-          scope: 'task',
-          scopeId: taskId,
-          allowedRoutes: [
-            { adapter: cli, route: { kind: 'stub', id: 'stub:stand' }, modelPattern: '*' },
-          ],
-        });
-        const m = await seedCommand(taskId, 'set-model', {
-          scope: 'task',
-          scopeId: taskId,
-          model: 'stub-model',
-          effort: null,
-          timing: 'now',
-        });
-        seeded.push(`${r.status}/${m.status}`);
-        if (r.status !== 200 || m.status !== 200) console.log(`  ~ засев: ${r.text} ${m.text}`);
-      }
-      await route.continue();
+  async function refusedChat(stand, check, browser, cli) {
+    const page = await openProjectChat(stand, browser, repo, 'repo');
+    const legacyPosts = [];
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().includes('/api/provider-chat/chats'))
+        legacyPosts.push(request.url());
     });
-    return seeded;
+    try {
+      await setProvider(page, cli);
+      await page.reload();
+      await dismissAccess(page);
+      await clickNewChat(page);
+      const input = page.locator('textarea[data-chat-input]');
+      await input.waitFor({ timeout: 60_000 });
+      // Шапка нового чата предлагает модели CLI разговора (W3-17a), не алиасы Claude.
+      const picked = await modelOptions(page);
+      check(
+        `${cli}: выбор модели без алиасов Claude, «по умолчанию» — модель CLI (${JSON.stringify(picked).slice(0, 200)})`,
+        picked.length > 0 &&
+          !picked.some((o) => isClaudeModel(o.value)) &&
+          picked[0]?.label === 'как выберет CLI',
+      );
+      await input.fill('ход-31: привет');
+      await input.press('Enter');
+      const named = page.locator('[data-core-chat-launch-refused]');
+      const seen = await named
+        .waitFor({ timeout: 120_000 })
+        .then(() => true)
+        .catch(() => false);
+      const text = seen ? await named.innerText() : '';
+      check(
+        `${cli}: ядро отказало по имени, лента называет отказ («${text.replace(/\s+/g, ' ').slice(0, 160)}»)`,
+        seen &&
+          text.includes('no_core_hook') &&
+          (await named.getAttribute('data-core-chat-launch-refused')) === 'no_core_hook',
+        seen
+          ? ''
+          : `панель: ${stand.log().slice(-1200)}\n    ядро: ${stand.coreLog().slice(-1200)}`,
+      );
+      check(
+        `${cli}: композера нет — писать в отказанный чат нечего`,
+        (await page.locator('textarea[data-chat-input]').count()) === 0,
+      );
+      check(
+        `${cli}: прежний исполнитель не позван (POST /api/provider-chat/chats: ${legacyPosts.length})`,
+        legacyPosts.length === 0,
+        legacyPosts.join('\n    '),
+      );
+      const image = IMAGE[cli] ?? cli;
+      const table = processTable();
+      const underPanel = [...table].filter(
+        ([pid, row]) =>
+          new RegExp(`\\b${image}(\\.exe|\\.cmd)?\\b`, 'i').test(row.command) &&
+          !/powershell/i.test(row.command) &&
+          ancestry(pid, table).includes(stand.serverPid()),
+      );
+      check(
+        `${cli}: процесса ${image} под сервером панели нет`,
+        underPanel.length === 0,
+        underPanel.map(([pid, row]) => `${pid}: ${row.command.slice(0, 120)}`).join('\n    '),
+      );
+      await shoot(page, `one-chat-${cli}-refused`);
+    } finally {
+      await setProvider(page, 'claude').catch(() => undefined);
+      await page.close();
+    }
   }
 
-  async function after(stand, check, browser, cli) {
-    const journal = (taskId) => {
-      const dir = join(stand.coreHome, 'tasks', taskId);
-      const name = readdirSync(dir).find((f) => f.endsWith('.jsonl'));
-      return readFileSync(join(dir, name), 'utf8')
-        .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l));
-    };
-    const until = async (what, probe, seconds) => {
-      for (let i = 0; i < seconds; i++) {
-        const got = await probe();
-        if (got) return got;
-        await wait(1000);
-      }
-      throw new Error(`не дождались: ${what}`);
-    };
-
-    const page = await stand.newPage(browser, { width: 1440, height: 1100 });
-    const seeded = await seedOnSetCli(stand, page, cli);
-    // Оценка и команды ядра с экрана — для разбора, если чат не начался.
-    const coreCalls = [];
-    page.on('request', (r) => {
-      if (r.method() === 'POST' && /\/api\/core\/(estimate|commands)$/.test(r.url())) {
-        coreCalls.push(r);
-      }
+  /**
+   * Одноразовый контур стенда с галочкой «Чат»: стаб-контур за шлюзом ядра стенда. У CLI без входа
+   * (`cliLogin: false` — Qwen, а также aider и continue без хука ядра) иного маршрута нет: без
+   * контура `set-cli` такого CLI ядро отказывает `outside-allowed-set` ещё до суда совместимости.
+   */
+  async function activateContour(stand, check) {
+    const KEY = ['chat', 'stub', 'key'].join('-');
+    const CONTOUR = 'one-chat';
+    const saved = await stand.api(`/platforms/${CONTOUR}`, {
+      method: 'PUT',
+      body: {
+        settings: {
+          id: CONTOUR,
+          title: 'Контур чата',
+          driver: 'enterprise-platform',
+          baseUrl: contour.url,
+          enabled: true,
+          mode: 'best-effort',
+          budgetUsd: 0,
+          budgetSince: '',
+          capabilities: [],
+          // Чужой CLI идёт через контур по своей галочке (`chatConsumerOf`), «Чат» — только Claude.
+          consumers: ['chat', `foreign:${FOREIGN}`],
+          targets: [],
+          projectPaths: [],
+          agents: [],
+          caCertPath: '',
+          toolShim: false,
+          defaultModel: 'stub-chat',
+          // Перевод выбора человека (M-F1): модель Claude из настроек — в модель контура.
+          modelMap: { [CONTOUR_PICK]: CONTOUR_PICKED },
+        },
+        token: KEY,
+      },
     });
+    const activated = await stand.api(`/platforms/${CONTOUR}/activate?probe=skip`, {
+      method: 'POST',
+      body: {},
+    });
+    const restarted = await stand.api('/platforms/gateway/restart', { method: 'POST', body: {} });
+    check(
+      'контур стенда «Чат» сохранён, активен, шлюз на своём порту',
+      saved.status === 200 &&
+        activated.body?.activePlatformId === CONTOUR &&
+        restarted.body?.status?.running === true,
+      JSON.stringify([saved.body, activated.body, restarted.body?.status]).slice(0, 500),
+    );
+  }
 
-    if (cli === 'claude') {
-      // Вход человека — «Новый чат» прежнего чата: он ведёт в чат ядра, а не в черновик панели.
-      const { dismissAccess } = await import('./chat-walk.mjs');
-      await page.goto(`${stand.webUrl}/chat`);
-      await page.getByRole('button', { name: 'Новый чат' }).first().waitFor({ timeout: 90_000 });
+  /**
+   * Чужой CLI активным провайдером: новый чат в `/chat` отвечает через него — модель за контуром
+   * стенда (галочка «чат» у контура), сеанс этого CLI в журнале ядра, модель claude хода не видела.
+   * Потом активный снова Claude — тот же открытый чат продолжает свой CLI.
+   */
+  async function foreignChat(stand, check, browser) {
+    const page = await openProjectChat(stand, browser, repo, 'repo');
+    const contourCalls = () =>
+      contour.calls.filter((call) => call.path.endsWith('/chat/completions')).length;
+    try {
+      await setProvider(page, FOREIGN);
+      await page.reload();
       await dismissAccess(page);
-      await page.getByRole('button', { name: 'Новый чат' }).first().click();
-      const moved = await page
-        .waitForURL(/\/core\/chat/, { timeout: 15_000 })
-        .then(() => true)
-        .catch(() => false);
-      check(`«Новый чат» в /chat открывает чат ядра (${new URL(page.url()).pathname})`, moved);
-      // Отрицательный: без папки проекта форма называет поле и в ядро не уходит ничего.
-      const estimates = [];
-      page.on('request', (r) => {
-        if (r.method() === 'POST' && /\/api\/core\/estimate$/.test(r.url())) estimates.push(r);
-      });
-      await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
-      await page.locator('[data-core-chat-project] input').fill('');
-      await page.locator('[data-core-chat-first] textarea').fill('ход-0: без папки');
-      await page.locator('[data-core-chat-submit]').click();
-      await page.waitForTimeout(1500);
-      const named = await page.locator('[data-core-chat-project]').innerText();
+      await clickNewChat(page);
+      const input = page.locator('textarea[data-chat-input]');
+      await input.waitFor({ timeout: 60_000 });
+      const before = coreTasks(stand);
+      const calls0 = contourCalls();
+      await input.fill('ход-41: привет');
+      await input.press('Enter');
+      const fresh = await newTasks(stand, before);
+      const answered = await shownOn(page, 'готов');
+      const sessions = fresh[0] ? sessionsOf(stand, fresh[0]) : [];
+      const tail = fresh[0]
+        ? coreJournal(stand, fresh[0])
+            .slice(-10)
+            .map((l) => `${l.kind} ${JSON.stringify(l.data).slice(0, 160)}`)
+            .join('\n      ')
+        : `панель: ${stand.log().slice(-1200)}`;
       check(
-        `без папки проекта: поле названо, оценка не отправлена (${estimates.length})`,
-        estimates.length === 0 && named.includes('Укажите'),
-        named,
+        `${FOREIGN}: новый чат в /chat — задача ядра (${fresh.join(',') || 'нет'}) с сеансом ${FOREIGN}, ответ контура на экране`,
+        fresh.length === 1 && answered && sessions.some((s) => s.adapter === FOREIGN),
+        `${JSON.stringify(sessions).slice(0, 300)}\n      ${tail}`,
       );
-    }
-    if (cli !== 'claude') await foreignEntry(stand, check, page, cli);
-    await page.goto(`${stand.webUrl}/core/chat?project=${encodeURIComponent(repo)}`);
-    await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
-    await page.locator('[data-core-chat-cli] select').selectOption(cli);
-    await page.locator('[data-core-chat-first] textarea').fill('ход-1: привет, ядро');
-    if (cli === 'claude') await shoot(page, 'core-chat-start');
-    await page.locator('[data-core-chat-submit]').click();
-    await page.waitForURL(/[?&]id=/, { timeout: 60_000 }).catch(async (error) => {
-      const why = await page
-        .locator('[data-core-chat-start-failed]')
-        .innerText()
-        .catch(() => '');
-      // Ответ ядра на оценку и команды — причина, которую экран мог не показать.
-      const answers = [];
-      for (const r of coreCalls.slice(-6)) {
-        const res = await r.response().catch(() => null);
-        answers.push(
-          `${r.url().split('/api/')[1]} → ${res?.status()} ${(await res?.text().catch(() => '')) ?? ''}`.slice(
-            0,
-            400,
-          ),
-        );
+      check(
+        `${FOREIGN}: запрос дошёл до контура (${contourCalls() - calls0}), модель claude хода не видела`,
+        contourCalls() > calls0 && !panelTrace.some((t) => t.includes('ход-41')),
+      );
+      // Имя Claude другому CLI не уходит (W3-17a): ни одной правки модели с ним в журнале задачи.
+      const models41 = fresh[0] ? modelOverrides(stand, fresh[0]) : [];
+      check(
+        `${FOREIGN}: правки модели задачи без имени Claude (${JSON.stringify(models41)})`,
+        fresh.length === 1 && !models41.some(isClaudeModel),
+      );
+      await shoot(page, `one-chat-${FOREIGN}-new`);
+
+      // Активный снова Claude — переключатель провайдера, страница та же: открытый чат
+      // продолжает свой CLI.
+      await setProvider(page, 'claude');
+      // «готов» на экране — ещё не конец хода: qwen после ответа делает свой запрос к модели, и
+      // слово, отправленное в это окно, уходит «на ходу» (steer), а не продолжением законченного хода.
+      // Прежде шаг попадал туда через раз (контур +3 — хвост хода-41 в счёте, слово пропадало).
+      // Здесь — продолжение ЗАКОНЧЕННОГО хода; слово «на ходу» проверяет шаг ход-44 ниже.
+      const stopButton = page.getByRole('button', { name: 'Остановить' });
+      const idle = async (seconds) => {
+        for (let i = 0; i < seconds * 4; i++) {
+          if ((await stopButton.count()) === 0) return true;
+          await wait(250);
+        }
+        return false;
+      };
+      const idle41 = await idle(120);
+      const before2 = coreTasks(stand);
+      const calls1 = contourCalls();
+      const answers1 = await page.getByText('готов', { exact: true }).count();
+      await input.waitFor({ timeout: 60_000 });
+      await input.fill('ход-42: дальше');
+      await input.press('Enter');
+      let reached = false;
+      for (let i = 0; i < 180 && !reached; i++) {
+        reached = contourCalls() > calls1;
+        if (!reached) await wait(1000);
       }
-      await shoot(page, `core-chat-start-failed-${cli}`);
-      throw new Error(
-        `${error.message}\n    отказ экрана: ${why}\n    ответы: ${answers.join('\n      ')}`,
-      );
-    });
-    const taskId = new URL(page.url()).searchParams.get('id');
-    check(
-      `${cli}: новый чат — задача ядра ${taskId}, маршрут засеян (${seeded.join(',')})`,
-      !!taskId,
-    );
-
-    const assistant = (text) =>
-      page.locator('[data-core-chat-assistant]').filter({ hasText: text });
-    const answered = async (text, seconds = 180) =>
-      assistant(text)
-        .first()
-        .waitFor({ timeout: seconds * 1000 })
-        .then(() => true)
-        .catch(() => false);
-
-    const first = await answered('ответ на ход-1');
-    check(`${cli}: ответ на первый ход на экране`, first, traceTail());
-
-    const started = journal(taskId).find((l) => l.kind === 'session.started')?.data;
-    check(
-      `${cli}: сеанс ядра этого CLI в корне проекта, без копии (cwd ${started?.cwd})`,
-      started?.adapter === cli &&
-        resolve(started.cwd).toLowerCase() === resolve(repo).toLowerCase(),
-      JSON.stringify(started),
-    );
-    if (started?.cliPid) {
-      const table = processTable();
-      const chain = ancestry(started.cliPid, table);
+      // Ответ на ход-N — реплика ленты ПОСЛЕ пузыря ход-N (тексты ответов контура одинаковы,
+      // поэтому по порядку, а не по числу). Ответ идущего разговора чужого CLI стоит живой репликой
+      // хода, а не строкой `[data-feed-message]` (прогон 6: в ленте только «ход-41», «ход-42»), —
+      // ищется текстовый узел «готов» ниже пузыря ход-N в порядке документа.
+      const answeredAfter = (word = 'ход-42') =>
+        page.evaluate((said) => {
+          const sent = [...document.querySelectorAll('[data-feed-message]')].find((el) =>
+            el.textContent?.includes(said),
+          );
+          if (!sent) return false;
+          const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+            if (node.textContent?.trim() !== 'готов') continue;
+            if (sent.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) return true;
+          }
+          return false;
+        }, word);
+      let answered2 = false;
+      for (let i = 0; i < 60 && !answered2; i++) {
+        answered2 = await answeredAfter();
+        if (!answered2) await wait(1000);
+      }
+      const answers2 = await page.getByText('готов', { exact: true }).count();
+      const later = coreTasks(stand).filter((t) => !before2.includes(t));
+      const laterSessions = later.flatMap((t) => sessionsOf(stand, t));
+      const models42 = later.flatMap((t) => modelOverrides(stand, t));
       check(
-        `${cli}: процесс CLI — потомок хоста сеансов ядра, не панели (${chain.join(' ← ')})`,
-        chain.includes(started.hostPid) && !chain.includes(stand.serverPid()),
-        `host ${started.hostPid}, panel ${stand.serverPid()}`,
+        `${FOREIGN}: продолжение при активном Claude — правки модели без имени Claude (${JSON.stringify(models42)})`,
+        !models42.some(isClaudeModel),
       );
-    } else check(`${cli}: номер процесса CLI в журнале`, false, JSON.stringify(started));
+      check(
+        `${FOREIGN}: при активном Claude тот же чат продолжен через ${FOREIGN} (ход-41 кончился: ${idle41}, контур: +${contourCalls() - calls1}, ответ после ход-42 на экране: ${answered2}, новых задач ${later.length})`,
+        idle41 &&
+          reached &&
+          answered2 &&
+          !panelTrace.some((t) => t.includes('ход-42')) &&
+          laterSessions.every((s) => s.adapter === FOREIGN),
+        `${JSON.stringify(laterSessions).slice(0, 300)}\n      лента: ${JSON.stringify(
+          await page.locator('[data-feed-message]').allInnerTexts(),
+        ).slice(0, 600)}\n      экран: ${(await page.locator('main').innerText()).slice(-600)}`,
+      );
+      // Известный пробел (отчёт W3-17a): транскрипта у чужого CLI панель не читает, и прежний ответ
+      // разговора не CLI Claude из ленты уходит, когда начинается следующий ход. Печатается, не судится.
+      console.log(
+        `  ~ ${FOREIGN}: ответов «готов» на экране после двух ходов: ${answers1} → ${answers2}`,
+      );
+      await shoot(page, `one-chat-${FOREIGN}-continued`);
 
-    const composer = page.locator('[data-core-chat-composer] textarea');
-    const send = async (text) => {
-      await composer.fill(text);
-      await page.locator('[data-core-chat-send]').click();
-    };
-    await send('ход-2: покажи файл');
-    const tool = page.locator('[data-core-chat-tool]').first();
-    const toolSeen = await tool
-      .waitFor({ timeout: 180_000 })
-      .then(() => true)
-      .catch(() => false);
-    check(`${cli}: строка инструмента на экране`, toolSeen);
-    const readBack = await answered(FILE_MARK);
-    check(`${cli}: результат чтения файла вернулся в ответ модели`, readBack, traceTail());
-    const toolState = toolSeen ? await tool.getAttribute('data-tool-state') : null;
-    check(`${cli}: строка инструмента — «готово» (${toolState})`, toolState === 'done');
-    // Человек видит свои слова: шапка платформы и метка человека в пузырь не попадают.
-    const framed = (await page.locator('[data-core-chat-human]').allInnerTexts()).filter((t) =>
-      /agentdeck:platform|agentdeck-from|human-origin/.test(t),
-    );
-    check(
-      `${cli}: в пузырях человека нет служебной шапки`,
-      framed.length === 0,
-      framed.join(' | '),
-    );
-    await shoot(page, `core-chat-${cli}-tool`);
+      // Слово «на ходу» у чата чужого CLI: ход-44 уходит, пока ход-43 ещё идёт (запрос хода-43 уже
+      // у контура). Ядро доставит его новым ходом того же прогона. Транскрипта qwen панель не
+      // читает: прежде слово пропадало с экрана по концу прогона, а ответ на него дописывался к
+      // прежнему одним текстом («готовготов»). Судится экран ПОСЛЕ конца прогона.
+      await idle(120);
+      const sends = [];
+      const onSend = (req) => {
+        if (req.method() !== 'POST' || !req.url().includes('/api/chat/send')) return;
+        const body = req.postDataJSON?.() ?? {};
+        sends.push({ steer: body.steer === true, prompt: String(body.prompt ?? '') });
+      };
+      page.on('request', onSend);
+      const calls3 = contourCalls();
+      await input.fill('ход-43: ещё');
+      await input.press('Enter');
+      for (let i = 0; i < 1200 && contourCalls() === calls3; i++) await wait(50);
+      await input.fill('ход-44: на ходу');
+      await input.press('Enter');
+      let answered44 = false;
+      let idle44 = false;
+      for (let i = 0; i < 90 && !(answered44 && idle44); i++) {
+        idle44 = (await stopButton.count()) === 0;
+        answered44 = await answeredAfter('ход-44');
+        if (!(answered44 && idle44)) await wait(1000);
+      }
+      // Конец прогона снимал слово — суд после него, с запасом на перерисовку.
+      await wait(1500);
+      const feed44 = await page.locator('[data-feed-message]').allInnerTexts();
+      answered44 = await answeredAfter('ход-44');
+      const steered44 = sends.find((s) => s.prompt.includes('ход-44'))?.steer === true;
+      page.off('request', onSend);
+      check(
+        `${FOREIGN}: слово «на ходу» (ход-44) и ответ на него на экране после конца прогона (ушло на ходу: ${steered44}, прогон кончился: ${idle44}, ответ после ход-44: ${answered44})`,
+        steered44 &&
+          idle44 &&
+          answered44 &&
+          feed44.some((t) => t.includes('ход-43')) &&
+          feed44.some((t) => t.includes('ход-44')),
+        `отправки: ${JSON.stringify(sends)}\n      лента: ${JSON.stringify(feed44).slice(0, 600)}\n      экран: ${(await page.locator('main').innerText()).slice(-600)}`,
+      );
+      await shoot(page, `one-chat-${FOREIGN}-steer`);
+    } finally {
+      await setProvider(page, 'claude').catch(() => undefined);
+      await page.close();
+    }
+  }
 
-    // Жёсткий перезапуск панели: ни один ход не потерян и не повторён.
-    const shownBefore = await page
-      .locator('[data-core-chat-human], [data-core-chat-assistant]')
-      .allInnerTexts();
-    const { killedPid, pid } = await stand.restartHard();
-    await page.reload();
-    await page.locator('[data-core-chat-screen]').waitFor({ timeout: 90_000 });
-    await until(
-      'лента после перезапуска',
-      async () =>
-        (await page.locator('[data-core-chat-human], [data-core-chat-assistant]').count()) >=
-        shownBefore.length,
-      60,
-    ).catch(() => null);
-    const shownAfter = await page
-      .locator('[data-core-chat-human], [data-core-chat-assistant]')
-      .allInnerTexts();
-    check(
-      `${cli}: после перезапуска панели (${killedPid} → ${pid}) лента та же (${shownAfter.length} из ${shownBefore.length})`,
-      JSON.stringify(shownAfter) === JSON.stringify(shownBefore),
-      `до ${JSON.stringify(shownBefore)}\n    после ${JSON.stringify(shownAfter)}`,
-    );
-    await send('ход-3: после перезапуска');
-    const third = await answered('ответ на ход-3');
-    const humans = await page.locator('[data-core-chat-human]').allInnerTexts();
-    const once = ['ход-1', 'ход-2', 'ход-3'].every(
-      (h) => humans.filter((t) => t.includes(h)).length === 1,
-    );
-    check(`${cli}: ход после перезапуска получил ответ`, third);
-    check(`${cli}: каждый ход человека в ленте ровно один раз`, once, JSON.stringify(humans));
-    await shoot(page, `core-chat-${cli}-resumed`);
+  /**
+   * Выбор модели через контур (ревью W3-17a, M-F1). У чата чужого CLI модель решает перевод контура,
+   * а каталог контура один у любого CLI и несёт `claude-*`. Модель Claude из настроек (`chatModel`)
+   * доходит до карты контура (`claude-sonnet-5-5` → `stub-reasoning`): её показывает запертая шапка, её
+   * шлёт `set-model`, с ней запрос приходит в контур. Прежде шапка и сервер срезали имя Claude ДО
+   * перевода — ход шёл на модели контура по умолчанию, выбор человека пропадал молча.
+   */
+  async function contourPick(stand, check, browser) {
+    const page = await openProjectChat(stand, browser, repo, 'repo');
+    const completions = (from) =>
+      contour.calls
+        .slice(from)
+        .filter((call) => call.path.endsWith('/chat/completions'))
+        .map((call) => {
+          try {
+            return String(JSON.parse(String(call.body ?? '{}')).model ?? '');
+          } catch {
+            return '?';
+          }
+        });
+    try {
+      await setProvider(page, FOREIGN);
+      await patchSettings(page, { chatModel: CONTOUR_PICK });
+      await page.reload();
+      await dismissAccess(page);
+      await clickNewChat(page);
+      const input = page.locator('textarea[data-chat-input]');
+      await input.waitFor({ timeout: 60_000 });
+      // Запертая шапка — то, что уедет: перевод контура, а не модель контура по умолчанию.
+      const header = page.locator('select[aria-label="Модель"]').first();
+      await header.waitFor({ timeout: 30_000 });
+      let shown = '';
+      for (let i = 0; i < 30 && shown !== CONTOUR_PICKED; i++) {
+        shown = await header.evaluate((el) => el.options[el.selectedIndex]?.text ?? '');
+        if (shown !== CONTOUR_PICKED) await wait(1000);
+      }
+      const before = coreTasks(stand);
+      const from = contour.calls.length;
+      await input.fill('ход-43: выбор');
+      await input.press('Enter');
+      const fresh = await newTasks(stand, before);
+      for (let i = 0; i < 180 && completions(from).length === 0; i++) await wait(1000);
+      const answered = await shownOn(page, 'готов');
+      const sent = completions(from);
+      const overrides = fresh[0] ? modelOverrides(stand, fresh[0]) : [];
+      check(
+        `${FOREIGN} через контур: модель Claude из настроек переведена контуром — шапка «${shown}», set-model ${JSON.stringify(overrides)}, в контур ${JSON.stringify(sent)}`,
+        fresh.length === 1 &&
+          answered &&
+          shown === CONTOUR_PICKED &&
+          overrides.includes(CONTOUR_PICKED) &&
+          sent.length > 0 &&
+          sent.every((model) => model === CONTOUR_PICKED),
+        fresh[0]
+          ? coreJournal(stand, fresh[0])
+              .slice(-12)
+              .map((l) => `${l.kind} ${JSON.stringify(l.data).slice(0, 200)}`)
+              .join('\n      ')
+          : `панель: ${stand.log().slice(-1200)}`,
+      );
+      await shoot(page, `one-chat-${FOREIGN}-contour-pick`);
+    } finally {
+      await patchSettings(page, { chatModel: '' }).catch(() => undefined);
+      await setProvider(page, 'claude').catch(() => undefined);
+      await page.close();
+    }
+  }
 
-    await page.locator('[data-core-chat-end]').click();
-    const closed = await page
-      .locator('[data-core-chat-status="closed"]')
-      .waitFor({ timeout: 120_000 })
-      .then(() => true)
-      .catch(() => false);
-    const ended = journal(taskId).some((l) => l.kind === 'task.done' || l.kind === 'task.ended');
-    check(
-      `${cli}: «Закрыть» — чат закрыт, композера нет`,
-      closed && (await page.locator('[data-core-chat-composer]').count()) === 0,
-    );
-    check(
-      `${cli}: задача ядра кончилась (${journal(taskId).at(-1).kind})`,
-      ended || closed,
-      journal(taskId)
-        .slice(-5)
-        .map((l) => l.kind)
-        .join(', '),
-    );
-    await shoot(page, `core-chat-${cli}-closed`);
-    await page.close();
+  /**
+   * Старый адрес `/core/chat`: страницы нет, переход в `/chat`. `?project=` переходит (CLI снят),
+   * вкладка проекта открыта; `?id=<задача>` — разговор этой задачи по книге чата.
+   */
+  async function oldAddress(stand, check, browser, claudeChat) {
+    const page = await stand.newPage(browser);
+    const seen = [];
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) seen.push(frame.url());
+    });
+    try {
+      await page.goto(
+        `${stand.webUrl}/core/chat?project=${encodeURIComponent(repo)}&cli=${encodeURIComponent(FOREIGN || 'qwen')}`,
+      );
+      await page.waitForURL((u) => u.pathname === '/chat', { timeout: 60_000 });
+      await dismissAccess(page);
+      const landed = seen
+        .map((u) => new URL(u))
+        .find((u) => u.pathname === '/chat' && u.searchParams.get('project') === repo);
+      check(
+        `/core/chat?project=X&cli=… → /chat?project=X без cli (${landed ? landed.search : seen.join(' | ')})`,
+        Boolean(landed) && !landed.searchParams.has('cli'),
+      );
+      const tabOpened = await shownOn(page, repo, 60);
+      check(`вкладка проекта открыта по ?project= (${repo})`, tabOpened);
+      await shoot(page, 'one-chat-old-address-project');
+
+      if (claudeChat?.taskId && claudeChat.conv) {
+        await page.goto(`${stand.webUrl}/core/chat?id=${encodeURIComponent(claudeChat.taskId)}`);
+        await page.waitForURL((u) => u.pathname === '/chat', { timeout: 60_000 });
+        const id = await page
+          .waitForURL((u) => u.searchParams.get('id') === claudeChat.conv, { timeout: 30_000 })
+          .then(() => claudeChat.conv)
+          .catch(() => new URL(page.url()).searchParams.get('id'));
+        check(
+          `/core/chat?id=<задача> → разговор этой задачи в /chat (${id ?? '—'})`,
+          id === claudeChat.conv,
+        );
+        await page.goto(`${stand.webUrl}/core/chat?id=no-such-task`);
+        await page.waitForURL((u) => u.pathname === '/chat', { timeout: 60_000 });
+        check(
+          `/core/chat?id=<незнакомая задача> → /chat без разговора (${new URL(page.url()).search || 'пусто'})`,
+          new URL(page.url()).searchParams.get('id') !== 'no-such-task',
+        );
+      } else check('/core/chat?id=: разговор нового чата claude известен', false);
+    } finally {
+      await page.close();
+    }
   }
 }

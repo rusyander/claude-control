@@ -176,6 +176,7 @@ describe('base key carries the CLI version; core stop takes the probe down (G9)'
     let release: () => void = () => undefined;
     const adapter = {
       id: 'claude',
+      ephemeral: 'flag',
       launch: async () => {
         launches += 1;
         return { ok: true, handle: { sessionId: 'p' }, layer: {} };

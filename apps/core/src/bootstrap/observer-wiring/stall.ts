@@ -1,5 +1,7 @@
 import { stopSession } from '../../adapters/launcher/session-io.ts';
 import type { LiveTask } from '../../journal/resume.ts';
+import { stopTree as stopProcessTree, type TreeStopReport } from '../../platform/tree-stop.ts';
+import { hostVerdict, type HostVerdict } from '../../session-host/client.ts';
 import {
   sessionStallThreshold,
   STALL_DEFAULT_MS,
@@ -28,7 +30,12 @@ import type { ObserverNote } from './observer-wiring.types.ts';
  *   (pid + старт хоста, прирост процессора дерева от базы). Живой — только показан (предикат
  *   `stall`), шаг идёт дальше; мёртвый — дерево снимается и пишется `host-dead` → lost (правило
  *   продолжения берёт шаг), даже если снятие бросило; живость не прочитана — ничего не снято;
- * - `deadline` starting → ended: старт дольше `startingDeadlineMs` — дерево снимается.
+ * - `deadline` starting → ended: старт дольше `startingDeadlineMs` — дерево снимается;
+ * - `host-dead` → lost (этап 11): хост открытого сеанса сверяется не реже `hostCheckMs` судом
+ *   `hostVerdict` — та же доказанная смерть (свежий снимок), что у снятия места владельцем, и
+ *   исхода хоста нет. Пережившее хост дерево CLI снимается; строка пишется один раз — сеанс
+ *   уже не открыт, и повтор (второй тик, сверка загрузки) её не пишет. Без этого сеанс с убитым
+ *   хостом числился живым: исход хоста не придёт, и насос сеанса ждал бы его вечно.
  * Отсчёт идёт от прикрепления: после перезапуска ядра старые сессии не «застревают» на загрузке.
  * Все пробы тика — ОДИН снимок таблицы процессов (03:165).
  */
@@ -40,9 +47,12 @@ export interface StallOptions {
   stallDefaultMs?: number;
   /** Срок старта сессии (спека: 60 с). */
   startingDeadlineMs?: number;
+  /** Сверка хостов открытых сеансов не чаще, чем раз в столько (5 с — такт удара мест); 0 — каждый тик. */
+  hostCheckMs?: number;
 }
 
 export const SILENT_AFTER_MS = 60_000;
+export const HOST_CHECK_MS = 5_000;
 export const STARTING_DEADLINE_MS = 60_000;
 
 export interface StallWatchDeps {
@@ -62,6 +72,13 @@ export interface StallWatchDeps {
    * вопросы человеку шага.
    */
   permitPending?: (sessionId: string) => boolean;
+  /** Суд о хосте сеанса; по умолчанию — `hostVerdict` каталога сессии из журнала пробой `probe`. */
+  hostOf?: (task: LiveTask, sessionId: string) => Promise<HostVerdict>;
+  /**
+   * Снять дерево CLI, пережившее хост; по умолчанию — `stopTree` платформы. Чистая остановка —
+   * пустой `residual` без `unknown`; иначе CLI мог выжить, и сеанс не кончается.
+   */
+  stopOrphan?: (child: ProcessIdentity) => Promise<Pick<TreeStopReport, 'residual' | 'unknown'>>;
 }
 
 export interface StallWatch {
@@ -83,6 +100,8 @@ interface Watched {
   baselineCpu: number | null;
   /** `lastAt` эпизода тишины, по которому проба уже записана: один эпизод — одна проба. */
   probedAt?: number;
+  /** Провал снятия сироты уже записан: повторные сверки пробуют снова, но молча. */
+  orphanStopNoted?: boolean;
 }
 
 type Move =
@@ -115,9 +134,17 @@ export function createStallWatch(deps: StallWatchDeps): StallWatch {
     deps.stop ??
     ((task: LiveTask, sessionId: string) =>
       stopSession(journaledSessionDir(task, sessionId), 'tree'));
+  const hostCheckMs = deps.options?.hostCheckMs ?? HOST_CHECK_MS;
+  const hostOf =
+    deps.hostOf ??
+    ((task: LiveTask, sessionId: string) =>
+      hostVerdict(journaledSessionDir(task, sessionId), { probe: deps.probe }));
+  const stopOrphan = deps.stopOrphan ?? ((child: ProcessIdentity) => stopProcessTree(child));
   const tasks = new Map<string, LiveTask>();
   const watched = new Map<string, Watched>();
   let running: Promise<void> | null = null;
+  /** Рабочее время прошлой сверки хостов; первая — на первом тике. */
+  let hostCheckedAt = Number.NEGATIVE_INFINITY;
 
   const watch = (sessionId: string): Watched => {
     let w = watched.get(sessionId);
@@ -277,6 +304,79 @@ export function createStallWatch(deps: StallWatchDeps): StallWatch {
       transition(task, sessionId, { event: 'host-dead', from: now, to: 'lost' });
   };
 
+  /**
+   * Снять CLI, переживший хост. `null` — снят доказанно; иначе причина. Остановка не бросает на
+   * выжившем: остаток приходит в `residual`, недоказанное — в `unknown`.
+   */
+  const stopOrphanOf = async (child: ProcessIdentity): Promise<string | null> => {
+    try {
+      const report = await stopOrphan(child);
+      if (report.unknown !== undefined) return `not proven: ${report.unknown}`;
+      if (report.residual.length > 0)
+        return `still alive: ${report.residual.map((p) => p.pid).join(', ')}`;
+      return null;
+    } catch (error) {
+      return reasonOf(error);
+    }
+  };
+
+  /**
+   * Хост сеанса доказанно мёртв без исхода: остаток дерева CLI снимается, сеанс — `lost`. `lost`
+   * отпускает место шага (`dropSeat`), поэтому пишется только после доказанной смерти CLI: живая
+   * сирота, оставшаяся после неудачной остановки, — работающий сеанс на этом месте (на POSIX CLI в
+   * своей группе переживает хост). Следующая сверка (`hostCheckMs`) пробует снова.
+   */
+  const checkHost = async (task: LiveTask, sessionId: string): Promise<void> => {
+    if (!OPEN.has(task.state.sessions[sessionId]?.state ?? '')) return;
+    const got = await hostOf(task, sessionId);
+    if (got.state !== 'lost') return;
+    if (got.child && got.childAlive !== 'dead') {
+      const failed = await stopOrphanOf(got.child);
+      if (failed !== null) {
+        const w = watch(sessionId);
+        if (!w.orphanStopNoted)
+          deps.note('observer.host.stop-failed', {
+            taskId: task.taskId,
+            sessionId,
+            orphan: got.child.pid,
+            reason: failed,
+          });
+        w.orphanStopNoted = true;
+        return;
+      }
+    }
+    // Между пробой и записью сеанс мог кончиться сам (строка `exited`): второй конец не пишется.
+    const now = task.state.sessions[sessionId]?.state;
+    if (!now || !OPEN.has(now)) return;
+    if (transition(task, sessionId, { event: 'host-dead', from: now, to: 'lost' }))
+      deps.note('observer.host-dead', {
+        taskId: task.taskId,
+        sessionId,
+        hostPid: got.host.pid,
+        orphan: got.child && got.childAlive !== 'dead' ? got.child.pid : null,
+      });
+  };
+
+  const checkHosts = async (at: number, busy: ReadonlySet<string>): Promise<void> => {
+    if (at - hostCheckedAt < hostCheckMs) return;
+    hostCheckedAt = at;
+    for (const task of tasks.values()) {
+      for (const [sessionId, session] of Object.entries(task.state.sessions)) {
+        // Сеанс, который этот тик уже пробует сроком, судит его проба.
+        if (!OPEN.has(session.state) || busy.has(sessionId)) continue;
+        try {
+          await checkHost(task, sessionId);
+        } catch (error) {
+          deps.note('observer.host.failed', {
+            taskId: task.taskId,
+            sessionId,
+            reason: reasonOf(error),
+          });
+        }
+      }
+    }
+  };
+
   const pass = async (): Promise<void> => {
     const at = deps.now();
     const moves: Move[] = [];
@@ -313,6 +413,7 @@ export function createStallWatch(deps: StallWatchDeps): StallWatch {
         });
       }
     }
+    await checkHosts(at, new Set(moves.filter((m) => m.kind !== 'silent').map((m) => m.sessionId)));
   };
 
   const watcher: StallWatch = {

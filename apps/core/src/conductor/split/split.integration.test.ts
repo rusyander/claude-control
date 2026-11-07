@@ -9,7 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { splitHooksWith } from '../../bootstrap/conductor-wiring/split.ts';
 import type { ConductorWiringDeps } from '../../bootstrap/conductor-wiring/conductor-wiring.types.ts';
 import { deps } from '../../journal/__fixtures__/journal-harness.ts';
+import { splitOf } from '../../api/task-view.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
+import { initialState, reduce } from '../../journal/reduce/reduce.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { layoutOf } from '../../platform/core-home.ts';
@@ -217,6 +219,13 @@ describe('split flow', () => {
       actor: 'human:panel',
       data: { outcome: 'approved', by: 'human', decisionSeq: received?.seq },
     });
+    // Утверждение после `accepted` проверки — переход, не «решено дважды»: вид, который читает
+    // панель (`GET /tasks/:id` → `splitOf`), и свёртка с диска показывают `approved`.
+    const refolded = lines(task).reduce(reduce, initialState(task.taskId));
+    for (const state of [task.state, refolded]) {
+      expect(state.anomalies.map((a) => a.reason)).not.toContain(`split ${splitId} decided twice`);
+      expect(splitOf(state, lines(task))?.state).toBe('approved');
+    }
     const made = of(task, 'unit.created').slice(1);
     expect(made.map((l) => [l.data.name, l.data.splitId])).toEqual([
       ['review-1', splitId],

@@ -1,13 +1,18 @@
 import { useTranslation } from 'react-i18next';
 import type { EstimateReply } from '@agentdeck/contracts/core/estimate';
+import { CORE_TASKS_ROUTE } from '@shared/config/routes';
 import { Badge } from '@shared/ui/badge';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { LaunchSection } from '../LaunchSection/LaunchSection';
 import styles from '../rows.module.scss';
+import { EstimateLead } from './EstimateLead';
 
 interface EstimateCardProps {
   reply: EstimateReply;
+  /** Ключ репозитория задачи из ленты (для «Настроить для этого проекта»); нет — `null`. */
+  repoKey?: string | null;
+  onLeadScope?: (repoKey: string) => void;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {
@@ -24,10 +29,46 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 /**
+ * Группа оценки (W3-18): ядро создало задачу на пункт с общим `groupId`. Ответ — первой задачи
+ * группы, поэтому экран называет все задачи группы со ссылкой на ленту каждой: остальные человек
+ * ведёт оттуда. Блок есть при любом сценарии, не только у ведущего.
+ */
+function EstimateGroup({ group }: { group: NonNullable<EstimateReply['group']> }) {
+  const { t } = useTranslation();
+  const P = 'coreLaunch.estimate';
+  return (
+    <Stack gap="var(--spacing-3xs)" data-estimate-group={group.groupId}>
+      <Typography variant="body-sm" weight="medium" as="span">
+        {t(`${P}.group`, { id: group.groupId, count: group.taskIds.length })}
+      </Typography>
+      <Typography variant="caption" color="muted" as="p">
+        {t(`${P}.groupHint`)}
+      </Typography>
+      <ol className={styles.plainList}>
+        {group.taskIds.map((id, i) => (
+          <li key={id} data-estimate-group-task={id}>
+            <a
+              href={`${CORE_TASKS_ROUTE}?id=${encodeURIComponent(id)}`}
+              className={styles.feedLink}
+            >
+              {/* Цвет акцента темы, как у ссылок группы на карточке запуска: синий браузера в
+                  тёмной теме не читается. */}
+              <Typography variant="caption" as="span" color="accent" className={styles.mono}>
+                {t(`${P}.groupTask`, { n: i + 1, id })}
+              </Typography>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </Stack>
+  );
+}
+
+/**
  * Числа оценки и состояние созданной задачи. Истории нет — «неизвестно», а не ноль: ядро чисел
  * не придумывает (03 §Economy), и экран тоже.
  */
-export function EstimateCard({ reply }: EstimateCardProps) {
+export function EstimateCard({ reply, repoKey = null, onLeadScope }: EstimateCardProps) {
   const { t, i18n } = useTranslation();
   const P = 'coreLaunch.estimate';
   const num = (n: number) => n.toLocaleString(i18n.language);
@@ -67,6 +108,8 @@ export function EstimateCard({ reply }: EstimateCardProps) {
         <Typography variant="caption" color="muted" as="p" data-estimate-basis={basis}>
           {t(`${P}.basis.${basis}`)}
         </Typography>
+        {reply.lead && <EstimateLead lead={reply.lead} repoKey={repoKey} onScope={onLeadScope} />}
+        {reply.group && <EstimateGroup group={reply.group} />}
         {reply.problems.length > 0 && (
           <Stack gap="var(--spacing-3xs)" data-estimate-problems>
             <Typography variant="body-sm" weight="medium" as="span">

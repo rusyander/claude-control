@@ -35,7 +35,11 @@ function unique<T>(items: readonly T[], id: (item: T) => string = String): T[] {
 
 export function platformDenySet(facts: PlatformDenyFacts): DenySet {
   return {
-    paths: unique([facts.coreHome, ...facts.tokenFiles]),
+    paths: unique([
+      facts.coreHome,
+      ...(facts.machineQueue ? [facts.machineQueue] : []),
+      ...facts.tokenFiles,
+    ]),
     commands: PUBLISH_COMMANDS.map((argv) => [...argv]),
     mcpTools: unique([...(facts.forgeMcpTools ?? [])]),
     tools: [],

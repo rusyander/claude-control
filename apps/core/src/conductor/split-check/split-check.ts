@@ -1,4 +1,5 @@
 import { matchesGlob, toSlashes } from '../../lib/glob/glob.ts';
+import { judgePlan } from './plan-contract.ts';
 import type {
   SplitCheckDecision,
   SplitCheckInput,
@@ -33,8 +34,13 @@ export function decideSplit(input: SplitCheckInput): SplitCheckDecision {
     ];
     return { verdict: 'refused', problems, reasons: problems.map(line) };
   }
+  // Договор плана ведущего (этап 11) судится и у одного куска: проверка и критерии нужны всегда.
+  const plan = input.plan ? judgePlan(units, input.plan) : null;
+  const planned = plan ? { roles: plan.roles, demoted: plan.demoted } : {};
   if (units.length === 1) {
     const only = units[0] as SplitUnit;
+    if (plan && plan.problems.length > 0)
+      return { verdict: 'refused', problems: plan.problems, reasons: plan.problems.map(line) };
     return {
       verdict: 'accepted',
       solo: true,
@@ -42,7 +48,8 @@ export function decideSplit(input: SplitCheckInput): SplitCheckDecision {
       edges: [],
       queued: [],
       suggestions: [],
-      reasons: ['one unit: solo, no split'],
+      reasons: ['one unit: solo, no split', ...(plan?.reasons ?? [])],
+      ...planned,
     };
   }
 
@@ -55,6 +62,7 @@ export function decideSplit(input: SplitCheckInput): SplitCheckDecision {
   const order = topoOrder(units, edges);
   if (order === null) problems.push(cycleProblem(units, edges));
   else problems.push(...sharedProblems(input, edges));
+  if (plan) problems.push(...plan.problems);
 
   if (problems.length > 0) return { verdict: 'refused', problems, reasons: problems.map(line) };
 
@@ -67,8 +75,18 @@ export function decideSplit(input: SplitCheckInput): SplitCheckDecision {
     ...queued.map((q) => `${q.unit} queued: ${q.why}`),
     ...unknownEstimates(units),
     ...suggestions.map((s) => s.detail),
+    ...(plan?.reasons ?? []),
   ];
-  return { verdict: 'accepted', solo: false, order: ordered, edges, queued, suggestions, reasons };
+  return {
+    verdict: 'accepted',
+    solo: false,
+    order: ordered,
+    edges,
+    queued,
+    suggestions,
+    reasons,
+    ...planned,
+  };
 }
 
 function line(p: SplitProblem): string {

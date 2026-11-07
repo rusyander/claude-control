@@ -39,6 +39,12 @@ export interface RecordedSend {
    * выданного до записи: показ по `seen` отдаёт такую отправку ровно один раз.
    */
   seen?: number;
+  /**
+   * Стена (мс эпохи) записи отправки (этап 11, волна 3; прежние записи — без неё). Время хода
+   * человека для истории чата не-Claude CLI: вид сеанса времени строк не несёт, а лента панели
+   * отделяет прошлые ответы от идущего хода по времени (`withoutLiveTurn`).
+   */
+  wall?: number;
   data: string;
   acked: boolean;
 }
@@ -55,7 +61,15 @@ export interface IoRecord {
 }
 
 type Line =
-  | { t: 'send'; cmdId: string; uuid: string; at: number; seen?: number; data: string }
+  | {
+      t: 'send';
+      cmdId: string;
+      uuid: string;
+      at: number;
+      seen?: number;
+      wall?: number;
+      data: string;
+    }
   | { t: 'ack'; cmdId: string }
   | { t: 'control'; id: string };
 
@@ -65,6 +79,8 @@ function parse(text: string): Line | null {
     if (value.t === 'send' && typeof value.cmdId === 'string' && typeof value.at === 'number') {
       // `seen` не число — как записи до прохода 8: показ по `at`.
       if (value.seen !== undefined && typeof value.seen !== 'number') delete value.seen;
+      // `wall` не число — как записи до волны 3: времени хода вид не называет.
+      if (value.wall !== undefined && typeof value.wall !== 'number') delete value.wall;
       return value as Line;
     }
     if (value.t === 'ack' && typeof value.cmdId === 'string') return value as Line;
@@ -137,11 +153,14 @@ function stdoutSize(dir: string): number {
  * Отправка получает `seen` здесь, у единственного писателя записи (насосы stream-json и JSON-RPC):
  * длина вывода снимается ПОСЛЕ того, как насос решил отправлять, — любой курсор вида, выданный
  * раньше, не больше её. Заданный вызывающим `seen` главнее (восстановление, тесты).
+ * Там же — `wall`, стена записи отправки (время хода человека в истории чата); заданная главнее.
  */
-export function appendIoRecord(dir: string, line: Line): void {
+export function appendIoRecord(dir: string, line: Line, now: () => number = Date.now): void {
   const path = join(dir, IO_RECORD);
   const stamped =
-    line.t === 'send' && line.seen === undefined ? { ...line, seen: stdoutSize(dir) } : line;
+    line.t === 'send'
+      ? { ...line, seen: line.seen ?? stdoutSize(dir), wall: line.wall ?? now() }
+      : line;
   // Обрывок прежнего ядра закрывается переводом строки: иначе эта запись склеится с ним.
   const lead = endsTorn(path) ? '\n' : '';
   appendFileSync(path, `${lead}${JSON.stringify(stamped)}\n`, {

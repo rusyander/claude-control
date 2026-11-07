@@ -332,6 +332,7 @@ export function createCodexAdapter(options: RpcAdapterOptions = {}): RpcAdapter 
       ownsTranscript: codexOwnsTranscript,
       transcriptPresent: codexTranscriptPresent,
       toolsNone: true,
+      ephemeral: 'flag',
       dialectInput: ({ spec, permit }): CodexDialectData => {
         const ro = readOnly(spec);
         return {
@@ -345,6 +346,7 @@ export function createCodexAdapter(options: RpcAdapterOptions = {}): RpcAdapter 
           developerInstructions: spec.brief,
           ...(spec.endpoint ? { model: spec.endpoint.endpoint.model } : {}),
           ...(spec.resume ? { resume: spec.resume.conversationId } : {}),
+          ...(spec.ephemeral ? { ephemeral: true as const } : {}),
           permit,
         };
       },

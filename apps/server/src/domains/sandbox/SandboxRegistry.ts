@@ -25,8 +25,26 @@ export function markSandboxBusy(id: string): void {
   busySandboxes.add(sandboxKey(id));
 }
 
+/**
+ * Срок успокоения после прогона. Ход разговора кончился и поток закрыт, а CLI ещё выходит:
+ * ядро закрывает сеанс через секунду-две после хода, и всё это время процесс стоит в `work`
+ * текущей папкой — на Windows такую папку не стереть (EBUSY).
+ */
+export const SANDBOX_SETTLE_MS = 10_000;
+
+/** Когда в песочнице кончился последний прогон. */
+const freedAt = new Map<string, number>();
+
 export function markSandboxFree(id: string): void {
-  busySandboxes.delete(sandboxKey(id));
+  const key = sandboxKey(id);
+  busySandboxes.delete(key);
+  freedAt.set(key, Date.now());
+}
+
+/** Сколько ещё длится успокоение после прогона, мс; прогона не было или срок вышел — 0. */
+export function sandboxSettleLeft(id: string, now = Date.now()): number {
+  const at = freedAt.get(sandboxKey(id));
+  return at === undefined ? 0 : Math.max(0, at + SANDBOX_SETTLE_MS - now);
 }
 
 /** Песочницу унесло подметание — папки нет по истечении простоя, а не по ошибке. */
@@ -51,6 +69,7 @@ export function forgetExpired(id: string): void {
 export function forgetSandbox(key: string): void {
   busySandboxes.delete(key);
   expiredSandboxes.delete(key);
+  freedAt.delete(key);
 }
 
 export function markExpired(key: string): void {

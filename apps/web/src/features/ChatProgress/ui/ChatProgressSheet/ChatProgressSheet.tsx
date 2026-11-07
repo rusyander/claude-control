@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ChatProgress, ProgressAgent } from '@agentdeck/contracts';
+import { NO_FILTERS, useCoreAgents, withCoreFacts } from '@entities/AgentTree';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
 import { Icon } from '@shared/ui/icon';
 import { Badge } from '@shared/ui/badge';
 import { formatDuration } from '@shared/lib/format-duration';
-import { AgentExtensionsModal, AgentHistoryButton, ExtensionChips } from '@entities/AgentTree';
 import { useNow } from '../../model/useNow';
 import { TaskRow } from '../TaskRow/TaskRow';
 import { AgentTree } from '../AgentTree/AgentTree';
@@ -15,6 +16,11 @@ import styles from './ChatProgressSheet.module.scss';
 import { elapsedMs } from '../../model/elapsedMs';
 import { summarizeProgress } from '../../model/summarizeProgress';
 import { clockTicks } from '../../model/clockTicks';
+
+/** Прогресса из транскрипта нет (чат чужого CLI) — пустой план, субагентов даст ядро. */
+const NO_PROGRESS: ChatProgress = { tasks: [], agents: [] };
+/** Одна пустая ссылка: новый массив на каждом рендере пересчитывал бы дерево. */
+const NO_AGENTS: ProgressAgent[] = [];
 
 /**
  * Панель прогресса: что агент наметил себе сам и что из этого уже сделано.
@@ -41,11 +47,16 @@ export function ChatProgressSheet({
 }: ChatProgressSheetProps) {
   const { t } = useTranslation();
   const [isOpen, setOpen] = useState(false);
-  // Окно «Скиллы, хуки и MCP»: null — закрыто, без agentId — главный агент.
-  const [extensionsOf, setExtensionsOf] = useState<{ agentId?: string } | null>(null);
-  const openExtensions = (agentId: string | undefined): void =>
-    setExtensionsOf(agentId ? { agentId } : {});
-  const summary = summarizeProgress(progress, isRunning);
+  // Субагенты — строки транскрипта с фактами ядра. У чата чужого CLI строк транскрипта нет вовсе,
+  // и без ядра полоса не вставала, хотя субагент шёл (F-07). Запрос — тот же, что у дерева ниже и
+  // у кнопки «Агенты»: один кэш, второго опроса нет.
+  const coreNodes = useCoreAgents(chatId, NO_FILTERS, isRunning).data?.nodes;
+  const transcriptAgents = progress?.agents;
+  const agents = useMemo(
+    () => withCoreFacts(transcriptAgents ?? [], coreNodes ?? []),
+    [transcriptAgents, coreNodes],
+  );
+  const summary = summarizeProgress({ ...(progress ?? NO_PROGRESS), agents }, isRunning);
   const now = useNow(clockTicks(summary, isRunning));
   const waiting = awaiting && !isRunning;
 
@@ -147,35 +158,16 @@ export function ChatProgressSheet({
             </Typography>
           )}
 
-          {progress?.extensions && progress.extensions.length > 0 && (
-            <Stack
-              direction="row"
-              align="center"
-              gap="var(--spacing-2xs)"
-              marginTop="var(--spacing-sm)"
-              className={styles.extensions}
-              data-progress-extensions
-            >
-              <Typography variant="caption" color="subtle" as="span">
-                {t('agentTree.extensions.mainLine')}
-              </Typography>
-              <ExtensionChips
-                summary={progress.extensions}
-                {...(chatId ? { onOpen: () => openExtensions(undefined) } : {})}
-              />
-            </Stack>
-          )}
-
-          {progress && progress.agents.length > 0 && (
+          {agents.length > 0 && (
             <Stack gap="var(--spacing-2xs)" marginTop="var(--spacing-sm)">
               <Typography variant="caption" color="subtle" as="span">
                 {t('chat.progress.tree')}
               </Typography>
               <AgentTree
-                {...(chatId ? { chatId, onExtensions: openExtensions } : {})}
-                agents={progress.agents}
+                {...(chatId ? { chatId } : {})}
+                agents={transcriptAgents ?? NO_AGENTS}
                 isRunning={isRunning}
-                {...(progress.processAlive !== undefined
+                {...(progress?.processAlive !== undefined
                   ? { processAlive: progress.processAlive }
                   : {})}
                 now={now}
@@ -185,14 +177,6 @@ export function ChatProgressSheet({
                   {t('chat.progress.agentsLostHint')}
                 </Typography>
               )}
-            </Stack>
-          )}
-
-          {/* Агенты всех сессий разговора (у группы — всех её звеньев): дерево
-              выше знает только текущую. Кнопка прячется сама, пока сессий нет. */}
-          {chatId && (
-            <Stack direction="row" marginTop="var(--spacing-sm)" data-progress-history>
-              <AgentHistoryButton chatId={chatId} isRunning={isRunning} />
             </Stack>
           )}
 
@@ -222,20 +206,6 @@ export function ChatProgressSheet({
             </Stack>
           )}
         </div>
-      )}
-
-      {chatId && progress && (
-        <AgentExtensionsModal
-          chatId={chatId}
-          isOpen={extensionsOf !== null}
-          onOpenChange={(open) => {
-            if (!open) setExtensionsOf(null);
-          }}
-          agents={progress.agents}
-          mainSummary={progress.extensions}
-          initialAgentId={extensionsOf?.agentId}
-          isRunning={isRunning}
-        />
       )}
     </div>
   );

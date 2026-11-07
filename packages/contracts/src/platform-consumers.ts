@@ -65,6 +65,18 @@ export function foreignConsumerId(providerId: string): PlatformConsumerId {
   return `${FOREIGN_CONSUMER_PREFIX}${providerId}`;
 }
 
+/**
+ * Потребитель контура для разговора в едином чате: Claude — галочка «Чат», другой CLI — своя
+ * `foreign:<cli>`. Чат один для всех CLI (W3-17a), но галочки в мастере и подключение локальной
+ * модели (ставит `foreign:qwen`) обещают человеку маршрут ИМЕННО этого CLI: по одной «Чат» снятая
+ * `foreign:qwen` не держала бы ничего, а «Чат» уводила бы в контур разговоры всех CLI разом.
+ * Одно правило на сервер (маршрут хода) и веб (шапка чата, план прогона): разойдись они — шапка
+ * обещала бы контур ходу, который пойдёт мимо него.
+ */
+export function chatConsumerOf(cli: string): PlatformConsumerId {
+  return cli === 'claude' ? 'chat' : foreignConsumerId(cli);
+}
+
 /** Обратно: `foreign:codex` → `codex`; для остальных — undefined. */
 export function foreignProviderId(consumer: string): string | undefined {
   return consumer.startsWith(FOREIGN_CONSUMER_PREFIX)

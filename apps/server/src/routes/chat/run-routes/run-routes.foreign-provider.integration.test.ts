@@ -20,16 +20,20 @@ import {
 import type { RunOptions } from '../../../domains/chat/run-options/run-options.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { HandoffChains } from '../../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import type { CommandOutcome } from '@agentdeck/contracts/core/commands';
-import type { EstimateFields } from '@agentdeck/contracts/core/estimate';
+import {
+  coreChatBookPath,
+  createCoreChatBook,
+} from '../../../domains/chat/core-run/core-chat-book.ts';
 import { registerChatRunRoutes } from './run-routes.ts';
 import { registerChatHandoffRoutes } from '../handoff-routes.ts';
 
 /**
- * Чат Claude при активном чужом CLI. `POST /api/chat/send` (телефон, API) и
- * продолжение в чистой сессии — ход чата Claude. Раньше отправка брала команду
+ * Чат при активном чужом CLI. `POST /api/chat/send` (телефон, API) и
+ * продолжение в чистой сессии — ход чата через ядро. Раньше отправка брала команду
  * АКТИВНОГО провайдера и при активном Qwen запускала `qwen` с флагами Claude
- * (`--include-partial-messages --permission-prompt-tool …`).
+ * (`--include-partial-messages --permission-prompt-tool …`); потом отказывала 409.
+ * Теперь (W3-17a) ход уходит прогону ядра, а CLI — активный провайдер — выбирает
+ * сам прогон (`core-run`, его тесты); сервер сам ни одного CLI не запускает.
  *
  * Доказательство — настоящий реестр прогонов и маршруты; в PATH лежат подставные
  * `claude` и `qwen`, которые записывают свои argv в файл: сервер сам не запускает
@@ -100,7 +104,7 @@ async function until(check: () => boolean, ms = 8000): Promise<void> {
   }
 }
 
-describe('чат Claude при активном чужом CLI: ни чужого бинаря с флагами Claude, ни тихого Claude', () => {
+describe('чат при активном чужом CLI: ход через ядро, ни чужого бинаря с флагами Claude, ни отказа', () => {
   let root: string;
   let bin: string;
   let work: string;
@@ -108,13 +112,10 @@ describe('чат Claude при активном чужом CLI: ни чужог�
   let registry: ChatRunRegistry;
   let app: FastifyInstance;
   let savedPath: string | undefined;
-  /** Ручки ядра: разговор чужого CLI сервер заводит задачей ядра — здесь видно, чем. */
-  let core: { estimates: EstimateFields[]; commands: Array<[string, Record<string, unknown>]> };
-  /** Ходы Claude, отданные фабрике прогонов (в сборке — ядру). */
+  /** Ходы, отданные фабрике прогонов (в сборке — ядру). */
   let started: RunOptions[];
 
   beforeEach(async () => {
-    core = { estimates: [], commands: [] };
     started = [];
     root = mkdtempSync(join(tmpdir(), 'cc-foreign-send-'));
     bin = join(root, 'bin');
@@ -143,26 +144,28 @@ describe('чат Claude при активном чужом CLI: ни чужог�
       },
       backupDir: join(root, 'agentdeck', 'backups'),
       pricing: { current: () => ({ entries: [] }) },
-      models: { current: () => ({ models: [] }) },
+      // Каталог по вендорам: у Anthropic свежий Sonnet, у прочих пусто — по нему видно, по чьему
+      // каталогу сервер разворачивает алиас модели.
+      models: {
+        current: (vendors: string[]) => ({
+          models: vendors.includes('anthropic')
+            ? [
+                {
+                  id: 'claude-sonnet-5-5',
+                  name: 'Claude Sonnet 5.5',
+                  family: 'claude-sonnet',
+                  vendor: 'anthropic',
+                  releaseDate: '2026-10-01',
+                },
+              ]
+            : [],
+        }),
+      },
     } as unknown as ServerContext;
     app = Fastify();
     const session = new ChatSession(registry);
     registerChatRunRoutes(app, ctx, registry, session);
-    registerChatHandoffRoutes(app, ctx, {
-      runs: registry,
-      chains: new HandoffChains(),
-      coreChats: {
-        estimate: async (fields) => {
-          core.estimates.push(fields);
-          return { ok: true, taskId: '01890000-0000-7000-8000-0000000000aa' };
-        },
-        command: async (_taskId, kind, fields) => {
-          core.commands.push([kind, fields]);
-          return { cmdId: 'c', status: 'applied', seq: 1 } as CommandOutcome;
-        },
-      },
-      session,
-    });
+    registerChatHandoffRoutes(app, ctx, { runs: registry, chains: new HandoffChains(), session });
     await app.ready();
   });
 
@@ -191,32 +194,107 @@ describe('чат Claude при активном чужом CLI: ни чужог�
       payload: { chatId: 'phone-chat', prompt: 'привет', projectPath: work },
     });
 
-  it('Qwen активен — отправка отказывает кодом, ни qwen, ни claude не запускаются', async () => {
+  // W3-17a: один чат — ход идёт активным провайдером через ядро (CLI выбирает прогон ядра по
+  // настройке), а не отказ «только Claude»; сам сервер ни qwen, ни claude не запускает.
+  it('Qwen активен — ход уходит в прогон ядра, отказа 409 нет, сервер сам CLI не запускает', async () => {
     store.updateSettings({ provider: 'qwen' });
 
-    const reply = await send();
+    let status = 0;
+    void send().then((reply) => (status = reply.statusCode));
+    await until(() => started.length > 0);
     // Дать ошибочному запуску время дойти до файла: без исправления он туда пишет.
-    await until(() => calls(bin).length > 0, 1500);
+    await until(() => calls(bin).length > 0, 500);
 
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({ prompt: 'привет', cwd: work });
+    expect(status).not.toBe(409);
     expect(calls(bin)).toEqual([]);
-    expect(reply.statusCode).toBe(409);
-    expect(reply.json()).toMatchObject({
-      code: 'provider_not_claude',
-      provider: 'qwen',
-      messageCode: 'chat-send-foreign-provider',
-      params: { provider: expect.any(String) },
-    });
   });
 
-  it('Qwen активен — флаг очереди (queueIfBusy) отказ не обходит', async () => {
+  it('Qwen активен — флаг очереди (queueIfBusy) тоже ведёт ход в прогон ядра', async () => {
     store.updateSettings({ provider: 'qwen' });
-    const reply = await app.inject({
+    void app.inject({
       method: 'POST',
       url: '/api/chat/send',
       payload: { chatId: 'phone-chat', prompt: 'в очередь', projectPath: work, queueIfBusy: true },
     });
-    expect(reply.statusCode).toBe(409);
-    expect(reply.json()).toMatchObject({ messageCode: 'chat-send-foreign-provider' });
+    await until(() => started.length > 0);
+    expect(started[0]).toMatchObject({ prompt: 'в очередь' });
+  });
+
+  // Разговор не-Claude CLI транскрипта Claude не пишет: продолжение узнаётся по книге чата ядра.
+  it('разговор, известный только книге чата ядра, продолжается; незнакомый — 404 session_unknown', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    createCoreChatBook(coreChatBookPath(join(root, 'agentdeck'))).set('qwen-conv-1', {
+      taskId: 't',
+      stepId: 's',
+      cli: 'qwen',
+    });
+    const unknown = await app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: 'c2', sessionId: 'nobody-knows', prompt: 'эй', projectPath: work },
+    });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json()).toMatchObject({ code: 'session_unknown' });
+
+    void app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: { chatId: 'c1', sessionId: 'qwen-conv-1', prompt: 'дальше', projectPath: work },
+    });
+    await until(() => started.length > 0);
+    expect(started[0]).toMatchObject({ prompt: 'дальше', sessionId: 'qwen-conv-1', cwd: work });
+  });
+
+  // Ревью W3-17a (M-F3): разговор Claude при активном Qwen идёт Claude (книга), и алиас «Sonnet»
+  // разворачивается по каталогу Claude — по каталогу Qwen он оставался голым алиасом.
+  it('разговор Claude при активном Qwen: алиас модели разворачивается по каталогу Claude', async () => {
+    store.updateSettings({ provider: 'qwen' });
+    const book = createCoreChatBook(coreChatBookPath(join(root, 'agentdeck')));
+    book.set('claude-conv-1', { taskId: 't', stepId: 's', cli: 'claude' });
+    void app.inject({
+      method: 'POST',
+      url: '/api/chat/send',
+      payload: {
+        chatId: 'c1',
+        sessionId: 'claude-conv-1',
+        prompt: 'дальше',
+        projectPath: work,
+        model: 'sonnet',
+      },
+    });
+    await until(() => started.length > 0);
+    expect(started[0]).toMatchObject({ sessionId: 'claude-conv-1', model: 'claude-sonnet-5-5' });
+  });
+
+  // Старая ссылка `/core/chat?id=<задача>` (W3-17a): веб спрашивает, какой разговор ведёт задача.
+  it('GET /api/chat/core-task/:taskId — разговор задачи по книге чата; незнакомая задача — null', async () => {
+    createCoreChatBook(coreChatBookPath(join(root, 'agentdeck'))).set('qwen-conv-9', {
+      taskId: 'task-9',
+      stepId: 's',
+      cli: 'qwen',
+    });
+    const known = await app.inject({ method: 'GET', url: '/api/chat/core-task/task-9' });
+    expect(known.statusCode).toBe(200);
+    expect(known.json()).toEqual({ chatId: 'qwen-conv-9' });
+    const unknown = await app.inject({ method: 'GET', url: '/api/chat/core-task/task-0' });
+    expect(unknown.json()).toEqual({ chatId: null });
+  });
+
+  // Шапка чата берёт каталог моделей CLI разговора (W3-17a), а не активного провайдера.
+  it('GET /api/chat/core-cli/:chatId — CLI разговора по книге; запись без CLI и незнакомый — claude', async () => {
+    const book = createCoreChatBook(coreChatBookPath(join(root, 'agentdeck')));
+    book.set('codex-conv-7', { taskId: 'task-7', stepId: 's', cli: 'codex' });
+    // Задача кончилась — книга помнит CLI и после `forget`.
+    book.forget('codex-conv-7');
+    const known = await app.inject({ method: 'GET', url: '/api/chat/core-cli/codex-conv-7' });
+    expect(known.statusCode).toBe(200);
+    expect(known.json()).toEqual({ cli: 'codex' });
+    const unknown = await app.inject({ method: 'GET', url: '/api/chat/core-cli/old-claude-conv' });
+    expect(unknown.json()).toEqual({ cli: 'claude' });
+    const bad = await app.inject({ method: 'GET', url: '/api/chat/core-cli/..%2Fx' });
+    expect(bad.json()).toEqual({ cli: 'claude' });
   });
 
   it('Claude активен — ход уходит в прогон ядра, сервер сам CLI не запускает', async () => {
@@ -229,7 +307,9 @@ describe('чат Claude при активном чужом CLI: ни чужог�
     expect(calls(bin)).toEqual([]);
   });
 
-  it('продолжение в чистой сессии при Qwen — задача ядра с CLI qwen, сервер сам ничего не запускает', async () => {
+  // Этап 11, волна 3: продолжение к чужому CLI садится как у Claude — прогоном реестра под ключом
+  // `new-…` (CLI берёт прогон ядра), а не задачей ядра мимо реестра без id разговора.
+  it('продолжение в чистой сессии при Qwen — прогон реестра под ключом вкладки, инициатива текстом после задания, сервер сам ничего не запускает', async () => {
     store.updateSettings({ provider: 'qwen' });
     const reply = await app.inject({
       method: 'POST',
@@ -240,19 +320,23 @@ describe('чат Claude при активном чужом CLI: ни чужог�
         proposal: { done: 'этап закрыт', next: 'дальше', checkpoint: '.agent/PROGRESS.md' },
       },
     });
-    await until(() => core.commands.some(([kind]) => kind === 'launch'));
+    await until(() => started.length > 0);
 
     expect(reply.statusCode).toBe(200);
+    const body = reply.json<{ chatId: string; started: boolean }>();
+    expect(body.started).toBe(true);
+    expect(registry.isRunning(body.chatId)).toBe(true);
     // Ход чужого CLI ведёт ядро: ни qwen, ни claude сервер не спавнит.
     expect(calls(bin)).toEqual([]);
-    expect(core.estimates[0]).toMatchObject({
-      scenario: { preset: 'chat' },
-      repos: [{ path: work, baseRef: null }],
-      placement: { kind: 'in-place', grant: { project: work, ops: ['edit'] } },
-    });
-    expect(core.estimates[0]?.request).toContain('.agent/PROGRESS.md');
-    expect(core.commands.map(([kind]) => kind)).toEqual(['set-cli', 'launch']);
-    expect(core.commands[0]?.[1]).toMatchObject({ adapter: 'qwen' });
+    expect(started).toHaveLength(1);
+    expect(started[0]?.cwd).toBe(work);
+    const prompt = started[0]?.prompt ?? '';
+    expect(prompt).toContain('.agent/PROGRESS.md');
+    // Системной дописки чужому CLI прогон ядра не передаёт: инициатива — в тексте, после задания.
+    expect(started[0]?.appendSystemPrompt).toBeUndefined();
+    expect(prompt.indexOf('This run was started from the AgentDeck panel')).toBeGreaterThan(
+      prompt.indexOf('.agent/PROGRESS.md'),
+    );
   });
 
   it('продолжение в чистой сессии при Claude — ход в прогон ядра с точкой возврата, без своего CLI', async () => {

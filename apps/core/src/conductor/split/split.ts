@@ -12,6 +12,8 @@ import { journalPreflight, publishesOf, runTaskPreflight } from '../estimate/pre
 import { resolveScenario, scenarioPrecedence, titleLangOf } from '../scenario/index.ts';
 import { decideSplit, type SplitCheckDecision, type SplitUnit } from '../split-check/index.ts';
 import { unitsOfSplit } from '../units/index.ts';
+import { firstWave, splitsIntoTasks, XL_CHILDREN_SIGNAL } from './children.ts';
+import { integrationUnitsOf } from './integration.ts';
 import { latestSplit, linesOf, type SplitRecordView } from './journal-view.ts';
 import type {
   AfterAccept,
@@ -90,9 +92,11 @@ export function proposeSplit(
     data: { splitId, stepId: source.stepId, by: source.by, units: [...units] },
   });
   const created = task.state.created;
-  const capacity = env.capacity();
+  const capacity = env.capacity(task);
   const decision = decideSplit({
-    units: units.map(toCheck),
+    // Куски плана ведущего (этап 11): то, чего строка `split.proposed` не несёт, — по имени.
+    units: units.map((u) => ({ ...toCheck(u), ...input.plan?.pieces[u.name] })),
+    ...(input.plan ? { plan: input.plan.contract } : {}),
     deliverable: input.deliverable,
     capacity,
     foldCase: env.foldCase,
@@ -240,9 +244,32 @@ export async function launchSplit(
   if (decision.solo) {
     // Соло: единица 0 продолжает — её ветка, копия и сессия плана остаются (G6).
     made.push(...zeros.map(([id]) => id));
+  } else if (env.childTasks && splitsIntoTasks(task, split.units.length)) {
+    // XL (W3-18): части деления — дочерние задачи; родитель единиц не создаёт. Первая волна —
+    // части без зависимостей; остальные создаёт суд родителя, когда их зависимости сданы, и
+    // родитель кончается по детям (Q-2 s11, `xl-wait.ts`).
+    const ordered = decision.order.flatMap((n) => split.units.filter((u) => u.name === n));
+    const children = await env.childTasks(task, split.splitId, ordered, firstWave(ordered));
+    if (children.taskIds.length === 0)
+      return { kind: 'launch-refused', code: 'preflight-failed', reasons: children.problems };
+    for (const [id] of zeros) closeUnit(task, id, pre.seq, cmdId);
+    task.append({
+      kind: 'signal',
+      actor: 'core',
+      cause: pre.seq,
+      ...(cmdId ? { cmdId } : {}),
+      data: {
+        signal: XL_CHILDREN_SIGNAL,
+        severity: children.problems.length > 0 ? 'warn' : 'info',
+        subject: split.splitId,
+        detail: JSON.stringify(children),
+      },
+    });
   } else {
     for (const [id] of zeros) closeUnit(task, id, pre.seq, cmdId);
-    const units = unitsOfSplit(decision, split.units.map(toCheck), split.splitId, newId);
+    const parts = unitsOfSplit(decision, split.units.map(toCheck), split.splitId, newId);
+    // L/XL с параллельными единицами (W3-18b): единица интеграции после всех них, последней.
+    const units = [...parts, ...integrationUnitsOf(task, parts, split.splitId, newId)];
     for (const u of units) {
       task.append({
         kind: 'unit.created',

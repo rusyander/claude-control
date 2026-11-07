@@ -26,7 +26,7 @@ import {
   openAiResponseToAnthropic,
   statusOfErrorCode,
 } from './dialect/dialect.ts';
-import { StreamTranslator } from './frames/frames.ts';
+import { maskStopMessage, StreamTranslator } from './frames/frames.ts';
 import { expandDeferredTools } from './local-window/deferred-tools.ts';
 import { applyRequestRules, framesFromCompletion, upstreamStreamBody } from './request-rules.ts';
 import { noteSummarized } from './summarized-ledger/summarized-ledger.ts';
@@ -188,6 +188,29 @@ export async function bridgeChat(
   }
 
   const facts = translator.facts;
+  // Потери ответа видны только по ходу потока: подтверждённый кадром выброс инструментов и части,
+  // не перенесённые в диалект клиента (картинка в ответе Anthropic). Прежний шлюз клал их в след;
+  // при переезде в ядро они собирались и терялись — человек видел пустой ответ без причины.
+  // Выброс при прослойке не потеря: полем `tools` наверх не ушло ничего, схемы уехали текстом.
+  const lostAll = [
+    ...new Set([
+      ...lost,
+      ...(facts.toolsDropped && translated.shimmed.length === 0 ? ['tools'] : []),
+      ...facts.droppedParts,
+    ]),
+  ];
+  const nativeRoute = route?.mode === 'native';
+  const traceError =
+    failure ??
+    (facts.upstreamError
+      ? hopText('gateway-upstream-aborted', { message: facts.upstreamError.message })
+      : facts.maskStop.length > 0
+        ? maskStopMessage(facts.maskStop.join(', '))
+        : facts.interrupted
+          ? hopText('gateway-checks-stopped')
+          : facts.truncated
+            ? translator.truncationMessage()
+            : undefined);
   // `prompt_tokens` верха = свежий вход + прочитанное + записанное (`cache-usage.ts`): запись
   // вычитается из входа, иначе она считалась бы дважды — входом и записью (и деньгами тоже).
   const usage = {
@@ -237,10 +260,12 @@ export async function bridgeChat(
       status,
       masked: guarded.masked || facts.masked,
       tokens: facts.totalTokens,
-      ...(lost.length ? { lost } : {}),
+      ...(lostAll.length ? { lost: lostAll } : {}),
       ...(facts.violations.length ? { violations: facts.violations } : {}),
       ...(sent.reply.retried ? { retried: true } : {}),
-      ...(failure ? { error: failure } : {}),
+      // Причина в следе — та же, что ушла клиенту: обрыв кадром ошибки после 200, стоп защиты
+      // данных, стоп проверок контура, недосказанный поток (как у прежнего шлюза).
+      ...(traceError ? { error: traceError } : {}),
       ...(facts.imageBytes ? { imageBytes: facts.imageBytes } : {}),
       ...(unreported ? { usageUnreported: true as const } : {}),
     },
@@ -253,7 +278,10 @@ export async function bridgeChat(
       unknownFrames: facts.unknownFrames,
       shimmed: translated.shimmed,
       toolCalls: facts.toolCalls,
-      contourCalls: facts.contourCalls,
+      // Поле `tool_calls` одно, а чьи в нём вызовы — решил маршрут: при нативных инструментах
+      // набора контура на запросе нет, и «контур звал свои инструменты» было бы неправдой.
+      contourCalls: nativeRoute ? 0 : facts.contourCalls,
+      ...(nativeRoute && facts.contourCalls > 0 ? { nativeCalls: facts.contourCalls } : {}),
       toolFlaws: facts.toolFlaws,
       toolsBlocked: facts.toolsBlocked,
       claimedWithoutCall: facts.claimedWithoutCall,

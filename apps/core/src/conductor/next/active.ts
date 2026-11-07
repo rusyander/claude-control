@@ -23,6 +23,12 @@ export const REMINDER_CAP = 3;
 
 export const isCoreKind = (def: StepDef): boolean => CORE_KINDS.has(def.kind);
 
+/** Шаг ждёт места сеанса (этап 11, P141): ждать освобождения, а не запускать снова. */
+function seatWait(input: NextInput, stepId: string): NextAction | null {
+  const why = input.seats?.[stepId];
+  return why === undefined ? null : { kind: 'wait', reason: `session seat: ${why}` };
+}
+
 /** Вопросы по ключу в порядке журнала (ключи — UUIDv7, порядок вставки сохранён). */
 export function asksBy(
   state: TaskFoldState,
@@ -200,7 +206,10 @@ export function activeAction(
   const win = input.windows?.[stepId];
   if (rec.state === 'queued') {
     if (isCoreKind(def)) return { kind: 'run-core-step', stepId };
-    return windowAction(state, def, att, undefined, win) ?? { kind: 'run-step', stepId };
+    return (
+      windowAction(state, def, att, undefined, win) ??
+      seatWait(input, stepId) ?? { kind: 'run-step', stepId }
+    );
   }
   if (rec.state === 'waiting-human') return waitingHuman(input, def, att);
   if (rec.state === 'round-capped') {
@@ -243,7 +252,10 @@ export function activeAction(
   // Окно маршрута раньше напоминания: ход в отказавший маршрут ничего не даст (03:157, P116).
   const held = windowAction(state, def, att, fact, win);
   if (held) return held;
-  if (!fact) return { kind: 'run-step', stepId };
+  const seat = seatWait(input, stepId);
+  if (!fact) return seat ?? { kind: 'run-step', stepId };
+  // Сеанс отдал место на вопросе человеку и ждёт его назад: ни напоминания, ни хода без места.
+  if (seat && !fact.ended) return seat;
   // Просьба наблюдателя о паузе (`context-growth`, этап 8 F10) — до напоминания: напоминать
   // модели, чью сессию сейчас снимут, значит тратить ход. Паркуется только в безопасной точке
   // (граница хода), иначе ждём её; повтор шага начнёт новый разговор и запишет `continuation`.

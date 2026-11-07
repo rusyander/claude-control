@@ -1,4 +1,5 @@
 import type { AskFields } from '@agentdeck/contracts/core/ask';
+import { chatConsumerOf } from '@agentdeck/contracts/platform-consumers';
 import { chooseRunModel } from '@agentdeck/contracts/platform-models';
 import type { AppStore } from '../../../lib/app-store/app-store.ts';
 import { modelRulesFor } from '../models/models.ts';
@@ -51,6 +52,18 @@ export function coreContourRoutes(
       modelPattern: model || '*',
     },
   ];
+}
+
+// Правило потребителя чата — в контрактах: по нему же шапка веба называет маршрут хода.
+export { chatConsumerOf };
+
+/** Маршрут контура хода единого чата: потребитель — по CLI разговора (`chatConsumerOf`). */
+export function chatContourRoutes(
+  store: AppStore,
+  cli: string,
+  asked = '',
+): CoreContourRoutes | undefined {
+  return coreContourRoutes(store, chatConsumerOf(cli), cli, asked);
 }
 
 /**

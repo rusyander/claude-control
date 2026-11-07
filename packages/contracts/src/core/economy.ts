@@ -1,4 +1,5 @@
 import { WINDOW_VERDICTS } from './journal-data.ts';
+import type { LeadRole, TaskClass } from './lead.ts';
 import type { LimitKind, ModelId, RouteId } from './routes.ts';
 
 /**
@@ -89,6 +90,38 @@ export interface LearnedKey {
   adapter: string;
   route: RouteId;
   model: ModelId | null;
+  /** Этап 11 (P140): роль ведущего; нет — роль по умолчанию вида шага (строки `learned.json` v2). */
+  role?: LeadRole;
+}
+
+/**
+ * Проба первого прохода (этап 11, P140): узкая проверка куска зелёная с первой попытки на ступени
+ * `rung`. `sampleId` — id шага, по которому проба снята: доказательство подъёма называет их.
+ */
+export interface FirstPassSample {
+  sampleId: string;
+  at: number;
+  passed: boolean;
+  rung: string;
+  class: TaskClass | null;
+}
+
+/** Вход подъёма по обучению (`TierInput.learnedRaise`): ключ и класс задачи для отката по классу. */
+export interface LearnedRaiseQuery {
+  key: LearnedKey;
+  class: TaskClass | null;
+}
+
+/**
+ * Подъём по обучению: на сколько ступеней ключ уже поднят (одна за окно доказательств, не выше
+ * потолка) и чем это доказано. `basis` — по ключу с классом (проб ≥ minSamples) или по ключу.
+ */
+export interface LearnedRaise {
+  rungs: number;
+  evidence: string[];
+  rate: number | null;
+  samples: number;
+  basis: 'key+class' | 'key';
 }
 
 /** Основание чисел оценки: история прогонов есть — числа и разброс; нет — числа `null`. */

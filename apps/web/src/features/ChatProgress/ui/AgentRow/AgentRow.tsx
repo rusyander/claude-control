@@ -7,7 +7,7 @@ import { Icon } from '@shared/ui/icon';
 import { cn } from '@shared/lib/cn';
 import { formatDuration } from '@shared/lib/format-duration';
 import { formatTokens } from '@shared/lib/formatTokens';
-import { agentTokenTotal, ExtensionChips, shortModel } from '@entities/AgentTree';
+import { shortModel } from '@entities/AgentTree';
 import type { AgentRowProps } from '../ChatProgressSheet.types';
 import styles from './AgentRow.module.scss';
 import { AGENT_TONE } from './AgentRow.constants';
@@ -16,9 +16,8 @@ import { elapsedMs } from '../../model/elapsedMs';
 
 /**
  * Субагент в «Кому раздана работа». В дереве — узел ARIA-дерева: модель,
- * вызовы, расход, время и последнее действие, щелчок открывает его ход справа,
- * у идущего — «Остановить». Вне дерева (старый сервер без id) — та же строка
- * без узла.
+ * вызовы, расход и время (факты ядра), у идущего — что он делает сейчас; щелчок
+ * открывает узел ядра справа. Вне дерева — та же строка без узла.
  */
 export function AgentRow({ agent, isRunning, processAlive, now, tree, children }: AgentRowProps) {
   const { t } = useTranslation();
@@ -35,14 +34,18 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
   const activityFor = activity ? elapsedMs(activity.startedAt, now) : undefined;
   const what = activity ? [activity.name, activity.summary].filter(Boolean).join(': ') : '';
   const status = t(`chat.progress.agentStatus.${view}`);
-  const tokens = agentTokenTotal(agent);
+  // Строка только из ядра несёт код типа узла, а не имя агента: показывается словом языка интерфейса.
+  const kind = agent.coreKind ? t(`agentTree.kind.${agent.coreKind}`) : agent.kind;
   const model = shortModel(agent.model);
+  // Расход — у ядра; не знает его ядро — числа нет, ноль не рисуется.
   const metrics = [
     model,
     agent.toolCalls !== undefined
       ? t('agentTree.toolCalls', { count: agent.toolCalls })
       : undefined,
-    tokens > 0 ? t('agentTree.tokens', { value: formatTokens(tokens) }) : undefined,
+    agent.spendTokens !== undefined
+      ? t('agentTree.tokens', { value: formatTokens(agent.spendTokens) })
+      : undefined,
     took !== undefined ? t('agentTree.took', { for: formatDuration(took, t) }) : undefined,
   ].filter(Boolean);
   // Узлу без вложенных — пустое место под стрелку: узлы одного уровня в столбик.
@@ -60,14 +63,13 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
             role: 'treeitem',
             'aria-level': tree.level,
             'aria-selected': tree.isSelected,
-            'aria-label': t('agentTree.nodeLabel', {
-              kind: agent.kind,
-              description: agent.description,
-              status,
-            }),
+            // Без описания (у ядра нет брифа) — без пустого места между типом и состоянием.
+            'aria-label': agent.description
+              ? t('agentTree.nodeLabel', { kind, description: agent.description, status })
+              : t('agentTree.nodeLabelNoBrief', { kind, status }),
             ...(tree.expanded !== undefined ? { 'aria-expanded': tree.expanded } : {}),
             tabIndex: tree.isTabStop ? 0 : -1,
-            'data-agent-node': agent.agentId ?? agent.id,
+            'data-agent-node': agent.id,
           }
         : {})}
     >
@@ -92,7 +94,7 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
         </span>
         <span className={styles.headText}>
           <Typography variant="body-sm" as="span" weight="medium" className={styles.kind}>
-            {agent.kind}
+            {kind}
           </Typography>
           <Typography variant="caption" color="subtle" as="span" className={styles.agentText}>
             {agent.description}
@@ -114,28 +116,11 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
           color="subtle"
           as="div"
           className={styles.metrics}
-          {...(agent.tokens
-            ? {
-                title: t('agentTree.tokensHint', {
-                  input: formatTokens(agent.tokens.input),
-                  cacheRead: formatTokens(agent.tokens.cacheRead),
-                  cacheCreation: formatTokens(agent.tokens.cacheCreation),
-                  output: formatTokens(agent.tokens.output),
-                }),
-              }
-            : {})}
           data-agent-metrics
         >
           {metrics.join(' · ')}
         </Typography>
       )}
-
-      <ExtensionChips
-        summary={agent.extensions}
-        className={styles.extensions}
-        openLabel={t('agentTree.extensions.openAgent', { description: agent.description })}
-        {...(tree?.onExtensions ? { onOpen: tree.onExtensions } : {})}
-      />
 
       {activity && (
         <Stack
@@ -154,18 +139,6 @@ export function AgentRow({ agent, isRunning, processAlive, now, tree, children }
               : what}
           </Typography>
         </Stack>
-      )}
-
-      {!activity && agent.lastAction && (
-        <Typography
-          variant="caption"
-          color="subtle"
-          as="div"
-          className={cn(styles.activity, styles.activityText)}
-          data-agent-last
-        >
-          {t('agentTree.last', { what: agent.lastAction })}
-        </Typography>
       )}
 
       {agent.result && (

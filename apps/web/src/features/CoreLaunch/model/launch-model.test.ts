@@ -129,7 +129,9 @@ describe('core launch draft', () => {
       library: [{ id: 'flow', version: 2, title: 'Мой поток', steps: [] as never }],
     });
     expect(opts.find((o) => o.value === 'preset:answer-reviewers')?.disabled).toBe(true);
-    expect(opts.filter((o) => o.value.startsWith('preset:')).length).toBe(6);
+    // Шесть пресетов этапа 9 и ведущий этапа 11 (`lead`); чат, ask и ревью по ссылке — не здесь.
+    expect(opts.filter((o) => o.value.startsWith('preset:')).length).toBe(7);
+    expect(opts.some((o) => o.value === 'preset:lead')).toBe(true);
     expect(opts.some((o) => o.value === 'preset:chat')).toBe(false);
     expect(opts.some((o) => o.value === 'preset:ask')).toBe(false);
     expect(opts.at(-1)).toEqual({

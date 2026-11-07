@@ -4,6 +4,7 @@ import type { DeliveryReply } from '@agentdeck/contracts/core/publish';
 import type { RouteId, RouteKind } from '@agentdeck/contracts/core/routes';
 import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { ModelRank } from '../../policy/resolve/risky.ts';
+import type { CompatAdapterGate } from '../../routes/compat/compat.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
 import type { CoreHomeLayout } from '../../platform/core-home.ts';
@@ -32,6 +33,11 @@ export interface CommandEnv {
    * лестницам переходников (`bootEconomy.ladders`). Нет — ранг неизвестен, и предупреждение `set-model` называет это, а не молчит.
    */
   modelRank?: ModelRank;
+  /**
+   * Возможности переходника по id для суда `set-cli` до набора (W3-17a): CLI без судьи ядра
+   * отказан `no_core_hook`, а не «вне набора». Нет порта или переходника — суд набора, как прежде.
+   */
+  adapterOf?(id: string): CompatAdapterGate | undefined;
   /**
    * Сверка загрузки (`bootstrap/boot-reconcile.ts`) для ответа «повторить сверку» на точку 4: нет —
    * действие всё равно снова начатое в журнале, его прочтёт следующая загрузка ядра.

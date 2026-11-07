@@ -2,6 +2,7 @@ import type { ServerResponse } from 'node:http';
 import type { DlpRule } from '@agentdeck/contracts';
 import { builtinRuleSet, maskRulesFor } from '@agentdeck/dlp/default-rules';
 import type { DlpApiKind } from '@agentdeck/dlp/api-shapes';
+import type { ActivityBook } from './activity/activity.ts';
 import type { ContourBook } from './contour-book/contour-book.ts';
 import { hopText, type TextLanguage } from './gateway/texts.ts';
 import type { ThinkTailModels } from './gateway/think-models.ts';
@@ -33,6 +34,8 @@ export interface HopContext {
   thinkTail: ThinkTailModels;
   now(): number;
   fetchImpl?: typeof fetch;
+  /** Лента хода локальных маршрутов (op `activity`); нет — запросы её не ведут (тесты ручек). */
+  activity?: ActivityBook;
 }
 
 /** Правила маски из каталога данных панели; каталога нет — встроенный набор (как у панели). */

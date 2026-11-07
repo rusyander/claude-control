@@ -4,7 +4,7 @@ import { hopText as serverText } from '../texts.ts';
 
 /**
  * Ручки `…/models/<модель>:streamGenerateContent | :generateContent | :countTokens`
- * шлюза звена (перенос из шлюза панели, этап 10) — диалект Gemini API, на котором говорит
+ * шлюза звена (перенос из шлюза в панели, этап 10) — диалект Gemini API, на котором говорит
  * Gemini CLI.
  *
  * Тот же приём, что у Responses (`responses-bridge.ts`): ПЕРЕВОД НА КРАЮ. Запрос

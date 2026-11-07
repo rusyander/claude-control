@@ -128,4 +128,36 @@ describe('listProjects', () => {
       rmSync(newer, { recursive: true, force: true });
     }
   });
+
+  // Разговор не-Claude CLI живёт в ядре, транскрипта у него нет: без сводки ядра список проектов
+  // телефона его не знал, и открыть разговор qwen/opencode с телефона было нечем.
+  it('сводки разговоров ядра (не-Claude CLI) входят в проекты, без дублей и по свежести', () => {
+    const real = mkdtempSync(join(tmpdir(), 'cc-foreign-proj-'));
+    try {
+      writeTranscript('enc-mixed', 'claude-1', real, { mtime: new Date('2026-07-18T10:00:00Z') });
+      const summary = (id: string, path: string, updatedAt: string) => ({
+        id,
+        title: `разговор ${id}`,
+        project: path,
+        projectPath: path,
+        isSandbox: false,
+        messageCount: 2,
+        createdAt: updatedAt,
+        updatedAt,
+      });
+      const projects = listProjects(projectsDir, [
+        summary('qwen-1', real, '2026-07-19T09:00:00.000Z'),
+        summary('opencode-1', 'C:/work/только-ядро', '2026-07-17T09:00:00.000Z'),
+        // Тот же id, что у транскрипта, — не второй чат.
+        summary('claude-1', real, '2026-07-20T09:00:00.000Z'),
+      ]);
+
+      expect(projects.map((p) => p.path)).toEqual([real, 'C:/work/только-ядро']);
+      expect(projects[0]?.chats.map((c) => c.id)).toEqual(['qwen-1', 'claude-1']);
+      expect(projects[0]?.lastActivity).toBe('2026-07-19T09:00:00.000Z');
+      expect(projects[1]?.chats.map((c) => c.id)).toEqual(['opencode-1']);
+    } finally {
+      rmSync(real, { recursive: true, force: true });
+    }
+  });
 });

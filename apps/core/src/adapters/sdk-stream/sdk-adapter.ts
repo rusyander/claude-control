@@ -81,6 +81,8 @@ export interface SdkAdapterDef {
   /** Серверы MCP человека в конфиге CLI (`CliAdapter.mcpSource`, P73). */
   mcpSource?: CliAdapter['mcpSource'];
   toolsNone?: true;
+  /** Сеанс без следа (`CliAdapter.ephemeral`); план читает `spec.ephemeral` сам. */
+  ephemeral?: CliAdapter['ephemeral'];
   userSourcesOnly?: true;
   sessionCarry?: CliAdapter['sessionCarry'];
   echo: boolean;
@@ -112,6 +114,11 @@ export interface SdkAdapterDef {
   readWindow?: SdkRule['readWindow'];
   /** Как читать исход вызова из `tool_result` этого CLI (этап 8, F18); нет — без `outcome`. */
   outcome?: SdkRule['outcome'];
+  /**
+   * Строки задач потока этого CLI (этап 11, P148): субагенты и фон → `agent.*` / `bg.*`, и
+   * переходник объявляет `backgroundFacts`. Нет — дерево агентов этого CLI пусто.
+   */
+  tasks?: SdkRule['tasks'];
   /**
    * Чтение отказов хуков человека для сеанса (G-e): по спеке и слою запуска (`null` — сеанс
    * прежнего ядра, спеки нет). Нет — CLI отказ хука не отличает, `hook.refused` не издаётся.
@@ -191,6 +198,7 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
     ...(def.classifyError ? { classifyError: def.classifyError } : {}),
     ...(def.readWindow ? { readWindow: def.readWindow } : {}),
     ...(def.outcome ? { outcome: def.outcome } : {}),
+    ...(def.tasks ? { tasks: def.tasks } : {}),
   };
   const ruleFor = (spec: SessionSpec | null, layer: LayerRun | null): SdkRule => {
     const hookRefusals = def.hookReader?.(spec, layer);
@@ -222,11 +230,13 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
     ...(def.ownsTranscript ? { ownsTranscript: def.ownsTranscript } : {}),
     ...(def.mcpSource ? { mcpSource: def.mcpSource } : {}),
     ...(def.toolsNone ? { toolsNone: true as const } : {}),
+    ...(def.ephemeral ? { ephemeral: def.ephemeral } : {}),
+    ...(def.tasks ? { backgroundFacts: true as const } : {}),
     ...(def.userSourcesOnly ? { userSourcesOnly: true as const } : {}),
     ...(def.sessionCarry ? { sessionCarry: def.sessionCarry } : {}),
     caps: def.caps,
     readLayer: (pin) => def.readLayer(pin),
-    inventory: (pin, cwd, repoLayer) => def.layer.inventory(pin, cwd, repoLayer),
+    inventory: (pin, cwd, repoLayer, session) => def.layer.inventory(pin, cwd, repoLayer, session),
     bindEndpoint: (channel, endpoint, limits) => def.bindEndpoint(channel, endpoint, limits),
     mapPermission: (raw) => def.mapPermission(raw),
     permitCodec: SDK_PERMIT_CODEC,

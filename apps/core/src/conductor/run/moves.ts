@@ -13,6 +13,7 @@ import {
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { END_REASON } from '../next/next.types.ts';
+import { dropSeat } from '../schedule/lease.ts';
 import type {
   BriefSection,
   HookVerdict,
@@ -141,10 +142,16 @@ export async function endSession(
   stepId: string,
   mode: 'soft' | 'tree',
 ): Promise<void> {
+  // Место сеанса (этап 11) возвращается и без живой сессии: шаг мог получить место и упасть до
+  // её открытия (крючки брифа, бюджет брифа). После снятия сеанса — иначе ждущий открыл бы свой,
+  // пока этот ещё идёт.
+  const seats = ctx.deps.allocator;
   const live = ctx.live.get(stepId);
-  if (!live) return;
-  ctx.live.delete(stepId);
-  if (!live.ended) await ctx.deps.sessions.end(live.sessionId, mode);
+  if (live) {
+    ctx.live.delete(stepId);
+    if (!live.ended) await ctx.deps.sessions.end(live.sessionId, mode);
+  }
+  if (seats) dropSeat(ctx.task, seats, stepId, `session end (${mode})`);
 }
 
 /** Шаг кончается провалом: переход `fail` (если ещё допустим) и `step.ended`. */

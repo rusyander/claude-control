@@ -9,7 +9,7 @@
       "source": "2563acadd5022b6b",
       "width": 1541,
       "height": 772,
-      "exportedAt": "2026-11-01T16:34:47.915Z"
+      "exportedAt": "2026-11-07T08:36:16.401Z"
     },
     {
       "name": "launch-to-steps",
@@ -18,7 +18,16 @@
       "source": "1bf33443d72c4c92",
       "width": 1611,
       "height": 732,
-      "exportedAt": "2026-11-01T16:34:50.955Z"
+      "exportedAt": "2026-11-07T08:36:19.336Z"
+    },
+    {
+      "name": "lead-pipeline",
+      "file": "lead-pipeline.png",
+      "page": 3,
+      "source": "c75ec2eee39f45a5",
+      "width": 1611,
+      "height": 952,
+      "exportedAt": "2026-11-07T08:36:22.281Z"
     }
   ]
 }

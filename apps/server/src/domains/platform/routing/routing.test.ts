@@ -230,7 +230,7 @@ describe('прогон через контур', () => {
     connect(PLATFORM, 0);
     const down = resolveRunRoute(deps, 'chat');
     expect(!down.routed && down.refusal).toContain('Контур «Company · dev» обязателен');
-    expect(!down.routed && down.refusal).toContain('шлюз панели не поднят');
+    expect(!down.routed && down.refusal).toContain('шлюз ядра не поднят');
     // Совет — ровно к своей причине: кнопка на карточке, а не три перехода в мастер.
     expect(!down.routed && down.refusal).toContain('«Поднять шлюз» на карточке контура');
     expect(describeRunPlan(deps, 'chat')).toMatchObject({ routed: false, refused: true });

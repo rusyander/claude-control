@@ -48,4 +48,24 @@ describe('withoutLiveTurn', () => {
     const queued = [message('user', -5000, 'ask'), message('assistant', -100, 'answer')];
     expect(withoutLiveTurn(queued, START, true)).toBe(queued);
   });
+
+  it('история разговора не-Claude CLI из ядра: прошлые ответы остаются, ответ идущего хода скрыт', () => {
+    // Сервер ставит ответу время отправки ЕГО хода (`sentAt` вида сеанса ядра, волна 3): ответ
+    // прошлого хода раньше старта прогона, ответ идущего — не раньше отправки, то есть старта.
+    const core = [
+      message('user', -120_000, 'ист-1'),
+      message('assistant', -120_000, 'готов-1'),
+      message('user', -60_000, 'ист-2'),
+      message('assistant', -60_000, 'готов-2'),
+      message('user', 40, 'ист-3'),
+      message('assistant', 40, 'готов-3'),
+    ];
+    expect(withoutLiveTurn(core, START, true).map((m) => m.id)).toEqual([
+      'ист-1',
+      'готов-1',
+      'ист-2',
+      'готов-2',
+      'ист-3',
+    ]);
+  });
 });

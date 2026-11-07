@@ -1,5 +1,5 @@
 import type { UserLayerInventory } from '@agentdeck/contracts/core/user-layer';
-import type { LayerMode, LayerRun, SessionSpec } from '../adapter.types.ts';
+import type { InventorySession, LayerMode, LayerRun, SessionSpec } from '../adapter.types.ts';
 
 /**
  * Слой сеанса на деле (03 §Layer control, F-86). Доверие — отметка ИСХОДНОГО репозитория:
@@ -20,7 +20,12 @@ export interface LayerPolicy {
    * Опись слоя человека (01:18, 06:114-129): настройки, инструкции, правила, навыки, хуки, агенты
    * с окружением задачи; `repoLayer` — читать ли слой репозитория (доверенная копия).
    */
-  inventory(pin: Record<string, string>, cwd: string, repoLayer: boolean): UserLayerInventory;
+  inventory(
+    pin: Record<string, string>,
+    cwd: string,
+    repoLayer: boolean,
+    session?: InventorySession,
+  ): UserLayerInventory;
   /**
    * CLI без управления слоем (`caps.layerControl: false`, 06:117, G3): любой запрошенный режим
    * идёт `on`, и подмена названа этим текстом. Нет поля — CLI слоем управляет.

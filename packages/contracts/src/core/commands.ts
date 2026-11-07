@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { registryId, uuidv7 } from './ids.ts';
 import { allowedRouteSchema, COMMAND_TIMINGS, GRANT_OPS, OVERRIDE_SCOPES } from './journal-data.ts';
+import { LEAD_ROLES } from './lead.ts';
 import { scenarioSchema } from './scenario.ts';
 
 /**
@@ -105,7 +106,13 @@ export type CommandKind = keyof typeof COMMAND_FIELDS;
  * оба машинные, задачи у них нет.
  */
 export type AuthorityKind =
-  CommandKind | 'estimate' | 'ask' | 'set-config' | 'save-scenario' | 'adopt-devices';
+  | CommandKind
+  | 'estimate'
+  | 'ask'
+  | 'set-config'
+  | 'save-scenario'
+  | 'adopt-devices'
+  | 'learned-reset';
 export const COMMAND_KINDS = Object.keys(COMMAND_FIELDS) as CommandKind[];
 
 /**
@@ -129,6 +136,39 @@ export const commandEnvelopeSchema = z.strictObject({
 });
 
 export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
+
+/**
+ * Ключ обучения (`LearnedKey` в `economy.ts`, этап 11 P140) как его называет человек. `role` нет —
+ * строка до этапа 11 (роль по умолчанию вида шага); `model: null` — модель по умолчанию CLI.
+ */
+export const learnedKeySchema = z.strictObject({
+  project: line(1000),
+  stepKind: line(100),
+  adapter: registryId,
+  route: registryId,
+  model: registryId.nullable(),
+  role: z.enum(LEAD_ROLES).optional(),
+});
+
+/**
+ * Тело сброса ключа обучения (этап 11, P140): только человек (суд `learned-reset`). Машинное, как
+ * `set-config`: ключ — строка таблицы обучения ядра, а не задачи, поэтому не конверт команды с
+ * `target.taskId`. Подъём, заработанный ключом, снимается целиком; автоматического понижения нет.
+ */
+export const learnedResetBodySchema = z.strictObject({
+  cmdId: uuidv7,
+  key: learnedKeySchema,
+  proof: commandProofSchema,
+});
+export type LearnedResetBody = z.infer<typeof learnedResetBodySchema>;
+
+/** Ответ `POST /v1/learned/reset`. */
+export interface LearnedResetReply {
+  cmdId: string;
+  /** Строка ключа в таблице обучения (`keyOf`: роль по умолчанию вида шага подставлена). */
+  key: string;
+  at: number;
+}
 
 /** Разбор конверта и полей вида; ошибка — список проблем с путём, для 400 с типизированным кодом. */
 export interface CommandIssue {

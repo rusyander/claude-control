@@ -15,7 +15,15 @@ describe('лестница уровня ядра из фактов CLI', () => {
       models: ['haiku', 'sonnet', 'opus', 'fable'],
       aliases: [['claude-haiku'], ['claude-sonnet'], ['claude-opus'], ['claude-fable']],
       efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+      autoCeiling: 'opus',
     });
+  });
+
+  it('потолок автоматики — только ступень своей лестницы: чужое имя не ограничивает молча', () => {
+    const claude = facts('claude');
+    expect(tierLadderOf({ ...claude, autoCeiling: 'gpt-5' })).not.toHaveProperty('autoCeiling');
+    const { autoCeiling: _gone, ...bare } = claude;
+    expect(tierLadderOf(bare)).not.toHaveProperty('autoCeiling');
   });
 
   it('Codex: только усилие — семейства каталога (`modelLadder`) не имена для --model', () => {

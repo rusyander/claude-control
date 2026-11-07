@@ -70,6 +70,14 @@ export const MID_CHECKS = ['narrow', 'none'] as const;
 export type ModelTier = (typeof MODEL_TIERS)[number];
 
 /**
+ * Класс задачи ведущего (этап 11, P134): S — одна правка, XL — много единиц со связями. Живёт
+ * здесь, а не в `lead.ts`: шаг сценария ограничивается классами (`onlyFor`), а `lead.ts` сам
+ * читает `MODEL_TIERS` отсюда — иначе модули ссылались бы друг на друга.
+ */
+export const TASK_CLASSES = ['S', 'M', 'L', 'XL'] as const;
+export type TaskClass = (typeof TASK_CLASSES)[number];
+
+/**
  * Уровень модели нового шага по виду (канон пресетов): план — выше, механика ядра — ниже,
  * остальное — потолок. Один на ядро и панель: редактор сценария ставит шагу тот же уровень, что
  * дали бы пресеты, а расхождение копий меняло бы цену шага молча.
@@ -169,6 +177,11 @@ export const stepDefSchema = z.strictObject({
   regression: z.strictObject({ checkId }).optional(),
   /** Только вид `publish`: черновик или готовый MR решает сценарий (05:70); нет поля — готовый. */
   publish: z.strictObject({ draft: z.boolean().optional() }).optional(),
+  /**
+   * Этап 11 (P134): шаг идёт только у задач этих классов; у прочих ведущий его пропускает
+   * (`skip-step`). Нет поля — шаг для всех классов; пустой список — ошибка автора, а не «никогда».
+   */
+  onlyFor: z.array(z.enum(TASK_CLASSES)).min(1).max(TASK_CLASSES.length).optional(),
 });
 export type StepDef = z.infer<typeof stepDefSchema>;
 
@@ -208,6 +221,12 @@ export const PRESET_IDS = [
    * вопросом. Создаётся только `POST /v1/review-link` (нужна личность MR), оценка его отказывает.
    */
   'review-link',
+  /**
+   * Ведущий (этап 11, P133-P137): разведка → карточка разбора → класс S/M/L/XL решает форму —
+   * план только у M и шире, ревью у каждого класса. `tracker-ticket` — тот же ведущий с источником
+   * трекера.
+   */
+  'lead',
 ] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
 

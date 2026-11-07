@@ -66,9 +66,9 @@ its own answer: a card in the conversation's right column and a file in the pane
 is not in the thread, and the agent does not know it exists.
 
 Not every contour draws raster, and the server picks the road once: a contour that declares drawing
-returns the picture as part of an ordinary answer (through the panel's local gateway, so it is in the
+returns the picture as part of an ordinary answer (through the local core gateway, so it is in the
 journal; it reaches the key's spend only if the contour sent usage — the company platform does not for an image,
-and the journal marks it `usageUnreported` instead of a silent zero); a contour with its own images endpoint uses that, also through the panel gateway (journal, data protection, refusal translation, spend when usage is sent; a paid image is never retried); your endpoint
+and the journal marks it `usageUnreported` instead of a silent zero); a contour with its own images endpoint uses that, also through the core gateway (journal, data protection, refusal translation, spend when usage is sent; a paid image is never retried); your endpoint
 profile works when its image-generation address field is filled — the address is never guessed from
 the base one, because a guess would 404 after you had already described the picture. Otherwise the
 conversation's agent draws in code — a vector, not a photo — and what took the raster away is named

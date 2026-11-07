@@ -172,7 +172,6 @@ export const en: TranslationSchema = {
     coreTasks: 'Core tasks',
     coreLaunch: 'Launch a core task',
     coreScenarios: 'Core scenarios',
-    coreChat: 'Chat through the core',
     help: 'Help',
     sectionMain: 'Main',
     sectionBehavior: 'Agent behaviour',
@@ -1361,6 +1360,7 @@ export const en: TranslationSchema = {
     model: 'Model',
     modelHint: 'Model for this conversation. Empty — as set in Settings.',
     modelClaudeDefault: 'Opus 4.8 (1M)',
+    modelCliDefault: 'CLI default',
     effort: 'Thinking effort',
     effortAuto: 'default',
     effortHint: 'How deeply the agent reasons about the answer. Empty — as set in Settings.',
@@ -1389,6 +1389,15 @@ export const en: TranslationSchema = {
       preparing: 'the agent is preparing a request to the model',
       failed: 'no request to the model: the model server refused the last one',
       failure: 'The model server answered {{status}}: {{message}}',
+      starting: 'the model server is starting',
+      loading: 'the model is loading into memory',
+      queued: 'the request is waiting for the server to take it',
+      prompt: 'reading the prompt: {{filled}} of {{total}} tokens',
+      promptNoTotal: 'reading the prompt: {{filled}} tokens',
+      promptShare: 'Share of the prompt read',
+      generating: 'writing the answer: {{decoded}} tokens',
+      silent: 'the server has been silent for {{seconds}} s — a stall in {{left}} s',
+      stalled: 'no progress for {{seconds}} s — the model server looks stuck',
       restart: 'Restart the server',
       restarting: 'Restarting…',
       restartFailed: 'The server did not restart: {{message}}',
@@ -1463,7 +1472,7 @@ export const en: TranslationSchema = {
     platformBypassed:
       'Bypassing the contour: "{{title}}" is set to “best effort”, but {{reason}} — the message goes straight to the vendor cloud, without the contour’s protection. {{fix}}',
     platformRefusedReason: {
-      gateway_down: 'the panel gateway is down',
+      gateway_down: 'the core gateway is down',
       no_token: 'the contour key is not saved',
       cli_config_bypass:
         'the CLI config has {{setting}}, which the run environment cannot override',
@@ -2592,12 +2601,12 @@ export const en: TranslationSchema = {
     add: 'Add profile',
     remove: 'Delete profile',
     ownerLine:
-      'This profile is owned by the contour “{{title}}”: the address points at the panel’s local gateway and the key is injected there. Editing the fields here sends the CLI past the contour.',
+      'This profile is owned by the contour “{{title}}”: the address points at the local core gateway and the key is injected there. Editing the fields here sends the CLI past the contour.',
     ownerActive: 'contour is active',
     ownerIdle: 'contour is not active',
     ownerGone: 'The contour that created this profile is gone — the profile can be deleted.',
     ownerUnknown:
-      'This profile is owned by a contour: the address points at the panel’s local gateway and the key is injected there. Which contour exactly, the panel has not read yet.',
+      'This profile is owned by a contour: the address points at the local core gateway and the key is injected there. Which contour exactly, the panel has not read yet.',
     ownerReturned: 'Back on the default provider: CLI files are restored',
     ownerReturnFailed: 'Could not return to the default provider',
     newName: 'Endpoint {{n}}',
@@ -2689,12 +2698,12 @@ export const en: TranslationSchema = {
       access:
         'Which panel sections go through the selected contour — chat, groups, tests, assistant, foreign CLIs, terminal — and what gets written for that.',
       tools:
-        'Tool shim, the contour’s content checks and the cases where the contour compressed history. Shown while the contour is active and the panel gateway is up.',
+        'Tool shim, the contour’s content checks and the cases where the contour compressed history. Shown while the contour is active and the core gateway is up.',
       agents: 'Platform agents of the active contour and the MCP bridge for CLI agents.',
     },
     tabEmpty: {
       tools:
-        'Nothing to show yet: the shim and checks cards appear once a contour is active, the panel gateway is up and at least one request went through it.',
+        'Nothing to show yet: the shim and checks cards appear once a contour is active, the core gateway is up and at least one request went through it.',
       agents:
         'Only the active contour has agents. Make a contour active on the Contours tab and its agent list appears here.',
     },
@@ -3036,7 +3045,7 @@ export const en: TranslationSchema = {
     gatewayDown: 'the gateway is down — there is nothing to apply to a CLI yet',
     gatewayStart: 'Start the gateway',
     gatewayStarted: 'Gateway is up: {{address}}',
-    gatewayDownCard: 'The panel gateway is down',
+    gatewayDownCard: 'The core gateway is down',
     gatewayDownCardHint:
       'Chat and CLIs reach the contour only through the gateway. While it is down a required contour refuses to start a run, and a best-effort one lets the work bypass the contour.',
     modeLabel: 'If the contour does not respond',
@@ -3476,7 +3485,7 @@ export const en: TranslationSchema = {
       },
       'dialect-bridge': {
         name: 'Dialect translation lives on our side',
-        how: 'Some CLIs speak the Anthropic dialect while the platform speaks the OpenAI one. Where the platform’s driver declares no native Anthropic endpoint, the panel’s gateway rewrites request and response on the fly; where it does, the request goes out as is and no bridge is needed.',
+        how: 'Some CLIs speak the Anthropic dialect while the platform speaks the OpenAI one. Where the platform’s driver declares no native Anthropic endpoint, the core gateway rewrites request and response on the fly; where it does, the request goes out as is and no bridge is needed.',
         why: 'Otherwise only CLIs that already speak OpenAI could use a contour. What the translation loses is listed next to the translation itself, not hidden.',
         revisitWhen:
           'If the platform starts accepting requests in the Anthropic dialect: its driver declares the native endpoint, and the bridge switches off for it by itself.',
@@ -3857,74 +3866,6 @@ export const en: TranslationSchema = {
     inputPlaceholder: 'paste the key',
     cliMissing: 'The "{{command}}" CLI was not found in PATH — so a key is needed.',
     openSettings: 'Open settings',
-  },
-  providerChat: {
-    title: '{{provider}} chat',
-    you: 'You',
-    conversations: 'Conversations',
-    new: 'New',
-    noConversations: 'No conversations yet.',
-    projectsTab: 'Projects',
-    projects: {
-      search: 'Search projects',
-      searchPlaceholder: 'Name or path',
-      count_one: '{{count}} project',
-      count_few: '{{count}} projects',
-      count_many: '{{count}} projects',
-      count_other: '{{count}} projects',
-      emptyTitle: 'No projects yet',
-      emptyText:
-        'Folders where Claude or another CLI has worked show up here. «New conversation here» opens a core chat in that folder.',
-      notFound: 'Nothing found.',
-      providersLabel: 'Who worked in this project',
-      badgeTitle_one: '{{provider}}: {{count}} conversation',
-      badgeTitle_few: '{{provider}}: {{count}} conversations',
-      badgeTitle_many: '{{provider}}: {{count}} conversations',
-      badgeTitle_other: '{{provider}}: {{count}} conversations',
-      startHere: 'New conversation here',
-      startHereLabel: 'New {{provider}} conversation in project {{name}}',
-      problem: {
-        empty: 'The folder path is empty',
-        relative: 'The path is not absolute — there is nowhere to run the CLI',
-        missing: 'The folder no longer exists on disk',
-        'not-dir': 'The path points to a file, not a folder',
-        unreadable: 'The folder cannot be read',
-      },
-    },
-    messageCount_one: '{{count}} message',
-    messageCount_few: '{{count}} messages',
-    messageCount_many: '{{count}} messages',
-    messageCount_other: '{{count}} messages',
-    startHint:
-      'These are the conversations the panel kept before the chat moved to the core. A new conversation opens in the core chat.',
-    empty: 'This conversation has no messages.',
-    failed: 'error',
-    // A message picked up by the running CLI turn (В1), not sent after it.
-    steered: 'mid-answer',
-    rename: 'Rename',
-    renamePrompt: 'Conversation title',
-    delete: 'Delete',
-    deleteTitle: 'Delete the conversation?',
-    deleteDescription: 'The transcript is removed from disk with no way back.',
-    deleteFailed: 'Failed to delete the conversation.',
-    workdirBadge: 'directory: {{path}}',
-    modelBadge: 'model: {{model}}',
-    // How the reply arrived: CLI stream, local server session, or a direct API call.
-    transport: {
-      stream: 'CLI stream',
-      session: 'CLI session',
-      api: 'via API',
-      live: 'CLI server',
-    },
-    timing: {
-      step: 'Answer took {{step}}',
-      full: 'Answer took {{step}}, {{total}} in this conversation',
-    },
-    history: {
-      badge: 'history',
-      continue: 'Continue in the core chat',
-      note: 'Read-only: the panel kept this conversation before the chat moved to the core, and it cannot go on in the same {{provider}} session. «Continue in the core chat» opens a new chat in the same folder.',
-    },
   },
   mcp: {
     title: 'MCP servers',

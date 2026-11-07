@@ -98,6 +98,93 @@ describe('schedule', () => {
     expect(granted).toBe(false);
   });
 
+  describe('seat mode (held given, P141)', () => {
+    const R = 'cli-login:claude';
+    const seat = (unitId: string, over: Partial<ScheduleCandidate> = {}) =>
+      cand(unitId, { route: R, routeCap: null, limit: 4, ...over });
+
+    it('grants while all held seats stay under the candidate limit; the rest wait with a named count', () => {
+      const d = decideSchedule({
+        candidates: [seat('a'), seat('b'), seat('c')],
+        freeSlots: 6,
+        now: 0,
+        agingMs: AGING,
+        held: [{ route: R }, { route: R }],
+      });
+      expect(d.grant).toEqual(['a', 'b']);
+      expect(d.blocked).toEqual({ c: 'slot' });
+      expect(d.reasons).toContain('c waits: 4 of 4 seats held');
+    });
+
+    it('free slots of the machine cap the grant even under a higher limit', () => {
+      const d = decideSchedule({
+        candidates: [seat('a', { limit: 6 }), seat('b', { limit: 6 })],
+        freeSlots: 1,
+        now: 0,
+        agingMs: AGING,
+        held: [],
+      });
+      expect(d.grant).toEqual(['a']);
+      expect(d.blocked).toEqual({ b: 'slot' });
+    });
+
+    it('head of line: a blocked higher-ranked candidate holds everyone below it, even a bigger limit', () => {
+      const d = decideSchedule({
+        candidates: [
+          seat('fix-low', { stepKind: 'fix', limit: 1 }),
+          seat('work-high', { limit: 6 }),
+        ],
+        freeSlots: 5,
+        now: 0,
+        agingMs: AGING,
+        held: [{ route: R }],
+      });
+      expect(d.order.map((r) => r.unitId)).toEqual(['fix-low', 'work-high']);
+      expect(d.grant).toEqual([]);
+      expect(d.blocked).toEqual({ 'fix-low': 'slot', 'work-high': 'slot' });
+      expect(d.reasons).toContain('work-high waits behind fix-low');
+    });
+
+    it('a full route does not hold the head: other routes go, the capped one waits "route"', () => {
+      const d = decideSchedule({
+        candidates: [
+          seat('own', { stepKind: 'fix', route: 'local:own', routeCap: 1 }),
+          seat('cloud'),
+        ],
+        freeSlots: 5,
+        now: 0,
+        agingMs: AGING,
+        held: [{ route: 'local:own' }],
+      });
+      expect(d.grant).toEqual(['cloud']);
+      expect(d.blocked).toEqual({ own: 'route' });
+      expect(d.reasons).toContain('own waits: route local:own full (1)');
+    });
+
+    it('class order decides who takes the last seat; aging lifts a long-waiting work step over a fresh fix', () => {
+      const fresh = decideSchedule({
+        candidates: [seat('work', { waitingSince: 0 }), seat('fix', { stepKind: 'fix' })],
+        freeSlots: 1,
+        now: 0,
+        agingMs: AGING,
+        held: [],
+      });
+      expect(fresh.grant).toEqual(['fix']);
+      const aged = decideSchedule({
+        candidates: [
+          seat('work', { waitingSince: 0 }),
+          seat('fix', { stepKind: 'fix', waitingSince: 3 * AGING }),
+        ],
+        freeSlots: 1,
+        now: 3 * AGING,
+        agingMs: AGING,
+        held: [],
+      });
+      expect(aged.grant).toEqual(['work']);
+      expect(aged.order[0]?.why).toBe('work aged +3, new, learned unknown ms');
+    });
+  });
+
   it('learned durations come from past journals by area, skip tasks with overrides and unreadable journals', async () => {
     const root = tempDir('learn-');
     const clock = fakeClock();

@@ -20,7 +20,8 @@ function road(resumedId?: string) {
   let finish: () => void = () => undefined;
   const handle = (id: string) => ({ sessionId: id }) as SessionHandle;
   const deps: RoadPortDeps = {
-    task: {} as LiveTask,
+    // Настоящая задача даёт подписку на журнал (порт слушает потерю хоста сеанса): здесь строк нет.
+    task: { subscribe: () => () => undefined } as unknown as LiveTask,
     road: {
       prepare: async () => ({ ok: true, prepared: {} as never }),
       launch: async () => ({ ok: true, handle: handle('new'), layer: {} as never }),

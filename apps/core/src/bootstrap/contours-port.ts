@@ -19,7 +19,6 @@ import {
   contourSummarizedIds,
   HopHostError,
   hopStatus,
-  recordContour,
   registerTag,
   type HopHostHandle,
 } from '../routes/hops/hops.ts';
@@ -109,7 +108,7 @@ export function panelRouteLinkSpec(
 
 /**
  * Учёт контуров для API (`/v1/contours*`, C3b) над хостом звеньев. Чтение карточки и запись
- * шлюза панели поднимают хост, как любой зов (`handle`); извещения о бюджете — только у живого
+ * снаружи поднимают хост, как любой зов (`handle`); извещения о бюджете — только у живого
  * (`live`): без звена трафика не было. Зов, не прошедший до хоста, забывает его — следующий
  * найдёт или поднимет заново.
  */
@@ -164,7 +163,6 @@ export function createContoursPort(hops: HopAccess, options: ContoursPortOptions
         async (handle) => (await contoursOf(handle)).notices.filter((item) => item.seq > after),
         () => [],
       ),
-    record: (body) => call(any, (handle) => recordContour(handle, body), never),
     clearExhausted: (platformId) =>
       call(any, (handle) => clearExhausted(handle, gatewayRouteId(platformId)), never),
     // Факты прогона — только у живого звена: прогон через контур поднял его своей записью, а

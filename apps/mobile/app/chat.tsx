@@ -39,7 +39,7 @@ import { Progress } from '../src/features/chat/Progress/Progress';
 import { TokenBadge } from '../src/features/chat/TokenBadge/TokenBadge';
 import { ToolCall } from '../src/features/chat/ToolCall/ToolCall';
 import { RunTimer } from '../src/features/chat/RunTimer/RunTimer';
-import { liveToolsOutsideHistory } from '../src/features/chat/liveTurn';
+import { liveToolsOutsideHistory, liveTurnStart } from '../src/features/chat/liveTurn';
 import { Transcript } from '../src/features/chat/Transcript/Transcript';
 import { AskCard } from '../src/features/inbox/AskCard/AskCard';
 import { useSent } from '../src/features/inbox/sent';
@@ -292,7 +292,7 @@ export default function ChatScreen() {
 
   const history = messages.data?.messages ?? [];
   // Чат, открытый посреди хода, уже видит его шаги в транскрипте: поток их не повторяет.
-  const liveTools = liveToolsOutsideHistory(history, run.tools, run.startedAt);
+  const liveTools = liveToolsOutsideHistory(history, run.tools, liveTurnStart(run));
   // Пока лента грузится, «Пусто» — неправда: крутилка и приглашение писать
   // стояли на экране одновременно.
   const isBlank =

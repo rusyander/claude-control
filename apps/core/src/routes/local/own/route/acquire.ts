@@ -176,8 +176,8 @@ export function createAcquire(
         ...(spec.signal ? { signal: spec.signal } : {}),
         // Неудачный запуск снят не доказанно — освобождение не отдаст слот (F-64); запись на
         // диск сразу: перезапущенное ядро иначе сочло бы слот свободным рядом с живым остатком.
-        onLeftover: (text, root) => {
-          entry.startLeft = { rid: serverRid, text, root };
+        onLeftover: (text, root, since) => {
+          entry.startLeft = { rid: serverRid, text, root, since };
           persist();
         },
       });

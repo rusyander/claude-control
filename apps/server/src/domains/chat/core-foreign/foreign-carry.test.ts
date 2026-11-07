@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { EstimateFields } from '@agentdeck/contracts/core/estimate';
-import { startCoreForeignChat } from './core-foreign-start.ts';
+import { coreWithTurns } from '../core-run/__fixtures__/core-with-turns.ts';
+import { CoreChatRun } from '../core-run/core-run.ts';
+import type { CoreChatBook, CoreChatEntry, CoreChatPort } from '../core-run/core-run.types.ts';
 import { createForeignCarry, type ForeignCarryDeps, type KitExtras } from './foreign-carry.ts';
 
 /**
@@ -9,7 +10,6 @@ import { createForeignCarry, type ForeignCarryDeps, type KitExtras } from './for
  * оценки), набор Codex — правила текстом дописки; локальность — по маршруту шлюза локального слоя.
  */
 
-const TASK = '01890000-0000-7000-8000-000000000002';
 const LOCAL_ROUTE = {
   adapter: 'qwen',
   route: { kind: 'gateway' as const, id: 'gateway:local-ollama' },
@@ -79,32 +79,42 @@ describe('createForeignCarry', () => {
   });
 });
 
-describe('startCoreForeignChat carries the layer', () => {
+// Ход чата чужого CLI идёт исполнителем панели `CoreChatRun` (W3-17a): слой ему кладёт тот же
+// `createForeignCarry`, что собирает сборка сервера (`foreignCarry` в `chat-wiring.ts`).
+describe('a foreign CLI chat turn carries the layer through CoreChatRun', () => {
   it('session fields go into the estimate fields, the env values into the estimate body only', async () => {
-    const estimates: EstimateFields[] = [];
     const envs: Array<Record<string, string> | undefined> = [];
-    const d = deps(() => ({ args: [], env: { QWEN_HOME: 'C:/kit/qwen-home' } }));
-    const carried = createForeignCarry(d.deps)({ cli: 'qwen', cwd: 'C:/proj' });
-    if (!carried.ok) throw new Error(carried.reason);
-    const out = await startCoreForeignChat(
-      {
-        async estimate(fields, env) {
-          estimates.push(fields);
-          envs.push(env);
-          return { ok: true as const, taskId: TASK };
-        },
-        async command() {
-          return { cmdId: 'c', status: 'applied', seq: 1 } as never;
-        },
+    const core = coreWithTurns({ sessionId: 'qwen-conv', answer: 'ok', turnAt: 1 });
+    const port: CoreChatPort = {
+      ...core.port,
+      estimate: (fields, env, attachments) => {
+        envs.push(env);
+        return core.port.estimate(fields, env, attachments);
       },
-      { cli: 'qwen', cwd: 'C:/proj', prompt: 'go', carry: carried.carry },
-    );
-    expect(out).toEqual({ ok: true, taskId: TASK });
-    expect(estimates[0]!.session).toEqual({
+    };
+    const d = deps(() => ({ args: [], env: { QWEN_HOME: 'C:/kit/qwen-home' } }));
+    const entries = new Map<string, CoreChatEntry>();
+    const book: CoreChatBook = {
+      get: (id) => entries.get(id),
+      cliOf: (id) => entries.get(id)?.cli,
+      set: (id, e) => void entries.set(id, e),
+      forget: (id) => void entries.delete(id),
+    };
+    const run = new CoreChatRun({
+      port,
+      book,
+      pollMs: 1,
+      activeCli: () => 'qwen',
+      foreignCarry: createForeignCarry(d.deps),
+    });
+    await run.start({ prompt: 'go', cwd: 'C:/proj' }, () => undefined);
+    expect(d.seen).toEqual([{ provider: 'qwen', local: false, hasSources: false }]);
+    expect(core.estimates[0]!.session).toEqual({
       append: 'TESTS_LINE',
       env: ['AGENTDECK_TESTS_NOTE', 'QWEN_HOME'],
     });
     expect(envs[0]).toEqual({ AGENTDECK_TESTS_NOTE: '1', QWEN_HOME: 'C:/kit/qwen-home' });
-    expect(JSON.stringify(estimates[0])).not.toContain('qwen-home');
+    expect(JSON.stringify(core.estimates[0])).not.toContain('qwen-home');
+    expect(core.calls.find((c) => c.kind === 'set-cli')?.fields).toMatchObject({ adapter: 'qwen' });
   });
 });

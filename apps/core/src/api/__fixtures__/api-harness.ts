@@ -122,6 +122,10 @@ export async function startStand(
     ask?: ApiDeps['ask'];
     reviewLink?: ApiDeps['reviewLink'];
     mcpOffers?: ApiDeps['mcpOffers'];
+    agents?: ApiDeps['agents'];
+    allocator?: ApiDeps['allocator'];
+    localActivity?: ApiDeps['localActivity'];
+    learned?: ApiDeps['learned'];
   } = {},
 ): Promise<Stand> {
   const layout = layoutOf(tasksDir ? dirname(tasksDir) : tempDir('api-'));
@@ -176,6 +180,10 @@ export async function startStand(
     ...(opts.mcpOffers ? { mcpOffers: opts.mcpOffers } : {}),
     ...(opts.ask ? { ask: opts.ask } : {}),
     ...(opts.reviewLink ? { reviewLink: opts.reviewLink } : {}),
+    ...(opts.agents ? { agents: opts.agents } : {}),
+    ...(opts.allocator ? { allocator: opts.allocator } : {}),
+    ...(opts.localActivity ? { localActivity: opts.localActivity } : {}),
+    ...(opts.learned ? { learned: opts.learned } : {}),
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;

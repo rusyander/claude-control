@@ -9,8 +9,11 @@ import { useMessagesLimit } from './useMessagesLimit';
 export interface ChatFeedInput {
   /** Настоящий id открытого разговора (у черновика его ещё нет). */
   activeChatId: string | undefined;
-  /** Потребитель маршрута контура: `groups` у звена разделения, иначе `chat`. */
-  consumer: 'groups' | 'chat';
+  /**
+   * Потребитель маршрута контура: `groups` у звена разделения, иначе по CLI разговора — `chat`
+   * у Claude, `foreign:<cli>` у другого (`chatConsumerOf`).
+   */
+  consumer: string;
   run: AgentRun;
   stream: StreamState;
   isRunning: boolean;
@@ -31,15 +34,27 @@ export function useChatFeed({ activeChatId, consumer, run, stream, isRunning }: 
   // Пока потоковый пузырь на экране, текущий ход агента рисует он один: из
   // истории такой ход убираем, иначе перечитка ленты посреди прогона
   // показывает те же вызовы дважды — по разу из каждого источника.
-  const shownHistory = withoutLiveTurn(messageList, run.startedAt, isStreamShown(stream));
+  // Граница — начало ТЕКУЩЕГО хода: прогон чата на ядре ведёт и ход слова «на ходу» (`turnAt`),
+  // и ответ прошлого хода к этому времени уже в истории, а не в пузыре.
+  const shownHistory = withoutLiveTurn(
+    messageList,
+    run.turnAt ?? run.startedAt,
+    isStreamShown(stream),
+  );
   // Ход через контур без вызовов или с вызовом текстом — назвать под лентой
   // (развилки 3 и 5): иначе «агент ничего не сделал» выглядит поломкой панели.
   const toolHint = useTurnToolHint(consumer, lastTurnFacts(messageList), isRunning);
   // Разговор мог продолжиться мимо панели — из терминала или расширения
   // редактора. Такой ход не даёт потока событий, и лента жила бы снимком на
   // момент открытия: вопрос агента человек увидел бы только после F5. То же
-  // с припаркованным прогоном — потока к нему нет, правда в транскрипте.
-  useChatAutoRefresh(activeChatId, isRunning, run.stalled === true || run.parked === true);
+  // с припаркованным прогоном — потока к нему нет, правда в транскрипте. Граница хода (`turnAt`)
+  // перечитывает переписку сразу: ответ прошлого хода пузырь уже отдал истории.
+  useChatAutoRefresh(
+    activeChatId,
+    isRunning,
+    run.stalled === true || run.parked === true,
+    run.turnAt,
+  );
   // Прогресс агента читается из транскрипта, поэтому нужен настоящий id сессии:
   // у нового разговора он появляется только с первым событием потока.
   const progressChatId = activeChatId ?? run.sessionId;

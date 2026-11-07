@@ -5,44 +5,66 @@
       "light-ru": {
         "file": "01-tree.png",
         "width": 880,
-        "height": 449
+        "height": 1000
       },
       "light-en": {
         "file": "01-tree.en.png",
         "width": 880,
-        "height": 449
+        "height": 1000
       },
       "dark-ru": {
         "file": "01-tree.dark.png",
         "width": 880,
-        "height": 449
+        "height": 1000
       },
       "dark-en": {
         "file": "01-tree.dark.en.png",
         "width": 880,
-        "height": 449
+        "height": 1000
       }
     },
-    "agents/02-extensions": {
+    "agents/02-history": {
       "light-ru": {
-        "file": "02-extensions.png",
-        "width": 928,
-        "height": 768
+        "file": "02-history.png",
+        "width": 1428,
+        "height": 928
       },
       "light-en": {
-        "file": "02-extensions.en.png",
-        "width": 928,
-        "height": 768
+        "file": "02-history.en.png",
+        "width": 1428,
+        "height": 928
       },
       "dark-ru": {
-        "file": "02-extensions.dark.png",
-        "width": 928,
-        "height": 768
+        "file": "02-history.dark.png",
+        "width": 1428,
+        "height": 928
       },
       "dark-en": {
-        "file": "02-extensions.dark.en.png",
-        "width": 928,
-        "height": 768
+        "file": "02-history.dark.en.png",
+        "width": 1428,
+        "height": 928
+      }
+    },
+    "agents/03-background": {
+      "light-ru": {
+        "file": "03-background.png",
+        "width": 1428,
+        "height": 928
+      },
+      "light-en": {
+        "file": "03-background.en.png",
+        "width": 1428,
+        "height": 928
+      },
+      "dark-ru": {
+        "file": "03-background.dark.png",
+        "width": 1428,
+        "height": 928
+      },
+      "dark-en": {
+        "file": "03-background.dark.en.png",
+        "width": 1428,
+        "height": 928
       }
     },
     "basics/01-project-empty": {

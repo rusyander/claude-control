@@ -102,6 +102,7 @@ export const decisionsRu: DecisionTexts = {
       raise: 'Спросить человека',
       'skip-step': 'Пропустить шаг',
       'end-unit': 'Завершить единицу',
+      'launch-children': 'Запустить следующие дочерние задачи',
       'finish-task': 'Завершить задачу',
       'fail-task': 'Задача не удалась',
       'cancel-task': 'Отменить задачу',
@@ -207,5 +208,18 @@ export const decisionsRu: DecisionTexts = {
   'layer-run': {
     label: 'Слой пользователя',
     outcomes: { 'as-asked': 'Как запрошено', lowered: 'Понижен' },
+  },
+  intake: {
+    label: 'Приём задачи',
+    outcomes: { auto: 'Карточка принята без вопроса', ask: 'Карточка ждёт подтверждения' },
+  },
+  classify: {
+    label: 'Класс задачи',
+    outcomes: {
+      S: 'Класс S — одна правка',
+      M: 'Класс M — одна единица и ревью',
+      L: 'Класс L — несколько единиц и сборка',
+      XL: 'Класс XL — дочерние задачи',
+    },
   },
 };

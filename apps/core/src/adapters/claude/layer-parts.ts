@@ -14,7 +14,9 @@ import {
   type Source,
   type Unread,
 } from '../layer-inventory.ts';
-import { claudeConfigDir, keyedHooks, readUserLayer, userLayerFiles } from './user-layer.ts';
+import type { InventorySession } from '../adapter.types.ts';
+import { claudeSessionHooks } from './session-hooks.ts';
+import { claudeConfigDir, readUserLayer, userLayerFiles } from './user-layer.ts';
 
 /**
  * Слой человека Claude Code по частям (01:18, 06:114-129): файлы настроек, инструкции, правила,
@@ -182,24 +184,32 @@ export function claudeLayerParts(
   return parts;
 }
 
-/** Опись слоя Claude (`LayerPolicy.inventory`): части + хуки с ключами записи `observe`. */
+/**
+ * Опись слоя Claude (`LayerPolicy.inventory`): части + хуки с ключами записи `observe`. С фактами
+ * сеанса — и хуки, которые CLI исполняет помимо файлов настроек (плагины набора, локальный слой,
+ * включённые плагины; `session-hooks.ts`), их файлы — источники описи и её хеша.
+ */
 export function claudeInventory(
   pin: Record<string, string>,
   cwd: string,
   repoLayer: boolean,
+  session?: InventorySession,
 ): UserLayerInventory {
   const parts = claudeLayerParts(pin, cwd, repoLayer);
   const user = readUserLayer(userLayerFiles(pin, cwd, repoLayer));
+  const run = claudeSessionHooks(pin, cwd, repoLayer, session);
   const unread = [...parts.unread];
   for (const path of user.unreadable) {
     if (!unread.some((u) => u.path === path))
       unread.push({ path, reason: 'not valid settings JSON' });
   }
+  for (const u of run.unread) if (!unread.some((x) => x.path === u.path)) unread.push(u);
+  const sources = [...parts.sources, ...run.sources];
   return {
     cli: 'claude',
-    hash: inventoryHash(parts.sources, unread, parts.settings),
-    sources: parts.sources,
-    hooks: keyedHooks(user).map((hook) => ({
+    hash: inventoryHash(sources, unread, parts.settings),
+    sources,
+    hooks: run.hooks.map((hook) => ({
       key: hook.key,
       event: hook.event,
       matcher: hook.matcher ?? null,

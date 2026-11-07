@@ -30,7 +30,7 @@ const RANK: ModelRank = ladderRank({
   claude: { models: ['claude-haiku-4', 'claude-sonnet-5', 'claude-opus-5'], efforts: [] },
 });
 
-function startStep(t: LiveTask, unitId: string, stepKind: 'work' | 'review'): string {
+function startStep(t: LiveTask, unitId: string, stepKind: 'work' | 'review' | 'custom'): string {
   const stepId = newId();
   t.append({
     kind: 'step.started',
@@ -110,6 +110,47 @@ describe('set-model risky pair: reviewer below author (06:8, G12)', () => {
     );
     expect(got.status).toBe('applied');
     expect(got.outcome).not.toHaveProperty('warnings');
+  });
+
+  it('the author is the same as the tier reviewer floor uses: a unit with only a custom step warns against it; beside a work step the work step is the author', async () => {
+    // Только свой шаг пишет код — он автор (общее правило `reviewAuthorOf`, как у пола ревьюера).
+    const solo = await homeTask({ allowedRoutes: [LOGIN], modelCeiling: 'claude-sonnet-5' });
+    open.push(solo.task);
+    const unitId = newId();
+    solo.task.append({
+      kind: 'unit.created',
+      actor: 'core',
+      unitId,
+      data: { unitId, repoKey: 'r1', branch: 'b', ownedPaths: [], ...SOLO_UNIT },
+    });
+    const custom = startStep(solo.task, unitId, 'custom');
+    const review = startStep(solo.task, unitId, 'review');
+    const got = await processCommand(
+      solo.task,
+      setReviewModel(solo.task, review, 'claude-haiku-4'),
+      HUMAN_PROOF,
+      ranked(solo.env, RANK),
+    );
+    expect((got.outcome as { warnings: string[] }).warnings).toEqual([
+      expect.stringContaining(`vs its author step ${custom} (claude/claude-sonnet-5)`),
+    ]);
+    // Свой шаг рядом с работой, начатый позже неё, автором не становится: пара — с работой.
+    const { task: t, env, author } = await task();
+    const unit = t.state.steps[author]!.unitId;
+    const side = startStep(t, unit, 'custom');
+    const late = startStep(t, unit, 'review');
+    const pair = await processCommand(
+      t,
+      setReviewModel(t, late, 'claude-haiku-4'),
+      HUMAN_PROOF,
+      ranked(env, RANK),
+    );
+    const warnings = (pair.outcome as { warnings: string[] }).warnings;
+    expect(warnings).toContainEqual(expect.stringContaining(`review step ${late} `));
+    expect(warnings.find((w) => w.includes(`review step ${late} `))).toContain(
+      `its author step ${author} `,
+    );
+    expect(warnings.join('\n')).not.toContain(side);
   });
 
   it('no rank port (or an unknown model): the warning names the unknown rank', async () => {

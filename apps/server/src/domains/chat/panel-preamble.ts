@@ -13,6 +13,7 @@ import {
   SKILL_ROUTE_LINE,
   taskCoverageLine,
 } from '@agentdeck/contracts/quality-floor';
+import { SOURCE_OPENER } from './initiative/initiative.ts';
 import { LEGACY_IDENTITY, LEGACY_LEADING, LEGACY_WHOLE } from './panel-preamble-legacy.ts';
 import { coldResumeBrief, lostConversationBrief } from './split-continue.ts';
 
@@ -158,6 +159,16 @@ export function withoutPanelPreamble(text: string): string {
 }
 
 /**
+ * Задание без инициативы панели, приписанной ПОСЛЕ него абзацем: так она едет к чужому CLI
+ * (системной подсказки у него нет, `handoff-routes`). У Claude она — системная подсказка и в
+ * ленте не видна; здесь её снимают для показа, а задание, ушедшее модели, остаётся целым.
+ */
+export function withoutInitiativeTail(text: string): string {
+  const at = text.indexOf(`\n${SOURCE_OPENER}`);
+  return at >= 0 ? text.slice(0, at).trimEnd() : text;
+}
+
+/**
  * Хвост панели после слов задания. Строка языка ответа приписана к заданиям
  * модели по-английски (решение владельца D-E) и в названии чата стояла бы
  * английской фразой; справка об исходном задании продолжения — тоже: название
@@ -165,11 +176,16 @@ export function withoutPanelPreamble(text: string): string {
  * старшинства (любая форма, `isPrecedenceLine`: полная, простая и прежние) и
  * строка навыков (`SKILL_ROUTE_LINE`) и след задач (`taskCoverageLine`) — тоже
  * хвост панели, и стоят они то отдельным абзацем, то строкой сразу под строкой
- * языка: поэтому отбрасываются построчно, а не абзацами.
+ * языка: поэтому отбрасываются построчно, а не абзацами. Инициатива панели у
+ * чужого CLI едет абзацем ПОСЛЕ задания (системной подсказки у него нет,
+ * `handoff-routes`) — с её первой строки дальше тоже хвост: иначе название
+ * продолжения дописывалось английским «This run was started…», которого у
+ * продолжения Claude (инициатива — системной подсказкой) нет.
  */
 function withoutPanelTail(text: string): string {
-  const at = text.indexOf(`\n${HANDOFF_ROOT_TASK_LINE}`);
-  const head = at >= 0 ? text.slice(0, at) : text;
+  const own = withoutInitiativeTail(text);
+  const at = own.indexOf(`\n${HANDOFF_ROOT_TASK_LINE}`);
+  const head = at >= 0 ? own.slice(0, at) : own;
   return head
     .split('\n')
     .filter((line) => {

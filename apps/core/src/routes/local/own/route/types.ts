@@ -98,6 +98,8 @@ export const OWN_CAPS: RouteCaps = {
   binding: { via: 'endpoint' },
   // Окно, сроки и простой локального сервера CLI обязан знать (11 R:PR-04).
   limitsToTell: true,
+  // Одна своя модель на машине — одно место распределителя (P141).
+  sessionCap: 1,
 };
 
 export interface Held {
@@ -117,7 +119,7 @@ export interface Held {
    * Запуск сервера не поднялся, а остановка его дерева не доказана (остаток или «неизвестно»,
    * F-64): освобождение называет это утечкой под меткой сервера и не отдаёт слот.
    */
-  startLeft?: { rid: string; text: string; root: ProcessIdentity | number };
+  startLeft?: { rid: string; text: string; root: ProcessIdentity | number; since?: number };
 }
 
 /** Аренда живого (или непрояснённого) чужого ядра: держится только слот за ней (F-88). */

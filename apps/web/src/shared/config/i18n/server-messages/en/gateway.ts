@@ -28,7 +28,7 @@ export const gatewayEn: Record<GatewayMessageCode, string> = {
     "The key budget is spent — the contour refused before calling the model. Raise the budget or wait for the key's next period in the platform admin; in half a minute the contour will start rejecting this key with code 401",
   'gateway-content-checks-request': "The contour's content checks stopped the request",
   'gateway-registry-not-ready': 'The contour is still starting: the model registry is not ready',
-  'gateway-route-unknown': 'The panel gateway accepts only {{routes}} at /<contour>/v1/...',
+  'gateway-route-unknown': 'The core gateway accepts only {{routes}} at /<contour>/v1/...',
   'gateway-contour-unknown': 'Contour “{{id}}” is not set up in the panel',
   'gateway-section-closed-chat':
     'The Chat section is closed for contour “{{title}}” — the request was not sent. Open the section on the contour card',

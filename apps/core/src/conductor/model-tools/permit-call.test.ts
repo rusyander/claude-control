@@ -164,7 +164,7 @@ describe('agentdeck-permit', () => {
     s.task.close();
   });
 
-  it.each(['intake', 'plan', 'split'])(
+  it.each(['intake', 'plan', 'split', 'research'])(
     'a %s step is read-only: edit and shell are denied on the permit road, read passes',
     async (kind) => {
       const s = await setup(kind);
@@ -310,7 +310,7 @@ describe('policy/permit decidePermit', () => {
   it('a step permit: read-only kinds refuse edit and exec, an unknown kind is read-only, work passes to the path and argv rules', () => {
     const edit = ask({ action: 'edit', target: 'src/a.ts' });
     const exec = ask({ action: 'exec', target: 'ls', argv: ['ls'] });
-    for (const kind of ['intake', 'plan', 'split', 'review', 'nope']) {
+    for (const kind of ['intake', 'plan', 'split', 'review', 'research', 'nope']) {
       expect(decidePermit(edit, ctx, kind), kind).toMatchObject({
         allow: false,
         code: 'read-only-step',

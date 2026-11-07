@@ -12,7 +12,8 @@
  *     (`chat: [probe]`, `work: [probe]`, `ghost` снят), прочие разделы целы;
  *   - чужая запись между чтением и сохранением (прямо в ядро, со своим доказательством) — запись
  *     экрана отказана 409, карточка называет отказ (отрицательный 2), на диске — чужая запись;
- *   - следующая задача (новый чат claude через ядро, модель — заглушка) пишет в журнал сигнал
+ *   - следующая задача (новый чат claude в едином чате `/chat`, модель — `packages/stub-model` по
+ *     адресу из `env` личного settings.json стенда) пишет в журнал сигнал
  *     `mcp-human`: `offered: probe(user), stray(user)` и `picked: probe` — выбор экрана, не
  *     «по умолчанию».
  *
@@ -21,7 +22,7 @@
  * Код выхода: 0 — сходится, 1 — провал, 2 — не проверено.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,20 +47,23 @@ async function main() {
   const { chromium } = await import('playwright');
   const { runOnStand, reapCoreSessions, wait } = await import('./throwaway-stand.mjs');
   const { uuidv7 } = await import('./core-scenario-stand.mjs');
+  const { openProjectChat } = await import('./chat-walk.mjs');
+  const { startStubModel } = await import('../../packages/stub-model/src/index.mjs');
   const SHOTS = process.env.SHOTS || '';
   const where = spawnSync(process.platform === 'win32' ? 'where' : 'which', ['claude'], {
     encoding: 'utf8',
   });
   const claudeAt = where.status === 0 ? where.stdout.split(/\r?\n/)[0].trim() : '';
   let repo = '';
+  const model = await startStubModel({ script: picksScript() });
+  const stubEnv = { ANTHROPIC_BASE_URL: model.baseUrl, ANTHROPIC_API_KEY: 'stand-stub-key' };
 
   await runOnStand(
     {
       label: 'core-mcp-picks',
       extraPath: claudeAt ? [dirname(claudeAt)] : [],
-      core: {
-        stub: [{ name: 'stand', script: { module: SELF, export: 'picksScript', args: [] } }],
-      },
+      env: stubEnv,
+      core: true,
       seed: ({ root, cfg, coreHome }) => {
         repo = join(root, 'repo');
         mkdirSync(repo, { recursive: true });
@@ -209,56 +213,39 @@ async function main() {
           console.log('  ~ claude не найден в PATH — журнал задачи не проверен');
           return;
         }
-        const seeded = [];
-        await page.route(/\/api\/core\/commands$/, async (route) => {
-          const body = route.request().postDataJSON();
-          if (body?.kind === 'set-cli') {
-            const taskId = body.target.taskId;
-            for (const [kind, fields] of [
-              [
-                'set-route',
-                {
-                  scope: 'task',
-                  scopeId: taskId,
-                  allowedRoutes: [
-                    {
-                      adapter: 'claude',
-                      route: { kind: 'stub', id: 'stub:stand' },
-                      modelPattern: '*',
-                    },
-                  ],
-                },
-              ],
-              [
-                'set-model',
-                {
-                  scope: 'task',
-                  scopeId: taskId,
-                  model: 'stub-model',
-                  effort: null,
-                  timing: 'now',
-                },
-              ],
-            ]) {
-              const r = await direct('POST', '/v1/commands', {
-                cmdId: uuidv7(),
-                kind,
-                target: { taskId },
-                fields,
-                proof: await proof(),
-              });
-              seeded.push(r.status);
-            }
+        // Новый чат claude в едином чате `/chat` (этап 11, W3-17a): маршрут задачи без контура —
+        // вход CLI, адрес модели — заглушка в `env` личного settings.json стенда.
+        const settingsPath = join(stand.cfg, 'settings.json');
+        const settings = existsSync(settingsPath)
+          ? JSON.parse(readFileSync(settingsPath, 'utf8'))
+          : {};
+        writeFileSync(
+          settingsPath,
+          `${JSON.stringify({ ...settings, env: { ...settings.env, ...stubEnv } }, null, 2)}\n`,
+        );
+        const tasks = () => {
+          try {
+            return readdirSync(join(stand.coreHome, 'tasks'));
+          } catch {
+            return [];
           }
-          await route.continue();
-        });
-        await page.goto(`${stand.webUrl}/core/chat?project=${encodeURIComponent(repo)}`);
-        await page.locator('[data-core-chat-start]').waitFor({ timeout: 90_000 });
-        await page.locator('[data-core-chat-cli] select').selectOption('claude');
-        await page.locator('[data-core-chat-first] textarea').fill('ход-1: какие серверы у тебя?');
-        await page.locator('[data-core-chat-submit]').click();
-        await page.waitForURL(/[?&]id=/, { timeout: 60_000 });
-        const taskId = new URL(page.url()).searchParams.get('id');
+        };
+        const chat = await openProjectChat(stand, browser, repo, 'repo');
+        await chat.getByRole('button', { name: 'Новый чат', exact: true }).first().click();
+        const input = chat.locator('textarea[data-chat-input]');
+        await input.waitFor({ timeout: 90_000 });
+        const before = tasks();
+        await input.fill('ход-1: какие серверы у тебя?');
+        await input.press('Enter');
+        let taskId;
+        for (let i = 0; i < 90 && !taskId; i++) {
+          taskId = tasks().find((t) => !before.includes(t));
+          if (!taskId) await wait(1000);
+        }
+        if (!taskId) {
+          check('новый чат /chat завёл задачу ядра', false, stand.coreLog().slice(-1200));
+          return;
+        }
         const journal = () => {
           const dir = join(stand.coreHome, 'tasks', taskId);
           const name = readdirSync(dir).find((f) => f.endsWith('.jsonl'));
@@ -274,26 +261,24 @@ async function main() {
         }
         const detail = signal?.data?.detail ?? '';
         check(
-          `задача ${taskId} (засев ${seeded.join(',')}): журнал — offered probe и stray, picked probe (${detail})`,
+          `задача ${taskId}: журнал — offered probe и stray, picked probe (${detail})`,
           /offered: .*probe\(user\)/.test(detail) &&
             /stray\(user\)/.test(detail) &&
             /(^|; )picked: probe($|;)/.test(detail),
         );
         check('выбор экрана, не «по умолчанию»', detail !== '' && !detail.includes('by default'));
-        // Чат закрывает человек: иначе отвязанный хост сеансов и CLI держат каталог стенда.
-        await page
-          .locator('[data-core-chat-assistant]')
+        // Ответ дождаться, затем снять сеансы ядра: иначе отвязанный хост сеансов и CLI держат
+        // каталог стенда.
+        await chat
+          .getByText('ответ ядра на выбор MCP')
           .first()
           .waitFor({ timeout: 120_000 })
           .catch(() => undefined);
-        await page.locator('[data-core-chat-end]').click();
-        await page
-          .locator('[data-core-chat-status="closed"]')
-          .waitFor({ timeout: 120_000 })
-          .catch(() => undefined);
+        await chat.close();
         reapCoreSessions(stand.coreHome);
       } finally {
         await browser.close();
+        await model.close();
       }
     },
   );

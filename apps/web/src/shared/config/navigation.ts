@@ -152,8 +152,6 @@ export const NAV_SECTIONS: NavSection[] = [
       // Ядро задач — свой процесс рядом с панелью, панель-level: задачи ведутся любым CLI.
       // Запуск и сценарии открываются из раздела задач; палитра и окно агента их видят.
       { path: '/core', label: 'nav.coreTasks', icon: 'layers', key: 'coreTasks' },
-      // Чат через ядро (этап 10): разговор с CLI — задача ядра, панель его только показывает.
-      { path: '/core/chat', label: 'nav.coreChat', icon: 'chat', key: 'coreChat' },
       {
         path: '/core/launch',
         label: 'nav.coreLaunch',

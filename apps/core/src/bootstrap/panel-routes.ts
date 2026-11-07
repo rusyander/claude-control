@@ -120,7 +120,7 @@ export function contourManifest(contour: GatewayProfile): PlatformManifestOverri
  * Диалект верха контура. Объявлена родная ручка Anthropic (LiteLLM, OpenRouter, vLLM, …) — клиент
  * Anthropic идёт к ней без моста: мост теряет размышления, метки кэша и подписанные блоки. Прослойка
  * инструментов карточки сильнее манифеста (её протокол собран под мост), кроме контура со своими
- * инструментами — то же правило, что `nativeMessagesPath` шлюза панели. Иначе — мост в openai-chat.
+ * инструментами — то же правило, что `nativeMessagesPath` шлюза ядра. Иначе — мост в openai-chat.
  */
 export function contourUpstreamDialect(contour: GatewayProfile): Dialect {
   if (!contourManifest(contour).anthropicMessages) return 'openai-chat';
@@ -180,7 +180,7 @@ function keyHeader(apiKind: ApiKeyKind): HopUpstreamAuth {
 }
 
 /**
- * Факты звена по id маршрута. Маска контура — тем же решением, что у шлюза панели
+ * Факты звена по id маршрута. Маска контура — тем же решением, что у шлюза ядра
  * (`dataMaskOn`): выбор карточки, а не выбрал — объявил ли драйвер подмену данных; общий
  * выключатель сильнее обоих. Маршруты не из профилей панели — без маски политики (вход CLI,
  * заглушки, своя модель) и с ключом по диалекту звена.

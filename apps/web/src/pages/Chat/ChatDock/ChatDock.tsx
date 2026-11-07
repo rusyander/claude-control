@@ -9,6 +9,7 @@ import { ChatComposer, MAX_FILE_BYTES, type AttachRejection } from '@features/Ch
 import { SUPPORTED_UPLOAD_EXTENSIONS } from '../lib/uploads';
 import { ChatQueue } from '@features/ChatQueue';
 import { ChatProgressSheet } from '@features/ChatProgress';
+import { AgentHistoryButton } from '@entities/AgentTree';
 import type { ChatDockProps } from './ChatDock.types';
 
 type DraftComposerProps = Omit<ComponentProps<typeof ChatComposer>, 'value' | 'onChange'> & {
@@ -79,13 +80,23 @@ export function ChatDock({
 
   return (
     <>
-      {/* План агента и дерево субагентов — read-only, из транскрипта. */}
+      {/* План агента — read-only: шаги плана и вызовы субагентов главного разговора сервер берёт
+          из его транскрипта, а дерево (вложенность, модель, расход, конец и строки, которых в
+          транскрипте нет, — чат чужого CLI) — из узлов ядра, транскрипты субагентов не читаются. */}
       <ChatProgressSheet
         {...(progressChatId ? { chatId: progressChatId } : {})}
         progress={progress}
         isRunning={isRunning}
         {...(awaiting ? { awaiting } : {})}
       />
+
+      {/* «Агенты · фоном: N» — узлы ядра этого разговора, у любого CLI. Узлов нет —
+          карточки нет, и пустое место высоты не занимает. */}
+      {progressChatId && (
+        <Stack padding="0 var(--spacing-xl)">
+          <AgentHistoryButton chatId={progressChatId} isRunning={isRunning} />
+        </Stack>
+      )}
 
       {/* Дописанное, пока агент занят: видно, что уйдёт следующим, и можно
           передумать до отправки. */}

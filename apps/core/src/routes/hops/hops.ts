@@ -295,14 +295,6 @@ export async function contourSpend(
   return unwrap(await control(handle, { op: 'contour-spend' }), 'contour-spend').records;
 }
 
-/** Запись в учёт звена снаружи (шлюз панели, славший её, снят; засев проверок чтения). */
-export async function recordContour(
-  handle: HopHostHandle,
-  message: Omit<Extract<HopControlRequest, { op: 'contour-record' }>, 'op'>,
-): Promise<void> {
-  unwrap(await control(handle, { op: 'contour-record', ...message }), 'contour-record');
-}
-
 /** Факты прогона чужого CLI (сжатие по метке, вызовы инструментов с `since`). */
 export async function contourRun(
   handle: HopHostHandle,

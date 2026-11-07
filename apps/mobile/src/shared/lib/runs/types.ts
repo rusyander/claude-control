@@ -86,6 +86,12 @@ export interface AgentRun {
    * сервер ещё минуту держит в списке для догона.
    */
   startedAt?: number;
+  /**
+   * Начало текущего хода внутри прогона, по часам сервера (`nextTurn`): чат на ядре отдаёт слово
+   * «на ходу» новым ходом того же прогона. С этой отметки лента считает ход живым — раньше
+   * записанное принадлежит прошлому ходу. Нет отметки — ход начался с прогоном (`startedAt`).
+   */
+  turnAt?: number;
   /** Разговор, в котором работа продолжена чистой сессией: экран уходит в него. */
   handoffTo?: string;
   /**
@@ -150,6 +156,11 @@ export type ChatEvent =
   | { kind: 'text'; text: string }
   /** Слово человека ушло агенту посреди хода (с любого устройства). */
   | { kind: 'steer'; text: string; at: string }
+  /**
+   * Слово «на ходу» доставлено, и с него начался следующий ход ТОГО ЖЕ прогона (чат на ядре).
+   * `at` — мс по часам сервера. Копия события сервера (`domains/chat/chat-events.ts`).
+   */
+  | { kind: 'nextTurn'; prompt: string; at: number }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }
@@ -240,6 +251,7 @@ export const TURN_RESET: Partial<AgentRun> = {
   tailOnly: undefined,
   lastPrompt: undefined,
   steered: undefined,
+  turnAt: undefined,
   handoffTo: undefined,
   stalled: undefined,
 };

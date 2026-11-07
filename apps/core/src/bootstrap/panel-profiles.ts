@@ -74,8 +74,8 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
 function endpointOf(raw: unknown, at: string, problems: string[]): ApiKeyProfile | undefined {
-  // Профиль, порождённый контуром, указывает на шлюз панели: маршрут контура — `gateway:<id>`,
-  // второй маршрут к тому же контуру через шлюз панели был бы обходом звена ядра.
+  // Профиль, порождённый контуром, указывает на шлюз ядра: маршрут контура — `gateway:<id>`,
+  // второй маршрут к тому же контуру через этот шлюз был бы обходом звена ядра.
   if (isObj(raw) && typeof raw.ownerPlatformId === 'string' && raw.ownerPlatformId)
     return undefined;
   // Схема профиля — та же, по которой панель его пишет (`contracts/endpoints`).
@@ -146,7 +146,7 @@ function contourOf(raw: unknown, at: string, problems: string[]): GatewayProfile
 /**
  * Настройки панели, по которым ядро держит слушатели человека на хосте звеньев (C3c): прокси
  * защиты данных (`settings.dlp` по схеме панели + профили эндпоинта для адреса наверх) и шлюз
- * контуров (`settings.platformGateway` + `platformGatewayPort` — порт, который шлюз панели занял
+ * контуров (`settings.platformGateway` + `platformGatewayPort` — порт, который шлюз ядра занял
  * на самом деле и который уже вписан в конфиги CLI). Файла нет или он не читается — умолчания.
  */
 export interface PanelListenerSettings {

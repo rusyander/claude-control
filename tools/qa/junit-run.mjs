@@ -459,6 +459,23 @@ function runVitestDirs(root, group, cases, known) {
   const seconds = (Date.now() - started) / 1000;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   const name = `${base || '.'} (наборы)`;
+  // Как у одного файла: отказ mutation-guard — тесты не запускались, это не провал каталога
+  // (06.11 набор panel-agent/ лёг красным «нет ни одного теста», пока шёл чужой mustfail).
+  const busy = result.status !== 0 ? mutationBusy(output) : undefined;
+  if (busy) {
+    rmSync(report, { force: true });
+    console.log(`  стенд занят мутантами — не проверено`);
+    const skipped = {
+      status: 'skipped',
+      seconds,
+      message: `Не проверено. ${busy} Повторите после конца mustfail.`,
+      output: tail(output, 80),
+    };
+    return {
+      name,
+      cases: group.flatMap((dir) => suiteOf(dir, cases.get(dir) ?? [], skipped).cases),
+    };
+  }
   if (!existsSync(report)) {
     const failure = {
       status: 'failed',
@@ -540,7 +557,9 @@ function quoteArg(value) {
 }
 
 function vitestRoot(start) {
-  for (let dir = start; dir.startsWith(project); dir = dirname(dir)) {
+  // `resolve` снимает хвостовой разделитель: от `apps/core/` корень иначе выходил `…\core\`, а от
+  // `apps/core/src/` — `…\core`, и наборы одного пакета шли двумя прогонами всего пакета (07.11).
+  for (let dir = resolve(start); dir.startsWith(project); dir = dirname(dir)) {
     const names = [
       'vitest.config.ts',
       'vitest.config.mts',

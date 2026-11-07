@@ -1,6 +1,5 @@
 import { receivedInputOf, type RunOptions } from '../run-options/run-options.ts';
 import type { ChatEvent } from '../chat-events.ts';
-import { randomUUID } from 'node:crypto';
 import type { RunNotice } from '../../notify/run-notice.types.ts';
 // Прежний адрес типа — для тех, кто ещё не перешёл на `notify/run-notice.types.ts`.
 export type { RunNotice };
@@ -16,7 +15,6 @@ import { DetachedRun, type DetachedRunDeps } from '../detached-run/detached-run.
 import { withoutChildrenBrief } from '../children-brief/children-brief.ts';
 import { withoutMcp, type GroupRunProfile } from '../group-profile/group-profile.ts';
 import { capKitToRoute, capProfileToRoute } from './route-caps.ts';
-import { carryOfRunOptions, type CarryOutcome } from '../core-run/session-carry.ts';
 import {
   isCliCommand,
   SessionWorkspaceNotes,
@@ -623,25 +621,6 @@ export class ChatRunRegistry {
   }
 
   private platformRouting?: (origin: PlatformRunConsumer, asked: string) => PlatformRunRoute;
-
-  /**
-   * Слой панели для НОВОГО разговора Claude, начатого мимо реестра (веб «Чат ядра», этап 10 G13):
-   * та же сборка, что у хода реестра (`compose`: маршрут, набор, наши слои, профиль обычного чата,
-   * строка о тестах), и тот же перевод в поля сеанса ядра (`carryOfRunOptions`, G6). Ничего не
-   * регистрирует и не запоминает: ключ разговора одноразовый, строка о тестах — первая для сессии.
-   * Отказ маршрута (обязательный контур, набор не собрался) — отказ переноса тем же текстом.
-   */
-  carryFor(cwd: string, model = ''): CarryOutcome {
-    const key = `core-start-${randomUUID()}`;
-    const { routed, route } = this.compose(
-      [key],
-      { prompt: '', cwd, model },
-      { projectPath: cwd },
-      '',
-    );
-    if (route.refusal) return { ok: false, reason: route.refusal };
-    return carryOfRunOptions(routed);
-  }
 
   setSessionListener(listener: (chatId: string, sessionId: string, from?: string) => void): void {
     this.onSession = listener;
@@ -1591,6 +1570,13 @@ export class ChatRunRegistry {
     }
     // Вызов инструмента закрывает промежуточный текст: итог — то, что после последнего.
     if (event.kind === 'tool') run.answer = '';
+    // Граница хода внутри прогона (слово «на ходу» начало свой ход, чат на ядре): итог прогона —
+    // ответ последнего хода, а хвост ходы разделяет абзацем. Без этого уведомление и планировщик
+    // конца читали оба ответа одной склейкой («готовготов», core-chat-012).
+    if (event.kind === 'nextTurn') {
+      run.answer = '';
+      if (run.text && !run.text.endsWith('\n\n')) run.text = `${run.text}\n\n`.slice(-TEXT_TAIL);
+    }
 
     // Накопленный расход считаем здесь, на сервере: тогда счётчик за сеанс не
     // обнуляется при перезагрузке вкладки, как и сами прогоны. Дублируем вклад в

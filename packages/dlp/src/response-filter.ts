@@ -1,6 +1,12 @@
 import { createStreamReplacer, replaceAll, type StreamReplacer } from './stream-replace.ts';
 import { parseFrame, serializeFrame, splitFrames } from './sse.ts';
-import { deltaTextOf, mapBodyTexts, withDeltaText, type DlpApiKind } from './api-shapes.ts';
+import {
+  deltaCarriesMore,
+  deltaTextOf,
+  mapBodyTexts,
+  withDeltaText,
+  type DlpApiKind,
+} from './api-shapes.ts';
 
 /**
  * Обратная подстановка в ответе модели: метки снова становятся значениями,
@@ -100,8 +106,11 @@ export class ResponseStreamFilter {
     this.#event = frame.event;
 
     const safe = this.#replacer?.push(delta.text) ?? delta.text;
-    if (!safe) return prefix;
-    return prefix + this.#emit(safe);
+    if (safe) return prefix + this.#emit(safe);
+    // Текста наружу пока нет (пусто или удержан), но кадр несёт своё — id и имя вызова, роль,
+    // причину остановки: он уходит с пустым текстом, удержанное доедет следующим кадром канала.
+    // Раньше такой кадр выбрасывался целиком, и Qwen Code отвергал вызов «malformed tool call».
+    return deltaCarriesMore(event, this.#kind) ? prefix + this.#emit('') : prefix;
   }
 
   #flushChannel(): string {

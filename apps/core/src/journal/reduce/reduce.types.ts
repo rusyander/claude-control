@@ -5,7 +5,7 @@ import type {
   RequirementVerdict,
   STEP_END_BASES,
 } from '@agentdeck/contracts/core/journal';
-import type { ScenarioRef } from '@agentdeck/contracts/core/scenario';
+import type { ScenarioRef, TaskClass } from '@agentdeck/contracts/core/scenario';
 import type {
   AskState,
   CheckRunState,
@@ -37,7 +37,10 @@ import type {
 // 10: этап 8 (наблюдатель): подсказки и просьба о паузе по сессии из `signal{action}`, решения
 //     наблюдателя с подсказкой, ждущие своей строки сигнала.
 // 11: этап 8 (закрытие): шаг, чья сессия кончилась при просьбе наблюдателя о паузе, до повтора.
-export const REDUCER_VERSION = 11;
+// 12: этап 11 (ведущий): принятая карточка приёма и класс задачи (`lead`).
+// 13: этап 11: утверждение деления человеком после `accepted` / `edited` — `approved`, не аномалия
+//     (снимок v12 держит такое деление в `accepted`).
+export const REDUCER_VERSION = 13;
 
 /**
  * Состояния задачи, в которых идёт работа (паузы, ожидание человека и окна не считаются). Здесь,
@@ -133,6 +136,8 @@ export interface UnitRecord {
   contract: boolean;
   splitId: string | null;
   createdSeq: number;
+  /** Этап 11 (P137, W3-18b): роль куска плана (`unit.created.role`); `integrate` — единица интеграции. */
+  role?: JournalDataV1['unit.created']['role'];
 }
 
 export interface AskRecord {
@@ -208,6 +213,15 @@ export interface TaskFoldState extends TaskFoldStage4, TaskFoldStage5, TaskFoldP
    * нового сеанса. Из журнала, а не из памяти процесса — перезапуск ядра не пишет смену заново.
    */
   layerHashes: Record<string, string>;
+  /**
+   * Этап 11 (W2-6, W2-8): ведение задачи — принятая карточка приёма (`intake.card`) и последний
+   * класс (`decision` класса `classify`). Нет поля — задача ни того, ни другого не писала
+   * (необязательное: свёртки до v12 его не знают, `initialState` его не заводит).
+   */
+  lead?: {
+    card: { by: 'auto' | 'human'; seq: number } | null;
+    taskClass: { class: TaskClass; seq: number } | null;
+  };
 }
 
 /** Требование в свёртке (CD§10): вердикт выносит только `conductor/requirements` (02:57). */

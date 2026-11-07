@@ -90,6 +90,10 @@ const STEP_DONE = test(
   'conductor/model-tools/step-done.test.ts',
   'step_done evidence binding > G3 a claim citing an id the core never issued is a field error; P72 call errors are listed once, then counted; P08 an evidence refusal is never counted',
 );
+const BG_WIRING_TEST = 'bootstrap/agents-wiring/background.integration.test.ts';
+const BG_WIRING = 'stage 11 background watch on real processes (P148)';
+const LEAD_TEST = 'bootstrap/conductor-wiring/lead.integration.test.ts';
+const LEAD = 'lead: intake, recon map and class from the estimate route';
 const SERVED = test(
   'bootstrap/economy-wiring/served.test.ts',
   'stage 8 journalServed goes through the observer judge > another model than asked → model-served, then decision{observer, key} and route-mismatch with cause',
@@ -379,12 +383,84 @@ const EMITTED: SignalDef[] = [
       'journal-rejected sink > a refused signal row of the sink itself is noted, never journaled again',
     ),
   ),
+  // Сторож фона (этап 11, P148): сироту и зависание судят по ОС (процесс, файл вывода), не по строкам.
+  emitted(
+    'bg-orphan',
+    'bootstrap/agents-wiring',
+    ['warn'],
+    test(
+      BG_WIRING_TEST,
+      `${BG_WIRING} > the session host is killed: bg-orphan names the detached child, reaped through the resource release, read back, the process is gone`,
+    ),
+  ),
+  emitted(
+    'bg-hang',
+    'bootstrap/agents-wiring',
+    ['warn'],
+    test(
+      BG_WIRING_TEST,
+      `${BG_WIRING} > a background shell with no output for the hang limit: one bg-hang, shown only, nothing stopped`,
+    ),
+  ),
+  // Этап 11 (W2-6): приём ведущего на оценке — линт тела источника и отложенная карточка.
+  emitted(
+    'intake-lint',
+    'conductor/intake/estimate-seed',
+    ['warn'],
+    test(
+      LEAD_TEST,
+      `${LEAD} > P36 an injected source body is data: lint shows the push line, the settings stay`,
+    ),
+  ),
+  emitted(
+    'intake-deferred',
+    'conductor/intake/estimate-seed',
+    ['warn'],
+    // Больше 100 критериев — теперь отказ 422 на оценке (карточку не вместит и шаг разбора);
+    // отложенную карточку даёт источник без цели — сигнал с причиной `goal`.
+    test(
+      LEAD_TEST,
+      'lead: the human answer, the snapshot sinks and the estimate replay > a deferred card keeps its sources: the class counts every item',
+    ),
+  ),
+  // Этап 11 (W3-16): ожидание места первого сеанса ведущего — число на оценке, повтор отвечает им же.
+  emitted(
+    'lead-session-wait',
+    'conductor/intake/session-wait',
+    ['info'],
+    test(
+      'bootstrap/allocator-wiring/session-wait.integration.test.ts',
+      'stage 11 W3-16 lead estimate: expected session wait from allocator occupancy and session history > every seat taken and no finished session in history → null (not estimated), the reason journaled',
+    ),
+  ),
+  // Этап 11 (W3-18): деление XL запущено дочерними задачами; отказ части запуска — warn.
+  emitted(
+    'xl-children',
+    'conductor/split/split',
+    ['warn', 'info'],
+    test(
+      'conductor/split/group-xl.integration.test.ts',
+      'W3-18 XL single goal → child tasks through the split launch > an accepted XL split of 2 parts launches 2 child tasks with parentTaskId; the parent makes no unit and finishes',
+    ),
+  ),
+  // Этап 11 (W3-18b): головы единиц не слились — шаг ворот интеграции красный, пока конфликт не снят.
+  emitted(
+    'integration-conflict',
+    'conductor/copy/integration-base',
+    ['warn'],
+    test(
+      'conductor/copy/copy-integration.integration.test.ts',
+      'W3-18b integration copy = the merge of the unit heads > a planted conflict (both units edit iface.ts) → no integration copy, the files named, the integrated gate red',
+    ),
+  ),
 ];
 
 const INTEGRITY_TEST = 'observer/integrity/integrity.test.ts';
 const WASTE_TEST = 'observer/waste/waste.test.ts';
 const WASTE = 'stage 8 waste predicates (observer fold)';
 const STALL = 'stage 8 stall predicate over session.probe (F9, P18)';
+const SPEND = 'stage 11 spend over the estimate (F3, P143)';
+const BG = 'stage 11 background watch rules (P148)';
 
 /**
  * Предикаты этапа 8 (06:134-145): логику строят зоны W (waste), T (stall), I (integrity).
@@ -491,6 +567,37 @@ const PREDICATES: SignalDef[] = [
       INTEGRITY_TEST,
       'integrity window predicate > open → warn is the first step, warn → refused escalates; one signal per transition',
       'integrity window predicate > near-miss: the same verdict again with only a new reset time stays silent',
+    ),
+  }),
+  // Этап 11. Расход сверх оценки — заметка (F3): `info` + `show`, ни паузы, ни вопроса.
+  predicate({
+    id: 'spend-over-estimate',
+    owner: 'observer/waste',
+    first: { severity: 'info', action: SHOW },
+    selftest: test(
+      'observer/waste/spend-over-estimate.test.ts',
+      `${SPEND} > past 2× the history estimate upper bound: one info signal shown in the feed, never a pause`,
+      `${SPEND} > near-miss: the same run below 2× the upper bound stays silent`,
+    ),
+  }),
+  predicate({
+    id: 'spend-misattributed',
+    owner: 'observer/integrity',
+    first: { severity: 'warn', action: SHOW },
+    selftest: test(
+      'observer/integrity/spend-misattributed.test.ts',
+      'stage 11 spend-misattributed predicate (P149) > usage naming a subagent call the session never spawned fires at session end, once per session and call',
+      'stage 11 spend-misattributed predicate (P149) > near-miss: usage that came before its own agent.spawned is the subagent spend, silent',
+    ),
+  }),
+  predicate({
+    id: 'child-outlived-parent',
+    owner: 'observer/background',
+    first: { severity: 'warn', action: SHOW },
+    selftest: test(
+      'observer/background/background.test.ts',
+      `${BG} > child-outlived-parent > a nested subagent still running when its parent subagent ends fires once per child`,
+      `${BG} > child-outlived-parent > near-miss: the child ended first, or only the session ended, stays silent`,
     ),
   }),
 ];

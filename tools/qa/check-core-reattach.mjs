@@ -6,11 +6,12 @@
  *
  * Дорога настоящая: браузер → Vite → панель → прокладка → ядро → хост сеансов → настоящий `claude`
  * из PATH. Подменены только внешние границы: модель — сценарий `chatScript` над
- * `packages/stub-model` (маршрут `stub:stand`), дома временные.
+ * `packages/stub-model` по адресу из `env` личного settings.json стенда (маршрут задачи без контура —
+ * вход CLI), дома временные.
  *
  * Что проверяется:
  * 1. Ядра стенд не запускал — надзор панели поднял его (`/api/core/supervisor` up, pid).
- * 2. Чат ядра: первый ход получил ответ.
+ * 2. Новый чат в едином чате `/chat` (этап 11): первый ход — задача ядра, получил ответ.
  * 3. Ядро убито — надзор поднял новое (другой pid, `restarts` ≥ 1, отсрочка названа).
  * 4. Второй ход, отправленный сразу, как новое ядро поднялось, получил ответ быстрее окна молчания
  *    аренды (STALE_MS): аренда мёртвого держателя этой машины перехвачена сразу; на экране нет сырых
@@ -27,17 +28,16 @@
  * в PATH). Код выхода: 0 — сходится, 1 — провал, 2 — стенд не поднялся / `claude` нет.
  */
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { chromium } from 'playwright';
-import { FILE_MARK } from './check-core-chat.mjs';
-import { uuidv7 } from './core-scenario-stand.mjs';
+import { startStubModel } from '../../packages/stub-model/src/index.mjs';
+import { FILE_MARK, chatScript } from './check-core-chat.mjs';
+import { openProjectChat } from './chat-walk.mjs';
 import { NotChecked, runOnStand, wait } from './throwaway-stand.mjs';
 
 const { BEAT_MS, STALE_MS } = await import('../../apps/core/src/journal/lease.ts');
 
-const CHAT_SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), 'check-core-chat.mjs');
 const supervised = process.env.SUPERVISED !== '0';
 
 const claudeAt = (() => {
@@ -62,24 +62,21 @@ const git = (cwd, args) => {
 };
 
 let repo = '';
+let file = 'notes.txt';
+// Модель — заглушка в этом процессе: падение ядра её не задевает, как настоящего вендора.
+const model = await startStubModel({ script: (ctx) => chatScript({ file })(ctx) });
+const stubEnv = { ANTHROPIC_BASE_URL: model.baseUrl, ANTHROPIC_API_KEY: 'stand-stub-key' };
 
 await runOnStand(
   {
     label: 'core-reattach',
     // Каталог claude — в конец PATH: стенд вырезает его из PATH оболочки, сеанс ядра зовёт его.
     extraPath: claudeAt ? [dirname(claudeAt)] : [],
-    core: {
-      supervised,
-      stub: [
-        {
-          name: 'stand',
-          script: { module: CHAT_SCRIPT, export: 'chatScript', args: [{ file: '__FILE__' }] },
-        },
-      ],
-    },
-    seed: ({ root, coreHome }) => {
+    env: stubEnv,
+    core: { supervised },
+    seed: ({ root }) => {
       repo = join(root, 'repo');
-      const file = join(repo, 'notes.txt');
+      file = join(repo, 'notes.txt');
       mkdirSync(repo, { recursive: true });
       git(repo, ['init', '-q', '-b', 'main']);
       git(repo, ['config', 'user.name', 'stand']);
@@ -87,10 +84,6 @@ await runOnStand(
       writeFileSync(file, `${FILE_MARK}\n`);
       git(repo, ['add', '.']);
       git(repo, ['commit', '-qm', 'init']);
-      const cfgPath = join(coreHome, 'config.json');
-      const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
-      cfg.routes.stub[0].script.args[0].file = file;
-      writeFileSync(cfgPath, `${JSON.stringify(cfg, null, 2)}\n`);
     },
   },
   async (stand, check) => {
@@ -129,94 +122,65 @@ await runOnStand(
       JSON.stringify(first),
     );
 
-    // Маршрут задачи — заглушка: засев прямо в ядро (ключ ядра + число страницы), как в чате ядра.
-    const token = readFileSync(join(stand.coreHome, 'token'), 'utf8').trim();
-    const coreUrl = () =>
-      JSON.parse(readFileSync(join(stand.coreHome, 'procs.json'), 'utf8')).cores.at(-1).url;
-    const direct = async (method, path, body) => {
-      const res = await fetch(`${coreUrl()}${path}`, {
-        method,
-        headers: {
-          authorization: `Bearer ${token}`,
-          ...(body ? { 'content-type': 'application/json' } : {}),
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-      return { status: res.status, text: await res.text() };
-    };
-    const seedCommand = async (taskId, kind, fields) => {
-      const page = uuidv7();
-      const minted = JSON.parse((await direct('GET', `/v1/nonce?page=${page}`)).text);
-      return direct('POST', '/v1/commands', {
-        cmdId: uuidv7(),
-        kind,
-        target: { taskId },
-        fields,
-        proof: { nonce: minted.nonce, page },
-      });
+    // Вход claude стенда — адрес заглушки в `env` личного settings.json: маршрут задачи без
+    // контура — вход CLI, и ядро передаёт личный слой как есть.
+    const settingsPath = join(stand.cfg, 'settings.json');
+    const settings = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {};
+    writeFileSync(
+      settingsPath,
+      `${JSON.stringify({ ...settings, env: { ...settings.env, ...stubEnv } }, null, 2)}\n`,
+    );
+    const tasks = () => {
+      try {
+        return readdirSync(join(stand.coreHome, 'tasks'));
+      } catch {
+        return [];
+      }
     };
 
     const browser = await chromium.launch();
     try {
-      const page = await stand.newPage(browser, { width: 1440, height: 1100 });
-      const seeded = [];
-      await page.route(/\/api\/core\/commands$/, async (route) => {
-        const body = route.request().postDataJSON();
-        if (body?.kind === 'set-cli') {
-          const taskId = body.target.taskId;
-          const r = await seedCommand(taskId, 'set-route', {
-            scope: 'task',
-            scopeId: taskId,
-            allowedRoutes: [
-              { adapter: 'claude', route: { kind: 'stub', id: 'stub:stand' }, modelPattern: '*' },
-            ],
-          });
-          const m = await seedCommand(taskId, 'set-model', {
-            scope: 'task',
-            scopeId: taskId,
-            model: 'stub-model',
-            effort: null,
-            timing: 'now',
-          });
-          seeded.push(`${r.status}/${m.status}`);
-        }
-        await route.continue();
-      });
-
-      // 2. Чат ядра, первый ход.
-      await page.goto(`${stand.webUrl}/core/chat?project=${encodeURIComponent(repo)}`);
-      await page.locator('[data-core-chat-start]').waitFor({ timeout: 120_000 });
-      await page.locator('[data-core-chat-cli] select').selectOption('claude');
-      await page.locator('[data-core-chat-first] textarea').fill('ход-1: привет, ядро');
-      await page.locator('[data-core-chat-submit]').click();
-      await page.waitForURL(/[?&]id=/, { timeout: 60_000 });
-      const taskId = new URL(page.url()).searchParams.get('id');
+      // 2. Новый чат в едином чате `/chat` (этап 11, W3-17a), первый ход — задача ядра.
+      const page = await openProjectChat(stand, browser, repo, 'repo');
+      await page.getByRole('button', { name: 'Новый чат', exact: true }).first().click();
+      const input = page.locator('textarea[data-chat-input]');
+      await input.waitFor({ timeout: 120_000 });
+      const before = tasks();
+      await input.fill('ход-1: привет, ядро');
+      await input.press('Enter');
+      let taskId;
+      for (let i = 0; i < 90 && !taskId; i++) {
+        taskId = tasks().find((t) => !before.includes(t));
+        if (!taskId) await wait(1000);
+      }
+      if (!taskId)
+        throw new Error(`ход /chat не завёл задачу ядра: ${stand.coreLog().slice(-1200)}`);
       const answered = async (text, seconds = 180) =>
         page
-          .locator('[data-core-chat-assistant]')
+          .locator('[data-feed-message]')
           .filter({ hasText: text })
           .first()
           .waitFor({ timeout: seconds * 1000 })
           .then(() => true)
           .catch(() => false);
-      check(
-        `первый ход получил ответ (задача ${taskId}, засев ${seeded.join(',')})`,
-        await answered('ответ на ход-1'),
-      );
+      check(`первый ход получил ответ (задача ${taskId})`, await answered('ответ на ход-1'));
       const startedBefore = journal(taskId).filter((l) => l.kind === 'session.started');
       const host = startedBefore[0]?.data?.hostPid;
 
       // 3. Ядро убито посреди чата. Ответы прокладки на команды экрана с этого места — в разбор.
       const answers = [];
       page.on('response', async (res) => {
-        if (!/\/api\/core\/(commands|tasks)/.test(res.url()) || res.request().method() !== 'POST')
+        if (
+          !/\/api\/(core\/(commands|tasks)|chat\/)/.test(res.url()) ||
+          res.request().method() !== 'POST'
+        )
           return;
         answers.push(`${res.status()} ${(await res.text().catch(() => '')).slice(0, 200)}`);
       });
       const killedAt = Date.now();
       // Падение — смерть ОДНОГО процесса ядра (на Windows `TerminateProcess`): его отвязанные
-      // хост сеансов и сервер заглушки живут дальше, как при настоящем сбое. Снятие деревом унесло
-      // бы и сервер модели, к которому обращается живой CLI, — это уже не падение ядра.
+      // хосты сеансов живут дальше, как при настоящем сбое. Снятие деревом унесло бы и сеанс с
+      // живым CLI — это уже не падение ядра.
       process.kill(corePid, 'SIGKILL');
       for (let i = 0; i < 20 && alive(corePid); i += 1) await wait(250);
       const second = await until(
@@ -237,10 +201,10 @@ await runOnStand(
       if (second?.state === 'up') {
         if (process.env.WAIT_LEASE === '1')
           await wait(Math.max(0, killedAt + STALE_MS + BEAT_MS - Date.now()));
-        await page.locator('[data-core-chat-composer] textarea').waitFor({ timeout: 90_000 });
-        await page.locator('[data-core-chat-composer] textarea').fill('ход-2: после падения ядра');
+        await input.waitFor({ timeout: 90_000 });
+        await input.fill('ход-2: после падения ядра');
         sentAt = Date.now();
-        await page.locator('[data-core-chat-send]').click();
+        await input.press('Enter');
       }
       const secondAnswered = await answered('ответ на ход-2', 120);
       const answeredIn = Date.now() - sentAt;
@@ -252,7 +216,8 @@ await runOnStand(
             .map((l) => `${l.kind}${l.data?.reason ? `(${l.data.reason})` : ''}`)
             .join(', ')}\n    команды: ${answers.join(' | ')}\n    экран: ${(
             await page
-              .locator('[data-core-chat-screen]')
+              .locator('main')
+              .first()
               .innerText()
               .catch(() => '')
           ).slice(-600)}`;
@@ -264,7 +229,8 @@ await runOnStand(
       );
       // Сырые отказы на экране: 409 «held» от аренды и 503 «ядро не отдало поток» в окне молчания.
       const screen = await page
-        .locator('[data-core-chat-screen]')
+        .locator('main')
+        .first()
         .innerText()
         .catch(() => '');
       const raw = /status code \d{3}|код 50\d|\b409\b/.exec(screen)?.[0] ?? '';
@@ -283,6 +249,7 @@ await runOnStand(
       await page.close();
     } finally {
       await browser.close();
+      await model.close();
     }
   },
 );

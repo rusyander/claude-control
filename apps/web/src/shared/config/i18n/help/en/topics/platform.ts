@@ -73,7 +73,7 @@ export const platformEn: typeof platformRu = {
     tabTools: 'Tools and checks',
     tabToolsText:
       'The tool shim summary, the contour’s content checks and the cases where the contour ' +
-      'compressed history. Shown once a contour is active, the panel gateway is up and a request ' +
+      'compressed history. Shown once a contour is active, the core gateway is up and a request ' +
       'went through it; until then the tab says what is missing.',
     tabAgents: 'Agents',
     tabAgentsText:
@@ -96,7 +96,12 @@ export const platformEn: typeof platformRu = {
       'Chat, groups, the tests agent, the panel assistant, foreign CLI chats and ' +
       '“Terminal” — the same rows as in the wizard, with the same dashes and reasons. Chat, ' +
       'groups, tests and foreign CLIs are decided at every start: the gateway address goes into ' +
-      'the run’s environment and nothing is written. “Required” mode outranks the boxes for core ' +
+      'the run’s environment and nothing is written. A conversation with Claude follows the ' +
+      '“Chat” box; a conversation with another CLI in the same chat follows that CLI’s own row ' +
+      '(“Chat Codex”, “Chat Qwen Code”) — the “Chat” box neither turns it on nor off, and the ' +
+      'chat header names the gateway by that same row. Connecting ' +
+      'a local model ticks the Qwen Code row when it is available. “Required” mode outranks ' +
+      'the boxes for core ' +
       'tasks — Claude chat, the tests agent and foreign CLI chats: they always go through the contour, box ' +
       'ticked or not, with the section’s model, or the contour’s model when it has none. A model ' +
       'picked in the chat goes through the name map, as the header caption shows; a name the ' +
@@ -202,7 +207,7 @@ export const platformEn: typeof platformRu = {
     screenSmoke: 'Test request',
     screenSmokeText:
       'The result of the last activation: the model’s answer in quotes, the latency and the ' +
-      'model name. It goes through the panel’s OWN gateway — the very path a CLI takes — and ' +
+      'model name. It goes through the core gateway — the very path a CLI takes — and ' +
       'so it disagrees with the probe more often than one would think: a live contour with the ' +
       'gateway down gives a green probe and a red test request. This is the line that explains ' +
       'why a CLI “sees no models”.',
@@ -1033,7 +1038,7 @@ export const platformEn: typeof platformRu = {
       'A contour request travels through the core, the same road the CLI requests of this ' +
       'contour take, so it is in the journal. It ' +
       'reaches the key’s spend only if the contour sent a bill: the company platform sends an image as part ' +
-      'of an answer without one, so such an image is not in the key’s spend. The panel gateway ' +
+      'of an answer without one, so such an image is not in the key’s spend. The core gateway ' +
       'switch plays no part here. If the core did not answer or did not accept the contour at the ' +
       'moment of the request, the image is not drawn, and the refusal names the reason in the ' +
       'core’s words.',
@@ -1054,7 +1059,7 @@ export const platformEn: typeof platformRu = {
       'the agent dictates the presentation itself — a revision too, and the pictures already ' +
       'drawn for the previous deck carry over into the new one — while a contour or an own ' +
       'endpoint dictates it only outside a conversation. A deck request to the contour goes ' +
-      'through the core, the same road as pictures: the panel gateway toggle is not needed for ' +
+      'through the core, the same road as pictures: the core gateway toggle is not needed for ' +
       'it, and if the core did not answer or did not accept the contour, the refusal comes at ' +
       'sending and names the cause.',
     worksHonestTitle: 'How the shim differs from real tools',
@@ -1440,7 +1445,7 @@ export const platformEn: typeof platformRu = {
         'there is nothing to apply yet. A forgotten button does not break the connection: ' +
         'activation raises a stopped gateway itself, and one that fails to start names the reason ' +
         'in the smoke-request line. If the gateway goes down later, the active contour’s card says ' +
-        '“The panel gateway is down” and keeps the same button right there — no trip to the wizard.',
+        '“The core gateway is down” and keeps the same button right there — no trip to the wizard.',
       pCard: 'Done: the contour is active and has already answered',
       pCardText:
         'On “Done” the new contour becomes active at once, and the panel immediately asks the ' +
@@ -1473,7 +1478,7 @@ export const platformEn: typeof platformRu = {
       aSmokeText:
         'The line under the address is the result of a question the panel asked the model ' +
         'itself: the answer in quotes, the delay, the model name and when it was asked. It goes ' +
-        'through the panel’s gateway, so a green line proves the whole CLI path, not just that ' +
+        'through the core gateway, so a green line proves the whole CLI path, not just that ' +
         'the contour is alive. Further down, in “Applied to”, the panel assistant has a tick, ' +
         'the CLIs that can be applied have circles, and the rest have dashes with a flag ' +
         'carrying the reason.',
@@ -1573,7 +1578,7 @@ export const platformEn: typeof platformRu = {
         'by the protocol”. The task names the file after “ФАЙЛ:” — the scripted model takes ' +
         'its path from there, and “ЯЗЫК: en” switches its replies to English. The shoot ' +
         'checks the file on disk, not the text on screen: no file, no frame. The conversation ' +
-        'is shot on the “Chat through the core” page: Claude Code runs as a core task right in ' +
+        'is shot in the panel’s ordinary chat: Claude Code runs as a core task right in ' +
         'the project folder, with the scripted contour (stub-tool-shim) as its model.',
       agQuote: 'An example in a code block does not run',
       agQuoteText:
@@ -1638,7 +1643,7 @@ export const platformEn: typeof platformRu = {
       mCard: 'An image is a card, not a message',
       mCardText:
         'The description “A lighthouse on a cliff at dusk, watercolour” went through the ' +
-        'panel’s gateway — so the request is in the gateway journal (in the key’s spend if the ' +
+        'core gateway — so the request is in the gateway journal (in the key’s spend if the ' +
         'contour sent a bill). The image ' +
         'lands as a card in the right-hand column: size, weight, “Drawn by stub-image · ' +
         'contour, part of the answer” and your description under it. It does not enter the ' +
@@ -1744,7 +1749,7 @@ export const platformEn: typeof platformRu = {
   },
   diagrams: {
     'request-path':
-      'The path of one request: CLI → the panel’s local gateway → the contour → the model. The key appears at exactly one point on it.',
+      'The path of one request: CLI → the local core gateway → the contour → the model. The key appears at exactly one point on it.',
     'who-creates-what':
       'What gets created in the contour admin, what in the panel, and which two lines cross the border.',
     'two-systems':

@@ -12,6 +12,22 @@
   gap: var(--spacing-xs);
 }
 
+/* Доля прочитанного промпта: тонкая полоса под строкой этапа. */
+.track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transition: width 300ms ease;
+}
+
 /* Текст отказа llama.cpp бывает длинной строкой без пробелов (путь, выдержка шаблона). */
 .failure {
   overflow-wrap: anywhere;

@@ -6,92 +6,100 @@
       "id": "01-shim-call",
       "side": "panel",
       "file": "01-shim-call.png",
-      "masked": 0,
+      "masked": 1,
       "width": 1280,
       "height": 1000,
-      "shotAt": "2026-11-03T12:34:36.157Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Задача ядра Новый чат Модель Сейчас запишу (ход стаба №1). Инструмент Write C:/agentdeck-help-shots/shim-NQEBUl/hello.txt готово Модель файл создан по протоколу Ждёт вашего сообщения Сообщение Закрыть чат Отправить",
+      "shotAt": "2026-11-07T09:04:27.065Z",
+      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Чаты shim-pkgJhV Новый чат По названию По сообщениям Показано 1 из 1 СЕГОДНЯ Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/hello.txt master только что · 3 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/hello.txt C:\\agentdeck-help-shots\\shim-pkgJhV stub-tool-shim не отправляется Через контур «Сценарный контур»: stub-tool-shim. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Локальная Агенты Настройки чата До MR: некуда Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» master Изменено файлов: 1 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/hello.txt Сейчас запишу (ход стаба №1). Write 13 +13 0с файл создан по протоколу 13 +13 1с Σ 2с хуки 5, из них 1 добавил контекст · 1,2 с Агенты фоновых нет Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "01-shim-call.en.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:09:08.571Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. Core task New chat You Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-IBGToR/hello.txt ЯЗЫК: en Model Writing it now (stub turn #1). Tool Write C:/agentdeck-help-shots/shim-IBGToR/hello.txt done Model file created by the protocol Waiting for your message Message Close chat Send",
+        "shotAt": "2026-11-07T09:06:31.645Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Chats shim-Dyd92e New chat By title In messages Showing 1 of 1 TODAY Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e/hello.txt ЯЗ master just now · 3 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e/hello.txt ЯЗ C:\\agentdeck-help-shots\\shim-Dyd92e stub-tool-shim not sent Through the \"Scripted contour\" contour: stub-tool-shim. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Local Agents Chat settings To MR: nowhere Project code Tests Environment Editor Dev server To Projects master Changed files: 1 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e/hello.txt ЯЗЫК: en Writing it now (stub turn #1). Write 13 +13 1s file created by the protocol 13 +13 2s Σ 2s hooks 5, 1 of them added context · 1.4 s Agents no background work Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "8b857306df176a05",
-          "text": "bce9a5c03a1411f6"
+          "png": "f0667c652668df68",
+          "text": "ab5dc25fe032a507"
         }
       },
       "dark": {
         "file": "01-shim-call.dark.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:21:31.148Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Задача ядра Новый чат Вы Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-Phjegk/hello.txt Модель Сейчас запишу (ход стаба №1). Инструмент Write C:/agentdeck-help-shots/shim-Phjegk/hello.txt готово Модель файл создан по протоколу Ждёт вашего сообщения Сообщение Закрыть чат Отправить",
+        "shotAt": "2026-11-07T09:08:37.048Z",
+        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Чаты shim-9hzukA Новый чат По названию По сообщениям Показано 1 из 1 СЕГОДНЯ Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/hello.txt master только что · 3 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/hello.txt C:\\agentdeck-help-shots\\shim-9hzukA stub-tool-shim не отправляется Через контур «Сценарный контур»: stub-tool-shim. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Локальная Агенты Настройки чата До MR: некуда Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» master Изменено файлов: 1 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/hello.txt Сейчас запишу (ход стаба №1). Write 13 +13 1с файл создан по протоколу 13 +13 2с Σ 2с хуки 5, из них 1 добавил контекст · 1,6 с Агенты фоновых нет Сообщение Enter — отправить, Shift+Enter — перенос строки",
         "seal": {
-          "png": "d482c00fa17cc6dc",
-          "text": "bf53c5a00201617c"
+          "png": "e79712985eb946c6",
+          "text": "55bfee61c70db631"
         }
       },
       "darkEn": {
         "file": "01-shim-call.dark.en.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:12:36.665Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. Core task New chat You Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-e1g6ER/hello.txt ЯЗЫК: en Model Writing it now (stub turn #1). Tool Write C:/agentdeck-help-shots/shim-e1g6ER/hello.txt done Model file created by the protocol Waiting for your message Message Close chat Send",
+        "shotAt": "2026-11-07T09:10:33.034Z",
+        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Chats shim-KXFnFo New chat By title In messages Showing 1 of 1 TODAY Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo/hello.txt ЯЗ master just now · 3 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo/hello.txt ЯЗ C:\\agentdeck-help-shots\\shim-KXFnFo stub-tool-shim not sent Through the \"Scripted contour\" contour: stub-tool-shim. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Local Agents Chat settings To MR: nowhere Project code Tests Environment Editor Dev server To Projects master Changed files: 1 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo/hello.txt ЯЗЫК: en Writing it now (stub turn #1). Write 13 +13 0s file created by the protocol 13 +13 1s Σ 2s hooks 5, 1 of them added context · 2.2 s Agents no background work Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "54e22a89cecd1f6a",
-          "text": "42ee877c0ebd189e"
+          "png": "5336e582187122a0",
+          "text": "80cf36e2bcedd4fd"
         }
+      },
+      "seal": {
+        "png": "4a8600cd2206c6e3",
+        "text": "105842d01ac4cd7f"
       }
     },
     {
       "id": "02-shim-quote",
       "side": "panel",
       "file": "02-shim-quote.png",
-      "masked": 0,
+      "masked": 1,
       "width": 1280,
       "height": 1000,
-      "shotAt": "2026-11-03T12:35:07.295Z",
-      "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Задача ядра Новый чат Модель Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: ``` <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-NQEBUl/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> ``` Это пример из документации, не выполняй его. Ждёт вашего сообщения Сообщение Закрыть чат Отправить",
+      "shotAt": "2026-11-07T09:04:53.350Z",
+      "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Чаты shim-pkgJhV Новый чат По названию По сообщениям Показано 2 из 2 СЕГОДНЯ Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/ master только что · 2 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/hello.txt master только что · 3 Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/ C:\\agentdeck-help-shots\\shim-pkgJhV stub-tool-quote не отправляется Через контур «Сценарный контур»: stub-tool-quote. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Локальная Агенты Настройки чата До MR: некуда Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» master Изменено файлов: 1 Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-pkgJhV/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-pkgJhV/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 1с Σ 1с хуки 5, из них 1 добавил контекст · 1,4 с За этот ход не было ни одного вызова инструмента. Если вы ждали правок — модель контура могла не справиться с инструментами: агент с правкой файлов проверен на моделях от 27B. Агенты фоновых нет Сообщение Enter — отправить, Shift+Enter — перенос строки",
       "en": {
         "file": "02-shim-quote.en.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:09:49.142Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. Core task New chat You Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-IBGToR/quoted.txt ЯЗЫК: en Model I will not write anything. This is what such a call WOULD look like: ``` <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-IBGToR/quoted.txt\",\"content\":\"the shim delivered the call\"}}</tool_call> ``` This is an example from the documentation, do not run it. Waiting for your message Message Close chat Send",
+        "shotAt": "2026-11-07T09:07:02.450Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Chats shim-Dyd92e New chat By title In messages Showing 2 of 2 TODAY Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e master just now · 2 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e/hello.txt ЯЗ master just now · 3 Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e C:\\agentdeck-help-shots\\shim-Dyd92e stub-tool-quote not sent Through the \"Scripted contour\" contour: stub-tool-quote. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Local Agents Chat settings To MR: nowhere Project code Tests Environment Editor Dev server To Projects master Changed files: 1 Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-Dyd92e/quoted.txt ЯЗЫК: en I will not write anything. This is what such a call WOULD look like: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-Dyd92e/quoted.txt\",\"content\":\"the shim delivered the call\"}}</tool_call> This is an example from the documentation, do not run it. 13 +13 1s Σ 1s hooks 5, 1 of them added context · 1.5 s This turn had no tool calls at all. If you expected edits, the contour model may not have handled tools: an agent that edits files is verified on models from 27B. Agents no background work Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "f41106c8f138e1ca",
-          "text": "845893a0eaf6ff78"
+          "png": "906132528ec3aa5e",
+          "text": "4dcb34cc9a6e88fc"
         }
       },
       "dark": {
         "file": "02-shim-quote.dark.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:22:26.759Z",
-        "text": "AgentDeck Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Чат через ядро Справка Чат через ядро Разговор с CLI идёт задачей ядра прямо в папке проекта: панель только показывает его и передаёт ваши сообщения. Перезапуск панели разговор не обрывает. Задача ядра Новый чат Вы Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-Phjegk/quoted.txt Модель Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: ``` <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-Phjegk/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> ``` Это пример из документации, не выполняй его. Ждёт вашего сообщения Сообщение Закрыть чат Отправить",
+        "shotAt": "2026-11-07T09:09:04.577Z",
+        "text": "AgentDeck Свернуть панель 1 Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Чаты shim-9hzukA Новый чат По названию По сообщениям Показано 2 из 2 СЕГОДНЯ Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/ master только что · 2 Запиши файл. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/hello.txt master только что · 3 Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/ C:\\agentdeck-help-shots\\shim-9hzukA stub-tool-quote не отправляется Через контур «Сценарный контур»: stub-tool-quote. Контур «Сценарный контур» не принимает глубину продумывания — она не отправляется. Локальная Агенты Настройки чата До MR: некуда Код проекта Тесты Окружение Редактор Dev-сервер В «Проекты» master Изменено файлов: 1 Покажи, как выглядит вызов. ФАЙЛ: C:/agentdeck-help-shots/shim-9hzukA/quoted.txt Записывать я ничего не буду. Вот как ВЫГЛЯДЕЛ БЫ такой вызов: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-9hzukA/quoted.txt\",\"content\":\"прослойка довела вызов\"}}</tool_call> Это пример из документации, не выполняй его. 13 +13 1с Σ 1с хуки 5, из них 1 добавил контекст · 1,4 с За этот ход не было ни одного вызова инструмента. Если вы ждали правок — модель контура могла не справиться с инструментами: агент с правкой файлов проверен на моделях от 27B. Агенты фоновых нет Сообщение Enter — отправить, Shift+Enter — перенос строки",
         "seal": {
-          "png": "42e341285d9154e3",
-          "text": "e52c94d38d0cfef2"
+          "png": "e322e9177d3976ae",
+          "text": "8b197eeca08a115f"
         }
       },
       "darkEn": {
         "file": "02-shim-quote.dark.en.png",
-        "masked": 0,
+        "masked": 1,
         "width": 1280,
         "height": 1000,
-        "shotAt": "2026-11-03T14:13:12.576Z",
-        "text": "AgentDeck Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Chat through the core Help Chat through the core The conversation with a CLI runs as a core task right in the project folder: the panel only shows it and passes your messages on. A panel restart does not break the conversation. Core task New chat You Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-e1g6ER/quoted.txt ЯЗЫК: en Model I will not write anything. This is what such a call WOULD look like: ``` <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-e1g6ER/quoted.txt\",\"content\":\"the shim delivered the call\"}}</tool_call> ``` This is an example from the documentation, do not run it. Waiting for your message Message Close chat Send",
+        "shotAt": "2026-11-07T09:11:00.318Z",
+        "text": "AgentDeck Collapse the sidebar 1 Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Chats shim-KXFnFo New chat By title In messages Showing 2 of 2 TODAY Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo master just now · 2 Write the file. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo/hello.txt ЯЗ master just now · 3 Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo C:\\agentdeck-help-shots\\shim-KXFnFo stub-tool-quote not sent Through the \"Scripted contour\" contour: stub-tool-quote. The \"Scripted contour\" contour takes no reasoning effort — it is not sent. Local Agents Chat settings To MR: nowhere Project code Tests Environment Editor Dev server To Projects master Changed files: 1 Show what a call looks like. ФАЙЛ: C:/agentdeck-help-shots/shim-KXFnFo/quoted.txt ЯЗЫК: en I will not write anything. This is what such a call WOULD look like: <tool_call>{\"name\":\"Write\",\"arguments\":{\"file_path\":\"C:/agentdeck-help-shots/shim-KXFnFo/quoted.txt\",\"content\":\"the shim delivered the call\"}}</tool_call> This is an example from the documentation, do not run it. 13 +13 0s Σ 0s hooks 5, 1 of them added context · 1.1 s This turn had no tool calls at all. If you expected edits, the contour model may not have handled tools: an agent that edits files is verified on models from 27B. Agents no background work Message Enter to send, Shift+Enter for a new line",
         "seal": {
-          "png": "55a745f2dbfaeec2",
-          "text": "20266d0399b3ac53"
+          "png": "db6ceaa7b49a6259",
+          "text": "1a46c2503f8f781d"
         }
+      },
+      "seal": {
+        "png": "7da4471e5baa014a",
+        "text": "4d94e67568049296"
       }
     },
     {

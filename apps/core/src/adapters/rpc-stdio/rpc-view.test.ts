@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -78,6 +78,20 @@ describe('rpc-stdio session view', () => {
       { kind: 'assistant-text', data: { text: 'NEW_ANSWER' } },
       { kind: 'turn-end', data: { isError: false, numTurns: 1 } },
     ]);
+  });
+
+  // Этап 11, волна 3: ход человека JSON-RPC CLI несёт стену своей отправки — время хода в истории
+  // чата панели (у opencode и goose вида с временем нет иначе).
+  it('the human turn carries the wall clock of its send as `sentAt`', () => {
+    const lines = [INIT, rpc({ id: 2, result: MODES }), chunk('ANSWER')];
+    const dir = session({ cli: 'goose', cwd: 'C:\\w', permit: 'core', load: 'S1' }, lines, 2);
+    const record = join(dir, IO_RECORD);
+    const sent = JSON.parse(readFileSync(record, 'utf8')) as Record<string, unknown>;
+    writeFileSync(record, `${JSON.stringify({ ...sent, wall: 1_762_400_000_000 })}\n`);
+    expect(viewOfDir(dir)[0]).toEqual({
+      kind: 'user-text',
+      data: { text: 'NEW_TURN', sentAt: 1_762_400_000_000 },
+    });
   });
 
   it('the recorded permit mode decides the view of an ask: refuse → denied ask, core → a request', () => {

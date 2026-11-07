@@ -20,6 +20,7 @@ import type {
   StepCtx,
 } from '../../conductor/run/run.types.ts';
 import { inPlaceRootOf, isScratchTask } from '../../conductor/estimate/index.ts';
+import { integrationStartOf } from '../../conductor/gates/integration-hooks.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
@@ -399,6 +400,11 @@ export function createWiringHooks(
         return { verdict: stop('unit', 'copy-unknown', `copy: ${why(prepared)}`), sections };
       const decision = prepared.value.decision;
       const placed = unitCopyOf(task, u.unitId);
+      // Конфликт слияния голов единицы интеграции (W3-18b) не закрывает её: шаг ворот интеграции
+      // красный, пока конфликт не снят в задаче (`gates/integration-hooks.ts`).
+      const conflict = placed ? null : integrationStartOf(task, u.unitId);
+      if (conflict)
+        return { verdict: ok, sections: [...sections, copySection(decision), conflict] };
       if (!placed)
         return {
           verdict: stop(

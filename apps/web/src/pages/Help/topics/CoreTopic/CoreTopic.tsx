@@ -78,6 +78,9 @@ export function CoreTopic() {
           <GuideStep title={tr('launchForm')} text={tr('launchFormText')}>
             <HelpShot topic="core" scenario="launch" frame="01-form" side="panel" />
           </GuideStep>
+          <GuideStep title={tr('launchSource')} text={tr('launchSourceText')}>
+            <HelpShot topic="core" scenario="launch" frame="10-items" side="panel" />
+          </GuideStep>
           <GuideStep title={tr('launchReview')} text={tr('launchReviewText')}>
             <HelpShot topic="core" scenario="launch" frame="07-review-link" side="panel" />
           </GuideStep>
@@ -99,12 +102,50 @@ export function CoreTopic() {
           <GuideStep title={tr('launchMcp')} text={tr('launchMcpText')}>
             <HelpShot topic="core" scenario="launch" frame="08-mcp-picks" side="panel" />
           </GuideStep>
+          <GuideStep title={tr('launchLead')} text={tr('launchLeadText')}>
+            <HelpShot topic="core" scenario="launch" frame="09-lead" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('launchGroup')} text={tr('launchGroupText')}>
+            <HelpShot topic="core" scenario="launch" frame="11-group-estimate" side="panel" />
+            <HelpShot topic="core" scenario="launch" frame="12-group-launch" side="panel" />
+          </GuideStep>
         </GuideSteps>
       </HelpSection>
 
       {/* Схема — после шагов: путь задачи целиком читается, когда экран уже знаком. */}
       <HelpSection title={tr('launchDiagramTitle')}>
         <HelpDiagram topic="core" name="launch-to-steps" />
+      </HelpSection>
+
+      {/* Ведущий: сначала весь путь схемой и словами, потом каждый поворот — класс, единицы,
+          места, расход, подъём ступени, сборка. Числа — те, что ядро берёт по умолчанию. */}
+      <HelpSection title={tr('leadTitle')} caption={tr('leadCaption')}>
+        <HelpDiagram topic="core" name="lead-pipeline" />
+        <Callout tone="info" title={tr('leadPathTitle')}>
+          {tr('leadPathText')}
+        </Callout>
+        <GuideSteps>
+          <GuideStep title={tr('leadRecon')} text={tr('leadReconText')} />
+          <GuideStep title={tr('leadIntake')} text={tr('leadIntakeText')} />
+          <GuideStep title={tr('leadClass')} text={tr('leadClassText')} />
+        </GuideSteps>
+        <FieldTable
+          nameHeader={tr('leadClassesHeader')}
+          descriptionHeader={tr('leadClassesWhat')}
+          rows={[row('leadClassS'), row('leadClassM'), row('leadClassL'), row('leadClassXL')]}
+        />
+        <OptionCards
+          items={[
+            { title: tr('leadAsk'), text: tr('leadAskText') },
+            { title: tr('leadUnits'), text: tr('leadUnitsText') },
+            { title: tr('leadParallel'), text: tr('leadParallelText') },
+            { title: tr('leadSpend'), text: tr('leadSpendText') },
+            { title: tr('leadEscalation'), text: tr('leadEscalationText') },
+            { title: tr('leadPromotion'), text: tr('leadPromotionText') },
+            { title: tr('leadIntegration'), text: tr('leadIntegrationText') },
+            { title: tr('leadXl'), text: tr('leadXlText') },
+          ]}
+        />
       </HelpSection>
 
       <HelpSection title={tr('askTitle')} caption={tr('askCaption')}>

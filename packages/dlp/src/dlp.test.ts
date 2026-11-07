@@ -352,6 +352,50 @@ describe('ответ: обратная подстановка', () => {
     expect(out.trimEnd().endsWith('data: [DONE]')).toBe(true);
   });
 
+  it('поток OpenAI: заголовок вызова (id, имя, пустые аргументы) доезжает до CLI', () => {
+    // Первый кадр вызова по справке OpenAI несёт id и имя при `arguments: ""`. Пустой текст
+    // канала аргументов — не повод выбросить кадр: без него CLI получал аргументы вызова без
+    // имени, и Qwen Code отвергал ответ «malformed tool call» (s11 w3, без прослойки).
+    const frame = (delta: object, finish: string | null = null): string =>
+      `data: ${JSON.stringify({
+        id: 'chatcmpl-1',
+        object: 'chat.completion.chunk',
+        choices: [{ index: 0, delta, finish_reason: finish }],
+      })}\n\n`;
+    const stream =
+      frame({ role: 'assistant', content: '' }) +
+      frame({
+        tool_calls: [
+          { index: 0, id: 'call_1', type: 'function', function: { name: 'agent', arguments: '' } },
+        ],
+      }) +
+      frame({ tool_calls: [{ index: 0, function: { arguments: '{"path":"/home/[ИМЯ_2]"}' } }] }) +
+      frame({}, 'tool_calls') +
+      'data: [DONE]\n\n';
+
+    const filter = new ResponseStreamFilter('openai-compat', reverse);
+    const out = filter.push(stream) + filter.end();
+    const chunks = out
+      .split('\n\n')
+      .filter((raw) => raw.startsWith('data: {'))
+      .map((raw) => JSON.parse(raw.slice(6)));
+    const calls = chunks.flatMap((c) => c.choices[0].delta.tool_calls ?? []);
+
+    expect(chunks[0].choices[0].delta.role).toBe('assistant');
+    expect(calls[0]).toMatchObject({ index: 0, id: 'call_1', function: { name: 'agent' } });
+    expect(calls.map((c) => c.function.arguments).join('')).toBe('{"path":"/home/Иванов"}');
+    expect(chunks.at(-1).choices[0].finish_reason).toBe('tool_calls');
+  });
+
+  it('удержанный кусок без своих полей кадром не встаёт — текст доезжает следующим', () => {
+    const chunk = (content: string): string =>
+      `data: ${JSON.stringify({ choices: [{ index: 0, delta: { content }, finish_reason: null }] })}\n\n`;
+    const filter = new ResponseStreamFilter('openai-compat', reverse);
+    const out = filter.push(chunk('[ИМ') + chunk('Я_1]')) + filter.end();
+    expect(out.split('\n\n').filter((raw) => raw.startsWith('data: '))).toHaveLength(1);
+    expect(out).toContain('Рустам Урманов');
+  });
+
   it('без меток поток проходит байт в байт', () => {
     const stream = anthropicStream(['ничего заменять не нужно']);
     const filter = new ResponseStreamFilter('anthropic', new Map());

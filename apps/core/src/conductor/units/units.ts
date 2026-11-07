@@ -38,6 +38,8 @@ export function unitsOfSplit(
       after,
       contract: u.contract,
       splitId,
+      // Роль куска плана ведущего после проверки (этап 11); без договора плана роли нет.
+      ...(decision.roles?.[name] ? { role: decision.roles[name] } : {}),
     };
   });
 }

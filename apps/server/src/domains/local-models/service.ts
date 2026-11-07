@@ -1607,7 +1607,12 @@ export function createLocalModels(deps: LocalModelsDeps) {
         server: () => {
           const record = readRecord(paths) ?? supervisor.target();
           return record
-            ? { model: record.tag, quant: record.quant, context: record.context }
+            ? {
+                model: record.tag,
+                quant: record.quant,
+                context: record.context,
+                device: record.device,
+              }
             : undefined;
         },
         events: () => deps.coreEvents?.(),

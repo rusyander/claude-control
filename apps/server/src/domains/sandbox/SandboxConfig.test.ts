@@ -5,7 +5,16 @@ import { tmpdir } from 'node:os';
 import type { ClaudeLocation } from '@agentdeck/contracts';
 import { AppStore } from '../../lib/app-store/app-store.ts';
 import { readHooks } from '../hooks/hooks.ts';
-import { createSandbox, removeSandbox, sandboxPaths, stopSandboxSweeper } from './SandboxConfig.ts';
+import { spawn, type ChildProcess } from 'node:child_process';
+import {
+  createSandbox,
+  markSandboxBusy,
+  markSandboxFree,
+  removeSandbox,
+  removeSandboxSettled,
+  sandboxPaths,
+  stopSandboxSweeper,
+} from './SandboxConfig.ts';
 
 /**
  * Тесты изоляции песочницы. Суть песочницы — временный каталог настроек, куда
@@ -229,6 +238,61 @@ describe('SandboxConfig', () => {
         }
 
         expect(sandbox.configDir).toContain(sandboxRoot);
+      },
+    );
+
+    /** Живой процесс, стоящий в `work` текущей папкой, — как CLI, который ещё выходит. */
+    async function holdWorkDir(ms: number): Promise<ChildProcess> {
+      const { workDir } = sandboxPaths(sandboxId);
+      mkdirSync(workDir, { recursive: true });
+      const child = spawn(process.execPath, ['-e', `setTimeout(() => {}, ${ms})`], {
+        cwd: workDir,
+        stdio: 'ignore',
+      });
+      await new Promise((ready) => child.once('spawn', ready));
+      return child;
+    }
+    const exited = (child: ChildProcess) =>
+      child.exitCode !== null ? Promise.resolve() : new Promise((done) => child.once('exit', done));
+
+    it.runIf(process.platform === 'win32')(
+      'сразу после прогона занятую папку ждёт, пока процесс выйдет, и стирает её',
+      async () => {
+        // Ядро закрывает сеанс CLI через секунду-две после конца хода: удаление по кнопке
+        // или агентом панели сразу после прогона упиралось в EBUSY и советовало стереть
+        // папку вручную, хотя через миг она освобождалась.
+        createSandbox(sandboxId, {}, location, store);
+        const cli = await holdWorkDir(1_500);
+        try {
+          markSandboxBusy(sandboxId);
+          markSandboxFree(sandboxId);
+          // Папка действительно занята: без ожидания — отказ.
+          expect(() => removeSandbox(sandboxId)).toThrow(/удалить/i);
+          markSandboxFree(sandboxId);
+
+          await removeSandboxSettled(sandboxId);
+          expect(existsSync(sandboxPaths(sandboxId).root)).toBe(false);
+          expect(cli.exitCode).not.toBeNull();
+        } finally {
+          cli.kill();
+          await exited(cli);
+        }
+      },
+    );
+
+    it.runIf(process.platform === 'win32')(
+      'без недавнего прогона занятая папка — отказ сразу, без ожидания',
+      async () => {
+        createSandbox(sandboxId, {}, location, store);
+        const holder = await holdWorkDir(5_000);
+        try {
+          const started = Date.now();
+          await expect(removeSandboxSettled(sandboxId)).rejects.toThrow(/удалить/i);
+          expect(Date.now() - started).toBeLessThan(1_000);
+        } finally {
+          holder.kill();
+          await exited(holder);
+        }
       },
     );
   });

@@ -203,6 +203,18 @@ export const panelAgentEn: typeof panelAgentRu = {
       'a disabled group’s included. The agent cannot create, edit, delete or run a group — ' +
       'nothing does that any more. Only you can move a former group into the core, with the ' +
       '«To core» button on the Groups page.',
+    secCore: 'Core tasks',
+    secCoreText:
+      'Read-only. The task list (state, whether it runs, what waits for the human), one task — ' +
+      'the latest steps and check decisions of its feed with their reasons, the questions ' +
+      'waiting for you — the final report of a finished task and the lead settings (profile, ' +
+      'economy levers with defaults, session slots, human points). Core task agents: the ' +
+      'sessions, subagents and background commands of a chat or a task — model, status, spend ' +
+      '(unknown, never zero), exit code — and one node in detail (calls, files, refusals, output ' +
+      'tail). On request the agent opens a task’s page for you. It never answers a core ' +
+      'question and never launches, estimates or pauses a task; the lead settings, scenarios, ' +
+      'the learning reset, stopping an agent and exporting the agents log are your buttons ' +
+      'only. Model routes, CLI paths, read masks and grants are never shown to it.',
     secPlugins: 'Plugins',
     secPluginsText:
       'Installed and available — read. Enable/disable and update — change. Install, ' +

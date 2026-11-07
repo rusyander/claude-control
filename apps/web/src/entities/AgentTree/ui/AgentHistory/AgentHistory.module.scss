@@ -1,15 +1,22 @@
-// Кнопка «История агентов» — чип рядом со строкой агентов карточки группы.
+// Карточка «Агенты · фоном: N» над полем ввода и в карточке группы.
+.card {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  min-width: 0;
+}
+
 .open {
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--spacing-2xs);
+  padding: 2px var(--spacing-xs);
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-surface);
   color: var(--color-fg-muted);
   font: inherit;
   font-size: var(--font-size-caption);
-  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
 
@@ -24,10 +31,30 @@
   }
 }
 
-// Окно: сессии слева, шаги выбранного субагента справа — каждая колонка прокручивается сама.
+// «фоновых нет» — приглушённо; идущие — цветом «идёт» и жирным, не одним цветом.
+.bg {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bgLive {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3xs);
+  white-space: nowrap;
+}
+
+// Окно: фильтры и дерево слева, узел подробно справа — каждая колонка прокручивается сама.
 .layout {
   display: grid;
-  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 440px) minmax(0, 1fr);
   gap: var(--spacing-md);
   height: 100%;
   min-height: 0;
@@ -38,248 +65,246 @@
   }
 }
 
-.sessions {
+.side,
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   min-height: 0;
   overflow-y: auto;
   padding-right: var(--spacing-2xs);
 }
 
-.sessionList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
+.pick {
+  margin: auto;
+  text-align: center;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-xs);
   margin: 0;
   padding: 0;
-  list-style: none;
+  border: 0;
 }
 
-.session {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3xs);
-  padding: var(--spacing-xs);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-}
-
-.sessionHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-2xs);
-}
-
-.current {
-  padding: 0 var(--spacing-2xs);
-  border-radius: 999px;
-  background: var(--color-accent-subtle);
-  color: var(--color-fg);
-  font-size: var(--font-size-caption);
-}
-
-.badges {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: var(--spacing-3xs);
-}
-
-// В сессии кто-то работает прямо сейчас — словом и цветом «идёт».
-.sessionLive {
-  padding: 0 var(--spacing-2xs);
-  border-radius: 999px;
-  background: var(--color-warning-subtle);
-  color: var(--color-warning);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-medium);
-}
-
-.main {
-  overflow-wrap: anywhere;
-}
-
-// Строка главного агента — та же кнопка, что у субагента, с полосой слева:
-// у каждой сессии она есть, даже без субагентов.
-.mainButton {
-  margin-left: calc(-1 * var(--spacing-2xs));
-  width: calc(100% + var(--spacing-2xs));
-  border-left: 3px solid var(--color-border-strong);
-}
-
-// Отказы, ошибки, повторные чтения, большие результаты — цветом опасности.
-.anomalies {
-  color: var(--color-danger);
-  overflow-wrap: anywhere;
-}
-
-// «Сейчас работают» рядом с кнопкой истории: никого — приглушённо.
-.liveRow {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--spacing-2xs);
-  min-width: 0;
-}
-
-.live {
-  color: var(--color-fg);
-  font-size: var(--font-size-caption);
-  font-variant-numeric: tabular-nums;
+.filtersLegend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
-.liveNone {
-  color: var(--color-fg-subtle);
-}
-
-// Числа «сейчас: N агент · M субагентов»: ноль — приглушённо, не ноль — жирным
-// и своим цветом (агенты — цветом «идёт», как точка идущего, субагенты — акцентом).
-.liveCount {
-  color: var(--color-fg-subtle);
-  font-weight: var(--font-weight-regular);
-}
-
-.liveCountAgents {
-  color: var(--color-warning);
-  font-weight: var(--font-weight-semibold);
-}
-
-.liveCountSubagents {
-  color: var(--color-accent);
-  font-weight: var(--font-weight-semibold);
-}
-
-// «Сейчас» вверху колонки сессий: кто работает и чем занят.
-.now {
+.tree,
+.children {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-3xs);
-  margin-bottom: var(--spacing-sm);
-  padding: var(--spacing-xs);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid var(--color-border-strong);
-  border-radius: 8px;
-  background: var(--color-surface-sunken);
-}
-
-.nowLive {
-  border-left-color: var(--color-warning);
-}
-
-.nowGroup {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.nowState {
-  font-weight: var(--font-weight-medium);
+.children {
+  margin-top: var(--spacing-3xs);
+  margin-left: var(--spacing-sm);
+  padding-left: var(--spacing-xs);
+  border-left: 1px solid var(--color-border);
 }
 
-.nowStateLive {
-  color: var(--color-warning);
-}
-
-.nowDoing {
-  overflow-wrap: anywhere;
-}
-
-// Вызов «ждёт» (фоновая команда, ожидание итога) — словом, не только цветом.
-.nowWaiting {
-  padding: 0 var(--spacing-3xs);
-  border-radius: 4px;
-  background: var(--color-info-subtle);
-  color: var(--color-info);
-}
-
-// Оборванные паузой вызовы — не ошибки: свой, спокойный цвет.
-.interrupted {
-  color: var(--color-info);
-  overflow-wrap: anywhere;
-}
-
-.agentList {
+.row {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: var(--spacing-3xs) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-// Субагент, запущенный другим субагентом, — ступенькой под родителем.
-.nested {
-  padding-left: var(--spacing-sm);
-}
-
-.agent {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  gap: var(--spacing-3xs);
   width: 100%;
-  min-width: 0;
-  padding: var(--spacing-2xs);
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
+  padding: var(--spacing-2xs) var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-fg);
   font: inherit;
   text-align: left;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--color-surface);
-  }
-
-  &:disabled {
-    cursor: default;
+  &:hover {
+    border-color: var(--color-border-strong);
   }
 
   &:focus-visible {
     outline: 2px solid var(--color-focus-ring, var(--color-accent));
-    outline-offset: -2px;
+    outline-offset: 1px;
   }
 }
 
-.agentSelected {
-  border-color: var(--color-border);
+.rowPicked {
+  border-color: var(--color-accent);
   background: var(--color-accent-subtle);
-
-  &:hover:not(:disabled) {
-    background: var(--color-accent-subtle);
-  }
 }
 
-.agentHead {
+.rowHead {
   display: flex;
-  align-items: center;
   gap: var(--spacing-2xs);
   min-width: 0;
 }
 
-.agentName {
+.kind {
+  flex-shrink: 0;
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+}
+
+.rowTitle {
   min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.result {
-  display: -webkit-box;
   overflow: hidden;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow-wrap: anywhere;
+  font-size: var(--font-size-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.steps {
+.rowMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  font-size: var(--font-size-caption);
+}
+
+.model {
+  padding: 0 var(--spacing-2xs);
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  color: var(--color-fg);
+}
+
+.muted {
+  color: var(--color-fg-subtle);
+}
+
+.danger {
+  color: var(--color-danger);
+}
+
+.detail {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  gap: var(--spacing-sm);
+  min-width: 0;
 }
 
-.pick {
-  margin: auto;
-  max-width: 36ch;
-  text-align: center;
+.facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--spacing-3xs) var(--spacing-sm);
+  margin: 0;
+}
+
+.fact {
+  display: contents;
+}
+
+.factLabel {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+}
+
+.factValue {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-caption);
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  overflow-wrap: anywhere;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+}
+
+.sectionTitle {
+  margin: 0;
+}
+
+.tail {
+  max-height: 320px;
+  margin: 0;
+  padding: var(--spacing-xs);
+  overflow: auto;
+  border-radius: 8px;
+  background: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.brief summary {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.pre {
+  margin: var(--spacing-3xs) 0 0;
+  font-size: var(--font-size-caption);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.calls,
+.plain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-caption);
+}
+
+.call {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  gap: var(--spacing-2xs);
+}
+
+.callTool {
+  font-weight: var(--font-weight-medium);
+}
+
+.callTarget {
+  overflow: hidden;
+  color: var(--color-fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Боковая панель чата: узел справа от ленты.
+.pane {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  height: 100%;
+  min-height: 0;
+  padding: var(--spacing-md);
+  overflow-y: auto;
+}
+
+.paneHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.paneTitle {
+  margin: 0;
+  overflow-wrap: anywhere;
 }

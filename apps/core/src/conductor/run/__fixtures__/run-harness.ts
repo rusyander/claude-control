@@ -8,6 +8,7 @@ import { applyAnswer } from '../../commands/answer.ts';
 import { commandEnv } from '../../commands/__fixtures__/command-env.ts';
 import { raiseHumanPoint } from '../../human/raise.ts';
 import { presetOf } from '../../scenario/presets.ts';
+import type { SeatPort } from '../../schedule/schedule.types.ts';
 import {
   CREATED,
   deps as journalDeps,
@@ -64,6 +65,19 @@ export interface Script {
   request?: string;
   /** Язык панели, с которой задача запущена (`task.created.lang`); по умолчанию поля нет. */
   lang?: 'ru' | 'en';
+  /** Потолок задачи (`task.created.modelCeiling`); по умолчанию — `null`, как в `CREATED`. */
+  modelCeiling?: string | null;
+  /** Профиль ведения при запуске (`task.created.lead`, этап 11); по умолчанию поля нет. */
+  lead?: JournalDataV1['task.created']['lead'];
+  /**
+   * Роль единицы 0 (`unit.created.role`, этап 11): стенд сам пишет единицу с ролью до запуска,
+   * как её пишет принятое деление; по умолчанию единицу создаёт исполнитель, без роли.
+   */
+  unitRole?: NonNullable<JournalDataV1['unit.created']['role']>;
+  /** Каталог задач стенда (общий у нескольких стендов — выученное читает их журналы); по умолчанию свой. */
+  tasksDir?: string;
+  /** Порт мест сеансов (этап 11, P141); по умолчанию нет — места не считаются. */
+  allocator?: SeatPort;
 }
 
 export const ROUTE: JournalDataV1['task.created']['allowedRoutes'][number] = {
@@ -328,7 +342,7 @@ export async function stand(
   const sc = 'steps' in scenario ? scenario : presetOf(scenario)!;
   const clock = fakeClock();
   const d = journalDeps({ clock, now: () => clock.stamp().at });
-  const { task, dir, taskId } = await openFresh(undefined, d);
+  const { task, dir, taskId } = await openFresh(script.tasksDir, d);
   if (script.request !== undefined) writeFileSync(join(dir, 'request.md'), script.request);
   task.append({
     kind: 'task.created',
@@ -339,8 +353,29 @@ export async function stand(
       allowedRoutes: script.routes ?? [ROUTE],
       ...(script.request !== undefined ? { requirementsSource: 'request.md' } : {}),
       ...(script.lang ? { lang: script.lang } : {}),
+      ...(script.modelCeiling === undefined ? {} : { modelCeiling: script.modelCeiling }),
+      ...(script.lead ? { lead: script.lead } : {}),
     },
   });
+  if (script.unitRole) {
+    const unitId = newId();
+    task.append({
+      kind: 'unit.created',
+      actor: 'core',
+      unitId,
+      data: {
+        unitId,
+        name: 'unit',
+        repoKey: CREATED.repos[0]?.repoKey ?? 'r1',
+        branch: `agentdeck/${unitId.slice(-8)}`,
+        ownedPaths: ['**'],
+        after: [],
+        contract: false,
+        splitId: null,
+        role: script.unitRole,
+      },
+    });
+  }
   task.append({
     kind: 'task.transition',
     actor: 'core',
@@ -359,6 +394,7 @@ export async function stand(
       now: () => clock.stamp().at,
       ...(script.upkeepEveryMs === undefined ? {} : { upkeepEveryMs: script.upkeepEveryMs }),
       ...(script.economy ? { economy: script.economy } : {}),
+      ...(script.allocator ? { allocator: script.allocator } : {}),
     });
   const out: Stand = {
     task,

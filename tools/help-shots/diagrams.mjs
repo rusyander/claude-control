@@ -186,7 +186,7 @@ const SETS = [
   {
     source: 'docs/diagrams/core-guide/core-guide.drawio',
     topic: 'core',
-    pages: ['panel-to-core', 'launch-to-steps'],
+    pages: ['panel-to-core', 'launch-to-steps', 'lead-pipeline'],
   },
 ];
 

@@ -189,7 +189,7 @@ function contourPlan(deps: MediaDeps, contour: Platform): MediaImagePlan {
     // Флаг рисования читается из каталога ключа и только оттуда: имя модели
     // объявлением не является (`drivers/driver.ts → FLAG_FIELDS`).
     if (!drawing) return blocked('no-model', contour.title);
-    // Шлюз панели здесь больше не нужен: запрос идёт через звено ядра (C3b), и его
+    // Шлюз ядра здесь больше не нужен: запрос идёт через звено ядра (C3b), и его
     // недоступность — отказ при отправке, а не замок плана.
     return {
       available: true,

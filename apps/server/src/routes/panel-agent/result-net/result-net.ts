@@ -131,8 +131,19 @@ function secretName(name: string): boolean {
   return true;
 }
 
+/** Поля, где лежит номер вызова CLI: по нему модель открывает узел дерева агентов. */
+const CLI_ID_FIELD = /^(?:nodeId|parentId|toolUseId|parentToolUseId|itemId)$/;
+
+/**
+ * Номер вызова инструмента CLI (`toolu_01…` Claude, `call_…` OpenAI) — случайный хвост из 24+
+ * знаков, детектор принимает его за ключ. Секретом он не является, а спрятанный номер делает
+ * подробности субагента недоступными модели.
+ */
+const CLI_CALL_ID = /^(?:toolu|srvtoolu|call|fc)_[A-Za-z0-9_-]{1,96}$/;
+
 function maskString(value: string, name: string): string {
   if (isSecretFree(value) || PATH_FIELD.test(name)) return value;
+  if (CLI_ID_FIELD.test(name) && CLI_CALL_ID.test(value)) return value;
   return secretName(name) ? SECRET_MASK : maskText(value);
 }
 

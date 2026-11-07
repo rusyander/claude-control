@@ -46,4 +46,9 @@ export const panelActionsManageRu = {
   stop_session: 'Остановить сессию вне панели',
   delete_backup: 'Удалить копию',
   scaffold_plugin: 'Создать каркас плагина',
+  core_tasks: 'Задачи ядра',
+  core_task: 'Задача ядра',
+  core_report: 'Отчёт задачи ядра',
+  core_lead_settings: 'Настройки ведения ядра',
+  core_agents: 'Агенты ядра',
 };

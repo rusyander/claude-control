@@ -27,6 +27,17 @@ export function tierDecisionBody(tier: TierDecision): DecisionBody {
         alternatives: tier.alternatives.map((a) => `${a.adapter}/${routeLabel(a.route)}`),
         skipped: tier.skipped.map((s) => `${routeLabel(s.route.route)}=${s.verdict}`),
         basis: tier.basis,
+        // Этап 11: роль и откуда её ступень, эскалация (причина — `cause`: по `recordId` бриф
+        // берёт отрывок провала), подъём по обучению и ключ, по которому копятся пробы.
+        role: tier.role,
+        roleSource: tier.roleSource,
+        sources: { ...tier.sources },
+        cause: tier.escalation ? { ...tier.escalation.cause } : null,
+        atCeiling: tier.escalation?.atCeiling ?? false,
+        promotion: tier.promotion
+          ? { rungs: tier.promotion.rungs, evidence: [...tier.promotion.evidence] }
+          : null,
+        learnedKey: tier.learnedKey ? { ...tier.learnedKey } : null,
       }
     : {
         refused: true,

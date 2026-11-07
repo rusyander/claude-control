@@ -1,10 +1,11 @@
 import type { JournalLine } from '@agentdeck/contracts/core/journal';
 import type { UserLayerInventory } from '@agentdeck/contracts/core/user-layer';
-import type { CliAdapter } from '../../adapters/adapter.types.ts';
+import type { CliAdapter, LayerRun } from '../../adapters/adapter.types.ts';
 import { modelRank as rankOnLadder } from '../../economy/tier-ladder.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { PermitContext } from '../../policy/permit/permit.types.ts';
+import { inventorySession } from './layer-journal.ts';
 import type { RoadStart } from './road.types.ts';
 
 /**
@@ -28,14 +29,16 @@ export interface SessionLayerBook {
 }
 
 /**
- * Слой репозитория сеанса из его `session.started`. Строки нет или в ней нет слоя — `true`: опись
- * с определениями репозитория строже (больше определений подагентов судится по их модели).
+ * Слой сеанса из его `session.started`: слой репозитория и режим на деле. Строки нет или в ней нет
+ * слоя — слой репозитория `true` (опись с определениями репозитория строже: больше определений
+ * подагентов судится по их модели), режим — запрошенный шагом.
  */
-function repoLayerOf(task: LiveTask, sessionId: string): boolean {
+function layerOf(task: LiveTask, start: RoadStart): Pick<LayerRun, 'repoLayer' | 'ran'> {
   const line = readJournalLines(task.dir, task.taskId).lines.find(
-    (l) => l.kind === 'session.started' && l.sessionId === sessionId,
+    (l) => l.kind === 'session.started' && l.sessionId === start.sessionId,
   ) as JournalLine<'session.started'> | undefined;
-  return line?.data.layer?.repoLayer ?? true;
+  const layer = line?.data.layer;
+  return { repoLayer: layer?.repoLayer ?? true, ran: layer?.ran ?? start.layer.hooks };
 }
 
 function once<T>(read: () => T): () => T {
@@ -72,17 +75,33 @@ export function createSessionLayerBook(): SessionLayerBook {
         const inventory = adapter?.inventory;
         book.set(
           sessionId,
-          once(() =>
-            inventory ? inventory(start.pin, start.cwd, repoLayerOf(task, sessionId)) : null,
-          ),
+          once(() => {
+            if (!inventory) return null;
+            const layer = layerOf(task, start);
+            return inventory(
+              start.pin,
+              start.cwd,
+              layer.repoLayer,
+              inventorySession(layer, start.layer),
+            );
+          }),
         );
       }
       // Ранг модели — лестница переходника сеанса (факты запуска CLI): алиас и полное имя одной
       // модели — одна ступень. Лестницы нет — ранг неизвестен, подагент с названной моделью
-      // отказывается, с моделью сеанса идёт. Потолка нет — сравнение с моделью шага (R8).
+      // отказывается, с моделью сеанса идёт.
       const ladder = adapter?.ladder;
       const modelRank = (model: string): number | null => rankOnLadder(ladder, model);
+      // Потолок (03:147, модель человека = потолок): задачи → названная модель сеанса → модель,
+      // которую CLI сам назвал ЭТОМУ сеансу (`modelServed` журнала, читается в момент суда —
+      // сеанс на модели CLI по умолчанию имени при старте не имеет). Догадки нет: не назвал никто —
+      // чат без потолка задачи пускает модель с рангом, единица задачи отказывает.
       const ceiling = task.state.created?.modelCeiling ?? start.model;
+      const reportedCeiling = () => {
+        const sessions = task.state.sessions;
+        const served = Object.hasOwn(sessions, sessionId) ? sessions[sessionId]!.modelServed : null;
+        return served === null ? null : { model: served, rank: modelRank(served) };
+      };
       // `subagentHooks` по контракту — и хук ядра, и запреты держатся внутри подагента (проба G5).
       const holds = adapter?.caps.subagentHooks === true;
       return {
@@ -90,10 +109,15 @@ export function createSessionLayerBook(): SessionLayerBook {
         subagents: {
           allowed: holds,
           ceilingRank: ceiling === null ? null : modelRank(ceiling),
+          ...(ceiling === null
+            ? { reportedCeiling, openWithoutCeiling: start.stepKind === 'chat' }
+            : {}),
           modelRank,
           definitionModel: (type) =>
             inventoryOf(sessionId)?.agents.find((a) => a.name === type)?.model ?? null,
           readOnlyHolds: holds,
+          // Единица задачи под ведением (этап 11, P141); чат под ведением только наблюдается.
+          leadWorker: task.state.created?.lead !== undefined && start.stepKind !== 'chat',
         },
       };
     },

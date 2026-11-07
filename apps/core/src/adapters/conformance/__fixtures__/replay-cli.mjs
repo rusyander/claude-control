@@ -9,6 +9,7 @@
 //   REPLAY_DUMP    — сюда JSON: argv, окружение, cwd и все строки stdin (переписывается);
 //   REPLAY_STDERR  — текст в stderr при выходе; REPLAY_EXIT — код выхода (по умолчанию 0);
 //   REPLAY_EAGER=1 — первый отрезок сразу, не дожидаясь сообщения (ошибка запуска);
+//   REPLAY_OUTLIVE_MS — столько живёт после конца stdin (CLI, переживший хост сессии);
 //   REPLAY_VERSION — ответ на `--version` (по умолчанию 0.0.0).
 //
 // Запись режется на отрезки: отрезок кончается строкой `result` и следующими за ней строками
@@ -125,5 +126,9 @@ createInterface({ input: process.stdin })
     }
   })
   .on('close', () => {
-    void chain.then(finish);
+    // Клиент ушёл (умер хост сеанса): живой CLI посреди хода доделывает его и только потом
+    // выходит — REPLAY_OUTLIVE_MS держит процесс столько после конца stdin.
+    const outlive = Number(env.REPLAY_OUTLIVE_MS ?? 0);
+    if (outlive > 0) setTimeout(() => void chain.then(finish), outlive);
+    else void chain.then(finish);
   });

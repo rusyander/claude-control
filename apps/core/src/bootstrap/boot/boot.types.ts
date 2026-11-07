@@ -17,6 +17,7 @@ import type { LoopOptions } from '../conductor-wiring/index.ts';
 import type { CoreRouteConfig } from '../core-routes.ts';
 import type { BaseStart } from '../economy-wiring/base-start.ts';
 import type { ObserverOptions } from '../observer-wiring/observer-wiring.types.ts';
+import type { AgentsBootOptions } from '../agents-wiring/agents-wiring.types.ts';
 import type { LoginPathReader, ResourceReaders, SessionRoad } from '../session-road.ts';
 import type { SessionRuntime } from '../session-runtime.ts';
 
@@ -122,6 +123,8 @@ export interface BootOptions {
    * тишины, проба жизни, часы.
    */
   observer?: ObserverOptions;
+  /** Подстройки истории агентов и сторожа фона (этап 11) — только из кода теста. */
+  agents?: AgentsBootOptions;
   /** Чтение мягкого предела открытых файлов (09 limits); нет — настоящее чтение этой ОС. */
   openFiles?: () => Promise<Fact<OpenFilesLimit> | NotApplicable>;
 }

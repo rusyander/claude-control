@@ -55,6 +55,8 @@ let startDelayMs: number;
 let local: ReturnType<typeof createLocalModels>;
 /** Последний снимок книги контуров ядра, который панель отдаёт сервису (L6). */
 let coreEvents: PlatformGatewayEvent[] | undefined;
+/** Ответ ядра на `GET /api/core/local/activity` (лента звена, этап 11); нет — ядро молчит. */
+let coreActivity: { status: number; body: unknown } | undefined;
 
 const ENV = (): NodeJS.ProcessEnv => ({
   AGENTDECK_LOCAL_MODELS_DIR: join(root, 'lm'),
@@ -134,6 +136,13 @@ beforeEach(async () => {
 
   app = Fastify();
   app.get('/api/platforms', () => ({ activePlatformId: '', platforms: [] }));
+  // Прокладка к ядру (`/api/core/*`) — вне этой проверки: здесь — ответ ядра, который задал тест.
+  coreActivity = undefined;
+  app.get('/api/core/local/activity', (_request, reply) =>
+    coreActivity
+      ? reply.code(coreActivity.status).send(coreActivity.body)
+      : reply.code(503).send({ error: 'core-absent' }),
+  );
   const kit = { modeOf: () => 'global' } as unknown as KitService;
   const ctx = { store: { getSettings: () => ({ remoteAccess: { enabled: false } }) } };
   registerLocalModelsRoutes(app, ctx as unknown as ServerContext, local, kit);
@@ -149,7 +158,7 @@ afterEach(async () => {
 });
 
 describe('состояние локального прогона и перезапуск из чата (ревью m5)', () => {
-  it('GET /activity: простой — сервер, квантование и окно; этапов хода и замера слоя нет', async () => {
+  it('GET /activity: простой — сервер, квантование, окно и предел тишины; ядро молчит — этапа нет', async () => {
     const started = await api('POST', '/api/local-models/server/start', {
       tag: TAG,
       quant: 'Q4_K_M',
@@ -162,7 +171,50 @@ describe('состояние локального прогона и переза
       model: TAG,
       quant: 'Q4_K_M',
       context: 32_768,
+      stallMs: 120_000,
     });
+  });
+
+  it('GET /activity: этап хода — из ленты звена ядра, сервер — из записи панели (этап 11)', async () => {
+    const started = await api('POST', '/api/local-models/server/start', {
+      tag: TAG,
+      quant: 'Q4_K_M',
+      context: 32_768,
+    });
+    expect(started.status, JSON.stringify(started.body)).toBe(200);
+    const at = Date.now();
+    coreActivity = {
+      status: 200,
+      body: {
+        routes: [
+          {
+            route: 'local:own',
+            model: TAG,
+            phase: 'prompt',
+            inFlight: 1,
+            startedAt: at - 5_000,
+            prompt: { filled: 2048, total: 4096 },
+            decoded: 0,
+            lastMoveAt: at,
+            stalled: false,
+          },
+        ],
+      },
+    };
+    const busy = await api<LocalActivity>('GET', '/api/local-models/activity');
+    expect(busy.body).toMatchObject({
+      model: TAG,
+      quant: 'Q4_K_M',
+      phase: 'prompt',
+      inFlight: 1,
+      prompt: { filled: 2048, total: 4096 },
+      stalled: false,
+    });
+    // Ядро прежней версии отвечает отказом — ответ без этапа, а не ошибка чата.
+    coreActivity = { status: 501, body: { error: 'нет ленты' } };
+    const old = await api<LocalActivity>('GET', '/api/local-models/activity');
+    expect(old.status).toBe(200);
+    expect(old.body.phase).toBeUndefined();
   });
 
   it('GET /activity: отказ сервера моделей из книги контуров ядра — код и текст до удачного ответа (L6)', async () => {

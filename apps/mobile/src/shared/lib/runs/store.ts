@@ -1,6 +1,13 @@
 import { useSyncExternalStore } from 'react';
 import type { MessageUsage } from '@agentdeck/contracts';
-import { EMPTY_RUN, TURN_RESET, type AgentRun, type ChatEvent, type RunStatus } from './types';
+import {
+  EMPTY_RUN,
+  TURN_RESET,
+  type AgentRun,
+  type ChatEvent,
+  type RunStatus,
+  type StreamedTool,
+} from './types';
 
 /**
  * Состояние идущих прогонов. Живёт вне React по той же причине, что и в панели:
@@ -132,6 +139,14 @@ export function visibleStatus(run: AgentRun): RunStatus {
   return 'running';
 }
 
+/**
+ * Вопрос агента ещё ждёт человека. Закрыт самим фактом автовыбора, как на сервере: пустой
+ * список — выбор, который прогон не разобрал, а не открытый вопрос (F-132).
+ */
+function isOpenAsk(tool: StreamedTool): boolean {
+  return tool.name === 'AskUserQuestion' && tool.autoPicks === undefined;
+}
+
 function addUsage(base: MessageUsage | undefined, step: MessageUsage): MessageUsage {
   if (!base) return step;
   return {
@@ -191,6 +206,32 @@ export function applyEvent(id: string, event: ChatEvent): void {
         next.steered = [...(run.steered ?? []), event.text];
       }
       break;
+    case 'nextTurn': {
+      // Слово «на ходу» доставлено и начало свой ход того же прогона (чат на ядре, core-chat-012) —
+      // как в панели (`agent-runs.events.ts`). Оно уходит из строки «Передано агенту» в ленту своей
+      // репликой (`lastPrompt` — пузырь отправленного, его снимет история), а поток с этой минуты
+      // рисует новый ход. Без этого ответ дописывался к прежнему одним текстом, а слово по концу
+      // прогона пропадало: транскрипта чужого CLI нет. Отметка конца — экрану перечитать ленту.
+      const steered = run.steered ?? [];
+      const at = steered.findIndex((text) => text.trim() === event.prompt.trim());
+      const rest = at >= 0 ? steered.filter((_, i) => i !== at) : steered;
+      // Открытый вопрос агента переживает границу хода — на него ещё не ответили.
+      const tools = run.tools.filter(isOpenAsk);
+      next = {
+        ...next,
+        steered: rest.length > 0 ? rest : undefined,
+        lastPrompt: event.prompt,
+        text: '',
+        thinking: '',
+        tools,
+        // Хвост законченного (`tailOnly`) вызовов не копит — о вопросе знает только флаг.
+        askedQuestion: tailOnly ? run.askedQuestion : tools.length > 0,
+        textUsage: undefined,
+        turnAt: event.at,
+        endedAt: Date.now(),
+      };
+      break;
+    }
     case 'thinking':
       if (!tailOnly) next.thinking = run.thinking + event.text;
       break;
@@ -284,11 +325,7 @@ export function applyEvent(id: string, event: ChatEvent): void {
         tool.id === event.toolUseId ? { ...tool, autoPicks: event.picks } : tool,
       );
       next.tools = tools;
-      next.askedQuestion = tools.some(
-        // Закрыт самим фактом автовыбора, как на сервере: пустой список — выбор,
-        // который прогон не разобрал, а не открытый вопрос (F-132).
-        (tool) => tool.name === 'AskUserQuestion' && tool.autoPicks === undefined,
-      );
+      next.askedQuestion = tools.some(isOpenAsk);
       break;
     }
     case 'handoff':

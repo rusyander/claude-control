@@ -165,6 +165,9 @@ async function open(browser, { response, viewport, colorScheme = 'light' } = {})
 }
 
 const headers = (page) => page.locator('button[data-changelog-entry]');
+// Тела раскрытых выпусков. Не getByRole('region'): блок «Лимиты подписки» в боковой
+// панели — тоже region, и на стенде с данными подписки он стоит в документе первым.
+const bodies = (page) => page.locator('[role="region"][aria-labelledby]');
 const expandedOf = async (page, index) =>
   (await headers(page).nth(index).getAttribute('aria-expanded')) === 'true';
 
@@ -232,7 +235,7 @@ try {
 
     // Снова первый — для тела: пункты, «Как», полоса областей, коммиты, ссылки.
     await headers(page).first().click();
-    const body = page.getByRole('region').first();
+    const body = bodies(page).first();
     // Описание без коммита чисел не несёт: ни полосы областей, ни коммитов, ни «+N −M».
     check(
       'описание в работе: без чисел, полосы областей и коммитов',
@@ -260,7 +263,7 @@ try {
       (await treeHeader.innerText()).replaceAll('\n', ' | '),
     );
     await treeHeader.click();
-    const treeBody = page.getByRole('region').nth(1);
+    const treeBody = bodies(page).nth(1);
     check(
       'правки рабочей копии: пояснение и полоса областей',
       (await treeBody.getByText(/Все правки рабочей копии/).count()) === 1 &&
@@ -269,7 +272,7 @@ try {
     await treeHeader.click();
     // Выпущенное описание: числа и области берутся из его коммитов.
     await headers(page).nth(2).click();
-    const released = page.getByRole('region').last();
+    const released = bodies(page).last();
     check(
       'в теле выпущенного: полоса областей и легенда',
       (await released.getByRole('img', { name: /Веб: \+700/ }).count()) === 1 &&

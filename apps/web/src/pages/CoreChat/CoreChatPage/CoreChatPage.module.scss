@@ -1,9 +1,0 @@
-// Страница в раскладке `fill`: ровно высота колонки, прокручивается лента чата, а не страница.
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  height: 100%;
-  min-height: 0;
-  overflow-y: auto;
-}

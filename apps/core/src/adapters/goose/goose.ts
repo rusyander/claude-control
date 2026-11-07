@@ -269,6 +269,8 @@ export function createGooseAdapter(options: RpcAdapterOptions = {}): RpcAdapter 
       layer: gooseLayer,
       refuse: refuseGoose,
       plan: planGoose,
+      // Флага без записи у ACP Goose нет; база сеансов — под своим GOOSE_PATH_ROOT сеанса.
+      ephemeral: 'session-home',
       resume: gooseResume,
       ownsTranscript: gooseOwnsTranscript,
       transcriptPresent: gooseTranscriptPresent,

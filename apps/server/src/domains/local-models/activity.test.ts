@@ -1,6 +1,11 @@
 import type { PlatformGatewayEvent } from '@agentdeck/contracts';
+import {
+  HOP_STALL_CPU_MS as STALL_CPU_MS,
+  HOP_STALL_GPU_MS as STALL_GPU_MS,
+  type HopActivity,
+} from '@agentdeck/contracts/core/hops';
 import { describe, expect, it } from 'vitest';
-import { localActivityOf, localOutcomeOf } from './activity.ts';
+import { localActivityOf, localOutcomeOf, withHopActivity } from './activity.ts';
 
 /**
  * Память отказа сервера моделей (L6) по книге контуров ядра: события — в той форме, в какой их
@@ -83,6 +88,99 @@ describe('память отказа локальной модели по кни�
       model: 'qwen3.6:27b-coding',
       quant: 'UD-Q4_K_XL',
       context: 131_072,
+      // Число, а не константа: справка обещает «2 мин у видеокарты», и ядро берёт тот же предел.
+      stallMs: 120_000,
     });
+  });
+
+  it('сервер на процессоре молчит законно дольше: предел тишины 600 с', () => {
+    const snapshot = localActivityOf({
+      server: () => ({ model: 'm', context: 8_192, device: 'cpu' }),
+      events: () => undefined,
+    });
+    expect(snapshot.stallMs).toBe(600_000);
+  });
+});
+
+/** Ход маршрута в той форме, в какой его отдаёт лента звена ядра (`HopActivity`). */
+function hop(over: Partial<HopActivity> = {}): HopActivity {
+  return {
+    route: 'local:own',
+    model: 'stub',
+    phase: 'prompt',
+    inFlight: 1,
+    startedAt: 1_000,
+    prompt: { filled: 2048, total: 4096 },
+    decoded: 0,
+    lastMoveAt: 2_000,
+    stalled: false,
+    ...over,
+  };
+}
+
+describe('ход локальной модели по ленте звена ядра (этап 11, W2-5)', () => {
+  const base = { model: 'qwen', context: 8_192, stallMs: STALL_GPU_MS };
+
+  it('этап, разбор промпта и токены ответа берутся из ленты; сервер — из записи панели', () => {
+    const view = withHopActivity(base, { routes: [hop()] }, 3_000);
+    expect(view).toEqual({
+      model: 'qwen',
+      context: 8_192,
+      phase: 'prompt',
+      inFlight: 1,
+      startedAt: 1_000,
+      prompt: { filled: 2048, total: 4096 },
+      decoded: 0,
+      lastMoveAt: 2_000,
+      stalled: false,
+      stallMs: STALL_GPU_MS,
+    });
+  });
+
+  it('из маршрутов берётся тот, где запрос в полёте, а не самый свежий простаивающий', () => {
+    const idle = hop({ route: 'gateway:local-ollama', phase: 'idle', inFlight: 0, lastMoveAt: 9 });
+    const busy = hop({ phase: 'generating', decoded: 10, lastMoveAt: 5 });
+    const view = withHopActivity(base, { routes: [idle, busy] }, 6);
+    expect(view).toMatchObject({ phase: 'generating', decoded: 10, inFlight: 1 });
+  });
+
+  it('два маршрута в полёте — берётся тот, чьё движение свежее; в полёте никого — последний', () => {
+    const older = hop({
+      route: 'local:own',
+      phase: 'prompt',
+      prompt: { filled: 64 },
+      lastMoveAt: 3,
+    });
+    const fresher = hop({
+      route: 'local:own:panel',
+      phase: 'generating',
+      decoded: 7,
+      lastMoveAt: 8,
+    });
+    expect(withHopActivity(base, { routes: [fresher, older] }, 9)).toMatchObject({
+      phase: 'generating',
+      decoded: 7,
+    });
+    expect(withHopActivity(base, { routes: [older, fresher] }, 9).phase).toBe('generating');
+    const closedA = hop({ route: 'local:own', phase: 'idle', inFlight: 0, lastMoveAt: 4 });
+    const closedB = hop({ route: 'local:own:panel', phase: 'idle', inFlight: 0, lastMoveAt: 11 });
+    expect(withHopActivity(base, { routes: [closedB, closedA] }, 12).lastMoveAt).toBe(11);
+  });
+
+  it('застой пересчитан по устройству: 200 с тишины — застой у видеокарты, не у процессора', () => {
+    const quiet = { routes: [hop({ lastMoveAt: 0, stalled: true })] };
+    expect(withHopActivity(base, quiet, 200_000).stalled).toBe(true);
+    const cpu = { ...base, stallMs: STALL_CPU_MS };
+    expect(withHopActivity(cpu, quiet, 200_000).stalled).toBe(false);
+    expect(withHopActivity(cpu, quiet, 600_000).stalled).toBe(true);
+    const loading = { routes: [hop({ phase: 'loading', lastMoveAt: 0 })] };
+    expect(withHopActivity(base, loading, 900_000).stalled).toBe(false);
+  });
+
+  it('тело ядра не той формы или пустое — хода нет, ответ прежний', () => {
+    expect(withHopActivity(base, { routes: [] }, 1)).toEqual(base);
+    expect(withHopActivity(base, { routes: [{ route: 'x' }] }, 1)).toEqual(base);
+    expect(withHopActivity(base, { error: 'core-absent' }, 1)).toEqual(base);
+    expect(withHopActivity(base, undefined, 1)).toEqual(base);
   });
 });

@@ -94,11 +94,6 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     title: 'Core scenarios',
     description: 'Scenarios (presets) the core runs a task by, and their steps',
   },
-  {
-    route: '/core/chat',
-    title: 'Chat through the core',
-    description: 'A CLI chat run as a core task: session feed, asks and permits judged by the core',
-  },
   { route: '/rules', title: 'Rules', description: 'Rule files of the active CLI' },
   { route: '/claude-md', title: 'Global instructions', description: 'User-level CLAUDE.md' },
   { route: '/hooks', title: 'Hooks', description: 'CLI hooks' },

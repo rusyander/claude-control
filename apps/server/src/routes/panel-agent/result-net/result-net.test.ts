@@ -76,6 +76,23 @@ describe('net only: identifiers, paths, argument lists, app texts', () => {
     });
   });
 
+  it('a CLI call id stays under an id field; the same id elsewhere or a spaced value is checked', () => {
+    // Форма настоящего номера Claude: детектор по форме принимает хвост за ключ.
+    const toolUse = 'toolu_01A9kQz7XbVw3RtY5uP2mLnD';
+    const call = 'call_Zx8Qw2Lm5Np9Rt4Vb7Kc1Hj6';
+    expect(maskResult({ nodeId: toolUse, parentId: call, toolUseId: toolUse })).toEqual({
+      nodeId: toolUse,
+      parentId: call,
+      toolUseId: toolUse,
+    });
+    expect(maskResult({ apiKey: toolUse })).toEqual({ apiKey: SECRET_MASK });
+    expect(maskResult({ note: toolUse })).not.toEqual({ note: toolUse });
+    expect(maskResult({ nodeId: `${toolUse} ${VENDOR_KEY}` })).not.toEqual({
+      nodeId: `${toolUse} ${VENDOR_KEY}`,
+    });
+    expect(maskResult({ nodeId: VENDOR_KEY })).not.toEqual({ nodeId: VENDOR_KEY });
+  });
+
   it('path fields pass as they are; the same string elsewhere is checked', () => {
     const dir = 'C:/tmp/cc-agent-a4-project-uy9Xe7Qk2Lm4Np8Rw3';
     expect(maskResult({ projectPath: dir, cwd: dir })).toEqual({ projectPath: dir, cwd: dir });

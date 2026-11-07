@@ -55,9 +55,31 @@ export function applyEvent(id: string, event: ChatEvent): void {
           dropped: undefined,
           tailOnly: undefined,
           steered: undefined,
+          turnAt: undefined,
         } satisfies Partial<AgentRun>);
       }
       break;
+    case 'nextTurn': {
+      // Слово «на ходу» доставлено и начало свой ход того же прогона (чат на ядре). Оно уходит
+      // из пузырей ожидания в ленту своей репликой (`sentFromQueue` → оптимистичный пузырь, снимет
+      // его история), а поток с этой минуты рисует новый ход: прежний ответ лента берёт из истории
+      // (`turnAt` — новая граница «живого хода»). Без этого ответ дописывался к прежнему одним
+      // текстом, а слово по концу прогона пропадало: транскрипта чужого CLI панель не читает.
+      const steered = run.steered ?? [];
+      const at = steered.findIndex((item) => item.text.trim() === event.prompt.trim());
+      const rest = at >= 0 ? steered.filter((_, i) => i !== at) : steered;
+      Object.assign(next, {
+        steered: rest.length > 0 ? rest : undefined,
+        sentFromQueue: { id: `turn-${event.at}`, prompt: event.prompt },
+        text: '',
+        thinking: '',
+        // Открытый вопрос агента переживает границу хода — на него ещё не ответили.
+        tools: run.tools.filter(isOpenAsk),
+        textUsage: undefined,
+        turnAt: event.at,
+      } satisfies Partial<AgentRun>);
+      break;
+    }
     case 'text':
       // Хвост завершённого прогона: ответ уже в истории, пузырю он не нужен.
       if (!run.tailOnly) next.text = run.text + event.text;

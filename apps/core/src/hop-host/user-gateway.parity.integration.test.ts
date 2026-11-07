@@ -1,5 +1,6 @@
 import { defaultOurRules } from '@agentdeck/contracts/platform';
 import type { RouteReply, RouteRequest } from '@agentdeck/stub-model';
+import { contourRoute } from '@agentdeck/stub-model/scenarios/contour';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   CONTOUR_KEY,
@@ -9,7 +10,7 @@ import {
 } from './__fixtures__/user-gateway-stand.ts';
 
 /**
- * Паритет шлюза человека со шлюзом панели (этап 10, перенос перед удалением шлюза панели).
+ * Паритет шлюза человека с прежним шлюзом в панели (этап 10, перенос перед его удалением).
  * Случаи — те же, что у `section-rules.integration.test.ts` панели: разделы контура (баг 11а) и
  * чьи правила действуют (баг 11б). Путь настоящий от файла панели до провода: `state.json` панели
  * → `readPanelProfiles` → `userRouteOf` (ядро) → настройка хоста звеньев → запрос CLI → контур
@@ -259,6 +260,57 @@ describe('шлюз человека: поток наверх', () => {
     const answer = await ask(port, '/corp/_s/chat/v1/chat/completions', { stream: false });
     expect(answer.status).toBe(200);
     expect(sentBody()).toMatchObject({ stream: true, stream_options: { include_usage: true } });
+  });
+});
+
+describe('шлюз человека: потери ответа названы в следе', () => {
+  // Картинка в ответе контура не переносится в диалект Anthropic. Прежний шлюз клал её в `lost`
+  // следа; мост ядра собирал её в фактах перевода и не отдавал — след молчал (этап 11, check-platform-wire).
+  it('картинка ответа клиенту Anthropic — текст дошёл, часть названа потерей', async () => {
+    const port = await open({}, contourRoute());
+    const answer = await ask(
+      port,
+      '/corp/_s/chat/v1/messages',
+      { model: 'stub-image', max_tokens: 32, messages: [{ role: 'user', content: 'нарисуй' }] },
+      { 'anthropic-version': '2023-06-01' },
+    );
+    expect(answer.status).toBe(200);
+    expect(answer.text).toContain('вот картинка');
+    const event = trace().at(-1) as { lost?: string[] } | undefined;
+    expect(event?.lost ?? []).toEqual(expect.arrayContaining([expect.stringContaining('image')]));
+  });
+
+  it('отказ кадром ошибки после 200 — след несёт код и причину контура, а не пустую строку', async () => {
+    const port = await open({}, contourRoute());
+    const answer = await ask(port, '/corp/_s/chat/v1/chat/completions', {
+      model: 'stub-stream-error',
+      stream: false,
+    });
+    expect(answer.status).toBe(429);
+    const event = trace().at(-1) as { status?: number; error?: string } | undefined;
+    expect(event?.status).toBe(429);
+    expect(event?.error ?? '').toMatch(/Лимит запросов/);
+  });
+
+  it('родные инструменты контура — вызов в следе назван нативным, а не вызовом контура', async () => {
+    const port = await open({ driver: 'openai-compat' }, contourRoute());
+    const answer = await ask(port, '/corp/_s/chat/v1/chat/completions', {
+      model: 'stub-tool-native',
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'Write', parameters: { type: 'object', properties: {} } },
+        },
+      ],
+    });
+    expect(answer.status).toBe(200);
+    const reply = await gw!.control({ op: 'contours' });
+    const events =
+      reply.ok && reply.op === 'contours'
+        ? (reply.contours.events as { nativeCalls?: number; contourCalls?: number }[])
+        : [];
+    const last = events.at(0);
+    expect(last).toMatchObject({ nativeCalls: 1, contourCalls: 0 });
   });
 });
 

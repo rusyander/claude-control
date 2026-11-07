@@ -20,6 +20,9 @@ import {
   type NextStepDecision,
   type UnitView,
 } from './next.types.ts';
+import { integrationHold, integrationRoundOf, isIntegrationUnit } from '../gates/integrated.ts';
+import { xlParentNext } from '../split/xl-wait.ts';
+import { leadGate } from './lead-gate.ts';
 import { publishStep, resolveConflict, tailStep, unitEndEvent } from './publish.ts';
 import { reviewLinkClosedByDecision, reviewLinkNext } from './review-link.ts';
 
@@ -117,15 +120,24 @@ function unitNext(
   // Ревью по ссылке (этап 10, F8): после ревью шаги выбирает ответ человека.
   const byDecision = reviewLinkNext(state, scenario, view);
   if (byDecision) return byDecision;
+  // Интеграция после зелёного (Q-1): голова единицы сдвинулась — новый круг ворот.
+  const reround = integrationRoundOf(state, unitId);
+  if (reround) return reround;
   const publishTail = afterPublish(scenario);
   for (const def of topoOrder(scenario)) {
     if (publishTail.has(def.id) && def.kind !== 'publish') {
       // Хвост после публикации: «опубликовано», «отвечает» или пропуск ответа без нитей.
       const tail = tailStep(state, view, unit, def);
-      if (tail && (tail.kind === 'end-unit' || !satisfied(view, scenario, def))) return tail;
+      // Интеграция своего MR не открывает: её «опубликовано» — только после всех её шагов, иначе
+      // ревью общего диффа нового круга (Q-1) стояло бы за ранним концом хвоста.
+      const ends = tail?.kind === 'end-unit' && !isIntegrationUnit(unit);
+      if (tail && (ends || !satisfied(view, scenario, def))) return tail;
     }
     if (satisfied(view, scenario, def)) continue;
     const last = latest(view, def.id);
+    // Форма задачи ведущего (этап 11): шаг, которого ещё не было, — пропуск по карточке и классу.
+    const shaped = last ? null : leadGate(state, def, unitId);
+    if (shaped) return shaped;
     const round = last ? last.rec.round + 1 : 0;
     if (def.kind === 'publish') {
       const published = publishStep(input, scenario, view, unit, def);
@@ -299,13 +311,23 @@ function decide(input: NextInput, scoped = false): NextAction {
       action = view.active
         ? activeAction(input, scenario, view, view.active)
         : unitNext(input, scenario, view, unit);
+      // Интеграция не уходит в конец, пока её единицы публикуются (Q-1, `gates/integrated.ts`).
+      const hold =
+        action.kind === 'end-unit' && action.event === 'published'
+          ? integrationHold(state, unitId)
+          : null;
+      if (hold) action = { kind: 'wait', reason: hold };
     } else continue;
     if (action.kind !== 'wait') return action;
     // Ближайший срок среди ждущих единиц — исполнитель ставит таймер на него (рабочее время и
     // стена — разные часы, ближайший берётся по каждым).
     wait = sooner(wait, action);
   }
-  if (units.every(([, u]) => UNIT_SETTLED.has(u.state))) return taskEnd(state, scenario, units);
+  if (units.every(([, u]) => UNIT_SETTLED.has(u.state))) {
+    // Родитель XL (Q-2 s11): его итог — дети; кончается, когда кончились все они.
+    if (input.children) return xlParentNext(input.children, input.nowMs ?? 0);
+    return taskEnd(state, scenario, units);
+  }
   return wait ?? { kind: 'wait', reason: 'units blocked by predecessors' };
 }
 

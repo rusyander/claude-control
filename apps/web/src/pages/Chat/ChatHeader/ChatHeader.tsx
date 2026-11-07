@@ -1,4 +1,3 @@
-import { useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
@@ -14,7 +13,6 @@ import { ChatHeaderMenu } from '../ChatHeaderMenu/ChatHeaderMenu';
 import { ProjectShelfButton } from './ProjectShelfButton/ProjectShelfButton';
 import { useLineStarts } from '../model/useLineStarts';
 import { formatTime } from '../lib/formatTime';
-import { coreResumeIdOf, coreResumeSearch } from '../lib/coreResume';
 import type { ChatHeaderProps } from './ChatHeader.types';
 import styles from './ChatHeader.module.scss';
 import { formatSpend } from '../../../shared/lib/formatSpend';
@@ -53,6 +51,7 @@ export function ChatHeader({
   defaultModel,
   defaultEffort,
   models,
+  cli,
   consumer,
   onModelChange,
   onEffortChange,
@@ -83,8 +82,6 @@ export function ChatHeader({
   const projectBarRef = useLineStarts<HTMLDivElement>();
 
   const showRetry = runStatus === 'error' && Boolean(chatId) && !errorOverflow;
-  const navigate = useNavigate();
-  const resumeId = coreResumeIdOf(sessionId, chatId);
   const showSpend = tokens > 0 || costUsd !== undefined;
 
   return (
@@ -140,6 +137,7 @@ export function ChatHeader({
               defaultModel={defaultModel}
               defaultEffort={defaultEffort}
               models={models}
+              {...(cli ? { cli } : {})}
               consumer={consumer}
               {...(projectPath ? { projectPath } : {})}
               onModelChange={onModelChange}
@@ -202,28 +200,6 @@ export function ChatHeader({
           <div className={styles.group}>
             <DeliveryControl path={projectPath} />
           </div>
-
-          {/* Этот разговор — дальше через ядро, на месте в папке проекта: ядро сначала
-              сверит транскрипт с этой папкой и при несовпадении откажет по имени. */}
-          {resumeId && (
-            <div className={styles.group}>
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<Icon name="layers" size={20} />}
-                onClick={() =>
-                  void navigate({
-                    to: '/core/chat',
-                    search: coreResumeSearch(projectPath, resumeId),
-                  } as never)
-                }
-                title={t('coreChat.continueInCoreHint')}
-                data-chat-continue-in-core
-              >
-                <span data-bar-label="">{t('coreChat.continueInCore')}</span>
-              </Button>
-            </div>
-          )}
 
           {/* Код, тесты, окружение, редактор — ответы на один вопрос «в каком
               состоянии проект»: код и дифф правок агента прямо в панели,

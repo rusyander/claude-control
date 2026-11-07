@@ -10,15 +10,7 @@ import {
   CHAIN_MAX_AGE_MS,
   type HandoffChains,
 } from '../../domains/chat/ChatHandoff/ChatHandoff.ts';
-import { initiativePrompt } from '../../domains/chat/initiative/initiative.ts';
 import { appendMessage, listChats, readChat } from '../../domains/provider-chat/store/store.ts';
-import type { CoreChatPort } from '../../domains/chat/core-run/core-run.types.ts';
-import {
-  startCoreForeignChat,
-  withRoutes,
-} from '../../domains/chat/core-foreign/core-foreign-start.ts';
-import type { ForeignCarryResolver } from '../../domains/chat/core-foreign/foreign-carry.ts';
-import { coreContourRoutes } from '../../domains/platform/routing/core-contour.ts';
 import {
   carryChats,
   planCarry,
@@ -51,10 +43,6 @@ export interface PortabilityCarryDeps {
   runs: ChatRunRegistry;
   chains: HandoffChains;
   session: ChatSession;
-  /** Разговор у чужого CLI заводится задачей ядра (`startCoreForeignChat`). */
-  coreChats: Pick<CoreChatPort, 'estimate' | 'command'>;
-  /** Слой панели разговору чужого CLI (G6): строка о тестах, набор для CLI. */
-  foreignCarry?: ForeignCarryResolver;
 }
 
 export function registerPortabilityCarryRoutes(
@@ -142,68 +130,27 @@ export function registerPortabilityCarryRoutes(
       }
 
       const target = getActiveProvider(ctx.store);
-      // Задачи ядра, заведённые этим переносом: в их ленту панель не пишет (лента — журнал
-      // ядра, о переносе там говорит само задание), и заметке туда лечь некуда.
-      const coreTasks = new Set<string>();
       const outcomes = await carryChats(sourcesFor(target.id), keys, {
         chains: deps.chains,
         targetName: target.name,
         /**
-         * Заводит разговор у НОВОГО CLI. Две ветки, потому что разговоры
-         * устроены по-разному: у Claude прогон в реестре под временным ключом,
-         * у чужого — задача ядра с его CLI. Ветка Claude — общий с продолжением
-         * стартер: своя копия наследования прав, модели и набора проекта
-         * разошлась бы с ним на первой же правке.
+         * Заводит разговор у НОВОГО CLI — общим с продолжением стартером, каким бы CLI он ни был:
+         * прогон реестра под временным ключом, прогон ядра называет разговор id сеанса, книга
+         * чата ядра его помнит — и разговор в списке, открывается заново, его лента читается.
+         * Прежде чужой CLI получал задачу ядра мимо реестра: ключом был id задачи, записи в
+         * книге не было, и перенесённый разговор в список не попадал (этап 11, волна 3). Своя
+         * копия наследования прав, модели и набора проекта разошлась бы со стартером на первой
+         * же правке.
          */
         open: async (input) => {
-          if (target.id === 'claude') {
-            const key = `new-${Date.now()}`;
-            const started = continuationStarter(app, ctx, deps, selfBaseUrl, {
-              fromAliases: [],
-              allowEdits: false,
-            })({ chatId: key, prompt: input.prompt, cwd: input.cwd, title: input.title });
-            return started
-              ? { ok: true, key, chatId: key }
-              : { ok: false, failure: 'run_not_started' };
-          }
-
-          // Разговор чужого CLI — задача ядра `chat@1` с этим CLI (этап 10, F2c): своего
-          // исполнителя чужих CLI у панели нет. Ключ и id — задача ядра: её лента и есть
-          // разговор. Отказ ядра (CLI без переходника, ядро не запущено) — «прогон не
-          // пошёл» с кодом ядра в журнале сервера; задачу, не дошедшую до запуска, снимает
-          // сам стартер.
-          const prefix = initiativePrompt(ctx.store.getSettings(), { foreign: true });
-          const routes = withRoutes(
-            coreContourRoutes(ctx.store, `foreign:${target.id}`, target.id),
-          );
-          // Слой панели (G6): строка о тестах и набор для CLI; не переносится — не заводим.
-          const carried = deps.foreignCarry?.({ cli: target.id, cwd: input.cwd, ...routes });
-          if (carried && !carried.ok) {
-            app.log.warn({ cli: target.id }, `carry: ${carried.reason}`);
-            return { ok: false, failure: 'run_not_started' };
-          }
-          try {
-            const outcome = await startCoreForeignChat(deps.coreChats, {
-              cli: target.id,
-              cwd: input.cwd,
-              prompt: input.prompt,
-              title: input.title,
-              ...(prefix ? { preface: prefix } : {}),
-              ...routes,
-              ...(carried ? { carry: carried.carry } : {}),
-            });
-            if (outcome.ok) {
-              coreTasks.add(outcome.taskId);
-              return { ok: true, key: outcome.taskId, chatId: outcome.taskId };
-            }
-            app.log.warn(
-              { code: outcome.code, cli: target.id },
-              `carry refused by the core: ${outcome.message}`,
-            );
-          } catch (error) {
-            app.log.warn({ err: error, cli: target.id }, 'carry: core unreachable');
-          }
-          return { ok: false, failure: 'run_not_started' };
+          const key = `new-${Date.now()}`;
+          const started = continuationStarter(app, ctx, deps, selfBaseUrl, {
+            fromAliases: [],
+            allowEdits: false,
+          })({ chatId: key, prompt: input.prompt, cwd: input.cwd });
+          return started
+            ? { ok: true, key, chatId: key }
+            : { ok: false, failure: 'run_not_started' };
         },
         /**
          * Слово в ленту разговора, каким бы провайдером он ни был. У чужого CLI
@@ -214,7 +161,6 @@ export function registerPortabilityCarryRoutes(
          * показывается человеку — умолчания здесь нет.
          */
         notice: (key, text) => {
-          if (coreTasks.has(key)) return false;
           const foreign = parseForeignChatKey(key);
           if (!foreign) {
             return deps.runs.emitExternal(key, { kind: 'notice', code: 'contextCarried', text });

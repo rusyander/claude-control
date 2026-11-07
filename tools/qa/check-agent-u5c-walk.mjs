@@ -1,18 +1,22 @@
 /**
  * Живой обход действий агента панели P3 (U5c) на одноразовом стенде: настоящий
  * сервер `apps/server/src/index.ts`, настоящая сборка маршрутов, настоящий
- * процесс хука и процесс «CLI». Модульные проверки рядом собирают Fastify сами;
- * здесь видно, что действия дошли до настоящей панели и работают её путём.
+ * процесс хука, настоящее ядро стенда (`core: true`, свой дом) и процесс «CLI», который запускает
+ * хост сеансов ядра. Модульные проверки рядом собирают Fastify и подменяют ядро сами; здесь видно,
+ * что действия дошли до настоящей панели и работают её путём.
  *
- * Что подменено: `claude` и `code` — подделки первыми в PATH стенда (пишут, с
- * чем их запустили); контур — `tools/qa/stub-platform.mjs` на своём порту.
- * Решение человека — `/api/agent/pending/:id` с Origin окна стенда.
+ * Что подменено: `claude` и `code` — подделки первыми в PATH стенда (пишут, с чем их запустили;
+ * `claude` говорит с ядром как CLI в режиме SDK); контур — `tools/qa/stub-platform.mjs` на своём
+ * порту. Решение человека — `/api/agent/pending/:id` с Origin окна стенда.
  *
  * Проверяется:
  * - все 13 действий в реестре настоящей панели с заявленным риском;
  * - sandbox_probe_hook: сторож блокирует `rm -rf`, пропускает безопасное;
- * - sandbox_ask: ответ подделки, каталог конфигурации — песочница, `--setting-sources user`,
- *   в прогоне только выбранное правило; после действия песочниц на диске нет;
+ * - sandbox_ask (с этапа 10 — задача ядра `chat@1`): ответ, вызов Write и файл подделки дошли до
+ *   агента; CLI один, его pid — `session.started` задачи ядра «sandbox …»; каталог конфигурации и
+ *   рабочая папка — песочница, `--setting-sources user`; в прогоне только выбранное правило; после
+ *   действия песочниц на диске нет и отказа стирания (`cleanupFailed`) нет — стирание дождалось,
+ *   пока CLI ядра отпустит рабочую папку;
  * - open_project_in_editor: редактор получил каталог проекта;
  * - ask_contour_agent / read / reset / contour_embeddings через активный контур-стаб;
  *   ключ контура в ответах агенту не встречается.
@@ -38,29 +42,100 @@ if (/rm -rf|git push/.test(command)) {
 process.exit(0);
 `;
 
-const FAKE_CLAUDE = `import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+/**
+ * Подделка `claude` для ядра: ядро зовёт CLI как SDK (`-p --input-format stream-json`, stdin
+ * открыт, каждая строка user ждёт эха со своим uuid) и читает поток, как `sdk-stream/normalise.ts`
+ * ядра. Подделка пишет запуск (argv, CLAUDE_CONFIG_DIR, cwd, свой pid, CLAUDE.md каталога
+ * конфигурации, текст хода) в `claude-launches.jsonl` рядом с собой, кладёт `answer.txt` в рабочую
+ * папку, отвечает вызовом Write и текстом; выход — по концу stdin или по снятию стенда.
+ */
+const FAKE_CLAUDE = String.raw`import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { createInterface } from 'node:readline';
 import { dirname, join } from 'node:path';
-let prompt = '';
-process.stdin.setEncoding('utf8');
-for await (const chunk of process.stdin) prompt += chunk;
+const argv = process.argv.slice(2);
+if (argv[0] === '--version' || argv[0] === '-v') {
+  process.stdout.write('2.1.0 (Claude Code)\n');
+  process.exit(0);
+}
+const near = (name) => join(dirname(process.argv[1]), name);
+setInterval(() => {
+  if (!existsSync(near('.stand-alive'))) process.exit(0);
+}, 500).unref();
+const flag = (name) => (argv.indexOf(name) >= 0 ? argv[argv.indexOf(name) + 1] : undefined);
+const session = flag('--resume') ?? flag('--session-id') ?? randomUUID();
 const configDir = process.env.CLAUDE_CONFIG_DIR ?? '';
 const md = configDir && existsSync(join(configDir, 'CLAUDE.md'))
   ? readFileSync(join(configDir, 'CLAUDE.md'), 'utf8') : '';
-appendFileSync(join(dirname(process.argv[1]), 'claude-launches.jsonl'), JSON.stringify({
-  argv: process.argv.slice(2), configDir, cwd: process.cwd(), prompt, md,
-}) + '\\n');
-writeFileSync(join(process.cwd(), 'answer.txt'), '42');
-const out = (line) => process.stdout.write(JSON.stringify(line) + '\\n');
-out({ type: 'system', subtype: 'init', session_id: 'walk-1', model: 'fake', tools: [] });
-out({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Ответ песочницы: 42.' } } });
-out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Write', id: 't1', input: {} }] } });
-out({ type: 'result', subtype: 'success', total_cost_usd: 0.01, duration_ms: 3, session_id: 'walk-1' });
+const out = (line) => process.stdout.write(JSON.stringify(line) + '\n');
+const base = { session_id: session, parent_tool_use_id: null };
+const assistant = (content) => ({ type: 'assistant', ...base, message: { id: 'msg_' + randomUUID().slice(0, 8),
+  type: 'message', role: 'assistant', model: 'fake', stop_reason: null,
+  usage: { input_tokens: 1, output_tokens: 1 }, content } });
+const turn = (message) => {
+  const content = message.message?.content;
+  const prompt = typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('');
+  appendFileSync(near('claude-launches.jsonl'), JSON.stringify({
+    argv, configDir, cwd: process.cwd(), pid: process.pid, prompt, md,
+  }) + '\n');
+  out({ type: 'user', ...base, message: { role: 'user', ...message.message }, uuid: message.uuid, isReplay: true });
+  out({ type: 'system', subtype: 'init', session_id: session, model: 'fake', cwd: process.cwd(), tools: [], mcp_servers: [] });
+  writeFileSync(join(process.cwd(), 'answer.txt'), '42');
+  out(assistant([{ type: 'tool_use', id: 'toolu_walk1', name: 'Write', input: { file_path: 'answer.txt', content: '42' } }]));
+  out({ type: 'user', ...base, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_walk1', content: 'ok' }] } });
+  const text = 'Ответ песочницы: 42.';
+  const part = (event) => out({ type: 'stream_event', event, ...base });
+  const reply = assistant([{ type: 'text', text }]);
+  part({ type: 'message_start', message: { ...reply.message, content: [] } });
+  part({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text } });
+  part({ type: 'message_stop' });
+  out(reply);
+  out({ type: 'result', subtype: 'success', result: text, is_error: false, num_turns: 1, duration_ms: 3,
+    total_cost_usd: 0.01, session_id: session, usage: { input_tokens: 1, output_tokens: 1 } });
+};
+createInterface({ input: process.stdin })
+  .on('line', (line) => {
+    let message;
+    try { message = JSON.parse(line); } catch { return; }
+    if (message.type === 'user') turn(message);
+  })
+  .on('close', () => process.exit(0));
 `;
 
 const FAKE_CODE = `import { appendFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 appendFileSync(join(dirname(process.argv[1]), 'code-launches.jsonl'), JSON.stringify(process.argv.slice(2)) + '\\n');
 `;
+
+/**
+ * Задача ядра стенда, заведённая вопросом песочницы (`title: sandbox <id>` у `/api/sandbox/run`):
+ * её строка `task.created` и `session.started` из журнала `<дом ядра>/tasks/<id>/journal.jsonl`.
+ */
+function coreSandboxTask(coreHome) {
+  const tasks = join(coreHome, 'tasks');
+  for (const task of existsSync(tasks) ? readdirSync(tasks) : []) {
+    const file = join(tasks, task, 'journal.jsonl');
+    if (!existsSync(file)) continue;
+    const rows = readFileSync(file, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .flatMap((raw) => {
+        try {
+          return [JSON.parse(raw)];
+        } catch {
+          return [];
+        }
+      });
+    if (!rows.some((row) => JSON.stringify(row).includes('"sandbox '))) continue;
+    return { task, started: rows.find((row) => row.kind === 'session.started') };
+  }
+  return undefined;
+}
+
+/** Что осталось в каталоге (до 20 путей от него) — подробность провала уборки. */
+function filesUnder(dir) {
+  return readdirSync(dir, { recursive: true }).map(String).slice(0, 20);
+}
 
 const EXPECTED_RISK = {
   continue_chat_handoff: 'danger',
@@ -87,6 +162,9 @@ try {
       web: true,
       label: 'agent-u5c',
       fakeCli: { claude: FAKE_CLAUDE, code: FAKE_CODE },
+      // Разговор песочницы — задача ядра (этап 10, F6): без `core` `/api/sandbox/run` отказывает
+      // «core is not running». Ядро стенда — свой дом, маршрут-заглушка по умолчанию.
+      core: true,
       seed: ({ root, cfg }) => {
         mkdirSync(join(cfg, 'hooks'), { recursive: true });
         writeFileSync(join(cfg, 'hooks', 'guard.mjs'), GUARD);
@@ -202,11 +280,23 @@ try {
           answer.files?.includes('answer.txt'),
         JSON.stringify(ask.result).slice(0, 400),
       );
-      const [launch] = lines('claude-launches.jsonl');
+      const launches = lines('claude-launches.jsonl');
+      const [launch] = launches;
+      // CLI запускает хост сеансов ядра: его pid — в `session.started` задачи песочницы.
+      const sandboxTask = coreSandboxTask(stand.coreHome);
+      check(
+        'вопрос песочницы — задача ядра, CLI запущен её сеансом',
+        launches.length === 1 &&
+          Boolean(sandboxTask?.started) &&
+          sandboxTask.started.data?.cliPid === launch?.pid,
+        `${JSON.stringify(sandboxTask ?? null).slice(0, 400)} | pids ${launches.map((row) => row.pid)}`,
+      );
       const flag = launch?.argv.indexOf('--setting-sources') ?? -1;
       check(
-        'CLI запущен с каталогом песочницы и --setting-sources user',
-        Boolean(launch?.configDir.startsWith(sandboxes)) && launch?.argv[flag + 1] === 'user',
+        'CLI запущен с каталогом песочницы, её рабочей папкой и --setting-sources user',
+        Boolean(launch?.configDir.startsWith(sandboxes)) &&
+          Boolean(launch?.cwd.startsWith(sandboxes)) &&
+          launch?.argv[flag + 1] === 'user',
         JSON.stringify(launch).slice(0, 400),
       );
       check(
@@ -217,8 +307,10 @@ try {
       );
       check(
         'после вопроса песочниц на диске нет',
-        leftovers().length === 0,
-        leftovers().join(', '),
+        leftovers().length === 0 && answer.cleanupFailed === undefined,
+        `${leftovers()
+          .map((name) => `${name}: ${filesUnder(join(sandboxes, name)).join(', ')}`)
+          .join('; ')} | cleanup: ${answer.cleanupFailed ?? '—'}`,
       );
 
       // ── редактор ──

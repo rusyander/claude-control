@@ -166,6 +166,7 @@ export function configFor(
     kill?: KillPoint;
     waitMs?: number;
     observer?: ChildConfig['observer'];
+    tools?: ChildConfig['tools'];
   } = {},
 ): ChildConfig {
   return {
@@ -186,6 +187,7 @@ export function configFor(
     ...(over.taskId ? { taskId: over.taskId } : {}),
     ...(over.kill ? { kill: over.kill } : {}),
     ...(over.observer ? { observer: over.observer } : {}),
+    ...(over.tools ? { tools: over.tools } : {}),
   };
 }
 

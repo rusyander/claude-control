@@ -125,17 +125,6 @@ describe('panel-agent actions: chat gaps (lane A)', () => {
       registerChatHandoffRoutes(app, ctx, {
         runs: registry,
         chains: new HandoffChains(),
-        coreChats: {
-          // Разговор чужого CLI здесь не заводится: ядра в тесте нет.
-          estimate: async () => ({
-            ok: false as const,
-            code: 'no-core',
-            message: 'no core in this test',
-          }),
-          command: async () => {
-            throw new Error('no core in this test');
-          },
-        },
         session,
       });
       registerChatCascadeRoutes(app, ctx);

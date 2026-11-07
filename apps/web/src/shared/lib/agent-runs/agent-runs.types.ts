@@ -90,6 +90,11 @@ export interface AgentRun {
    * прямо сейчас рисует поток, от записанного в транскрипт раньше.
    */
   startedAt?: number;
+  /**
+   * Начало текущего хода внутри прогона, по часам сервера (`nextTurn`): прогон чата на ядре ведёт
+   * и ход слова «на ходу». Граница «живого хода» для ленты — она, если есть, иначе `startedAt`.
+   */
+  turnAt?: number;
   /** Каталог проекта — для группировки статусов (undefined = домашний чат). */
   projectPath?: string;
   /**
@@ -325,6 +330,11 @@ export type ChatEvent =
   | { kind: 'text'; text: string }
   /** Слово человека ушло агенту посреди хода — сервер подтвердил, агент его учтёт. */
   | { kind: 'steer'; text: string; at: string }
+  /**
+   * Слово «на ходу» доставлено и начало следующий ход того же прогона (чат на ядре); `at` — мс
+   * по часам сервера.
+   */
+  | { kind: 'nextTurn'; prompt: string; at: number }
   | { kind: 'thinking'; text: string }
   | { kind: 'tool'; name: string; input: unknown; id: string }
   | { kind: 'limit'; resetsAt: number; type: string; status: string }

@@ -53,6 +53,19 @@ export const sessionWindowDataSchema = z.strictObject({
 });
 export type SessionWindowData = z.infer<typeof sessionWindowDataSchema>;
 
+/**
+ * Стена отправки хода человека (`user-text`): `data.sentAt`, мс эпохи, из записи ввода ядра
+ * (`core-io.jsonl` `wall`, этап 11, волна 3). Вид времени строк не несёт; по этой стене история
+ * чата не-Claude CLI ставит время хода и его ответа. Запись без стены (прежняя) — `undefined`.
+ */
+export function sentAtOf(event: Pick<SessionStreamEvent, 'kind' | 'data'>): number | undefined {
+  if (event.kind !== 'user-text') return undefined;
+  const data = event.data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return undefined;
+  const at = (data as { sentAt?: unknown }).sentAt;
+  return typeof at === 'number' && Number.isFinite(at) ? at : undefined;
+}
+
 export const sessionStreamEventSchema = z.strictObject({
   offset: z.number().int().nonnegative(),
   kind: z.enum(SESSION_STREAM_KINDS),

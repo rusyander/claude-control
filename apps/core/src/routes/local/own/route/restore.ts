@@ -64,7 +64,7 @@ export function createRestore(ctx: OwnContext, waiters: OwnWaiters): () => Promi
   async function restoreLeftover(state: OwnLeaseState, workDir: string): Promise<void> {
     const start = state.startLeft;
     if (!start) return;
-    const left = await stopLeftover(start.root, start.rid);
+    const left = await stopLeftover(start.root, start.rid, start.since);
     const label = `failed model server start ${start.rid} (lease ${state.leaseId})`;
     held.set(state.leaseId, {
       lease: {

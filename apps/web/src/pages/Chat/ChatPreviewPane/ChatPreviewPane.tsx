@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { ResizeHandle } from '@shared/ui/resize-handle';
 import { ArtifactPreview, MediaImageCard } from '@features/ArtifactPreview';
 import { MediaDeckCard } from '@entities/Media';
-import { AgentTranscript } from '@entities/AgentTree';
+import { AgentNodePane } from '@entities/AgentTree';
 import type { ChatPreviewPaneProps } from './ChatPreviewPane.types';
 
 /**
@@ -44,7 +44,7 @@ export function ChatPreviewPane({
         />
       )}
       {!media && agent && (
-        <AgentTranscript
+        <AgentNodePane
           chatId={agent.chatId}
           agentId={agent.agentId}
           onClose={onCloseAgent ?? onClose}

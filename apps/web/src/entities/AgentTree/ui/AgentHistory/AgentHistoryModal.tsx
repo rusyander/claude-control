@@ -1,62 +1,118 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@shared/ui/modal';
+import { Button } from '@shared/ui/button';
 import { Typography } from '@shared/ui/typography';
-import { AgentTranscript } from '../AgentTranscript/AgentTranscript';
-import { AgentHistorySessions } from './AgentHistorySessions';
-import type { AgentHistoryModalProps, HistoryPick } from './AgentHistory.types';
+import { toast } from '@shared/lib/toast';
+import { exportChatAgents, useChatGroups, useCoreAgents } from '../../api/agentTreeApi';
+import { buildCoreTree, modelsOf, NO_FILTERS, ownerPool, taskIdsOf } from '../../model/coreAgents';
+import type { AgentFilters } from '../../model/coreAgents.types';
+import { AgentFiltersBar } from './AgentFiltersBar';
+import { AgentNodeDetail } from './AgentNodeDetail';
+import { AgentNodeList } from './AgentNodeList';
+import type { AgentHistoryModalProps, NodePick } from './AgentHistory.types';
 import styles from './AgentHistory.module.scss';
 
 /**
- * Окно «История агентов»: все сессии разговора новыми первыми — у каждой
- * главный агент одной строкой и её субагенты; щелчок по субагенту открывает
- * справа его шаги (тот же ход, что в «Плане агента»), в том числе субагента
- * прошлой сессии — по ключу ЕГО сессии. Только чтение: источник — транскрипты CLI.
+ * Окно «Агенты»: слева фильтры и дерево узлов всех задач чата, справа выбранный узел подробно
+ * (фоновая работа — своим видом). Всё — свёртка журнала ядра, отбор по фильтрам делает ядро.
+ * «Выгрузить» — строки журнала об агентах каждой задачи чата одним файлом.
  */
 export function AgentHistoryModal({
-  history,
+  chatId,
   isOpen,
   onOpenChange,
   isRunning,
-  isLoading,
 }: AgentHistoryModalProps) {
   const { t } = useTranslation();
-  const [picked, setPicked] = useState<HistoryPick | undefined>();
+  const [filters, setFilters] = useState<AgentFilters>(NO_FILTERS);
+  const [picked, setPicked] = useState<NodePick | undefined>();
+  const [exporting, setExporting] = useState(false);
+  const all = useCoreAgents(isOpen ? chatId : undefined, NO_FILTERS, isRunning);
+  const filtered = useCoreAgents(isOpen ? chatId : undefined, filters, isRunning);
+  const allNodes = useMemo(() => all.data?.nodes ?? [], [all.data]);
+  const nodes = filtered.data?.nodes;
+  const roots = useMemo(() => buildCoreTree(nodes ?? []), [nodes]);
+  const owners = useMemo(() => ownerPool(allNodes, nodes), [allNodes, nodes]);
+  const taskIds = useMemo(() => taskIdsOf(allNodes), [allNodes]);
+  const groups = useChatGroups(taskIds, isOpen);
+  const now = Date.now();
+
   useEffect(() => {
-    if (!isOpen) setPicked(undefined);
+    if (isOpen) return;
+    setPicked(undefined);
+    setFilters(NO_FILTERS);
   }, [isOpen]);
+
+  const onExport = async (): Promise<void> => {
+    setExporting(true);
+    try {
+      await exportChatAgents(chatId, taskIds);
+    } catch (error) {
+      toast.error(
+        t('agentTree.history.exportFailed', {
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  let list;
+  if (filtered.isError && !nodes) list = t('agentTree.history.error');
+  else if (!nodes) list = t('agentTree.history.loading');
+  else if (nodes.length === 0) list = t('agentTree.history.empty');
 
   return (
     <Modal
       isOpen={isOpen}
       onOpenChange={onOpenChange}
       title={t('agentTree.history.title')}
-      {...(history
-        ? {
-            description: t('agentTree.history.summary', {
-              sessions: history.sessions.length,
-              agents: history.agentCount,
-            }),
-          }
-        : {})}
+      description={t('agentTree.history.summary', {
+        count: allNodes.length,
+        tasks: taskIds.length,
+      })}
       size="xl"
       bodyFill
+      headerActions={
+        <Button
+          size="sm"
+          variant="secondary"
+          isLoading={exporting}
+          disabled={taskIds.length === 0}
+          title={t('agentTree.history.exportHint')}
+          onClick={() => void onExport()}
+          data-agent-history-export
+        >
+          {t('agentTree.history.export')}
+        </Button>
+      }
     >
       <div className={styles.layout} data-agent-history-modal>
-        <AgentHistorySessions
-          history={history}
-          isLoading={isLoading}
-          isRunning={isRunning}
-          picked={picked}
-          onPick={setPicked}
-        />
-        <div className={styles.steps}>
+        <div className={styles.side}>
+          <AgentFiltersBar
+            filters={filters}
+            onChange={setFilters}
+            models={modelsOf(allNodes)}
+            groups={groups}
+          />
+          {filtered.data?.truncated && (
+            <Typography variant="caption" color="subtle" as="p">
+              {t('agentTree.history.truncated')}
+            </Typography>
+          )}
+          {list ? (
+            <Typography variant="body-sm" color="subtle" as="p" role="status">
+              {list}
+            </Typography>
+          ) : (
+            <AgentNodeList roots={roots} picked={picked} onPick={setPicked} now={now} />
+          )}
+        </div>
+        <div className={styles.main}>
           {picked ? (
-            <AgentTranscript
-              chatId={picked.chatId}
-              agentId={picked.agentId}
-              onClose={() => setPicked(undefined)}
-            />
+            <AgentNodeDetail taskId={picked.taskId} nodeId={picked.nodeId} nodes={owners} />
           ) : (
             <Typography variant="body-sm" color="subtle" as="p" className={styles.pick}>
               {t('agentTree.history.pick')}

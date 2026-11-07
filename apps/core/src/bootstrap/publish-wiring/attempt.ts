@@ -22,7 +22,7 @@ import { pushUnit } from '../../publisher/push/push.ts';
 import type { OutboxPort } from '../../publisher/push/push.types.ts';
 import { backoffMs, nextBackoffAttempt } from '../../publisher/queue/queue.ts';
 import { refusalUnmet, type ReadyJudge } from '../../publisher/ready/ready.ts';
-import type { PublishReadyInput } from '../../publisher/ready/ready.types.ts';
+import type { PublishReadyInput, ReadyNext } from '../../publisher/ready/ready.types.ts';
 import { fetchBase, gitSyncDeps, syncWithBase } from '../../publisher/sync/sync.ts';
 import { detectConvention, loadPublishTextConfig, sieveText } from '../../publisher/text/index.ts';
 import { describeUnit, syncSiblingBodies } from './describe.ts';
@@ -72,7 +72,7 @@ function waitForge(task: LiveTask, s: StepCtx, cause: string): PublishOutcome {
 const refused = (
   next: 'fix-step' | 'resolve-conflict' | 'regate',
   unmet: string,
-): Extract<PublishOutcome, { kind: 'refused' }> => ({
+): { kind: 'refused'; next: ReadyNext; unmet: string[] } => ({
   kind: 'refused',
   next,
   unmet: [unmet],
@@ -86,7 +86,8 @@ const refused = (
  */
 export type UnitJudgement =
   | { kind: 'wait'; cause: string }
-  | Extract<PublishOutcome, { kind: 'refused' }>
+  // Словарь готовности публикатора (`reintegrate` — отказ ворот интеграции, не публикатора).
+  | { kind: 'refused'; next: ReadyNext; unmet: string[] }
   | { kind: 'allowed'; view: UnitView; route: PushRoute; access: ForgeAccess; head: string };
 
 export async function judgeUnit(

@@ -55,7 +55,9 @@ describe('GET /v1/scenarios', () => {
       library: { id: string; version: number }[];
       problems: { file: string }[];
     };
-    expect(body.presets.map((p) => p.id).sort()).toEqual([...PRESET_IDS].sort());
+    // Пресет может иметь несколько версий (tracker-ticket@1 и @2): список — каждая, ids — по разу.
+    expect([...new Set(body.presets.map((p) => p.id))].sort()).toEqual([...PRESET_IDS].sort());
+    expect(body.latestPresets.find((p) => p.id === 'tracker-ticket')!.version).toBe(2);
     expect(body.library.map((s) => `${s.id}@${s.version}`)).toEqual(['team-flow@1']);
     expect(body.problems.map((p) => p.file)).toEqual(['bad@1.json']);
     expect((await get('/v1/scenarios', false)).statusCode).toBe(401);

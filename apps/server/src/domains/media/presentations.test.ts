@@ -219,7 +219,7 @@ describe('planDeck: кто соберёт колоду', () => {
     expect(plan.reason).toBe('no-model');
   });
 
-  it('шлюз панели выключен — контур всё равно собирает: запрос идёт через звено ядра (C3b)', () => {
+  it('шлюз ядра выключен — контур всё равно собирает: запрос идёт через звено ядра (C3b)', () => {
     useContour(contour({ defaultModel: 'company-chat' }));
     store.updateSettings({ platformGateway: { enabled: false, port: 5179, forceStream: true } });
 

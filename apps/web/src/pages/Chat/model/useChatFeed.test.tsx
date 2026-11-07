@@ -115,6 +115,28 @@ describe('useChatFeed', () => {
     expect(feed.shownHistory.map((item) => item.role)).toEqual(['user']);
   });
 
+  it('ход слова «на ходу» (turnAt): ответ прошлого хода того же прогона — из истории, не прячется', () => {
+    calls.history = [
+      message('user', '2026-10-26T10:00:00Z'),
+      message('assistant', '2026-10-26T10:00:05Z'),
+      message('user', '2026-10-26T10:00:09Z'),
+      message('assistant', '2026-10-26T10:00:12Z'),
+    ];
+    const feed = run({
+      stream: stream({ isRunning: true }),
+      isRunning: true,
+      run: {
+        startedAt: Date.parse('2026-10-26T10:00:01Z'),
+        turnAt: Date.parse('2026-10-26T10:00:08Z'),
+      },
+    });
+    expect(feed.shownHistory.map((item) => item.id)).toEqual([
+      'user-2026-10-26T10:00:00Z',
+      'assistant-2026-10-26T10:00:05Z',
+      'user-2026-10-26T10:00:09Z',
+    ]);
+  });
+
   it('прогресс и ход субагента — по id разговора, у черновика — по сессии прогона', () => {
     run({ activeChatId: undefined, run: { sessionId: 'session-9' } });
     expect(calls.progress[0]).toEqual(['session-9', false]);
@@ -128,6 +150,13 @@ describe('useChatFeed', () => {
     run({ run: { parked: true } });
     run({});
     expect(calls.refresh.map((args) => args[2])).toEqual([true, true, false]);
+  });
+
+  // F-02: граница хода слова «на ходу» доходит до автообновления — оно перечитывает переписку.
+  it('автообновлению отдана граница текущего хода прогона (turnAt)', () => {
+    run({ isRunning: true, run: { turnAt: 5_000 } });
+    run({ isRunning: true });
+    expect(calls.refresh.map((args) => args[3])).toEqual([5_000, undefined]);
   });
 
   it('подсказка контура спрашивает маршрут тем же потребителем', () => {

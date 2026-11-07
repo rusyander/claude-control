@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from '@tanstack/react-router';
+import { chatConsumerOf } from '@agentdeck/contracts/platform-consumers';
 import { useWorkspace } from '@shared/lib/workspace';
 import {
   agentRuns,
@@ -20,8 +20,7 @@ import { useChats } from '@entities/Chat';
 import { closeAgentPane } from '@entities/AgentTree';
 import { useProjects, useOpenInEditor } from '@entities/Project';
 import { useSettings } from '@entities/AppConfig';
-import { useModelCatalog } from '@entities/ModelCatalog';
-import { TurnToolHintLine } from '@entities/Platform';
+import { TurnToolHintLine, usePlatformRunPlan } from '@entities/Platform';
 import { Stack } from '@shared/ui/stack';
 import { useChatMedia } from '@entities/Media';
 import { ChatSidebar } from '../ChatSidebar/ChatSidebar';
@@ -48,11 +47,15 @@ import { useChildHub } from '../model/useChildHub';
 import { useChatDots } from '../model/useChatDots';
 import { useProjectShelf } from '../model/useProjectShelf';
 import { useChatModelPrefs } from '../model/useChatModelPrefs';
+import { useChatCliModels } from '../model/useChatCliModels';
 import { useChatFeed } from '../model/useChatFeed';
 import { useChatAutoApprove } from '../model/useChatAutoApprove';
 import { useCoreAutoGrant } from '../model/useCoreAutoGrant';
 import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
+import { coreRefusalOf } from './coreRefusal';
+import { CoreRefusalLine } from './CoreRefusalLine';
+import { useProjectParam } from './useProjectParam';
 import { downloadChatExport } from '../lib/downloadChatExport';
 import { keepPending } from '../lib/pending';
 import { runAssignment } from '../lib/runAssignment';
@@ -78,21 +81,12 @@ export function ChatPage() {
   const [projectWindow, setProjectWindow] = useState<ProjectWindow>();
   const openEditor = useOpenInEditor();
   const { data: settings } = useSettings();
-  const { data: modelCatalog } = useModelCatalog();
   const costUnit = settings?.costUnit ?? 'tokens';
 
   const chats = useChats();
   const projects = useProjects();
   const shelf = useProjectShelf();
   const ws = useWorkspace();
-  const navigate = useNavigate();
-  // Новый чат — задача ядра (этап 10, F2): он идёт на месте в папке открытого проекта, CLI —
-  // процесс ядра, а не панели. Прежние разговоры открываются и продолжаются здесь.
-  const createCoreChat = () =>
-    void navigate({
-      to: '/core/chat',
-      search: ws.activeProject ? { project: ws.activeProject.path } : {},
-    } as never);
   // Цветные точки по разговорам и проектам — живые прогоны плюс те, что стоят
   // на вопросе мимо панели (подробности и почему их два источника — в хуке).
   const { chatStatuses, projectStatuses } = useChatDots();
@@ -103,9 +97,9 @@ export function ChatPage() {
   // ходят: всё это живёт в одном месте — здесь только читаем.
   const session = useChatSession({ chats: chats.data });
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
-  const consumer = activeChat?.parentId ? 'groups' : 'chat';
-  const localRun = useLocalRun(consumer, projectPath);
-
+  // `?project=` — вкладка этого проекта (W3-17a: туда ведёт и старый адрес `/core/chat`).
+  // Пока список грузится — `undefined` (вкладка ждёт имени из списка); ошибка списка — `[]`.
+  useProjectParam(projects.isPending ? undefined : (projects.data ?? []), session.openProject);
   const run = useAgentRun(chatId);
   // Авторежим прав этого чата: выбор чата сильнее глобальной настройки (подробности — в хуке).
   const autoMode = useChatAutoApprove(chatId, run.sessionId, settings?.chatAutoMode);
@@ -114,7 +108,15 @@ export function ChatPage() {
   // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
   useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
-  const stream = useStreamState(run, isRunning);
+  const runStream = useStreamState(run, isRunning);
+  // Отказ ядра запуску CLI (W3-17a) — строкой на месте композера; карточка ошибки ленты его не
+  // повторяет. Иная ошибка хода идёт карточкой, как была.
+  const refusal = useMemo(() => coreRefusalOf(runStream), [runStream]);
+  const stream = useMemo(() => {
+    if (!refusal) return runStream;
+    const { error: _shownAsLine, ...rest } = runStream;
+    return rest;
+  }, [refusal, runStream]);
 
   const draft = useDraftBox(draftKey);
   const fromWindow = useAskFromWindow(draft, () => setProjectWindow(undefined));
@@ -122,12 +124,25 @@ export function ChatPage() {
   // Модель и глубина продумывания: общий дефолт из настроек, глубина, назначенная
   // разговору панелью, и выбор этого разговора (подробности — в хуке). Прогон
   // без строки в списке назначен сервером — его модель тоже назначенная.
-  const models = useChatModelPrefs(draftKey, settings, runAssignment(activeChat, run));
+  // Модели CLI ЭТОГО разговора (W3-17a): новый — активного провайдера, начатый — своего CLI.
+  const chatCli = useChatCliModels(activeChat?.id ?? run.sessionId, !isRunning);
+  // Потребитель контура — по CLI разговора, тем же правилом, что ведёт ход на сервере
+  // (`chatConsumerOf`): разговор qwen идёт через контур по `foreign:qwen`, а не по «Чату».
+  const consumer = activeChat?.parentId ? 'groups' : chatConsumerOf(chatCli.cli ?? 'claude');
+  const localRun = useLocalRun(consumer, projectPath);
+  // Через контур модель решает его перевод, а не CLI: тот же план, что запирает шапку.
+  const runPlan = usePlatformRunPlan(consumer, projectPath ?? '');
+  const models = useChatModelPrefs(draftKey, settings, runAssignment(activeChat, run), {
+    ...(chatCli.cli ? { cli: chatCli.cli } : {}),
+    ...(chatCli.models ? { catalog: chatCli.models } : {}),
+    contour: runPlan.data?.routed === true,
+  });
   // Кто ответит: подпись ожидания называет модель, а через контур — модель контура.
   const modelName = useRunModelName({
     consumer,
     model: models.modelOverride,
     defaultModel: models.defaultModel,
+    ...(chatCli.cli ? { cli: chatCli.cli } : {}),
   });
 
   const shownChats = useMemo(
@@ -275,7 +290,7 @@ export function ChatPage() {
           activeChatId={activeChat?.id}
           chatStatuses={chatStatuses}
           onSelectChat={session.openChat}
-          onCreateChat={createCoreChat}
+          onCreateChat={ws.activeProject ? () => session.enterProjectDraft() : session.startNewChat}
           projects={projects.data ?? []}
           isProjectsLoading={projects.isLoading}
           activeProjectId={ws.activeProject?.id}
@@ -305,7 +320,8 @@ export function ChatPage() {
             effort={models.effortOverride}
             defaultModel={models.defaultModel}
             defaultEffort={models.defaultEffort}
-            models={modelCatalog?.models}
+            models={chatCli.models}
+            {...(chatCli.cli ? { cli: chatCli.cli } : {})}
             // Кем прогон пойдёт через контур. Связь с родителем заводит только
             // разделение, и сервер по ней же спрашивает маршрут потребителем
             // «Группы» — шапка обязана спрашивать тем же, иначе она говорит про
@@ -409,23 +425,27 @@ export function ChatPage() {
             </Stack>
           )}
 
-          <ChatDock
-            {...(session.draftId ? { focusKey: session.draftId } : {})}
-            progress={feed.progress.data}
-            {...(feed.progressChatId ? { progressChatId: feed.progressChatId } : {})}
-            isRunning={isRunning}
-            awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}
-            queued={run.queued}
-            onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
-            draft={draft}
-            // В неттекстовом режиме отправка делает, а не пишет агенту: на
-            // дорогах панели запрос в транскрипт не попадает вовсе, а на дороге
-            // агента он уходит обычным сообщением — просьбой ответить блоком.
-            onSend={media.isMediaMode ? sendMedia : send}
-            onStop={() => chatId && agentRuns.stop(chatId)}
-            onHandoff={handoff.askHandoff}
-            modes={media.modes}
-          />
+          {refusal ? (
+            <CoreRefusalLine refusal={refusal} />
+          ) : (
+            <ChatDock
+              {...(session.draftId ? { focusKey: session.draftId } : {})}
+              progress={feed.progress.data}
+              {...(feed.progressChatId ? { progressChatId: feed.progressChatId } : {})}
+              isRunning={isRunning}
+              awaiting={run.status === 'waiting' || Boolean(activeChat?.awaitingReply)}
+              queued={run.queued}
+              onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
+              draft={draft}
+              // В неттекстовом режиме отправка делает, а не пишет агенту: на
+              // дорогах панели запрос в транскрипт не попадает вовсе, а на дороге
+              // агента он уходит обычным сообщением — просьбой ответить блоком.
+              onSend={media.isMediaMode ? sendMedia : send}
+              onStop={() => chatId && agentRuns.stop(chatId)}
+              onHandoff={handoff.askHandoff}
+              modes={media.modes}
+            />
+          )}
         </div>
 
         {isRightOpen && (

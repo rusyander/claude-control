@@ -220,6 +220,7 @@ export function taskViewOf(input: TaskViewInput): TaskView {
       state: a.state,
       point: a.point,
       source: a.source,
+      dedupe: a.dedupe,
       stepId: a.stepId,
       lateAnswer: a.lateAnswer,
       answer: a.answer ?? null,
@@ -247,6 +248,9 @@ export function taskViewOf(input: TaskViewInput): TaskView {
     scenario: scenarioOf(state),
     split: splitOf(state, lines),
     attention: input.attention,
+    // Этап 11 (W3-18): связь задачи — группа панели и родитель дочерней задачи XL.
+    ...(state.created?.groupId ? { groupId: state.created.groupId } : {}),
+    ...(state.created?.parentTaskId ? { parentTaskId: state.created.parentTaskId } : {}),
   };
 }
 

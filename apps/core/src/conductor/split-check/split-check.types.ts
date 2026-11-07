@@ -1,3 +1,5 @@
+import type { LeadRole } from '@agentdeck/contracts/core/lead';
+
 /**
  * Вход и выход проверки деления (02 §Split, P39). Предложение плана уже приведено к одной форме:
  * имя, репозиторий, свои пути, зависимости по именам, флаг контракта, оценка (`null` — не дана).
@@ -10,6 +12,33 @@ export interface SplitUnit {
   deps: readonly string[];
   contract: boolean;
   estimate: { minutes: number | null; tokens: number | null };
+  /**
+   * Этап 11 (D6, P137) — кусок плана ведущего: проверка, роль, критерии, входы, спецификация
+   * механики. Судятся, только когда у входа есть `plan` (задача ведущего, предложение плана).
+   */
+  check?: string;
+  /** Строка, а не `LeadRole`: правка человека и журнал приносят что угодно — судит проверка. */
+  role?: string;
+  acRefs?: readonly string[];
+  inputs?: readonly { from: string; iface: string }[];
+  spec?: { files?: readonly string[]; interface?: string; check?: string };
+}
+
+/**
+ * Договор плана ведущего (этап 11, D6): что проверка деления судит сверх P39. Нет — предложение
+ * не ведущего (сценарий без ведения, соло ядра, правка человека): правила плана не действуют.
+ */
+export interface SplitPlanContract {
+  /** Проверка решается реестром проверок репозитория куска; реестр не прочитан — нет. */
+  resolvesCheck(repoKey: string, checkId: string): boolean;
+  /** id требований, ещё не закрытых (`open`/`unknown`): их обязаны покрыть `acRefs` кусков. */
+  openRequirements: readonly string[];
+}
+
+/** Кусок `mechanical` без полной спецификации идёт как `implement`, причина названа. */
+export interface SplitDemotion {
+  unit: string;
+  missing: string[];
 }
 
 /**
@@ -41,6 +70,8 @@ export interface SplitCheckInput {
    * растить. Нет списка — репозиторий не судится.
    */
   repoKeys?: readonly string[];
+  /** Договор плана ведущего (этап 11); нет — только правила P39. */
+  plan?: SplitPlanContract;
 }
 
 export const SPLIT_PROBLEM_CODES = [
@@ -53,6 +84,13 @@ export const SPLIT_PROBLEM_CODES = [
   'shared-path',
   'one-review',
   'review-count-unknown',
+  // Договор плана ведущего (этап 11, D6): все пробелы — в том же одном отказе.
+  'no-check',
+  'unknown-check',
+  'bad-role',
+  'uncovered-requirement',
+  'input-not-dep',
+  'no-skeleton',
 ] as const;
 export type SplitProblemCode = (typeof SPLIT_PROBLEM_CODES)[number];
 
@@ -90,5 +128,9 @@ export type SplitCheckDecision =
       queued: SplitQueued[];
       suggestions: SplitSuggestion[];
       reasons: string[];
+      /** Роль каждого куска после проверки (только с договором плана). */
+      roles?: Record<string, LeadRole>;
+      /** Куски `mechanical`, пониженные до `implement` (только с договором плана). */
+      demoted?: SplitDemotion[];
     }
   | { verdict: 'refused'; problems: SplitProblem[]; reasons: string[] };

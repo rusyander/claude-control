@@ -1,7 +1,7 @@
+import type { AskFields } from '@agentdeck/contracts/core/ask';
 import { LOCAL_PLATFORM_ID } from '@agentdeck/contracts/platform-layers';
 import { coreGatewayRouteId } from '../../platform/routing/core-contour.ts';
 import { buildCarry, carriedEnvOf, type CarryOutcome } from '../core-run/session-carry.ts';
-import type { CoreForeignStart } from './core-foreign-start.ts';
 
 /**
  * Перенос слоя панели в разговор чужого CLI через ядро (этап 10, G6): строка о блоке «Тесты» и
@@ -23,9 +23,14 @@ export interface ForeignCarryDeps {
   kitExtras(input: { provider: string; local: boolean; hasSources: boolean }): KitExtras;
 }
 
-export type ForeignCarryResolver = (
-  input: Pick<CoreForeignStart, 'cli' | 'cwd' | 'routes'>,
-) => CarryOutcome;
+/** Разговор, которому нужен слой: CLI, каталог и разрешённый набор маршрутов задачи. */
+export interface ForeignCarryInput {
+  cli: string;
+  cwd: string;
+  routes?: NonNullable<AskFields['routes']>;
+}
+
+export type ForeignCarryResolver = (input: ForeignCarryInput) => CarryOutcome;
 
 export function createForeignCarry(deps: ForeignCarryDeps): ForeignCarryResolver {
   return (input) => {

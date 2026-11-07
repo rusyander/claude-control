@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { registryId, sha256Hex, uuidv7 } from './ids.ts';
+import { AGENT_END_HOWS, BG_END_HOWS, BG_KINDS, ownerChainSchema } from './agents.ts';
 import { DECISION_CLASS_IDS } from './decisions.ts';
+import { intakeCardSchema } from './intake.ts';
+import { LEAD_PROFILES, LEAD_ROLES, TASK_CLASSES } from './lead.ts';
 import { CI_CLASSES, FORGE_KINDS } from './forge.ts';
 import { COMMIT_SHAPES } from './publish.ts';
 import { stepDoneSchema } from './model-tools.ts';
@@ -153,6 +156,8 @@ export const HUMAN_ASK_SOURCES = [
   'scenario-step',
   'launch',
   'reconcile',
+  /** Этап 11 (P133): карточка приёма — развилки и подтверждение понятого до запуска. */
+  'intake',
 ] as const;
 export type HumanAskSource = (typeof HUMAN_ASK_SOURCES)[number];
 export const LAUNCH_POLICIES = ['confirm', 'auto'] as const;
@@ -296,6 +301,27 @@ export const JOURNAL_DATA_V1 = {
         reviewBase: gitSha,
       })
       .optional(),
+    /** Этап 11: пункт группы панели, из которого задача запущена. */
+    groupId: z.string().min(1).max(200).optional(),
+    /** Этап 11 (P135): дочерняя задача XL — задача-родитель, разделившая работу. */
+    parentTaskId: uuidv7.optional(),
+    /** Этап 11 (P144): профиль ведения при запуске; класс — когда он решён до создания. */
+    lead: z
+      .strictObject({
+        profile: z.enum(LEAD_PROFILES),
+        class: z.enum(TASK_CLASSES).optional(),
+      })
+      .optional(),
+    /**
+     * Этап 11: разговор чата, из которого задача запущена. Не `origin`: то имя уже занято ключом
+     * повтора оценки (`{cmdId}`); здесь — только связь для «Агентов» и карточек чата.
+     */
+    launchOrigin: z
+      .strictObject({
+        kind: z.literal('chat'),
+        conversationId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
+      })
+      .optional(),
   }),
   'task.transition': transition(TASK_MACHINE, 'taskId'),
   'task.ended': z.strictObject({ outcome: z.enum(['done', 'cancelled', 'failed']) }),
@@ -331,6 +357,11 @@ export const JOURNAL_DATA_V1 = {
     after: z.array(uuidv7),
     contract: z.boolean(),
     splitId: uuidv7.nullable(),
+    /**
+     * Этап 11 (P137): роль куска по плану после проверки деления (неполная спецификация механики
+     * уже понижена до `implement`). Нет — роль по умолчанию вида шага.
+     */
+    role: z.enum(LEAD_ROLES).optional(),
   }),
   'unit.transition': transition(UNIT_MACHINE, 'unitId'),
   'split.proposed': z.strictObject({
@@ -507,6 +538,11 @@ export const JOURNAL_DATA_V1 = {
      * CLI по подписке). Нет — сессия окна не назвала.
      */
     contextWindow: z.number().int().positive().optional(),
+    /**
+     * Этап 11 (P149): вызов субагента, чей это ход; `null` — главный контекст сессии. Нет поля —
+     * строка до этапа 11 или CLI родителя не назвал: расход узла тогда неизвестен, а не родителю.
+     */
+    parentToolUseId: z.string().min(1).max(256).nullable().optional(),
   }),
   /** Что вводная отдала сеансу (03 §Context): по набору секций следующий ход шлёт только разницу. */
   'brief.sent': z.strictObject({
@@ -563,6 +599,76 @@ export const JOURNAL_DATA_V1 = {
      */
     denied: z.literal(true).optional(),
   }),
+  /**
+   * Этап 11 (P146): вызов начат — строка до `tool.event` того же `toolUseId`. Вызов без конца
+   * виден в дереве агентов как идущий; телеметрия, пачкой.
+   */
+  'tool.started': z.strictObject({
+    sessionId: uuidv7,
+    toolUseId: z.string().min(1).max(256),
+    parentToolUseId: z.string().min(1).max(256).nullable(),
+    tool: z.string().min(1).max(256),
+    target: z.string().max(2000),
+  }),
+  /**
+   * Этап 11 (P146-P148): сессия запустила субагента. Источник — строки задач потока CLI
+   * (`task_started`); выдержка вводной замаскирована и обрезана, полного текста в журнале нет.
+   */
+  'agent.spawned': z.strictObject({
+    sessionId: uuidv7,
+    toolUseId: z.string().min(1).max(256),
+    parentToolUseId: z.string().min(1).max(256).nullable(),
+    /** id задачи у самого CLI: по нему приходят `task_updated` / `task_notification`. */
+    cliTaskId: z.string().min(1).max(256),
+    kind: z.enum(['subagent', 'other']),
+    subagentType: z.string().min(1).max(200).nullable(),
+    model: z.string().min(1).max(200).nullable(),
+    effort: z.string().min(1).max(200).nullable(),
+    background: z.boolean(),
+    /** Глубина вложенности; `null` — CLI её не назвал. */
+    depth: nonNeg.nullable(),
+    briefExcerpt: z.string().max(2000).nullable(),
+  }),
+  'agent.ended': z.strictObject({
+    sessionId: uuidv7,
+    toolUseId: z.string().min(1).max(256),
+    cliTaskId: z.string().min(1).max(256),
+    how: z.enum(AGENT_END_HOWS),
+    /** Итог CLI (`task_notification.usage`); `null` — не назван, расход узла неизвестен. */
+    usage: z.strictObject({ totalTokens: nonNeg, toolUses: nonNeg, durationMs: nonNeg }).nullable(),
+    summaryExcerpt: z.string().max(2000).nullable(),
+  }),
+  /** Этап 11 (P148): фоновая работа (оболочка, монитор, сервер) с полной цепочкой владельца. */
+  'bg.started': z.strictObject({
+    itemId: z.string().min(1).max(256),
+    kind: z.enum(BG_KINDS),
+    excerpt: z.string().max(500),
+    ownerChain: ownerChainSchema,
+    pid: z.number().int().positive().optional(),
+    outputFile: z.string().min(1).max(1000).optional(),
+    startedAt: nonNeg,
+  }),
+  'bg.ended': z.strictObject({
+    itemId: z.string().min(1).max(256),
+    how: z.enum(BG_END_HOWS),
+    exitCode: int.optional(),
+    endedAt: nonNeg,
+    summary: z.string().max(2000).optional(),
+  }),
+  /**
+   * Этап 11 (P133): карточка приёма принята — сама (`auto`, `askId: null`) или человеком по
+   * вопросу `askId`. Критерии карточки — уже строки `requirement.extracted` (P134).
+   */
+  'intake.card': z
+    .strictObject({
+      card: intakeCardSchema,
+      by: z.enum(['auto', 'human']),
+      askId: uuidv7.nullable(),
+    })
+    .refine((d) => (d.by === 'auto') === (d.askId === null), {
+      path: ['askId'],
+      message: 'auto card has no ask; a human card names its ask',
+    }),
   // Запрос проверки (04, `CheckRequestedData` в records.ts): ключ `null` — ключ не прочитан,
   // это прогон, не повтор записи.
   'check.requested': z.strictObject({

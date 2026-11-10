@@ -1639,6 +1639,8 @@ export class ChatRunRegistry {
         chatId: run.chatId,
         projectPath: run.meta.projectPath,
         toolName: event.toolName,
+        // Вопрос права задачи ядра: тот же вопрос шлёт и пересылка ядра — push звонит один раз.
+        ...(event.core ? { askId: event.core.askId } : {}),
       });
     }
     if (event.kind === 'tool' && event.name === 'AskUserQuestion') {

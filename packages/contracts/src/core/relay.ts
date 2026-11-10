@@ -10,11 +10,14 @@ import { uuidv7 } from './ids.ts';
 export const RELAY_CHANNELS = ['phone', 'telegram'] as const;
 export type RelayChannel = (typeof RELAY_CHANNELS)[number];
 
+/**
+ * Пересылка сообщает только о том, что ждёт человека (этап 12, m3): вопрос ядра. Итог задачи
+ * (`report-final`) убран — телефон и Telegram не звонят о готовом, его видно на доске.
+ */
 export const relayNoticeSchema = z.strictObject({
   taskId: uuidv7,
-  /** `null` — уведомление об итоговом отчёте, вопроса нет. */
-  askId: uuidv7.nullable(),
-  kind: z.enum(['ask', 'report-final']),
+  askId: uuidv7,
+  kind: z.enum(['ask']),
   title: z.string().min(1).max(500),
   /** Ссылка панели на эту задачу (`/core?id=…&ask=…`): ответ — только там или с телефона. */
   deepLink: z.string().min(1),
@@ -45,6 +48,11 @@ export const relayPendingSchema = z.strictObject({
   taskId: uuidv7,
   askId: uuidv7,
   question: z.string(),
+  /**
+   * Вопрос блокирует (`askWaits`, этап 12, P175): только такой звонит на телефон. Нет поля — запись
+   * до этапа 12, когда push шёл о каждом вопросе: считается блокирующим.
+   */
+  waits: z.boolean().optional(),
 });
 export type RelayPending = z.infer<typeof relayPendingSchema>;
 

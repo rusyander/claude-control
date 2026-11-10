@@ -300,7 +300,8 @@ describe('lead: intake, recon map and class from the estimate route', () => {
       scenario: { preset: 'tracker-ticket' },
       source: tracker(),
     });
-    expect(reply.scenario).toEqual({ id: 'tracker-ticket', version: 2 });
+    // Последняя версия трекера (этап 12: @3 — шаги ведущего @2 со вторым ревью).
+    expect(reply.scenario).toEqual({ id: 'tracker-ticket', version: 3 });
     // Шов G: `task.created.lead` пишет оценка (`intake/estimate-seed.ts` → `createTask`); суд
     // маршрута G читает по нему строку роли профиля запуска.
     const zero = Object.keys(task.state.units)[0]!;

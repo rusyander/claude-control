@@ -17,6 +17,7 @@ import type {
   ProjectTestStatus,
   ProjectTestStep,
 } from '@agentdeck/contracts';
+import { PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES } from '@agentdeck/contracts/project-tests';
 import { toStatus, toSteps, stepText } from '@agentdeck/contracts/test-format';
 import {
   ProjectTestsError,
@@ -169,6 +170,7 @@ function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
   const externalId = optional(record.externalId);
   const suite = optional(record.suite);
   const suiteDigest = suite ? optional(record.suiteDigest) : undefined;
+  const timeoutMinutes = caseTimeout(record.timeoutMinutes);
   if (!status && !file && !testName && !externalId && !suite) return undefined;
   return {
     status: status ?? (file ? 'automated' : 'manual'),
@@ -177,7 +179,22 @@ function parseAutomation(raw: unknown): ProjectTestAutomation | undefined {
     externalId,
     ...(suite ? { suite } : {}),
     ...(suiteDigest ? { suiteDigest } : {}),
+    ...(timeoutMinutes ? { timeoutMinutes } : {}),
   };
+}
+
+/**
+ * Свой предел прогона кейса из файла: годный — число минут в (0; потолок], иначе его нет. Файл
+ * пишет агент руками — негодное значение не роняет чтение, а просто не действует (прогон берёт
+ * общий предел); вход панели и `tests-cli case` проверяются строго в {@link assertCaseInput}.
+ */
+function caseTimeout(raw: unknown): number | undefined {
+  return typeof raw === 'number' &&
+    Number.isFinite(raw) &&
+    raw > 0 &&
+    raw <= PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES
+    ? raw
+    : undefined;
 }
 
 /**
@@ -609,6 +626,33 @@ function assertCaseInput(input: ProjectTestCaseInput, existing?: ProjectTestCase
       { value: String(minutes) },
     );
   }
+  const timeout = input.automation?.timeoutMinutes;
+  if (timeout !== undefined && timeout !== 0 && caseTimeout(timeout) === undefined) {
+    throw coded(
+      new ProjectTestsError(
+        `Предел прогона «${String(timeout)}»: минуты больше 0 и не больше ` +
+          `${PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES}, 0 — очистить.`,
+      ),
+      'case-timeout-invalid',
+      { value: String(timeout), max: String(PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES) },
+    );
+  }
+}
+
+/**
+ * Привязка из входа поверх лежащей. Форма панели про свой предел кейса не знает и шлёт привязку
+ * без него — правка описания стирала бы предел, и долгий обход снова снимался бы общим пределом.
+ * Не названный предел остаётся прежним, 0 — явное «очисти».
+ */
+function mergeAutomation(
+  input: ProjectTestAutomation | undefined,
+  existing: ProjectTestAutomation | undefined,
+): ProjectTestAutomation | undefined {
+  if (!input) return existing;
+  const { timeoutMinutes, ...rest } = input;
+  const kept =
+    timeoutMinutes === undefined ? existing?.timeoutMinutes : timeoutMinutes || undefined;
+  return kept ? { ...rest, timeoutMinutes: kept } : rest;
 }
 
 /**
@@ -681,7 +725,7 @@ export function upsertCase(
     // Вложения и дефекты пишет прогон: форма про них не знает и стереть их
     // сохранением описания не может.
     attachments: patchList(input.attachments, existing?.attachments),
-    automation: input.automation ?? existing?.automation,
+    automation: mergeAutomation(input.automation, existing?.automation),
     codePaths: patchList(input.codePaths, existing?.codePaths),
     defects: existing?.defects,
     maxDiffRatio: input.maxDiffRatio ?? existing?.maxDiffRatio,

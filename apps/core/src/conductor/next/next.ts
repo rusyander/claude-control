@@ -25,6 +25,7 @@ import { xlParentNext } from '../split/xl-wait.ts';
 import { leadGate } from './lead-gate.ts';
 import { publishStep, resolveConflict, tailStep, unitEndEvent } from './publish.ts';
 import { reviewLinkClosedByDecision, reviewLinkNext } from './review-link.ts';
+import { trackerWriteHold } from './tracker-write.ts';
 
 /**
  * Единственный судья класса `next` (P01, 02 §Conductor loop): свёртка журнала + сценарий + живые
@@ -136,7 +137,10 @@ function unitNext(
     if (satisfied(view, scenario, def)) continue;
     const last = latest(view, def.id);
     // Форма задачи ведущего (этап 11): шаг, которого ещё не было, — пропуск по карточке и классу.
-    const shaped = last ? null : leadGate(state, def, unitId);
+    // Пропущенный шаг, устаревший по зависимости (второе ревью после нового круга ревью), судится
+    // формой заново: иначе он пошёл бы как устаревшая попытка мимо правила, что его пропустило.
+    const shaped =
+      last && last.rec.state !== 'skipped' ? null : leadGate(state, def, unitId, input.contour);
     if (shaped) return shaped;
     const round = last ? last.rec.round + 1 : 0;
     if (def.kind === 'publish') {
@@ -145,7 +149,7 @@ function unitNext(
     }
     if (last?.rec.state === 'failed') return failedDef(state, view, def, last.stepId, round);
     if (def.kind === 'fix') {
-      const review = reviewOf(scenario, def);
+      const review = reviewOf(scenario, def, view);
       const r = review ? latest(view, review.id) : undefined;
       if (r && !hasBlocking(r.rec)) {
         return {
@@ -206,11 +210,14 @@ function sooner(prev: Wait | null, next: Wait): Wait {
   if (!prev) return next;
   const work = earlier(prev.untilWorkMs, next.untilWorkMs);
   const wall = earlier(prev.untilWallMs, next.untilWallMs);
+  // Задача ждёт окна, только когда окна ждут все ждущие единицы: иначе она ждёт другого.
+  const window = prev.window && next.window ? prev.window : undefined;
   return {
     kind: 'wait',
     reason: prev.reason,
     ...(work === undefined ? {} : { untilWorkMs: work }),
     ...(wall === undefined ? {} : { untilWallMs: wall }),
+    ...(window ? { window } : {}),
   };
 }
 
@@ -248,6 +255,9 @@ function taskEnd(
       return { kind: 'fail-task', reason: `unit ${unitId}: closed before ready to publish` };
     }
   }
+  // Комментарий назад в тикет решается (пункт 9): конец ждёт ответа и записи (W2-D, P166).
+  const held = trackerWriteHold(state);
+  if (held) return { kind: 'wait', reason: held };
   return { kind: 'finish-task' };
 }
 
@@ -296,7 +306,8 @@ function decide(input: NextInput, scoped = false): NextAction {
   if (state.ended !== null) return { kind: 'wait', reason: `task ended ${state.ended}` };
   if (state.task === 'paused') return paused(input);
   if (state.task === 'estimating' && !scoped) return estimating(input);
-  if (state.task !== 'running' && state.task !== 'estimating')
+  // Ждущая окна задача судится как идущая: окно открылось или человек перевёл её — она идёт.
+  if (state.task !== 'running' && state.task !== 'estimating' && state.task !== 'waiting-window')
     return { kind: 'wait', reason: `task ${state.task}` };
   const units = Object.entries(state.units).sort((a, b) => a[1].createdSeq - b[1].createdSeq);
   if (units.length === 0) return { kind: 'create-unit' };

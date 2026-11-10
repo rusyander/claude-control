@@ -1,0 +1,206 @@
+{
+  "topic": "groups",
+  "scenario": "lanes",
+  "frames": [
+    {
+      "id": "01-lanes",
+      "side": "panel",
+      "file": "01-lanes.png",
+      "masked": 0,
+      "width": 1628,
+      "height": 534,
+      "shotAt": "2026-11-08T17:00:34.060Z",
+      "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b Группа 00a11a задач: 2 Входящие 0 Пусто Очередь 0 Пусто Разбор 1 Добавить тест парсера 1 вопрос группа 00a11a Работа 1 Починить парсер заказов единиц: 1 из 3 группа 00a11a Ревью 0 Пусто Проверка 0 Пусто Готово к MR 0 Пусто MR открыт 0 Пусто Влит / закрыт 0 Пусто Ждёт вас 0 Пусто Группа 00b22b задач: 2 Входящие 0 Пусто Очередь 0 Пусто Разбор 0 Пусто Работа 0 Пусто Ревью 1 Убрать дубли в настройках группа 00b22b Проверка 1 Описать итог релиза группа 00b22b Готово к MR 0 Пусто MR открыт 0 Пусто Влит / закрыт 0 Пусто Ждёт вас 0 Пусто Показать закрытые (1)",
+      "seal": {
+        "png": "f0c16674fcf4e52c",
+        "text": "ec43e6f7c219b11c"
+      },
+      "en": {
+        "file": "01-lanes.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 534,
+        "shotAt": "2026-11-08T17:01:15.774Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Waiting for you · 2 By group Group 00a11a Group 00b22b Group 00a11a tasks: 2 Inbox 0 Empty Queue 0 Empty Triage 1 Add a parser test 1 question group 00a11a Work 1 Fix the order parser units: 1 of 3 group 00a11a Review 0 Empty Check 0 Empty Ready for MR 0 Empty MR open 0 Empty Merged / closed 0 Empty Waiting for you 0 Empty Group 00b22b tasks: 2 Inbox 0 Empty Queue 0 Empty Triage 0 Empty Work 0 Empty Review 1 Drop duplicate settings group 00b22b Check 1 Write the release summary group 00b22b Ready for MR 0 Empty MR open 0 Empty Merged / closed 0 Empty Waiting for you 0 Empty Show closed (1)",
+        "seal": {
+          "png": "0085c2787a22610f",
+          "text": "3b6117090d962615"
+        }
+      },
+      "dark": {
+        "file": "01-lanes.dark.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 534,
+        "shotAt": "2026-11-08T17:01:57.138Z",
+        "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b Группа 00a11a задач: 2 Входящие 0 Пусто Очередь 0 Пусто Разбор 1 Добавить тест парсера 1 вопрос группа 00a11a Работа 1 Починить парсер заказов единиц: 1 из 3 группа 00a11a Ревью 0 Пусто Проверка 0 Пусто Готово к MR 0 Пусто MR открыт 0 Пусто Влит / закрыт 0 Пусто Ждёт вас 0 Пусто Группа 00b22b задач: 2 Входящие 0 Пусто Очередь 0 Пусто Разбор 0 Пусто Работа 0 Пусто Ревью 1 Убрать дубли в настройках группа 00b22b Проверка 1 Описать итог релиза группа 00b22b Готово к MR 0 Пусто MR открыт 0 Пусто Влит / закрыт 0 Пусто Ждёт вас 0 Пусто Показать закрытые (1)",
+        "seal": {
+          "png": "cb4b75f1b9be64c7",
+          "text": "ec43e6f7c219b11c"
+        }
+      },
+      "darkEn": {
+        "file": "01-lanes.dark.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 534,
+        "shotAt": "2026-11-08T17:02:38.486Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Waiting for you · 2 By group Group 00a11a Group 00b22b Group 00a11a tasks: 2 Inbox 0 Empty Queue 0 Empty Triage 1 Add a parser test 1 question group 00a11a Work 1 Fix the order parser units: 1 of 3 group 00a11a Review 0 Empty Check 0 Empty Ready for MR 0 Empty MR open 0 Empty Merged / closed 0 Empty Waiting for you 0 Empty Group 00b22b tasks: 2 Inbox 0 Empty Queue 0 Empty Triage 0 Empty Work 0 Empty Review 1 Drop duplicate settings group 00b22b Check 1 Write the release summary group 00b22b Ready for MR 0 Empty MR open 0 Empty Merged / closed 0 Empty Waiting for you 0 Empty Show closed (1)",
+        "seal": {
+          "png": "6e488873325539bf",
+          "text": "3b6117090d962615"
+        }
+      }
+    },
+    {
+      "id": "02-closed",
+      "side": "panel",
+      "file": "02-closed.png",
+      "masked": 1,
+      "width": 1628,
+      "height": 307,
+      "shotAt": "2026-11-08T17:00:34.826Z",
+      "text": "Скрыть закрытые Старая задача Прежние запуски групп Только для чтения. Ядро прежние запуски не подхватывает: недоведённый запуск остановлен для ядра, его копия, ветка и запрос в задачи ядра не переходят. Завершён 20.10.2026, 14:00:00 •••••••••••• Parser fix · feat/parser-fix · готово",
+      "seal": {
+        "png": "dddad8e7904f8a6a",
+        "text": "4e505c981d0ec041"
+      },
+      "en": {
+        "file": "02-closed.en.png",
+        "masked": 1,
+        "width": 1628,
+        "height": 307,
+        "shotAt": "2026-11-08T17:01:16.529Z",
+        "text": "Hide closed Old task Former group runs Read only. The core does not adopt former runs: an unfinished run is stopped for the core, its copy, branch and request do not move into core tasks. Finished 20.10.2026, 14:00:00 •••••••••••• Parser fix · feat/parser-fix · done",
+        "seal": {
+          "png": "4732cf5cffb7eba9",
+          "text": "15ec0155f719b499"
+        }
+      },
+      "dark": {
+        "file": "02-closed.dark.png",
+        "masked": 1,
+        "width": 1628,
+        "height": 307,
+        "shotAt": "2026-11-08T17:01:57.863Z",
+        "text": "Скрыть закрытые Старая задача Прежние запуски групп Только для чтения. Ядро прежние запуски не подхватывает: недоведённый запуск остановлен для ядра, его копия, ветка и запрос в задачи ядра не переходят. Завершён 20.10.2026, 14:00:00 •••••••••••• Parser fix · feat/parser-fix · готово",
+        "seal": {
+          "png": "8b719e34ca56859c",
+          "text": "4e505c981d0ec041"
+        }
+      },
+      "darkEn": {
+        "file": "02-closed.dark.en.png",
+        "masked": 1,
+        "width": 1628,
+        "height": 307,
+        "shotAt": "2026-11-08T17:02:39.209Z",
+        "text": "Hide closed Old task Former group runs Read only. The core does not adopt former runs: an unfinished run is stopped for the core, its copy, branch and request do not move into core tasks. Finished 20.10.2026, 14:00:00 •••••••••••• Parser fix · feat/parser-fix · done",
+        "seal": {
+          "png": "eb517f471654dfe5",
+          "text": "15ec0155f719b499"
+        }
+      }
+    },
+    {
+      "id": "03-import-pick",
+      "side": "panel",
+      "file": "03-import-pick.png",
+      "masked": 0,
+      "width": 652,
+      "height": 592,
+      "shotAt": "2026-11-08T17:00:35.581Z",
+      "text": "Импорт из прежней группы Прежние группы ядро не запускает. Выберите группу — ядро переведёт её «Путь» в сценарий библиотеки, и откроется запуск с ним. Log triage 3 шага Перевести",
+      "seal": {
+        "png": "6661bcbb9ab8a2de",
+        "text": "b1191f506eff31f4"
+      },
+      "en": {
+        "file": "03-import-pick.en.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-08T17:01:17.311Z",
+        "text": "Import from a former group The core does not run former groups. Pick a group — the core converts its Path into a library scenario, and launch opens with it. Log triage 3 steps Convert",
+        "seal": {
+          "png": "ee71b09e38fab241",
+          "text": "6fc845cfafe87ce5"
+        }
+      },
+      "dark": {
+        "file": "03-import-pick.dark.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-08T17:01:58.629Z",
+        "text": "Импорт из прежней группы Прежние группы ядро не запускает. Выберите группу — ядро переведёт её «Путь» в сценарий библиотеки, и откроется запуск с ним. Log triage 3 шага Перевести",
+        "seal": {
+          "png": "9da584a8399e4d89",
+          "text": "b1191f506eff31f4"
+        }
+      },
+      "darkEn": {
+        "file": "03-import-pick.dark.en.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-08T17:02:39.958Z",
+        "text": "Import from a former group The core does not run former groups. Pick a group — the core converts its Path into a library scenario, and launch opens with it. Log triage 3 steps Convert",
+        "seal": {
+          "png": "5922bed89d1061f2",
+          "text": "6fc845cfafe87ce5"
+        }
+      }
+    },
+    {
+      "id": "04-import-steps",
+      "side": "panel",
+      "file": "04-import-steps.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-08T17:00:36.574Z",
+      "text": "Группа «Log triage» → сценарий ядра Шаги сценария — шаги «Пути» группы по порядку; проверку и публикацию по-прежнему делает ядро. Сохранение кладёт сценарий в библиотеку ядра, затем открывается запуск с ним. Шаги сценария 1. Собрать логи 2. Найти причину 3. Починить парсер 4. Финальная проверка 5. Публикация Отмена Сохранить и открыть запуск",
+      "seal": {
+        "png": "170666ec9110731e",
+        "text": "f18c53b11de6d8ad"
+      },
+      "en": {
+        "file": "04-import-steps.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:18.254Z",
+        "text": "Group “Log triage” → core scenario The scenario steps are the group Path steps in order; checks and publishing are still done by the core. Saving puts the scenario into the core library, then launch opens with it. Scenario steps 1. Collect the logs 2. Find the cause 3. Fix the parser 4. Final check 5. Publish Cancel Save and open launch",
+        "seal": {
+          "png": "720df3493ed47e8e",
+          "text": "41e47cdcf70ab588"
+        }
+      },
+      "dark": {
+        "file": "04-import-steps.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:59.588Z",
+        "text": "Группа «Log triage» → сценарий ядра Шаги сценария — шаги «Пути» группы по порядку; проверку и публикацию по-прежнему делает ядро. Сохранение кладёт сценарий в библиотеку ядра, затем открывается запуск с ним. Шаги сценария 1. Собрать логи 2. Найти причину 3. Починить парсер 4. Финальная проверка 5. Публикация Отмена Сохранить и открыть запуск",
+        "seal": {
+          "png": "2192a114b8398f31",
+          "text": "f18c53b11de6d8ad"
+        }
+      },
+      "darkEn": {
+        "file": "04-import-steps.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:02:40.899Z",
+        "text": "Group “Log triage” → core scenario The scenario steps are the group Path steps in order; checks and publishing are still done by the core. Saving puts the scenario into the core library, then launch opens with it. Scenario steps 1. Collect the logs 2. Find the cause 3. Fix the parser 4. Final check 5. Publish Cancel Save and open launch",
+        "seal": {
+          "png": "a859ce58921e45f0",
+          "text": "41e47cdcf70ab588"
+        }
+      }
+    }
+  ]
+}

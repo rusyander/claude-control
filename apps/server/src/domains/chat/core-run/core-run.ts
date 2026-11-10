@@ -367,6 +367,7 @@ export class CoreChatRun implements RunLike {
       ['launch', {}],
     ];
     for (const [kind, fields] of commands) {
+      if (kind === 'launch') await this.waitEstimated(taskId);
       const out = await port.command(taskId, kind, fields);
       if (out.status !== 'applied') {
         this.cancel();
@@ -386,6 +387,26 @@ export class CoreChatRun implements RunLike {
       return null;
     }
     return { taskId, stepId, sessionId, from: 0, conversationId };
+  }
+
+  /**
+   * Запуск — только когда задача вышла из оценки. Оценка копии отвечает в `estimating` (единица 0
+   * ещё идёт), и `launch` в нём — `state-conflict`; чат на месте выходит из оценки в самом ответе,
+   * и запуск сразу работал только поэтому (W3-D F2). Политика `auto`, как у прохода по стенду, тут
+   * не годится: ядро запустило бы шаг раньше `set-cli` / `set-model` этого хода.
+   */
+  private async waitEstimated(taskId: string): Promise<void> {
+    const { port } = this.deps;
+    const deadline = this.now + (this.deps.waitMs ?? WAIT_MS);
+    while (!this.abort.signal.aborted && this.now < deadline) {
+      const view = await port.view(taskId).catch(() => null);
+      if (view?.ended) throw new Error(`core chat: the core task ended (${view.ended})`);
+      if (view && view.state !== 'estimating') return;
+      await sleep(this.deps.pollMs ?? POLL_MS, this.abort.signal);
+    }
+    if (this.abort.signal.aborted) throw new Error('core chat: stopped');
+    // Вид «… refused (код)» — отказ панели переводит общим текстом с кодом (`refusal-text.ts`).
+    throw new Error('core chat: launch refused (estimating): the core estimate did not finish');
   }
 
   /** Шаг `chat` и его первый сеанс; шаг кончился без сеанса — отказ с причиной ядра. */

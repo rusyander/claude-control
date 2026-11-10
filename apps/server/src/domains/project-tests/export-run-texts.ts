@@ -13,6 +13,19 @@ export function exportLanguage(language: string | undefined): ExportLanguage {
   return language === 'en' ? 'en' : 'ru';
 }
 
+/**
+ * Язык, который назвал сам экран (`lang` запроса), раньше сохранённой настройки: смена
+ * языка доходит до интерфейса раньше, чем PATCH настроек до сервера, и документ или
+ * выгрузка, запрошенные в этот миг, выходили на старом языке. Не назвал или назвал
+ * незнакомый — настройка.
+ */
+export function askedLanguage(
+  asked: string | undefined,
+  saved: string | undefined,
+): ExportLanguage {
+  return asked === 'ru' || asked === 'en' ? asked : exportLanguage(saved);
+}
+
 export interface RunTexts {
   status: Record<string, string>;
   mode: Record<string, string>;

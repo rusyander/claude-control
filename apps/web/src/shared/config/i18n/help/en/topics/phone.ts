@@ -28,7 +28,9 @@ export const phoneEn: typeof phoneRu = {
     whyAwayText:
       'A split, a test run or a long agent turn takes tens of minutes. There is no reason to ' +
       'sit at the screen for it: the phone home shows what is running and what is waiting, and ' +
-      'a notification arrives when the work is done, has failed or has hit a question.',
+      'a notification arrives only when the work has hit you — a question, a permission or a ' +
+      'core question with no default action. A turn ending or failing shows on the home screen ' +
+      'and in the chat.',
     whyAnswer: 'Answer, not just find out',
     whyAnswerText:
       'An agent question and a permission request are answered ' +
@@ -98,7 +100,12 @@ export const phoneEn: typeof phoneRu = {
       'question it is: the CLI, the panel or «outside the panel», whether it is a background ' +
       'turn, and for a group its number, title, stage and parent conversation. A ' +
       'request to launch an agent names what it is asked to do, which agent, which model, ' +
-      'which effort and whether it runs in the background. At the top of the tab sits an ' +
+      'which effort and whether it runs in the background. First on the tab is the «Core ' +
+      'tasks waiting for you: N» block: core tasks held by a question with no default action — ' +
+      'without your answer they will not go on. A question with a default action is not listed: ' +
+      'the task goes on by itself. Chat tasks are not here — their question is already the chat ' +
+      'card above and is not counted twice. Tapping opens the task with its questions; the tab badge ' +
+      'counts these tasks too. Below it sits an ' +
       '«Awaiting decision (N)» block: D-n calls the agents set aside while they keep working ' +
       '(the «Chat» document), with the reason and «Deny» and «Allow» buttons; an expired ' +
       'item can be «Allowed again». The badge on the «Questions» tab counts them too. A chat ' +
@@ -277,9 +284,11 @@ export const phoneEn: typeof phoneRu = {
     signingTelegram: 'Telegram',
     signingTelegramText:
       '«Allow» from Telegram is refused: modified window code can rewrite the bot settings, so ' +
-      'an answer from the chat proves nothing. A task core question arrives by push and in ' +
-      'Telegram once, with a link to the task; with no channel set up it waits and goes out ' +
-      'as soon as a channel is turned on. It cannot be answered in Telegram.',
+      'an answer from the chat proves nothing. A task core question arrives in Telegram once, ' +
+      'with a link to the task, and by push only when it blocks (no default action) — also ' +
+      'once: the chat card and the core relay about the same question ring a single time. With ' +
+      'no channel set up it waits and goes out as soon as a channel is turned on. It cannot be ' +
+      'answered in Telegram.',
     signingLevers: 'Loosening rights',
     signingLeversText:
       'Changes that loosen the rights of every future decision — auto mode in every chat, ' +
@@ -346,7 +355,8 @@ export const phoneEn: typeof phoneRu = {
       'be sent again.',
     offlinePush: 'Notifications',
     offlinePushText:
-      'The panel sends them. If the panel is asleep nothing arrives, even if an agent is ' +
+      'The panel sends them, and only about what waits for you: a permission, an agent ' +
+      'question, a blocking core question. «Done» and «failed» do not ring. If the panel is asleep nothing arrives, even if an agent is ' +
       'waiting somewhere. Tapping a notification opens its conversation: a Claude chat in its ' +
       'project, another CLI’s conversation on its own screen, a task core question its task ' +
       '(the same tasks are under «Core tasks» on the home screen); a notification from another ' +
@@ -430,8 +440,12 @@ export const phoneEn: typeof phoneRu = {
       'app language.',
     limitPushExpo: 'Notifications need Expo',
     limitPushExpoText:
-      'Delivery is done by the Expo service; the build needs an EAS projectId. Without it the ' +
-      'app works but notifications do not, and the settings say why.',
+      'Delivery is done by the Expo service over FCM. The build needs an EAS project id ' +
+      '(variable AGENTDECK_EAS_PROJECT_ID) and the Firebase file google-services.json ' +
+      '(AGENTDECK_GOOGLE_SERVICES — its path; the APK build moves it into the native project ' +
+      'itself). Both belong to the account owner and are not in the repository. Without them ' +
+      'the app works but notifications do not, the settings say «Push is not set up…», and ' +
+      'questions still show in the «Questions» tab.',
     limitCards: 'No proposal cards',
     limitCardsText:
       'A task split, skill and group proposals appear in the phone chat as one line. They can ' +

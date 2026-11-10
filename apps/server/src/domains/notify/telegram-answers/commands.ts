@@ -4,7 +4,9 @@ import { escapeHtml } from './html.ts';
 
 /**
  * Команды бота владельцу: `/status` — что работает и что ждёт, `/waiting` —
- * прислать всё ждущее сейчас, `/help` — подсказка. Тексты — как у остальных
+ * прислать всё ждущее сейчас, `/help` — подсказка. `/task <текст>` (этап 12, P193)
+ * в `KNOWN` не входит: разбор отдаёт `'other'`, и его берёт крючок уведомлений
+ * ядра (`telegram-notices/press.ts`) — запись во «Входящие». Тексты — как у остальных
  * сообщений ответов, по-русски; только приветствие подключения идёт на языке
  * панели (его читают сразу после нажатия в карточке).
  *
@@ -28,12 +30,14 @@ export const BOT_COMMANDS = {
   en: [
     { command: 'status', description: 'What is running and what waits for you' },
     { command: 'waiting', description: 'Send everything that waits for an answer now' },
+    { command: 'task', description: 'Put a task into the board inbox: /task fix login' },
     { command: 'clear', description: 'Remove bot messages (except pending)' },
     { command: 'help', description: 'Commands' },
   ],
   ru: [
     { command: 'status', description: 'Что работает и что ждёт тебя' },
     { command: 'waiting', description: 'Прислать всё, что ждёт ответа, сейчас' },
+    { command: 'task', description: 'Записать задачу во «Входящие» доски: /task исправить вход' },
     { command: 'clear', description: 'Убрать сообщения бота (кроме ждущих)' },
     { command: 'help', description: 'Команды' },
   ],
@@ -43,10 +47,12 @@ export const HELP_TEXT = [
   'Команды:',
   '/status — что работает и что ждёт тебя',
   '/waiting — прислать всё, что ждёт ответа, сейчас',
+  '/task текст — записать задачу во «Входящие» доски (запускать — кнопкой «В работу»)',
   '/clear — убрать сообщения бота, кроме ждущих ответа',
   '/help — эта подсказка',
   '',
   'Вопросы и разрешения агентов приходят сюда сами, с кнопками.',
+  'Задачи ядра сообщают о конце, открытом MR, падении и ожидании окна — тоже с кнопками.',
 ].join('\n');
 
 export const ALREADY_CONNECTED = `✅ Уже подключено к AgentDeck.\n\n${HELP_TEXT}`;
@@ -59,13 +65,13 @@ export function connectedText(language: 'ru' | 'en'): string {
         '✅ Connected to AgentDeck.',
         'Agent questions and permission requests arrive here with buttons, run failures too.',
         '',
-        'Commands: /status, /waiting, /help',
+        'Commands: /status, /waiting, /task, /help',
       ].join('\n')
     : [
         '✅ Подключено к AgentDeck.',
         'Сюда придут вопросы и разрешения агентов с кнопками и сообщения о сбоях прогонов.',
         '',
-        'Команды: /status, /waiting, /help',
+        'Команды: /status, /waiting, /task, /help',
       ].join('\n');
 }
 

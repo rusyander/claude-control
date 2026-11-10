@@ -34,6 +34,13 @@ import type { CoreChatHistory } from '../../../domains/chat/core-run/core-chat-h
  */
 const WORKING: ReadonlySet<SplitGroupStatus> = new Set(['started', 'awaiting', 'background']);
 
+/**
+ * Сеансы шагов задач ядра (разбор, план, работа…) — не разговоры человека, списки их не
+ * показывают. Ядро молчит и обхода не было — прятать нечего, список живёт.
+ */
+const stepSessionsOf = (history: CoreChatHistory | undefined): Promise<ReadonlySet<string>> =>
+  history ? history.stepSessions().catch(() => new Set<string>()) : Promise.resolve(new Set());
+
 /** Список разговоров, поиск по ним и чтение самой переписки — только чтение. */
 export function registerChatTranscriptRoutes(
   app: FastifyInstance,
@@ -76,7 +83,8 @@ export function registerChatTranscriptRoutes(
   app.get('/api/chats', async (request, reply) => {
     // Разговоры не-Claude CLI — сводками из ядра рядом со сводками транскриптов, тем же порядком.
     const foreign = coreHistory ? await coreHistory.summaries().catch(() => []) : [];
-    const own = readChats(projectsDir(ctx));
+    const steps = await stepSessionsOf(coreHistory);
+    const own = readChats(projectsDir(ctx)).filter((chat) => !steps.has(chat.id));
     const chats =
       foreign.length === 0
         ? own
@@ -272,15 +280,22 @@ export function registerChatTranscriptRoutes(
    * сниппетом вокруг совпадения. Читающий, без побочных эффектов; короткий
    * запрос отдаёт пустой результат, не читая диск.
    */
-  app.get<{ Querystring: { q?: string } }>('/api/chat/search', (request) =>
-    searchChats(projectsDir(ctx), request.query.q ?? ''),
-  );
+  app.get<{ Querystring: { q?: string } }>('/api/chat/search', async (request) => {
+    const [found, steps] = await Promise.all([
+      searchChats(projectsDir(ctx), request.query.q ?? ''),
+      stepSessionsOf(coreHistory),
+    ]);
+    return steps.size === 0
+      ? found
+      : { ...found, hits: found.hits.filter((hit) => !steps.has(hit.sessionId)) };
+  });
 
   /** Проекты, с которыми работал Claude Code, — для таба «Проекты» в чате. */
   app.get('/api/chats/projects', async (request, reply) => {
     // Разговоры не-Claude CLI — в своих проектах, как в `/api/chats`: по этому списку их находит телефон.
     const foreign = coreHistory ? await coreHistory.summaries().catch(() => []) : [];
-    return sendConditional(request, reply, listProjects(projectsDir(ctx), foreign));
+    const steps = await stepSessionsOf(coreHistory);
+    return sendConditional(request, reply, listProjects(projectsDir(ctx), foreign, steps));
   });
 
   /**

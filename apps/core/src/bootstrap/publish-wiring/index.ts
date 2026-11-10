@@ -6,7 +6,8 @@ import type { GitOptions } from '../../platform/git/git.types.ts';
 import { createPublishQueue, type PublishQueue } from '../../publisher/queue/queue.ts';
 import { readyJudge } from '../../publisher/ready/ready.ts';
 import { forgeOfPanel } from '../panel-forge.ts';
-import { publishAttempt, type ForgeAccess } from './attempt.ts';
+import { commentBackOf } from '../panel-trackers.ts';
+import { publishAttempt, type AttemptDeps, type ForgeAccess } from './attempt.ts';
 import { cleanRemote } from './clean-remote.ts';
 import { composeForGate, scenarioPublishes } from './compose.ts';
 import { probeDelivery } from './delivery-probe.ts';
@@ -25,6 +26,8 @@ export interface PublishWiringOptions {
   /** Форж по адресу пуша; `null` — форжа нет. По умолчанию — настройки панели. */
   forgeFor?: (url: string) => ForgeAccess | null;
   queue?: PublishQueue;
+  /** Комментарий назад в тикет (Z7); по умолчанию — Jira панели под настройкой ядра. */
+  commentBack?: AttemptDeps['commentBack'];
 }
 
 export interface PublishWiringDeps {
@@ -69,6 +72,9 @@ export function createPublishWiring(
     forgeFor: options.forgeFor ?? defaultForgeFor(deps.panelAppData),
     judge: readyJudge(),
     outbox: outboxPort,
+    commentBack:
+      options.commentBack ??
+      commentBackOf({ coreHome: deps.coreHome, panelAppData: deps.panelAppData, note: deps.note }),
   };
   return {
     queue,

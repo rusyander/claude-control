@@ -15,6 +15,8 @@ const KINDS: readonly AuthorityKind[] = [
   'save-scenario',
   'adopt-devices',
   'learned-reset',
+  // Этап 12 (08e): ход на доске — суд тот же, задачи у записи ещё нет.
+  'board-move',
 ];
 const STRICT_FROM_SPEC: ReadonlySet<AuthorityKind> = new Set([
   'set-config',
@@ -33,6 +35,8 @@ const STRICT_FROM_SPEC: ReadonlySet<AuthorityKind> = new Set([
   'move-build',
   'clean-remote',
   'clear-exhausted',
+  // Этап 12 (08e): перехват — правка копии рукой человека, строго, как грант.
+  'take-over',
 ]);
 
 function specVerdict(kind: AuthorityKind, p: CommandProof): string {

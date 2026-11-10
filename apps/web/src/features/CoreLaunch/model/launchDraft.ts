@@ -42,6 +42,12 @@ export const ASK_PRESET: PresetId = 'ask';
 export const REVIEW_LINK_PRESET: PresetId = 'review-link';
 
 /**
+ * Проход по стенду (этап 12, D24) открывает блок «Тесты» («Записать сценарий», первое расхождение
+ * повтора): ему нужны стенд и его доступы из окружения «Тестов», которых у экрана запуска нет.
+ */
+export const WALK_PRESET: PresetId = 'browser-walk';
+
+/**
  * Политика после принятого деления: всегда `confirm`. Экран запуска и есть точка подтверждения —
  * при `auto` ядро запустило бы деление само, мимо подтверждения грантов на этом экране.
  */
@@ -164,6 +170,7 @@ export function scenarioOptions(listing: ScenarioListing | undefined): ScenarioO
   presets.delete(CHAT_PRESET);
   presets.delete(ASK_PRESET);
   presets.delete(REVIEW_LINK_PRESET);
+  presets.delete(WALK_PRESET);
   const out: ScenarioOption[] = [...presets].map(([id, title]) => ({
     value: `preset:${id}`,
     label: title,

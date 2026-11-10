@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { registryId } from './ids.ts';
-import { MODEL_TIERS, TASK_CLASSES, type TaskClass } from './scenario.ts';
+import {
+  LEAD_PROFILES,
+  MODEL_TIERS,
+  TASK_CLASSES,
+  type LeadProfile,
+  type TaskClass,
+} from './scenario.ts';
 
 /**
  * Ведущий задачи (этап 11, P135-P145): класс задачи, роли и их ступени, профиль ведения, карта
@@ -113,8 +119,8 @@ export type RoleTable = z.infer<typeof roleTableSchema>;
 
 // ── профиль ведения ───────────────────────────────────────────────────────────────────────
 
-export const LEAD_PROFILES = ['economy', 'balanced', 'max-quality'] as const;
-export type LeadProfile = (typeof LEAD_PROFILES)[number];
+// Список живёт в `scenario.ts` (шаг сценария ограничивается профилем, `onlyProfile`); отсюда — тот же.
+export { LEAD_PROFILES, type LeadProfile };
 export const LEAD_PROFILE_DEFAULT: LeadProfile = 'balanced';
 
 /** Предел параллельных сеансов задач; машина сужает его `queue.sessionSlots` (P141). */

@@ -238,6 +238,8 @@ describe('reduce v6 (stage 4 fold, CD§10)', () => {
       stepId: STEP,
       lateAnswer: true,
       answer: 'a',
+      // v14 (этап 12): запись вопроса хранит действие по умолчанию.
+      defaultAction: null,
     });
     expect(s.anomalies.map((a) => a.reason)).toEqual([`human.answered: ${ASK} answered twice`]);
   });

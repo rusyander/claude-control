@@ -3,6 +3,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { claudeRunFacts } from '@agentdeck/providers/claude';
 import type { StepDef } from '@agentdeck/contracts/core/scenario';
+import { kitCarryRefusalOf } from '@agentdeck/contracts/core/session-carry';
 import type { CliAdapter, LayerRun, SessionHandle } from '../../adapters/adapter.types.ts';
 import {
   CLAUDE_CHANNELS,
@@ -37,6 +38,18 @@ const CHAT: StepDef = presetStep('chat', 'chat', 'Чат', []);
 const ROUTE = { adapter: 'claude', route: { kind: 'cli-login' as const, id: 'cli-login:claude' } };
 const ENDPOINT = { baseUrl: 'http://127.0.0.1:9', model: 'stub-model', key: 'stub-key' };
 const APPEND = 'G6_APPEND_MARKER: AgentDeck Tests section is on; kit rules follow.';
+/** Хук списка задач трекера из профиля чата панели (`group-profile.ts chatRunProfile`, s12). */
+const BOARD_HOOKS = {
+  PreToolUse: [
+    {
+      matcher: 'mcp__.*__jira_(search|get_board_issues|get_sprint_issues)',
+      hooks: [
+        { type: 'command', command: 'node "C:/panel/tools/board-fields-hook.mjs"', timeout: 10 },
+      ],
+    },
+  ],
+};
+const CORE_HOOK = 'node core-hook.mjs';
 
 const open: { adapter: CliAdapter; handle: SessionHandle }[] = [];
 afterAll(async () => {
@@ -116,7 +129,7 @@ async function startOf(live: LiveRoot, session: Record<string, unknown>): Promis
 }
 
 /** Настоящий запуск переходника Claude на подставном CLI; argv и окружение — из дампа процесса. */
-async function launchClaude(live: LiveRoot, start: RoadStart) {
+async function launchClaude(live: LiveRoot, start: RoadStart, coreHook?: string) {
   const bin = join(live.root, 'bin');
   mkdirSync(bin, { recursive: true });
   installReplay(bin, claudeRunFacts.binary.command);
@@ -128,6 +141,7 @@ async function launchClaude(live: LiveRoot, start: RoadStart) {
     brief: start.brief,
     layer: start.layer,
     tools: start.tools,
+    ...(coreHook ? { coreHook } : {}),
     endpoint: {
       channel: CLAUDE_CHANNELS[0]!,
       endpoint: { ...ENDPOINT, dialect: 'anthropic-messages' as const },
@@ -138,13 +152,16 @@ async function launchClaude(live: LiveRoot, start: RoadStart) {
     },
   });
   const launched = await adapter.launch(spec);
-  if (!launched.ok) return { refused: launched.reason, argv: [] as string[], spec };
+  if (!launched.ok) return { refused: launched.reason, argv: [] as string[], spec, settings: '' };
   open.push({ adapter, handle: launched.handle });
   for (let i = 0; i < 1200 && !readDump(dump); i += 1) await new Promise((r) => setTimeout(r, 25));
   const seen = readDump(dump);
   if (!seen) throw new Error('the session CLI left no dump');
+  // Файл `--settings`, который увидел процесс, — пока сеанс жив (каталог сеанса снимается с ним).
+  const settingsPath = seen.argv[seen.argv.indexOf('--settings') + 1];
+  const settings = settingsPath ? readFileSync(settingsPath, 'utf8') : '';
   await adapter.stop(launched.handle, 'tree');
-  return { refused: null, argv: seen.argv, spec };
+  return { refused: null, argv: seen.argv, spec, settings };
 }
 
 const valueOf = (argv: string[], flag: string): string | undefined => argv[argv.indexOf(flag) + 1];
@@ -244,6 +261,32 @@ describe('G6 panel layer carried into a core chat session (journal → stepStart
     expect(brief).toContain(APPEND);
     expect(brief).not.toContain('agentdeck-step:');
   }, 60_000);
+
+  // s12: хуки профиля чата панели (список задач трекера без описаний) прежний исполнитель клал
+  // своим `--settings`; ход через ядро терял их молча. Теперь — полем `session.hooks`.
+  it('panel profile hooks: journal → layer.carry.hooks → the --settings the CLI read, before the core hook; qwen refuses them by name', async () => {
+    const live = liveRoot('s12-panel-hooks-');
+    const start = await startOf(live, { hooks: BOARD_HOOKS });
+    expect(start.layer.carry).toEqual({ hooks: BOARD_HOOKS });
+    expect(sessionCarryRefusal(start, createClaudeAdapter())).toBeNull();
+    expect(sessionCarryRefusal({ ...start, adapterId: 'qwen' }, createQwenAdapter())).toBe(
+      'session-carry-unsupported: adapter qwen cannot carry hooks — ' +
+        'start the chat in a CLI that does, or drop the field',
+    );
+    const { refused, settings } = await launchClaude(live, start, CORE_HOOK);
+    expect(refused).toBeNull();
+    const parsed = JSON.parse(settings) as {
+      hooks: { PreToolUse: { matcher?: string; hooks: { command?: string }[] }[] };
+      disableAllHooks: boolean;
+    };
+    const pre = parsed.hooks.PreToolUse;
+    const board = pre.findIndex((g) => g.matcher === BOARD_HOOKS.PreToolUse[0]!.matcher);
+    expect(pre[board]).toEqual(BOARD_HOOKS.PreToolUse[0]);
+    // Судья права — последним: хук панели не может решить раньше ядра.
+    expect(pre.at(-1)).toEqual({ matcher: '*', hooks: [{ type: 'command', command: CORE_HOOK }] });
+    expect(board).toBeLessThan(pre.length - 1);
+    expect(parsed.disableAllHooks).toBe(false);
+  }, 60_000);
 });
 
 describe('G6 refusals: a carry the session cannot honour is refused by name, never dropped', () => {
@@ -308,5 +351,32 @@ describe('G6 refusals: a carry the session cannot honour is refused by name, nev
     expect(
       refuseClaude(spec, {}, { ...untrusted, ran: 'on', repoLayer: true, trust: 'panel' }),
     ).toBeNull();
+  });
+
+  // s12: хуки профиля чата — команда из каталога панели, как плагин набора: недоверие к папке их
+  // не отказывает, шаг, сам попросивший хуки не `on`, — отказ по имени (панель называет его кодом).
+  it('panel profile hooks: untrusted observe rides; a step that asks observe/off itself → refused by name at the gate and the adapter', async () => {
+    const live = liveRoot('s12-hooks-off-');
+    const start = await startOf(live, { hooks: BOARD_HOOKS });
+    const observed = { ...start, layer: { ...start.layer, hooks: 'observe' as const } };
+    const gate = sessionCarryRefusal(observed, createClaudeAdapter());
+    expect(gate).toMatch(
+      /^session-carry-plugins-without-hooks: panel profile hooks are hooks, the step runs hooks 'observe'/,
+    );
+    expect(kitCarryRefusalOf(gate!)).toEqual({ kind: 'hooks', mode: 'observe' });
+    const spec = liveSpec(live, { layer: start.layer, coreHook: CORE_HOOK });
+    const untrusted: LayerRun = {
+      asked: 'on',
+      ran: 'observe',
+      repoLayer: false,
+      trust: 'none',
+      detail: 'no mark',
+    };
+    expect(refuseClaude(spec, {}, untrusted)).toBeNull();
+    const asked = refuseClaude(spec, {}, { ...untrusted, asked: 'off', ran: 'off' });
+    expect(asked).toMatch(
+      /^session-carry-needs-layer-on: plugins, panel hooks and setting sources/,
+    );
+    expect(kitCarryRefusalOf(asked!)).toEqual({ kind: 'hooks', mode: 'off' });
   });
 });

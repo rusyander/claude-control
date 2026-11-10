@@ -25,7 +25,10 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
   {
     route: '/groups',
     title: 'Groups',
-    description: 'Groups of rules/skills/MCP toggled together, with a run «Path» and skill knobs',
+    description:
+      'Old address of groups; opens the group lanes of the core task board (/core?view=board&lane=group), ' +
+      'one lane per core group with its tasks; open_page focus = core groupId highlights its lane. ' +
+      'Old rule/skill/MCP groups are read-only: their «Path» is imported from the board («Импорт пунктов»)',
   },
   { route: '/history', title: 'History', description: 'Backups of edited files, restore' },
   {
@@ -82,7 +85,9 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     route: '/core',
     title: 'Core tasks',
     description:
-      'Tasks of the execution core: state, step feed with reasons, journal, questions to the human',
+      'Tasks of the execution core. Default view = board: columns inbox, queue, work, waiting, review, MR, ' +
+      '«waiting for you» count, card window with only the allowed moves, closed tasks folded below; ' +
+      '?view=list = task list; ?id=<taskId> = one task: step feed with reasons, journal, questions to the human',
   },
   {
     route: '/core/launch',
@@ -114,8 +119,8 @@ export const PANEL_SECTIONS: readonly PanelSection[] = [
     route: '/tests',
     title: 'Testing',
     description:
-      'QA workspace; open_page focus = tab key: library (cases, groups), plans, runs, report, coverage',
-    tabs: ['library', 'plans', 'runs', 'report', 'coverage'],
+      'QA workspace; open_page focus = tab key: library (cases, groups), plans, recorded (recorded browser walks: record, replay), runs, report, coverage',
+    tabs: ['library', 'plans', 'recorded', 'runs', 'report', 'coverage'],
   },
 ];
 

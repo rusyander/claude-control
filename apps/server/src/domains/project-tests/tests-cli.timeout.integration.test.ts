@@ -240,6 +240,40 @@ setInterval(() => undefined, 1000);
     expect(statuses).toEqual({ 'qa-001': 'passed', 'qa-002': 'failed' });
   });
 
+  // layout-024: живой обход окон идёт ~16 мин, общий предел 10 мин снимал его в каждом прогоне.
+  it('свой предел кейса (automation.timeoutMinutes) — вместо общего; --case-timeout сильнее', async () => {
+    writeGroup(project, {
+      ...createGroup(project, 'slow', 'slow'),
+      cases: [
+        {
+          id: 'slow-001',
+          title: 'долгий обход',
+          automation: { status: 'automated', file: 'tools/qa/slow.mjs', timeoutMinutes: 0.02 },
+        },
+        {
+          id: 'slow-002',
+          title: 'обычный',
+          automation: { status: 'automated', file: 'tools/qa/plain.mjs' },
+        },
+      ].flatMap((raw, index) => parseCase(raw, index) ?? []),
+    });
+    expect(cli(project, ['run', '--group', 'slow', '--dry']).out).toContain(
+      'Предел: 10.02 мин: свой предел кейса slow:slow-001 — 0.02 мин; остальным 10 мин × 1 (по умолчанию)',
+    );
+    // Флаг, названный в команде, сильнее предела кейса.
+    expect(
+      cli(project, ['run', '--case', 'slow:slow-001', '--case-timeout', '3', '--dry']).out,
+    ).toContain('Предел: 3 мин на кейс × 1 = 3 мин (--case-timeout)');
+    // Настоящий прогон без флага и без переменной: снят по пределу кейса, а не через 10 мин.
+    const result = cli(project, ['run', '--case', 'slow:slow-001']);
+    expect(result.out).toContain('Предел: 0.02 мин: свой предел кейса slow:slow-001 — 0.02 мин');
+    expect(result.code).toBe(124);
+    expect(result.seconds).toBeLessThan(30);
+    pids = JSON.parse(readFileSync(join(project, 'pids.json'), 'utf8'));
+    expect(await settled([pids!.runner, pids!.child])).toEqual([]);
+    expect(readRuns(project)[0]?.results.map((point) => point.caseId)).toEqual(['slow-001']);
+  });
+
   it('негодный предел — отказ словами до прогона', () => {
     for (const value of ['0', '-1', 'abc']) {
       const result = cli(project, ['run', '--case-timeout', value]);

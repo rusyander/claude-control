@@ -22,6 +22,7 @@ import {
 } from './states.ts';
 import { HOOK_OBSERVATIONS_MAX, hookObservationSchema } from './user-layer.ts';
 import { GRANT_OPS } from './grant-ops.ts';
+import { JOURNAL_DATA_S12, takeoverOfSchema, taskBoardEntrySchema } from './journal-data-s12.ts';
 import { sessionCarryShape } from './session-carry.ts';
 
 /**
@@ -134,8 +135,15 @@ const sessionLayer = z.strictObject({
 
 const repoPin = z.strictObject({
   repoKey: z.string().min(1),
+  /** Вершина рабочего дерева git (`--show-toplevel`): копия, база и ветка — от неё. */
   path: z.string().min(1),
   baseRef: z.string().min(1),
+  /**
+   * Подпапка проекта внутри репозитория (`--show-prefix`, через `/`), если человек назвал не
+   * вершину: корни проекта задачи (доступы стенда, чат на месте) — `path` + она. Нет — вершина:
+   * старые журналы поля не несут и читаются как раньше.
+   */
+  subPath: z.string().min(1).max(1000).optional(),
 });
 
 /** Вердикт требования (02:48, G2): `unknown` — шаг закрыт выводом, требования не судимы. */
@@ -158,6 +166,13 @@ export const HUMAN_ASK_SOURCES = [
   'reconcile',
   /** Этап 11 (P133): карточка приёма — развилки и подтверждение понятого до запуска. */
   'intake',
+  /** Этап 12: маршрут потерял вход CLI посреди шага (`route.login-lost`), пункт 4. */
+  'login',
+  /**
+   * Этап 12 (P166, W2-D): комментарий назад в тикет при `humanPoints.trackerWrites: ask` — пункт 9;
+   * запись отпускает только ответ человека из панели или с телефона.
+   */
+  'tracker-write',
 ] as const;
 export type HumanAskSource = (typeof HUMAN_ASK_SOURCES)[number];
 export const LAUNCH_POLICIES = ['confirm', 'auto'] as const;
@@ -322,6 +337,10 @@ export const JOURNAL_DATA_V1 = {
         conversationId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/),
       })
       .optional(),
+    /** Этап 12: запись доски, с которой задача стартовала (`journal-data-s12.ts`). */
+    boardEntry: taskBoardEntrySchema.optional(),
+    /** Этап 12: чат перехвата (`chat@1`) — чью единицу он ведёт; возврат ядру закрывает его. */
+    takeoverOf: takeoverOfSchema.optional(),
   }),
   'task.transition': transition(TASK_MACHINE, 'taskId'),
   'task.ended': z.strictObject({ outcome: z.enum(['done', 'cancelled', 'failed']) }),
@@ -738,7 +757,15 @@ export const JOURNAL_DATA_V1 = {
     proof: z.strictObject({
       token: z.enum(['none', 'panel-bearer', 'core', 'session']),
       nonce: z.enum(['absent', 'valid', 'invalid']),
-      peer: z.enum(['clear', 'session-descendant', 'unknown', 'remote', 'untrusted-forward']),
+      // `telegram` (этап 12, D29): команда доказана привязанным владельцем Telegram через бот панели.
+      peer: z.enum([
+        'clear',
+        'session-descendant',
+        'unknown',
+        'remote',
+        'untrusted-forward',
+        'telegram',
+      ]),
       signature: z.enum(['absent', 'valid', 'invalid']),
     }),
   }),
@@ -791,6 +818,8 @@ export const JOURNAL_DATA_V1 = {
     url: z.string().min(1),
     sourceBranch: z.string().min(1),
     actionId: uuidv7,
+    /** Этап 12: заголовок MR, каким его открыл публикатор (карточка доски); нет — строка до 12. */
+    title: z.string().min(1).max(500).optional(),
   }),
   /** Нити и конфликт, прочитанные ОДИН раз при открытии MR (05 §After publish). */
   'publish.read': z.strictObject({
@@ -909,6 +938,7 @@ export const JOURNAL_DATA_V1 = {
   error: z.strictObject({ code: z.string().min(1), detail: z.string() }),
   'journal.repaired': z.strictObject({ bytes: nonNeg }),
   'journal.migrated': z.strictObject({ fromV: nonNeg, toV: nonNeg }),
+  ...JOURNAL_DATA_S12,
 } as const;
 
 export type JournalKind = keyof typeof JOURNAL_DATA_V1;

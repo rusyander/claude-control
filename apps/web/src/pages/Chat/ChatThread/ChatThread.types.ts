@@ -25,6 +25,11 @@ export interface ChatThreadProps {
   messages: ChatMessage[];
   /** Разговор на экране: по его смене лента прокручивается к последнему. */
   conversationId?: string;
+  /**
+   * Разговор живого хода для карточки лимита: id прогона, пока разговора ещё нет в списке чатов.
+   * Отдельно от `conversationId`: по его смене лента прокручивается, а переносу id нужен сразу.
+   */
+  liveConversationId?: string;
   stream: StreamState;
   /** Кто отвечает — для подписи ожидания; через контур это модель контура. */
   modelName?: string;
@@ -41,6 +46,8 @@ export interface ChatThreadProps {
   localRun?: boolean;
   /** Ключ прогона этого разговора: по нему уходят права и повтор. */
   chatId?: string;
+  /** Задача ядра хода (`coreTask` прогона или последняя известная): карточка лимита читает её вид. */
+  coreTaskId?: string;
   permissions: PendingPermission[];
   /** Дописанное, ждущее конца хода: лента рисует его пузырём-призраком. */
   queued: QueuedMessage[];

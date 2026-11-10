@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Хранилище ключей доступа и шифрование секретов — общие для панели, ядра и хоста переходов",
   "exports": {
+    "./environment-keys": "./src/environment-keys.ts",
     "./errors": "./src/errors.ts",
     "./integration-keys": "./src/integration-keys.ts",
     "./provider-keys": "./src/provider-keys.ts",

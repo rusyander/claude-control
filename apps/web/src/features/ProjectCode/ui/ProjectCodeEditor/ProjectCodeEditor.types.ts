@@ -1,3 +1,5 @@
+import type { EditorNotes } from '../DiffNotes/notesGutter.types';
+
 export interface ProjectCodeEditorProps {
   /** Путь от корня проекта: по нему выбирается грамматика подсветки. */
   path: string;
@@ -24,4 +26,6 @@ export interface ProjectCodeEditorProps {
    * уходил на body.
    */
   autoFocus?: boolean;
+  /** Поле «+ заметка» у строк: есть только у окна кода, открытого из чата. */
+  notes?: EditorNotes;
 }

@@ -64,8 +64,10 @@ export const coreEn: typeof coreRu = {
       'above the task list sets up autostart (Windows Task Scheduler, systemd, macOS LaunchAgent).',
     startOpen: 'Open «Core tasks»',
     startOpenText:
-      'A sidebar entry. The list shows the core’s tasks: whether a task is running now, its state ' +
-      'and a link to its timeline. The header buttons lead to the launch screen and to scenarios.',
+      'A sidebar entry. The section opens on the task board (section «Task board» below); the ' +
+      '«Board / List» switch in the header leads to the list — whether a task is running now, its ' +
+      'state and a link to its timeline. The header buttons lead to the launch screen and to ' +
+      'scenarios; on the board «Import items» sits beside them.',
     startFault: 'The core does not start — a fault card',
     startFaultText:
       'While the core is starting, the list is replaced by the «The task core is starting» card; ' +
@@ -270,6 +272,15 @@ export const coreEn: typeof coreRu = {
       'for Claude). At the ceiling — the same rung, and the «Model» decision says so. There is no ' +
       'retry at the same rung below the ceiling. A reviewer is never weaker than the author. The ' +
       'core never picks effort max; a model above the ceiling is only your pick.',
+    leadCross: 'A second review on another CLI',
+    leadCrossText:
+      'Only Maximum quality: after the first review a second reviewer on another allowed CLI ' +
+      'looks at the unit. It cannot approve — only its findings and refutations count: a finding ' +
+      'sends the unit to a fix, and its agreement never lifts a finding of the first reviewer. ' +
+      'There is no second review if no other allowed CLI is left (the contour narrowing ' +
+      'included), if you pinned the first reviewer’s CLI, or if the first review ran no session: ' +
+      'the reason «cross-review: …» stands in the «Unverified» part of the final report. ' +
+      'Balanced and Economy never run it.',
     leadPromotion: 'Raise by learning',
     leadPromotionText:
       'The core remembers the first passes of every kind of work (project, step kind, CLI, route, ' +
@@ -296,9 +307,11 @@ export const coreEn: typeof coreRu = {
     askTitle: 'Answering the core’s questions',
     askCaption:
       'Open questions sit above the task timeline. An answer is one click; a second click does ' +
-      'not send a second command. An open question also arrives as a notification — on the phone ' +
-      'and in Telegram, with a link to the task; you can answer in the panel timeline or on the ' +
-      'phone, where the answer is signed with the phone key.',
+      'not send a second command. An open question also arrives as a notification in Telegram, ' +
+      'and on the phone only when it blocks (no default action), one push per question. An answer in the panel timeline or on the phone is signed with the phone ' +
+      'key. With «Answer the core from Telegram» on (help «Integrations») the question reaches the ' +
+      'bot with buttons, and the core takes the answer from there as an answer from Telegram; with ' +
+      'it off — as text with a link to the task.',
     askLaunch: 'The launch question',
     askLaunchText:
       'If a task was estimated but not launched from the launch screen, the core asks here: ' +
@@ -320,6 +333,22 @@ export const coreEn: typeof coreRu = {
       'Grant access to project paths: the «Grant access» form — project, paths, actions.',
     askKindHuman: 'model question',
     askKindHumanText: 'Answer in text a question the model asked a human.',
+    askKindLogin: 'login lost',
+    askKindLoginText:
+      'The route’s CLI logged out mid-step. «I logged in again — continue» after logging in to ' +
+      'that CLI, «Stop the step» to drop it; when other usable routes exist, moves to another ' +
+      'model or CLI follow below. The step never changes its route by itself. Only Claude ' +
+      'recognises a lost login so far; the other CLIs never raise this question.',
+    askKindExhausted: 'budget used up',
+    askKindExhaustedText:
+      'The route has used up its paid budget. Top up the account and clear the mark with the ' +
+      'clear-exhausted command, move a started task to another model or CLI with a click if any ' +
+      'exist, or stop the step.',
+    askKindTrackerWrite: 'ticket write',
+    askKindTrackerWriteText:
+      'The MR of a tracker task is open and the source has «Reply in the ticket» on. «Allow the ' +
+      'comment» writes one line with the MR link into the ticket, «Do not write» writes nothing. ' +
+      'The approval is taken only from the panel or the phone; Telegram does not show that button.',
 
     timelineTitle: 'The task timeline',
     timelineCaption:
@@ -390,6 +419,173 @@ export const coreEn: typeof coreRu = {
       'new record replaces the old one. Reading — the list, the timeline, the report — works ' +
       'without a record.',
 
+    boardTitle: 'Task board',
+    boardCaption:
+      'Every core task on one screen, in columns by stage. An entry waits in «Inbox» and «Queue»; ' +
+      'the core starts the head of the queue by itself once the board limits allow it. From then ' +
+      'on the task journal moves the stage, not hands.',
+    boardColumns: 'Columns and limits',
+    boardColumnsText:
+      'Left to right: «Inbox», «Queue», «Triage», «Work», «Review», «Check», «Ready for MR», «MR ' +
+      'open», «Merged / closed» and «Waiting for you» — cards that need a human. A card shows its ' +
+      'source (manual, chat, tracker, forge, tests, Telegram), the number of questions, «units: 1 ' +
+      'of 3», «group» and «driven by a human». Above the columns are the limits: «In work: 2 of ' +
+      '2», «Started today», «Default stop», and the filters «Waiting for you · 2» and «By group». ' +
+      'Closed tasks are folded behind «Show closed». The core re-reads an open MR from the forge ' +
+      'by itself: a merged or closed one moves to «Merged / closed» within one sweep, about 30 ' +
+      'seconds; if the forge does not answer, the card stays where it was.',
+    boardEntry: 'An entry in «Inbox»',
+    boardEntryText:
+      'A click on a card opens its window: stage, state, stop, source, scenario. Until the task is ' +
+      'started the entry has «Card moves»: from «Inbox» — «To queue» or «Reject», in «Queue» — ' +
+      '«Up» (place before its neighbour), a rejected one — «Restore». A started task has no ' +
+      'moves: the core moves the stage. The «Scenario» picker of an entry changes which scenario ' +
+      'it launches with, until the task has started. A core refusal shows under the picker in the ' +
+      'panel language, its original text in the hover hint. Moves work the same way: a move the ' +
+      'core did not accept is one line in the panel language under «Card moves» (which move and ' +
+      'why), the core’s original text in the hover hint, with no general pop-up notice beside it. ' +
+      'If another page moved the card meanwhile (rejected it, or it started as a task), the ' +
+      'window neither closes nor jumps to the task: it stays on the card as it was at the moment ' +
+      'of the move, marked «The card changed on the board while the move was on its way», with ' +
+      'the refusal line and no move buttons. Close the window and the board shows where the card ' +
+      'is now.',
+    boardTask: 'The window of a running task',
+    boardTaskText:
+      'Progress by unit, agents, token and turn spend, the MR and «Open in full» — the task ' +
+      'timeline. Below are «Manual intervention» and «Where to stop»: at the plan, at the MR or to ' +
+      'the end; the stop point cannot change after the MR. What waits for you is answered right ' +
+      'in the window: blocking questions as the same answer cards as on the timeline, a window ' +
+      'wait as move options, a unit takeover with its button. An entry not started yet has no ' +
+      'journal: its spend, agents and unit progress read «no data».',
+    boardLimits: 'Limits — the board section of the core config',
+    boardLimitsText:
+      'The queue head starts only while fewer tasks are in work than the limit (1, 2, 4 or 6; 2 ' +
+      'out of the box), the board is not paused and fewer starts happened in the local day than ' +
+      'the daily limit (none out of the box); a setting can also hold new starts while any card ' +
+      'waits for a human. The default stop is «at the MR». A rejected section means the defaults ' +
+      'apply, with a «Defaults» strip and the reason above the board. A failed start returns the ' +
+      'card to «Inbox» with the core’s reason; neither the slot nor the daily start is spent. ' +
+      'When the head’s route window is held, nobody starts: the queue is an order and the next ' +
+      'entry does not overtake the head, which shows the reason.',
+
+    inboxTitle: 'Inbox from the tracker',
+    inboxCaption:
+      'The core polls its sources — Jira and GitLab — by itself and puts new tickets into the ' +
+      'board «Inbox», one entry per ticket. You queue them, unless the source has «Queue by ' +
+      'itself» on.',
+    inboxRow: 'The row above the board',
+    inboxRowText:
+      '«Inbox from the tracker» names the number of sources, how many are off, how often the poll ' +
+      'runs and how many sources queue entries by themselves. No sources — it says so: tickets ' +
+      'will not reach the board by themselves. The buttons are «Sources» and «Find in the ' +
+      'tracker».',
+    inboxSources: 'Sources',
+    inboxSourcesText:
+      'A source is Jira or GitLab; GitHub is listed but cannot be picked. Jira reads tickets by ' +
+      'labels, «assigned to me only» or by your own JQL — the tracker itself judges it, it never ' +
+      'goes through a model. GitLab reads issues by labels or assigned to you, MRs where you are a ' +
+      'reviewer, and your MRs with open threads. «Repositories» map a forge path to a local ' +
+      'folder; a ticket with a bug label goes the «Bug fix» scenario. «Queue by itself» is off ' +
+      'for a new source. «Reply in the ticket» is off too: when on, after the MR opens the core ' +
+      'asks whether to write a line with the link into the ticket — and writes only on an answer ' +
+      'from the panel or the phone. The save sends the whole settings with their digest: edited ' +
+      'past the window — the reason and «Reload the settings».',
+    inboxSearch: 'Find in the tracker',
+    inboxSearchText:
+      'A source and a query — a ticket key, words from the title or JQL; empty means the ' +
+      "source's own query. Tick what was found and press «To the inbox»: the core answers how " +
+      'many are new and how many were already there. A ticket lands on the board once — a repeat ' +
+      'search or poll does not duplicate it. The tracker did not answer — «The source did not ' +
+      'answer» with the reason; not everything shown — the «narrow the query» note.',
+    inboxPreset: 'The entry scenario',
+    inboxPresetText:
+      'The scenario follows the ticket kind, the ticket text plays no part: an issue — «Tracker ' +
+      'ticket», type Bug or a bug label — «Bug fix», an MR to review — «MR review by link», your ' +
+      'MR with threads — «Reviewer replies». You can change it in the entry window until the task ' +
+      'has started.',
+
+    relatedTitle: 'Related cards',
+    relatedCaption:
+      'Several tickets about the same thing can go to work as one task. The core hints which ' +
+      'Inbox entries are related, and you merge them — the core never merges by itself.',
+    relatedChip: '1. The «related: N» badge on a tile',
+    relatedChipText:
+      'An Inbox entry from the tracker carries a «related: N» badge when the core found other such ' +
+      'entries by the ticket facts: a shared epic or parent (or one is the parent of the other), ' +
+      'an issue link in the tracker or on the forge, a path named in both tickets. A shared label, ' +
+      'author or similar title is not a relation: every polled entry has the source label. The ' +
+      'hover hint names the related entries.',
+    relatedMerge: '2. «Merge into this card (N)» in the entry window',
+    relatedMergeText:
+      'The entry window has a «Related cards» section: each related entry with its reason in ' +
+      'words, all checked by default. Uncheck the extra ones and press «Merge into this card (N)»: ' +
+      'the checked entries fold into this one, their tickets stay on it, and everything goes to ' +
+      'work as one task with all the tickets. Folded entries leave the board and never come back ' +
+      'from polling. One task takes at most 16 tickets, so you can check this entry and 15 more — ' +
+      'the remaining boxes are locked, and the caption under the list says what to uncheck to ' +
+      'check another.',
+    relatedRefused: '3. A core refusal',
+    relatedRefusedText:
+      'Only Inbox entries from the tracker merge: an entry that has already gone to the queue, an ' +
+      'MR entry or an entry without a ticket is refused by the core. The refusal is one line in ' +
+      'the panel language in the window, with the ticket key («PROJ-11 has left the Inbox — only ' +
+      'Inbox entries merge»), the core’s original text in the hover hint, with no general pop-up ' +
+      'notice beside it. Nothing is merged — the board stays as it was.',
+
+    queueTitle: 'To the queue instead of launching now',
+    queueCaption:
+      'The launch screen can skip the estimate for now and put the task on the board: it starts ' +
+      'when a slot frees up.',
+    queueForm: 'The «To queue» button and «Where to stop»',
+    queueFormText:
+      'Under the launch form pick where the task stops: «at the plan» — it waits for your ' +
+      '«Launch» after the split, «at the MR» — it opens the MR and stops, «to the end» — it keeps ' +
+      'going. «To queue» puts the entry into the board’s «Queue»; below appear «The task is in the ' +
+      'board queue» and «Open the board». If the board refuses the entry, the reason sits under ' +
+      'the button with «To queue — retry».',
+    queueStart: 'Starting from the queue',
+    queueStartText:
+      'Entries in «Queue» stand in order, the first starts first — within the board limits. While ' +
+      'the head’s route window is closed nobody starts: the next entry never overtakes the head, ' +
+      'and the head carries the reason. The start takes the same path as yours, estimate ' +
+      'included; the «at the plan» stop leaves the task waiting for your «Launch».',
+
+    takeoverTitle: 'Take over and hand back to the core',
+    takeoverCaption:
+      'A takeover pauses the task at a safe point and hands it to you; handing back resumes the ' +
+      'interrupted step. Rework in words does not stop the task.',
+    takeoverTake: '«Take over»',
+    takeoverTakeText:
+      'In the window of a running task. The core pauses at the nearest safe point, the work slot ' +
+      'frees up and the card shows «driven by a human». The block says «Takeover is open: you are ' +
+      'driving the task» and names the task copy: work in it by hand or with «Open chat» — that ' +
+      'chat may edit only this copy.',
+    takeoverBack: '«Hand back to the core»',
+    takeoverBackText:
+      'The «What was done» field goes to the next step. The takeover chat closes first, then the ' +
+      'core resumes the interrupted step.',
+    takeoverRework: '«Send for rework»',
+    takeoverReworkText:
+      'The «What to rework» text, no takeover. While the task is running, the current step gets ' +
+      'the message at the next turn boundary. Once the task is done and its MR is open, a ' +
+      'review-answer task opens on that MR with this text.',
+
+    windowTitle: 'The task waits for a limit window',
+    windowCaption:
+      'A step hit the subscription window — the task never changes its route by itself: it waits ' +
+      'for the reset and continues on the same route, and a click can move it.',
+    windowCard: 'The card in «Waiting for you»',
+    windowCardText:
+      'The state reads «waiting for the limit window», with «Why it stands» — the core’s reason ' +
+      'verbatim. The «Limit» block names the route that refused and when the window opens: «The ' +
+      'task continues by itself on the same route». When the reset time is unknown the core ' +
+      'rechecks the window itself.',
+    windowSwitch: 'Move without waiting',
+    windowSwitchText:
+      '«Move to …» goes to another CLI, «Other model: …» to another model of the same CLI; only ' +
+      'routes from the task’s set are offered. With none the card says so: waiting for the reset ' +
+      'is the only way. The same window in chat is the «Subscription limit» card (Chat help).',
+
     limitsTitle: 'What the section cannot do yet',
     limitEnglishTitle: 'Decision reasons are in English',
     limitEnglishText:
@@ -452,6 +648,45 @@ export const coreEn: typeof coreRu = {
       '01-library': 'Scenario library: core presets and your versions',
       '02-new': 'A new scenario based on a preset: steps, checks, gates',
     },
+    board: {
+      '01-board':
+        'The board: limits «In work: 2 of 2» and «Started today: 4 of 10», columns from «Inbox» ' +
+        'to «Waiting for you», cards of groups 00a11a and 00b22b',
+      '02-entry-window':
+        'An «Inbox» entry window: source «manual», stop at the plan, moves «To queue» and «Reject»',
+      '03-task-window':
+        'A running task window: units 1 of 3, spend, «Take over», «Send for rework» and «Where to ' +
+        'stop»',
+      '04-takeover-open':
+        'Takeover open: the task copy, «Open chat», the «What was done» field and «Hand back to ' +
+        'the core»',
+      '05-window-card':
+        'The task waits for a limit window: it opens at 19:30, «Move to codex» and another model',
+      '06-defaults':
+        'The «Defaults» strip: the board section of the core config was rejected, the reason named',
+    },
+    inbox: {
+      '01-row':
+        'The «Inbox from the tracker» row above the board: two sources, one off, the poll and buttons',
+      '02-sources':
+        'The «Inbox sources» window: Jira with labels and «assigned to me only», GitLab with MRs to review',
+      '03-search':
+        '«Find in the tracker»: three tickets of the jira source with key, kind and a pick box',
+      '04-preset': 'The «Inbox» entry window: the «Scenario» picker before the task starts',
+    },
+    related: {
+      '01-chip':
+        'Inbox tiles: two tracker entries carry the «related: 1» badge, an unrelated entry does not',
+      '02-merge':
+        'The entry window: the «Related cards» section with the reason in words, checked by default, and «Merge into this card (1)»',
+      '03-refused':
+        'A core refusal in the window: one line in the panel language with the ticket key, the core’s text in the hover hint',
+    },
+    queue: {
+      '01-queue':
+        'The launch form: «Where to stop» and the result «The task is in the board queue» with ' +
+        '«Open the board»',
+    },
   },
 
   diagrams: {
@@ -461,5 +696,17 @@ export const coreEn: typeof coreRu = {
       'From launch to steps: form, estimate, split and launch, steps, timeline and questions to you',
     'lead-pipeline':
       'The lead: recon, intake, task class and shape, units within the slots, review, integration and publishing',
+    'board-flow':
+      'The board: where entries come from, «Inbox» and «Queue», the head starting within the board section limits, stages by the journal, a refused start and the card window',
+    'takeover-loop':
+      'Manual intervention: «Take over» at a safe point, work in the copy, «Hand back to the core» with a note, and «Send for rework» without a takeover',
+    'limit-window':
+      'The limit window: in chat the «Subscription limit» card and the message sent again after the reset, in a task «waiting for the window» on the same route; moving only by a click',
+    'inbox-flow':
+      'Inbox: source poll and search, one entry per ticket, «Queue by itself», start and MR, the ticket write only on an answer from the panel or the phone',
+    'related-merge':
+      'Related cards: ticket facts, the core’s «related: N» hint, your pick of up to 15 entries, one task with all the tickets or the core’s refusal in words',
+    'group-lanes':
+      'Group lanes: a group «To queue», the group start, «By group», «Closed» with former runs, and «Import items» — a Path into a core scenario',
   },
 };

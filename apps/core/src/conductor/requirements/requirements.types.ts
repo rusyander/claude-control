@@ -25,6 +25,8 @@ export interface ClaimRow {
   stepId: string;
   stepKind: string;
   claim: StepDoneCall;
+  /** Второе ревью (P185): идут в счёт только его опровержения — «покрыто» и подтверждения нет. */
+  cross?: true;
 }
 
 export interface RequirementsInput {

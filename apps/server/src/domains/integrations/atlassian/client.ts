@@ -1,9 +1,14 @@
 import type { AtlassianDeployment, AtlassianSiteSettings } from '@agentdeck/contracts';
+import type { TrackerRequest } from '@agentdeck/trackers';
+import { authorizationOf, jsonBody, trimUrl } from '@agentdeck/trackers/client';
+import { accountOf, jiraApi, myself } from '@agentdeck/trackers/jira';
+import type { RawJiraMyself } from '@agentdeck/trackers/jira.types';
 import { invalidField } from '../errors.ts';
-import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '../http/http.ts';
+import { failedResponse, parseJson, type OutboundResponse } from '../http/http.ts';
+import { trackerPort } from './tracker-port.ts';
 
 /**
- * Один клиент Atlassian на два диалекта: облако и своя установка (Server/DC).
+ * Доступ панели к Atlassian на два диалекта: облако и своя установка (Server/DC).
  *
  * Разница не косметическая, и её нельзя спросить у пользователя галочкой —
  * половина людей не знает ответа, а вторая половина ошибается. Поэтому вид
@@ -14,7 +19,10 @@ import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '.
  * - Server/DC: авторизация `Bearer токен` (personal access token, почты нет),
  *   Jira на `/rest/api/2`, Confluence на `/rest/api/content` без префикса.
  *
- * Всё остальное — те же ручки и те же поля, поэтому клиент один, а не два.
+ * Сам клиент (авторизация, адреса Jira, разбор ответа) — пакет `@agentdeck/trackers`, общий с
+ * входящими ядра (этап 12, D15); здесь — доступ из настроек, определение вида установки и
+ * запросы Confluence поверх того же клиента. Отказ пакета панель называет своим текстом
+ * (`tracker-port.ts`).
  *
  * Jira и Confluence — РАЗНЫЕ интеграции со своим адресом и своим ключом
  * (владелец 10.10.2026): на своей установке это разные приложения, и personal
@@ -22,6 +30,8 @@ import { failedResponse, parseJson, sendRequest, type OutboundResponse } from '.
  * полностью рабочем доступе. Поэтому доступ собирается на одну систему, и
  * `baseUrl` у доступа Confluence — уже корень вики (`toConfluenceAccess`).
  */
+
+export { jiraApi, trimUrl };
 
 export interface AtlassianAccess {
   baseUrl: string;
@@ -33,28 +43,9 @@ export interface AtlassianAccess {
 /** Как `system` называет Confluence во всех его запросах. */
 export const CONFLUENCE_SYSTEM = 'Confluence';
 
-/** Адрес без хвостового слэша: иначе пути склеиваются с двойным. */
-export function trimUrl(url: string): string {
-  return url.trim().replace(/\/+$/, '');
-}
-
-/**
- * Заголовки авторизации. Облако принимает Basic с почтой и API-токеном; своя
- * установка почты не знает вовсе и ждёт Bearer. Ошибиться диалектом = получить
- * 401 на верном токене, поэтому решает только `deployment`.
- */
+/** Заголовок авторизации диалекта (решает только `deployment`). */
 export function authHeaders(access: AtlassianAccess): Record<string, string> {
-  const token = access.token;
-  if (access.deployment === 'cloud') {
-    const basic = Buffer.from(`${access.email}:${token}`, 'utf8').toString('base64');
-    return { Authorization: `Basic ${basic}` };
-  }
-  return { Authorization: `Bearer ${token}` };
-}
-
-/** Корень Jira REST для этого диалекта. */
-export function jiraApi(access: AtlassianAccess): string {
-  return `${access.baseUrl}/rest/api/${access.deployment === 'cloud' ? '3' : '2'}`;
+  return { Authorization: authorizationOf(access) };
 }
 
 /**
@@ -67,7 +58,7 @@ export function confluenceRoot(access: AtlassianAccess): string {
 
 export interface AtlassianCall {
   url: string;
-  method?: string;
+  method?: TrackerRequest['method'];
   body?: unknown;
   /** Как назвать систему в отказе: «Jira» или «Confluence». */
   system: string;
@@ -85,24 +76,21 @@ export async function raw(
   access: AtlassianAccess,
   request: AtlassianCall,
 ): Promise<OutboundResponse> {
-  return sendRequest({
+  const port = trackerPort(access);
+  await port.send({
     url: request.url,
     method: request.method ?? 'GET',
     system: request.system,
-    headers: {
-      ...authHeaders(access),
-      Accept: 'application/json',
-      ...(request.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    body: request.body === undefined ? undefined : JSON.stringify(request.body),
+    ...(request.body === undefined ? {} : jsonBody(request.body)),
   });
+  return port.last()!;
 }
 
-/** Кто мы для Atlassian: имя учётной записи из ответа `myself`. */
-interface MyselfResponse {
-  displayName?: string;
-  name?: string;
-  emailAddress?: string;
+/** «Кто я» Jira — ответ как есть: по коду выбирается диалект. */
+async function probeJira(access: AtlassianAccess): Promise<OutboundResponse> {
+  const port = trackerPort(access);
+  await myself(port.site, port.send);
+  return port.last()!;
 }
 
 export interface DeploymentProbe {
@@ -132,19 +120,17 @@ export async function detectDeployment(
       field: 'token',
     });
 
-  const cloud: AtlassianAccess = { ...access, deployment: 'cloud' };
   const cloudResponse = access.email
-    ? await raw(cloud, { url: `${jiraApi(cloud)}/myself`, system: 'Jira' })
+    ? await probeJira({ ...access, deployment: 'cloud' })
     : undefined;
   if (cloudResponse?.ok) {
-    const me = parseJson<MyselfResponse>('Jira', cloudResponse);
+    const me = parseJson<RawJiraMyself | null>('Jira', cloudResponse);
     return { deployment: 'cloud', account: accountName(me) };
   }
 
-  const server: AtlassianAccess = { ...access, deployment: 'server' };
-  const serverResponse = await raw(server, { url: `${jiraApi(server)}/myself`, system: 'Jira' });
+  const serverResponse = await probeJira({ ...access, deployment: 'server' });
   if (serverResponse.ok) {
-    const me = parseJson<MyselfResponse>('Jira', serverResponse);
+    const me = parseJson<RawJiraMyself | null>('Jira', serverResponse);
     return { deployment: 'server', account: accountName(me) };
   }
 
@@ -180,7 +166,7 @@ export async function detectConfluenceDeployment(
       })
     : undefined;
   if (cloudResponse?.ok) {
-    const me = parseJson<MyselfResponse>(CONFLUENCE_SYSTEM, cloudResponse);
+    const me = parseJson<RawJiraMyself | null>(CONFLUENCE_SYSTEM, cloudResponse);
     return { deployment: 'cloud', account: accountName(me) };
   }
 
@@ -190,14 +176,15 @@ export async function detectConfluenceDeployment(
     system: CONFLUENCE_SYSTEM,
   });
   if (serverResponse.ok) {
-    const me = parseJson<MyselfResponse>(CONFLUENCE_SYSTEM, serverResponse);
+    const me = parseJson<RawJiraMyself | null>(CONFLUENCE_SYSTEM, serverResponse);
     return { deployment: 'server', account: accountName(me) };
   }
   throw failedResponse(CONFLUENCE_SYSTEM, cloudResponse ?? serverResponse, 500);
 }
 
-function accountName(me: MyselfResponse): string {
-  return me.displayName || me.name || me.emailAddress || 'учётная запись без имени';
+/** Подпись учётки: имя из ответа, а без имени — честное «без имени», а не пустая строка. */
+function accountName(me: RawJiraMyself | null): string {
+  return accountOf(me) ?? 'учётная запись без имени';
 }
 
 /**

@@ -28,14 +28,33 @@ function routerPaths(): string[] {
     .map((match) => match[1] ?? '');
 }
 
+/**
+ * Адреса-переадресации, которые агенту всё же даны: веб переводит их сам (`pageNavigation.ts`),
+ * и без них модель не открыла бы то, куда они ведут. `/groups` — полосы групп доски ядра
+ * (этап 12, D13): `z.enum` путей не пускает в `open_page` адрес с ключами `/core?lane=group`.
+ */
+const AGENT_ALIASES = ['/groups'];
+
 describe('PANEL_SECTIONS ↔ router.tsx', () => {
+  it('каждый адрес-ярлык агента веб переводит сам, а роутер держит его переадресацией', () => {
+    const navigation = readFileSync(
+      resolve(WEB, 'entities/PanelAgent/model/pageNavigation.ts'),
+      'utf8',
+    );
+    const router = readFileSync(ROUTER, 'utf8');
+    for (const alias of AGENT_ALIASES) {
+      expect(navigation).toContain(`path === '${alias}'`);
+      expect(router).toMatch(new RegExp(`path: '${alias}', beforeLoad:`));
+    }
+  });
+
   it('роутер разобран (проверка не пустая)', () => {
     expect(routerPaths().length).toBeGreaterThan(10);
   });
 
   it('каждый путь роутера есть в списке разделов, и лишних нет', () => {
     const server = PANEL_SECTIONS.map((section) => section.route).sort();
-    expect(server).toEqual([...routerPaths()].sort());
+    expect(server).toEqual([...routerPaths(), ...AGENT_ALIASES].sort());
   });
 
   it('у каждого раздела есть название и описание', () => {
@@ -68,6 +87,14 @@ describe('вкладки разделов ↔ веб', () => {
     const web = [...(line?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]);
     expect(web.length).toBeGreaterThan(2);
     expect(tabsOf('/tests')).toEqual(web);
+  });
+
+  it('«Группы» — полосы групп доски ядра, а не прежняя страница групп (этап 12, D13)', () => {
+    const groups = PANEL_SECTIONS.find((item) => item.route === '/groups')?.description ?? '';
+    expect(groups).toContain('/core?view=board&lane=group');
+    expect(groups).not.toContain('toggled together');
+    const core = PANEL_SECTIONS.find((item) => item.route === '/core')?.description ?? '';
+    expect(core).toContain('board');
   });
 
   it('раздел со вкладками говорит модели, что focus — ключ вкладки', () => {

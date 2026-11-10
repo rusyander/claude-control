@@ -110,6 +110,10 @@ export interface SdkAdapterDef {
   mapPermission(raw: RawToolCall): PermissionAsk;
   /** Код ядра по тексту ошибки CLI — строка потока или stderr при выходе. */
   classifyError?(text: string): AdapterErrorCode | null;
+  /** Текст ошибки хода зовёт войти заново (этап 12, P170; `caps.loginLost`). */
+  loginLost?(text: string): boolean;
+  /** Задокументированное чтение входа CLI этой командой; нет — `unknown`. */
+  loginState?(command: string): Promise<'up' | 'absent' | 'unknown'>;
   /** Строка окна подписки (`caps.windowEvent: true`); нет — окно этого CLI `unknown`. */
   readWindow?: SdkRule['readWindow'];
   /** Как читать исход вызова из `tool_result` этого CLI (этап 8, F18); нет — без `outcome`. */
@@ -217,6 +221,8 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
    * версию отвечал бы CLI из PATH, а сеанс шёл бы настроенным.
    */
   const commandNow = (): string => options.commandOf?.() ?? options.command ?? def.command;
+  // Вход перечитывается той же командой, что запускает сеанс (P170).
+  const loginRead = def.loginState;
 
   return {
     id: def.id,
@@ -226,6 +232,8 @@ export function createSdkAdapter(def: SdkAdapterDef, options: SdkAdapterOptions 
       return commandNow();
     },
     ...(def.ladder ? { ladder: def.ladder } : {}),
+    ...(def.loginLost ? { loginLost: def.loginLost } : {}),
+    ...(loginRead ? { loginState: () => loginRead(commandNow()) } : {}),
     ...(def.transcriptPresent ? { transcriptPresent: def.transcriptPresent } : {}),
     ...(def.ownsTranscript ? { ownsTranscript: def.ownsTranscript } : {}),
     ...(def.mcpSource ? { mcpSource: def.mcpSource } : {}),

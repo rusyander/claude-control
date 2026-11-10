@@ -2,8 +2,6 @@ import type { TranslationSchema } from './ru';
 import { serverMessagesEn } from './server-messages/en.ts';
 import { panelAgentEn } from './panel-agent/en.ts';
 import { attachEn } from './attach/en.ts';
-import { groupKnobsEn, groupPathEn, groupSourcesEn } from './groups/en.ts';
-import { groupsPageEn } from './groups/page-en.ts';
 import { groupBuilderEn } from './groups/builder-en.ts';
 import { testsE2eEn } from './tests-e2e/en.ts';
 import { pageTabsEn } from './page-tabs/en.ts';
@@ -31,6 +29,13 @@ import { coreTimelineEn } from './core-timeline/en.ts';
 import { coreLaunchEn } from './core-launch/en.ts';
 import { coreScenarioEn } from './core-scenario/en.ts';
 import { coreChatEn } from './core-chat/en.ts';
+import { coreBoardEn } from './core-board/en.ts';
+import { coreInboxEn } from './core-inbox/en.ts';
+import { diffNotesEn } from './diff-notes/en.ts';
+import { limitCardEn } from './limit-card/en.ts';
+import { coreTakeoverEn } from './core-takeover/en.ts';
+import { sitePreviewEn } from './site-preview/en.ts';
+import { testsRecordedEn } from './tests-recorded/en.ts';
 
 /** Типизирован по русской версии: забыть ключ при переводе не получится. */
 export const en: TranslationSchema = {
@@ -41,10 +46,6 @@ export const en: TranslationSchema = {
   sandboxPrompts: sandboxPromptsEn,
   panelAgent: panelAgentEn,
   attach: attachEn,
-  groupPath: groupPathEn,
-  groupSources: groupSourcesEn,
-  groupKnobs: groupKnobsEn,
-  groupsPage: groupsPageEn,
   groupBuilder: groupBuilderEn,
   testsE2e: testsE2eEn,
   pageTabs: pageTabsEn,
@@ -65,6 +66,13 @@ export const en: TranslationSchema = {
   coreLaunch: coreLaunchEn,
   coreScenario: coreScenarioEn,
   coreChat: coreChatEn,
+  coreBoard: coreBoardEn,
+  coreInbox: coreInboxEn,
+  diffNotes: diffNotesEn,
+  limitCard: limitCardEn,
+  coreTakeover: coreTakeoverEn,
+  sitePreview: sitePreviewEn,
+  testsRecorded: testsRecordedEn,
   environment: environmentEn,
   projectsPage: projectsPageEn,
   /** Карточка «Локальный слой» на вкладке «Из проекта» — `local-layer/en.ts`. */
@@ -609,12 +617,13 @@ export const en: TranslationSchema = {
     mcpFailed: 'servers not responding',
     unusedScripts: 'not bound to any event',
     // English has one/other only; few/many exist to mirror the Russian key set.
-    groupsHint_one: '{{count}} setting bundle',
-    groupsHint_few: '{{count}} setting bundles',
-    groupsHint_many: '{{count}} setting bundles',
-    groupsHint_other: '{{count}} setting bundles',
+    groupsHint_one: '{{count}} core group in progress',
+    groupsHint_few: '{{count}} core groups in progress',
+    groupsHint_many: '{{count}} core groups in progress',
+    groupsHint_other: '{{count}} core groups in progress',
     permissionsAsk: 'ask first',
-    groupsEmpty: 'none yet',
+    groupsEmpty: 'no groups in progress',
+    groupsUnknown: 'core not responding',
     allScriptsUsed: 'all bound to hooks',
     backups: 'Backups',
     backupsLast: 'latest',

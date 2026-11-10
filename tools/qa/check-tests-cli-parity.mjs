@@ -31,12 +31,20 @@ const check = (ok, what, detail = '') => {
   console.log(`${ok ? '✓' : '✗'} ${what}${detail ? ` — ${detail}` : ''}`);
 };
 
+/**
+ * Предел вывода CLI. По умолчанию у spawnSync он 1 МБ: `tests lint` по хранилищу agentdeck
+ * (4487 кейсов) выдал 2 МБ, процесс убивался по ENOBUFS — код null и половина замечаний.
+ * Проверка сравнивала обрезанный вывод с панелью, а не CLI с панелью.
+ */
+const CLI_OUTPUT_MAX = 256 * 1024 * 1024;
+
 function cli(command) {
   const result = spawnSync(
     process.execPath,
     ['tools/tests-cli.mjs', command, '--project', cliProject],
-    { encoding: 'utf8', windowsHide: true },
+    { encoding: 'utf8', windowsHide: true, maxBuffer: CLI_OUTPUT_MAX },
   );
+  if (result.error) console.log(`  ${command}: ${result.error.message}`);
   return { code: result.status, out: `${result.stdout ?? ''}${result.stderr ?? ''}` };
 }
 

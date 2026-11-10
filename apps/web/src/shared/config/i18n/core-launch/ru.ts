@@ -282,6 +282,7 @@ export const coreLaunchRu = {
       split: 'Деление',
       review: 'Ревью',
       report: 'Отчёт',
+      walk: 'Проход по стенду',
     },
   },
   routes: {

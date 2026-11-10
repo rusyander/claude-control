@@ -178,3 +178,15 @@ export interface TelegramConnectView {
   /** Подробность Telegram — без токена. */
   detail?: string;
 }
+
+/**
+ * Цель ожидания «вопрос ядра задач» (этап 12, D29, P188): сообщение бота несёт вопрос ядра и
+ * `cmdId` каждой команды выбора — повтор нажатия шлёт те же ключи повтора, второй строки в журнале
+ * нет (P189). Объединение целей сервера (`AskTarget`) расширяет зона ответов Telegram.
+ */
+export interface TelegramCoreAskTarget {
+  kind: 'coreAsk';
+  taskId: string;
+  askId: string;
+  cmdIds: string[];
+}

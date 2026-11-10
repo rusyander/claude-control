@@ -1,0 +1,22 @@
+/* Переключатель «Отвечать ядру из Telegram» с пояснением, что можно из Telegram, а что нет. */
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  padding: var(--spacing-2xs);
+  border-radius: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2xs);
+}
+
+/* Поле репозиториев `/task` под пояснением: отделено от переключателя отступом. */
+.repos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3xs);
+  margin-top: var(--spacing-2xs);
+}

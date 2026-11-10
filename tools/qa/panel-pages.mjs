@@ -12,12 +12,13 @@ import { CORE_STUB_TASK_ID, installCoreTaskStub } from './core-task-stub.mjs';
  * пустым словом).
  */
 /**
- * Сетка «Прежние группы» — только чтение (этап 10, F1): подмена отдаёт пару и проектную группу,
- * `page.route` переживает перезагрузку `prepare`.
+ * Доска ядра (этап 12, D13) — подмена ответа доски с карточками всех видов (`check-core-board.mjs`):
+ * живой журнал ядра на стенде такого набора не держит; `page.route` переживает перезагрузку
+ * `prepare`. Прежние группы доска показывает в «Импорте пунктов» и «Закрытых» — та же подмена.
  */
-async function stubGroups(page) {
-  const { installLegacyGroupsStub } = await import('./legacy-groups-stub.mjs');
-  await installLegacyGroupsStub(page);
+async function stubBoard(page) {
+  const { installCoreBoardStub } = await import('./check-core-board.mjs');
+  await installCoreBoardStub(page);
 }
 
 /**
@@ -41,13 +42,201 @@ async function stubRules(page) {
   );
 }
 
-// Вкладка — явно: страница помнит последнюю у зрителя (`agentdeck.groups.tab`),
-// и голый `/groups` открылся бы на «В проектах», где пары нет.
-const GROUP_PAGE = {
-  path: '/groups?tab=global',
-  prepare: stubGroups,
-  ready: '[data-agent-anchor="qa-shop-order-global"]',
+const BOARD_PAGE = { path: '/core', prepare: stubBoard, ready: '[data-board-columns]' };
+
+/**
+ * Входящие доски (этап 12, I7) — подмена настройки ядра с двумя источниками (Jira и GitLab: окно
+ * рисует поля обоих видов), поиска и заведения поверх подмены доски (`check-core-inbox.mjs`).
+ */
+async function stubInbox(page) {
+  const { installCoreInboxStub } = await import('./check-core-inbox.mjs');
+  const repos = { 'group/app': 'C:/work/app' };
+  await installCoreInboxStub(page, {
+    v: 1,
+    inbox: {
+      sources: [
+        {
+          id: 'jira',
+          system: 'jira',
+          enabled: true,
+          repos,
+          autoQueue: false,
+          jira: { labels: ['qa-inbox'], assignedToMe: true },
+        },
+        {
+          id: 'gitlab',
+          system: 'gitlab',
+          enabled: false,
+          repos,
+          autoQueue: false,
+          gitlab: {
+            issues: { labels: [], assignedToMe: false },
+            reviewerMrs: true,
+            ownMrsWithThreads: false,
+          },
+        },
+      ],
+    },
+  });
+}
+
+const INBOX_PAGE = { ...BOARD_PAGE, prepare: stubInbox, ready: '[data-board-inbox-sources="2"]' };
+
+/**
+ * Выбор «Сценарий» в окне записи (W2-D, P164) виден только у записи с ходом `set-preset`: та же
+ * подмена доски, запись «Входящих» получает этот ход — иначе обход окна выбора не видит.
+ */
+async function stubBoardPreset(page) {
+  const { installCoreBoardStub } = await import('./check-core-board.mjs');
+  const state = await installCoreBoardStub(page);
+  const inbox = state.cards.find((c) => c.kind === 'entry' && c.column === 'inbox');
+  if (inbox) inbox.moves = [...inbox.moves, 'set-preset'];
+}
+
+/** Карточка Telegram «подключена»: бот, привязка ядра и `telegram.repos` из подмены. */
+async function stubTelegramCard(page) {
+  const { installTelegramCardStub } = await import('./telegram-card-stub.mjs');
+  await installTelegramCardStub(page);
+}
+
+/**
+ * «На доску» у красного кейса (этап 12, I7) — запись прогона с красным, зелёным и заблокированным
+ * кейсом и проект «Тестов» из подмены (`check-core-inbox.mjs`), доска — подмена ядра.
+ */
+async function stubTestsRun(page) {
+  const { installCoreBoardStub } = await import('./check-core-board.mjs');
+  const { installTestsRunStub, TESTS_PROJECT } = await import('./check-core-inbox.mjs');
+  await installCoreBoardStub(page);
+  await installTestsRunStub(page);
+  await page.evaluate((project) => {
+    const id = project.path.toLowerCase();
+    localStorage.setItem(
+      'agentdeck:workspace',
+      JSON.stringify({
+        projectTabs: [{ id, path: project.path, name: project.name }],
+        activeTabId: id,
+        views: {},
+      }),
+    );
+    localStorage.setItem('agentdeck:tests-project', id);
+  }, TESTS_PROJECT);
+}
+
+/** «Сценарии» «Тестов» — записанные проходы и расхождение из подмены (`check-tests-recorded.mjs`). */
+async function stubTestsRecorded(page) {
+  const { stubRecordedFilled } = await import('./check-tests-recorded.mjs');
+  await stubRecordedFilled(page);
+}
+
+/**
+ * Окно сайта в чате (этап 12, V1–V2): открыто только над работающей целью, которую запустила
+ * панель, и только через её прокси — на стенде обхода ни того ни другого нет. Подмена на границе
+ * сети: список запусков с одной целью проекта, ответ `POST /api/site-preview`, страница «прокси» и
+ * маскировка выбора; окно, полосу, чип в поле ввода рисует настоящий код панели.
+ */
+const QA_SITE = {
+  project: 'C:/a11y-site',
+  proxy: 'http://127.0.0.1:47123',
+  preview: { siteId: 'qa-site', nonce: 'qa-site-nonce-0123456789' },
 };
+
+/**
+ * `run` — запуск цели, который отдаёт реестр; его поля можно менять на ходу (перезапуск между
+ * опросами — новый порт и время старта, `check-site-preview-restart.mjs`).
+ */
+export async function stubChatSite(
+  page,
+  run = { port: 5999, startedAt: '2026-11-09T09:00:00.000Z', status: 'running' },
+) {
+  const { project, proxy, preview } = QA_SITE;
+  await page.route(/\/api\/project-runner(\?|$)/, (route) =>
+    route.fulfill({
+      json: [
+        {
+          projectPath: project,
+          dir: '',
+          path: project,
+          name: 'qa-site',
+          port: run.port,
+          url: `http://127.0.0.1:${run.port}/`,
+          status: run.status,
+          command: 'npm run dev',
+          startedAt: run.startedAt,
+        },
+      ],
+    }),
+  );
+  await page.route(/\/api\/site-preview(\?|$)/, (route) =>
+    route.fulfill({ json: { ...preview, url: `${proxy}/` } }),
+  );
+  await page.route(/\/api\/site-preview\/qa-site\/pick/, (route) =>
+    route.fulfill({ json: route.request().postDataJSON() }),
+  );
+  await page.route(`${proxy}/**`, (route) =>
+    route.fulfill({
+      contentType: 'text/html; charset=utf-8',
+      body: '<!doctype html><html lang="ru"><head><title>Магазин</title></head><body><main><h1>Корзина</h1><button type="button">Оплатить заказ</button></main></body></html>',
+    }),
+  );
+  await page.evaluate((path) => {
+    const id = path.toLowerCase();
+    localStorage.setItem(
+      'agentdeck:workspace',
+      JSON.stringify({ projectTabs: [{ id, path, name: 'qa-site' }], activeTabId: id, views: {} }),
+    );
+  }, project);
+}
+
+/** Открыть окно сайта и положить выбор кнопки чипом в поле ввода — сообщение самого iframe. */
+export async function openChatSite(page) {
+  const { proxy, preview } = QA_SITE;
+  const gate = page.getByRole('dialog').filter({ hasText: /нужен доступ|needs access/ });
+  const dismissGate = async () => {
+    if (!(await gate.isVisible().catch(() => false))) return;
+    await page.keyboard.press('Escape');
+    await gate.waitFor({ state: 'hidden', timeout: 5000 });
+  };
+  for (let attempt = 0; ; attempt++) {
+    await dismissGate();
+    try {
+      await page.locator('[data-site-open]').click({ timeout: 5000 });
+      await page.locator('[data-site-preview] iframe').waitFor({ timeout: 5000 });
+      break;
+    } catch (error) {
+      if (attempt >= 3) throw error;
+    }
+  }
+  const frame = await page
+    .locator('[data-site-preview] iframe')
+    .elementHandle()
+    .then((handle) => handle.contentFrame());
+  await frame.waitForSelector('button', { timeout: 5000 });
+  await frame.evaluate(
+    ({ nonce, url }) =>
+      window.parent.postMessage(
+        {
+          type: 'agentdeck:pick',
+          nonce,
+          selector: 'main > button',
+          tag: 'button',
+          text: 'Оплатить заказ',
+          outerHTML: '<button type="button">Оплатить заказ</button>',
+          rect: { x: 8, y: 60, width: 140, height: 32 },
+          url,
+        },
+        '*',
+      ),
+    { nonce: preview.nonce, url: `${proxy}/` },
+  );
+  await page.locator('[data-composer-chip]').waitFor({ timeout: 5000 });
+  await dismissGate();
+}
+
+/** Окно карточки доски со связанной записью (B11): значок «связано» и раздел «Связанные карточки». */
+async function stubBoardRelated(page) {
+  const { installCoreBoardStub } = await import('./check-core-board.mjs');
+  await installCoreBoardStub(page, { related: true });
+}
 
 export const PANEL_PAGES = [
   { path: '/', name: 'Обзор' },
@@ -166,6 +355,16 @@ export const PANEL_PAGES = [
       await dismissGate();
     },
   },
+  // Окно сайта (этап 12, V1–V2): полоса «Сайт: имя», окно справа с iframe прокси, чип выбранного
+  // элемента в поле ввода — закрытым не попадает ни в один обход; подмена `stubChatSite`.
+  {
+    path: '/chat',
+    name: 'Чат — окно сайта и чип выбора',
+    slug: 'chat-site',
+    prepare: stubChatSite,
+    ready: '[data-site-open]',
+    interact: openChatSite,
+  },
   { path: '/rules', name: 'Правила' },
   {
     path: '/rules?tab=enabled',
@@ -205,12 +404,6 @@ export const PANEL_PAGES = [
     },
   },
   { path: '/env', name: 'Переменные' },
-  { path: '/groups', name: 'Группы' },
-  {
-    ...GROUP_PAGE,
-    name: 'Группы — сетка карточек',
-    slug: 'groups-grid',
-  },
   { path: '/projects', name: 'Проекты' },
   { path: '/tests', name: 'Тестирование' },
   // Библиотека с настоящими кейсами — таблица со значками статуса, важности и
@@ -223,6 +416,30 @@ export const PANEL_PAGES = [
   // Вкладки тестов, как и вкладки настроек, рисуют по одной панели за раз:
   // отчёт и матрица покрытия — две самые плотные таблицы раздела, и обход,
   // открывающий только библиотеку, не видит ни одной из них.
+  {
+    path: '/tests?tab=runs',
+    name: 'Тестирование — прогон с красным кейсом',
+    slug: 'tests-runs-to-board',
+    prepare: stubTestsRun,
+    ready: '[id^="run-card-"]',
+    interact: async (page) => {
+      await page.locator('[id^="run-card-"] button[aria-expanded]').first().click();
+      await page
+        .locator('[data-tests-to-board]')
+        .first()
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  // «Сценарии» (этап 12, R3–R4): список записанных проходов с полоской прогонов и карточка
+  // первого расхождения с решением человека — подмена `check-tests-recorded.mjs`.
+  {
+    path: '/tests?tab=recorded',
+    name: 'Тестирование — записанные сценарии с расхождением',
+    slug: 'tests-recorded',
+    prepare: stubTestsRecorded,
+    ready: '[data-testid="recorded-mismatch"]',
+  },
   { path: '/tests?tab=report', name: 'Тестирование — отчёт' },
   { path: '/tests?tab=coverage', name: 'Тестирование — покрытие' },
   { path: '/compare', name: 'Сравнение' },
@@ -276,7 +493,10 @@ export const PANEL_PAGES = [
     interact: async (page) => {
       const trigger = page.locator('[data-panel-agent-trigger]').first();
       if ((await trigger.count()) === 0) return;
-      await trigger.click();
+      // По значку, а не по центру: в свёрнутой полосе (телефон 400 px) кнопка шире полосы в 60 px,
+      // её центр уходит под содержимое страницы, и клик по центру ловило оно — окно не
+      // открывалось, обход писал «не проверено». Человек жмёт видимый значок.
+      await trigger.click({ position: { x: 22, y: 20 } });
       await page.waitForTimeout(300);
     },
   },
@@ -303,8 +523,96 @@ export const PANEL_PAGES = [
         .catch(() => undefined);
     },
   },
-  // Ядро задач (этап 9): без ядра раздел рисует карточку отказа прокладки — её и обходим.
+  // Ядро задач (этап 9; этап 12 — доска по умолчанию, `/groups` ведёт на её полосы): живой
+  // `/core` и «Список» рисуют то, что отдаёт ядро стенда (без ядра — карточку отказа прокладки);
+  // насыщенная доска, её полосы, окно карточки и выбор импорта — на подмене ответа доски.
   { path: '/core', name: 'Задачи ядра' },
+  { path: '/core?view=list', name: 'Задачи ядра — список' },
+  { ...BOARD_PAGE, name: 'Доска ядра — карточки', slug: 'core-board' },
+  {
+    ...BOARD_PAGE,
+    path: '/core?view=board&lane=group',
+    name: 'Доска ядра — полосы групп',
+    slug: 'core-board-lanes',
+    ready: '[data-board-lane-group]',
+  },
+  {
+    ...BOARD_PAGE,
+    name: 'Доска ядра — окно карточки',
+    slug: 'core-board-card',
+    interact: async (page) => {
+      await page.locator('[data-board-card-kind="entry"]').first().click();
+      await page
+        .locator('[data-card-modal]')
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  {
+    ...BOARD_PAGE,
+    name: 'Доска ядра — импорт пунктов',
+    slug: 'core-board-import',
+    interact: async (page) => {
+      await page.locator('[data-board-import]').click();
+      await page
+        .locator('[data-board-import-group]')
+        .first()
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  {
+    ...INBOX_PAGE,
+    name: 'Доска ядра — источники входящих',
+    slug: 'core-inbox-sources',
+    interact: async (page) => {
+      await page.locator('[data-board-inbox-open="sources"]').click();
+      await page
+        .locator('[data-inbox-source-index="1"]')
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  {
+    ...INBOX_PAGE,
+    name: 'Доска ядра — найти в трекере',
+    slug: 'core-inbox-search',
+    interact: async (page) => {
+      await page.locator('[data-board-inbox-open="search"]').click();
+      await page.locator('[data-inbox-search-run]').click();
+      await page
+        .locator('[data-inbox-item]')
+        .first()
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  {
+    ...BOARD_PAGE,
+    prepare: stubBoardPreset,
+    name: 'Доска ядра — сценарий записи',
+    slug: 'core-board-preset',
+    interact: async (page) => {
+      await page.locator('[data-board-card-kind="entry"]').first().click();
+      await page
+        .locator('[data-entry-preset]')
+        .waitFor({ timeout: 5000 })
+        .catch(() => undefined);
+    },
+  },
+  // Связанные карточки (этап 12, B11): значок «связано» на плитке и раздел с отметками и
+  // «Объединить» в окне записи — подмена доски со связанной парой «Входящих».
+  {
+    ...BOARD_PAGE,
+    prepare: stubBoardRelated,
+    name: 'Доска ядра — связанные карточки',
+    slug: 'core-board-related',
+    ready: '[data-board-related]',
+    interact: async (page) => {
+      await page.locator('[data-board-related]').first().click();
+      await page.locator('[data-related-merge]').waitFor({ timeout: 5000 });
+    },
+  },
   { path: '/core/launch', name: 'Запуск задачи ядра' },
   { path: '/core/scenarios', name: 'Сценарии ядра' },
   // Лента задачи — страница с параметром: настоящей задачи на стенде может не быть, поэтому
@@ -324,7 +632,21 @@ export const PANEL_PAGES = [
   // Вкладки настроек рисуют по одной панели за раз: обход, открывающий только
   // `/settings`, не видит ни одной, кроме первой. «Интеграции» держат пять
   // форм с полями и переключателями — их проверять надо.
-  { path: '/settings?tab=integrations', name: 'Настройки — интеграции' },
+  {
+    path: '/settings?tab=integrations',
+    name: 'Настройки — интеграции',
+    ready: 'role=button[name="Найти уже подключённые"]',
+  },
+  // Части карточки Telegram, которые видны только у подключённого бота: переключатель «Отвечать
+  // ядру из Telegram», поле «Репозитории для задач из Telegram», строка «Тихие часы». Бот и
+  // настройка ядра — подмена (`telegram-card-stub.mjs`), только чтения; маркер — поле репозиториев.
+  {
+    path: '/settings?tab=integrations',
+    name: 'Настройки — интеграции, Telegram подключён',
+    slug: 'integrations-telegram-core',
+    prepare: stubTelegramCard,
+    ready: '[data-telegram-repos]',
+  },
   // «Промпты» — единственная вкладка настроек с редактором текста: свой список,
   // своё многострочное поле и две кнопки у каждого промпта.
   { path: '/settings?tab=prompts', name: 'Настройки — промпты' },
@@ -377,6 +699,10 @@ export async function openPanelPage(page, base, { path, prepare, ready, interact
     await prepare(page);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForSelector('nav', { timeout: 15000 });
+    await page.waitForSelector(ready, { timeout: 15000 });
+  } else if (ready) {
+    // Раздел без подмены, но с медленным ответом API (живая сверка интеграций): маркер ждётся тем
+    // же потолком, иначе обход видел скелет и звал «чисто» страницу из двух остановок.
     await page.waitForSelector(ready, { timeout: 15000 });
   }
   // Навигация рисуется сразу, а сам раздел — ленивым куском и после ответа API.

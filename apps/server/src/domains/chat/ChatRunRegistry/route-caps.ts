@@ -20,13 +20,16 @@ import type { PlatformRunRoute } from '../../platform/routing/routing.ts';
  * источников: маршрут, набор, группа — каждый прижат здесь один раз.
  *
  * Мимо контура окружение маршрута пусто, и ни профиль, ни набор не меняются ни в
- * одном байте: потолок набора против потолка группы там решает сам CLI
- * (`--settings` сильнее окружения), как и прежде.
+ * одном байте.
+ *
+ * s12: потолок чтения группы в `--settings` ушёл вместе с лёгким профилем группы
+ * (этап 10, G14) — настройки профиля теперь только хуки, и прижимать у профиля
+ * осталось окно; потолок чтения прижимается у набора.
  */
 
 /** Окно автосжатия CLI (2.1.286) — тот же ключ, что ставят профиль группы и локальная модель. */
 const COMPACT_WINDOW_ENV = 'CLAUDE_CODE_AUTO_COMPACT_WINDOW';
-/** Потолок ответа чтения файла: у профиля — в `--settings`, у локальной модели — окружением. */
+/** Потолок ответа чтения файла: у набора и у локальной модели — окружением. */
 const READ_MAX_TOKENS_ENV = 'CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS';
 
 function positive(value: unknown): number | undefined {
@@ -90,22 +93,12 @@ export function capKitToRoute(route: CapRoute): Record<string, string> | undefin
   };
 }
 
+/**
+ * Окно профиля под пределом маршрута. Потолок чтения профиль больше не несёт: его настройки —
+ * только хуки (s12), а прежний `env` в `--settings` ушёл с лёгким профилем группы (этап 10, G14).
+ */
 export function capProfileToRoute(profile: GroupRunProfile, route: CapRoute): GroupRunProfile {
-  const { window: windowCap, read: readCap } = routeCaps(route);
-  const window = capped(profile.env[COMPACT_WINDOW_ENV], windowCap);
-  const settingsEnv = profile.settings.env;
-  const readEnv =
-    settingsEnv && typeof settingsEnv === 'object' && !Array.isArray(settingsEnv)
-      ? (settingsEnv as Record<string, string>)
-      : undefined;
-  const read = capped(readEnv?.[READ_MAX_TOKENS_ENV], readCap);
-  if (window === undefined && read === undefined) return profile;
-  return {
-    ...profile,
-    env: window === undefined ? profile.env : { ...profile.env, [COMPACT_WINDOW_ENV]: window },
-    settings:
-      read === undefined
-        ? profile.settings
-        : { ...profile.settings, env: { ...readEnv, [READ_MAX_TOKENS_ENV]: read } },
-  };
+  const window = capped(profile.env[COMPACT_WINDOW_ENV], routeCaps(route).window);
+  if (window === undefined) return profile;
+  return { ...profile, env: { ...profile.env, [COMPACT_WINDOW_ENV]: window } };
 }

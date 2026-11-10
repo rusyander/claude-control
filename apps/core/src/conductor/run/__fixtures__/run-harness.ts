@@ -22,6 +22,7 @@ import type {
   ConductorHooks,
   HookVerdict,
   PublishOutcome,
+  RunDeps,
   RunEconomy,
   RunHandle,
   SessionEvents,
@@ -78,6 +79,8 @@ export interface Script {
   tasksDir?: string;
   /** Порт мест сеансов (этап 11, P141); по умолчанию нет — места не считаются. */
   allocator?: SeatPort;
+  /** Перечитать вход маршрута (этап 12, P170); по умолчанию порта нет — `unknown`. */
+  loginState?: RunDeps['loginState'];
 }
 
 export const ROUTE: JournalDataV1['task.created']['allowedRoutes'][number] = {
@@ -395,6 +398,7 @@ export async function stand(
       ...(script.upkeepEveryMs === undefined ? {} : { upkeepEveryMs: script.upkeepEveryMs }),
       ...(script.economy ? { economy: script.economy } : {}),
       ...(script.allocator ? { allocator: script.allocator } : {}),
+      ...(script.loginState ? { loginState: script.loginState } : {}),
     });
   const out: Stand = {
     task,

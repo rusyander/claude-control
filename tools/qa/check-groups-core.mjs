@@ -1,19 +1,19 @@
 /**
- * Страница «Группы» над ядром (этап 10, F1) — настоящая дорога браузера: одноразовая
- * панель + своё ядро (`startStand({ core: true })`), запросы идут через прокладку панели к живому
- * ядру, ответы не перехватываются.
+ * Группы над ядром (этап 10, F1; этап 12 — страница «Группы» свёрнута в доску, D13) — настоящая
+ * дорога браузера: одноразовая панель + своё ядро (`startStand({ core: true })`), запросы идут
+ * через прокладку панели к живому ядру, ответы не перехватываются.
  *
  * Что видно:
- *   - на странице — задачи ядра и вход в запуск (тот же экран оценки этапа 9);
- *   - у прежней группы с «Путём» — «В ядро»: перевод `fromPath` у ядра показывает шаги «Пути» по
- *     порядку + доставку ядра, сохранение кладёт сценарий в библиотеку ядра, запуск открывается с
- *     этим сценарием; оценка создаёт задачу ядра, у которой сценарий = этот, а его шаги = «Путь»;
+ *   - `/groups` ведёт на доску ядра полосами групп (`/core?view=board&lane=group`); прежней сетки
+ *     групп и кнопки «Создать группу» нет; список задач ядра — переключатель «Список» рядом;
+ *   - «Импорт пунктов» доски: выбор прежней группы с «Путём» → перевод `fromPath` у ядра показывает
+ *     шаги «Пути» по порядку + доставку ядра, сохранение кладёт сценарий в библиотеку ядра, запуск
+ *     открывается с этим сценарием; оценка создаёт задачу ядра, у которой сценарий = этот, а его
+ *     шаги = «Путь»;
  *   - в оценку не уходит ничего от прежнего недоведённого запуска (ни копия, ни ветка, ни его
  *     запрос) — ядро не подхватывает прежние запуски (Q10, спека 10:8);
  *   - прежний недоведённый запуск после старта панели остановлен разовой миграцией: в state.json у
- *     него `cancelledAt`, на странице — «Отменён», без кнопок, и в задачах ядра его нет;
- *   - сетка прежних групп только для чтения: у карточки одно действие «В ядро» — ни тумблера, ни
- *     правки, ни копии, ни запуска; кнопки «Создать группу» нет.
+ *     него `cancelledAt`, в «Закрытых» доски — «Отменён», без кнопок, и в задачах ядра его нет.
  *
  * Запуск: `node tools/qa/check-groups-core.mjs` (стенд свой, `pnpm dev` не нужен). `SHOTS=<dir>` —
  * кадры в обеих темах, `SHOT_TAG=BEFORE|AFTER` — суффикс кадра. Код выхода: 0 — сходится,
@@ -152,29 +152,54 @@ await runOnStand(
     const browser = await chromium.launch();
     try {
       const page = await stand.newPage(browser, { width: 1440, height: 3200 });
+      // 1. Прежний адрес «Групп» — доска ядра полосами групп; список задач — переключатель рядом.
       await page.goto(`${stand.webUrl}/groups?tab=global`);
       await page
-        .getByRole('heading', { name: GROUP_NAME })
-        .first()
+        .locator('[data-core-tasks-page]')
         .waitFor({ timeout: 30_000 })
         .catch(() => undefined);
-      await page.waitForTimeout(800);
-      await shoot(page, 'groups-page');
-
-      // 1. Задачи ядра на странице групп.
-      const core = page.locator('[data-groups-core]');
+      const landed = new URL(page.url());
       check(
-        'на странице групп — раздел задач ядра',
-        await core
+        '/groups ведёт на доску ядра полосами групп',
+        landed.pathname === '/core' &&
+          landed.searchParams.get('view') === 'board' &&
+          landed.searchParams.get('lane') === 'group',
+        page.url(),
+      );
+      const board = page.locator('[data-core-board]');
+      const boardShown = await board
+        .waitFor({ timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+      check(
+        'доска ядра ответила (GET /v1/board), полосы групп включены',
+        boardShown && (await board.getAttribute('data-board-lane')) === 'group',
+        boardShown ? '' : await page.locator('[data-core-tasks-page]').innerText(),
+      );
+      await page.waitForTimeout(800);
+      await shoot(page, 'groups-board');
+      check(
+        'прежней сетки групп и кнопки «Создать группу» нет',
+        (await page.locator('[data-groups-core], [data-group-core-import]').count()) === 0 &&
+          (await page.getByRole('button', { name: /Создать группу/ }).count()) === 0,
+      );
+      await page.locator('[data-core-view-option="list"]').click();
+      const listView = page.locator('[data-core-task-list-view]');
+      // Пустой журнал ядра — честная пустая строка «Задач пока нет», не ошибка и не отказ ядра.
+      const listRead = listView
+        .locator('[data-core-task-list]')
+        .or(listView.getByText('Задач пока нет'));
+      check(
+        '«Список» рядом с доской прочитал список ядра (пусто — честная пустая строка)',
+        await listRead
+          .first()
           .waitFor({ timeout: 15_000 })
           .then(() => true)
           .catch(() => false),
+        await listView.innerText().catch(() => '(нет списка)'),
       );
-      check(
-        'раздел задач ядра прочитал список ядра (пусто — честная пустая строка)',
-        (await core.locator('[data-core-task-list], [data-groups-core-empty]').count()) > 0,
-        await core.innerText().catch(() => '(нет раздела)'),
-      );
+      await page.locator('[data-core-view-option="board"]').click();
+      await board.waitFor({ timeout: 15_000 }).catch(() => undefined);
 
       // 2. Прежний недоведённый запуск — остановлен миграцией при старте, только чтение, не подхвачен.
       const stored = JSON.parse(readFileSync(statePath, 'utf8')).splitPlans?.[LEGACY_CHAT];
@@ -189,12 +214,17 @@ await runOnStand(
           JSON.stringify(['started', 'done']),
         JSON.stringify(stored?.groups?.map((g) => g.status)),
       );
+      // Прежние запуски — в свёрнутых «Закрытых» под доской.
+      await page
+        .locator('[data-board-closed-toggle]')
+        .click({ timeout: 10_000 })
+        .catch(() => undefined);
       const legacy = page.locator(`[data-legacy-run="${LEGACY_CHAT}"]`);
       const legacyShown = await legacy
         .waitFor({ timeout: 10_000 })
         .then(() => true)
         .catch(() => false);
-      check('прежний недоведённый запуск виден на странице', legacyShown);
+      check('прежний недоведённый запуск виден в «Закрытых» доски', legacyShown);
       if (legacyShown) {
         check(
           'прежний запуск показан остановленным (cancelled, «Отменён»), а не «не доведён»',
@@ -209,46 +239,23 @@ await runOnStand(
         );
       }
 
-      // 3. Сетка прежних групп — только чтение.
-      const tile = page
-        .getByRole('article')
-        .filter({ has: page.getByRole('heading', { name: GROUP_NAME, exact: true }) });
-      const controls = await tile
-        .locator(
-          'button, a, input, select, textarea, [role="switch"], [role="checkbox"], [role="menu"]',
-        )
-        .evaluateAll((els) =>
-          els.map((el) =>
-            el.hasAttribute('data-group-core-import') ? 'core-import' : el.outerHTML.slice(0, 120),
-          ),
-        );
-      check(
-        'у карточки прежней группы одно действие — «В ядро» (ни тумблера, ни правки, ни запуска)',
-        JSON.stringify(controls) === JSON.stringify(['core-import']),
-        controls.join(' | '),
-      );
-      check(
-        'на странице нет кнопки «Создать группу»',
-        (await page.getByRole('button', { name: /Создать группу/ }).count()) === 0,
-      );
-      await tile.click({ position: { x: 20, y: 20 } }).catch(() => undefined);
-      await page.waitForTimeout(400);
-      check(
-        'клик по карточке не открывает окна правки',
-        (await page.getByRole('dialog').count()) === 0,
-        await page
-          .getByRole('dialog')
-          .allInnerTexts()
-          .then((x) => x.join(' | ')),
-      );
-
-      // 4. «В ядро»: перевод «Пути» у ядра.
-      const importButton = tile.locator('[data-group-core-import]');
+      // 3. «Импорт пунктов» доски: выбор прежней группы с «Путём» → перевод «Пути» у ядра.
+      await page.locator('[data-board-import]').click();
+      const pickRow = page.locator(`[data-board-import-group="${GROUP_ID}"]`);
       if (
         !check(
-          'у прежней группы есть «В ядро»',
-          (await importButton.count()) === 1,
-          await tile.innerText().catch(() => '(карточки нет)'),
+          'в выборе импорта — прежняя группа с «Путём» (имя и число шагов)',
+          await pickRow
+            .waitFor({ timeout: 15_000 })
+            .then(async () => {
+              const text = await pickRow.innerText();
+              return text.includes(GROUP_NAME) && text.includes(String(PATH_TITLES.length));
+            })
+            .catch(() => false),
+          await page
+            .locator('[data-board-import-pick]')
+            .innerText()
+            .catch(() => '(окна выбора нет)'),
         )
       ) {
         check('страница без ошибок', page.errors.length === 0, page.errors.join('\n'));
@@ -258,7 +265,7 @@ await runOnStand(
         (r) => r.request().method() === 'POST' && r.url().includes('/api/core/scenarios/from-path'),
         { timeout: 20_000 },
       );
-      await importButton.click();
+      await pickRow.getByRole('button').click();
       const fromPath = await converted.catch(() => null);
       check(
         'перевод «Пути» ушёл в ядро и вернул 200',
@@ -296,8 +303,9 @@ await runOnStand(
       const saveBody = save ? await save.json().catch(() => ({})) : {};
       const ref = saveBody.ref;
 
-      // 5. Запуск со сценарием группы → задача ядра.
-      const form = page.locator('[data-groups-core] [data-core-launch-form]');
+      // 4. Запуск со сценарием группы (окно поверх доски) → задача ядра.
+      const launchBox = page.locator('[data-board-import-launch]');
+      const form = launchBox.locator('[data-core-launch-form]');
       await form.waitFor({ timeout: 15_000 });
       // Список сценариев перечитывается после записи: пока новой версии в нём нет, `<select>`
       // показывает первый вариант. Ждём ответа списка до 10 с, а не судим по первому кадру.
@@ -323,7 +331,7 @@ await runOnStand(
         (r) => r.method() === 'POST' && r.url().includes('/api/core/estimate'),
         { timeout: 20_000 },
       );
-      await page.locator('[data-groups-core] [data-estimate-button]').click();
+      await launchBox.locator('[data-estimate-button]').click();
       const request = await sent.catch(() => null);
       if (!check('форма отправила оценку', request !== null)) return;
       const body = JSON.parse(request.postData() ?? '{}');
@@ -343,8 +351,8 @@ await runOnStand(
         wire,
       );
 
-      const estimate = page.locator('[data-groups-core] [data-launch-section="estimate"]');
-      const failure = page.locator('[data-groups-core] [data-launch-failure]');
+      const estimate = launchBox.locator('[data-launch-section="estimate"]');
+      const failure = launchBox.locator('[data-launch-failure]');
       await estimate.or(failure).first().waitFor({ timeout: 60_000 });
       if (await failure.count()) {
         check(
@@ -380,17 +388,18 @@ await runOnStand(
           !JSON.stringify(list).includes(LEGACY_CHAT),
           JSON.stringify(list),
         );
-        // Без перезагрузки: список обязан перечитаться сам после оценки (5 с на ответ ядра).
-        await page
-          .locator(`[data-groups-core] [data-core-task="${taskId}"]`)
-          .waitFor({ timeout: 5_000 })
-          .catch(() => undefined);
-        check(
-          'новая задача видна в разделе задач ядра на странице групп',
-          (await page.locator(`[data-groups-core] [data-core-task="${taskId}"]`).count()) === 1,
-          await core.innerText(),
-        );
         await shoot(page, 'groups-core-launched');
+        // Без перезагрузки: окно запуска закрыто, «Список» обязан перечитаться сам (5 с на ответ).
+        await page.keyboard.press('Escape');
+        await launchBox.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined);
+        await page.locator('[data-core-view-option="list"]').click();
+        const row = page.locator(`[data-core-task-list-view] [data-core-task="${taskId}"]`);
+        await row.waitFor({ timeout: 5_000 }).catch(() => undefined);
+        check(
+          'новая задача видна в «Списке» раздела ядра',
+          (await row.count()) === 1,
+          await listView.innerText().catch(() => '(нет списка)'),
+        );
       }
       check('страница без ошибок', page.errors.length === 0, page.errors.join('\n'));
     } finally {

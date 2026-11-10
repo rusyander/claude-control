@@ -100,6 +100,41 @@ export function autoCapRank(
   return known.length === 0 ? null : Math.min(...known);
 }
 
+/**
+ * Потолок задачи на переходнике `adapter`. Имя ступени своей лестницы или имя ни одной лестницы
+ * (модель, которую назвал человек) — как есть. Ступень ЧУЖОЙ лестницы (`opus` задачи на маршруте
+ * codex `*`) дальше не идёт: при своих ступенях — та же доля лестницы (ранг вниз), без них —
+ * потолка нет, CLI берёт свою модель (W3-D: имя модели claude уходило в `codex -m`).
+ */
+export function ceilingOn(
+  ladders: Readonly<Record<string, TierLadder>> | undefined,
+  adapter: string,
+  ceiling: string | null,
+): { ceiling: string | null; reason?: string } {
+  if (ceiling === null) return { ceiling };
+  const own = ladders?.[adapter];
+  if (modelRank(own, ceiling) !== null) return { ceiling };
+  for (const [other, ladder] of Object.entries(ladders ?? {})) {
+    const rank = other === adapter ? null : modelRank(ladder, ceiling);
+    if (rank === null) continue;
+    const n = ladder.models.length;
+    const rungs = own?.models ?? [];
+    if (rungs.length === 0)
+      return {
+        ceiling: null,
+        reason: `task ceiling ${ceiling} is a ${other} rung and ${adapter} has no model ladder: ignored on ${adapter}, the CLI default model runs`,
+      };
+    const mapped = rungs[
+      n <= 1 ? rungs.length - 1 : Math.floor((rank * (rungs.length - 1)) / (n - 1))
+    ] as string;
+    return {
+      ceiling: mapped,
+      reason: `task ceiling ${ceiling} is a ${other} rung (${rank + 1}/${n}): on ${adapter} it maps by rank to ${mapped}`,
+    };
+  }
+  return { ceiling };
+}
+
 export const rungLabel = (r: TierRung): string =>
   `${r.model ?? 'cli default'}·${r.effort ?? 'cli default'}`;
 

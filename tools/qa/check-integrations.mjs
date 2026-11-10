@@ -64,8 +64,11 @@ const bare = (id) => ({
   state: 'unchecked',
   detail: '',
 });
+// Telegram с токеном и чатом — карточка «подключено»: без токена она показывает только шаги
+// подключения, и проверке событий и пробного сообщения нечего нажать.
+const TOKENS = { jira: 'atl…0000', telegram: '7000…GH' };
 let statuses = IDS.map((id) =>
-  id === 'jira' ? { ...bare(id), hasToken: true, maskedToken: 'atl…0000' } : bare(id),
+  TOKENS[id] ? { ...bare(id), hasToken: true, maskedToken: TOKENS[id] } : bare(id),
 );
 
 /** Находки среди MCP-серверов: полная, её проектный дубль, неполная и уже подключённая. */
@@ -146,6 +149,14 @@ await bypassOnboarding(page, settingsPatch);
 const problems = [];
 page.on('pageerror', (error) => problems.push(error.message));
 page.on('console', (message) => message.type() === 'error' && problems.push(message.text()));
+// «Failed to load resource» в консоли без адреса — красное должно назвать, какой запрос отказал.
+page.on('response', (response) => {
+  if (response.status() >= 400) {
+    problems.push(
+      `${response.status()} ${response.request().method()} ${new URL(response.url()).pathname}`,
+    );
+  }
+});
 
 const statusOf = (id) => statuses.find((item) => item.id === id);
 const setSettings = (next) => {
@@ -187,6 +198,31 @@ await page.route('**/api/integrations/*', async (route) => {
 
   return route.fulfill({ json: statusOf(id) });
 });
+
+// Карточка Telegram читает бота ответов вложенным путём (`*` выше его не ловит), а стенд отдаёт его
+// только проверенному устройству (human:secret) — без подмены безголовый браузер получает 403.
+await page.route('**/api/integrations/telegram/answers', async (route) =>
+  route.fulfill({
+    json: {
+      settings: { enabled: false, afterMinutes: 3, ownerId: '', ownerName: '' },
+      hasToken: false,
+      maskedToken: '',
+      usesNotifyBot: false,
+      status: { state: 'off' },
+      open: 0,
+    },
+  }),
+);
+await page.route('**/api/integrations/telegram/connect', async (route) =>
+  route.request().method() === 'GET'
+    ? route.fulfill({ json: { state: 'idle' } })
+    : route.fallback(),
+);
+await page.route('**/api/integrations/telegram/answers/core-binding', async (route) =>
+  route.fulfill({
+    json: { fingerprint: null, bound: false, reachable: true, ownerName: '', listening: false },
+  }),
+);
 
 await page.route('**/api/integrations/discover', async (route) => {
   const request = route.request();
@@ -536,20 +572,20 @@ check(
 
 // ── Telegram: события и пробное ─────────────────────────────────────────────
 const telegramCard = cardOf('Telegram');
-const eventBox = telegramCard.getByText(/Прогон завершён/).first();
+// События собраны в группы: отметка группы ставит все её события (`runDone` Telegram не пишет).
+const eventBox = telegramCard.getByText(/Что-то сломалось/).first();
 if ((await eventBox.count()) > 0) {
   await eventBox.click();
   await page.waitForTimeout(400);
   await telegramCard.getByRole('button', { name: /Сохранить/ }).click();
   await page.waitForTimeout(1000);
+  const events = saved?.id === 'telegram' ? (saved?.settings?.events ?? []) : [];
   check(
-    saved?.id === 'telegram' &&
-      Array.isArray(saved?.settings?.events) &&
-      saved.settings.events.includes('runDone'),
-    `выбранное событие уехало списком: ${JSON.stringify(saved?.settings?.events)}`,
+    events.includes('runError') && events.includes('testFailed') && !events.includes('runDone'),
+    `группа «Что-то сломалось» уехала своими событиями: ${JSON.stringify(events)}`,
   );
 } else {
-  check(false, 'у Telegram есть список событий');
+  check(false, 'у Telegram есть группы событий');
 }
 
 // Пробное сообщение — отдельным маршрутом: «дозвонились» и «дошло» не одно и то же.

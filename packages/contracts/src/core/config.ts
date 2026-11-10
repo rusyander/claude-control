@@ -3,6 +3,8 @@ import { commandIssues, commandProofSchema, type CommandIssue } from './commands
 import { registryId, uuidv7 } from './ids.ts';
 import { GRANT_OPS } from './journal-data.ts';
 import { LEAD_PARALLELISM_MAX, leadSectionSchema } from './lead.ts';
+import { BOARD_STOPS } from './board.ts';
+import { inboxSectionSchema } from './inbox.ts';
 import { SESSION_STEP_KINDS } from './model-tools.ts';
 
 /**
@@ -27,6 +29,9 @@ export const CONFIG_SECTIONS = [
   'mcpPicks', // s10 p7 (P73): какие серверы MCP человека отданы виду шага
   'economy', // s10 p8: рычаги экономии шагов задачи (порт рычагов групп панели)
   'lead', // этап 11 (D11): профиль ведения — умолчания машины и правки по проектам
+  'board', // этап 12 (D5): пределы доски — сколько в работе, стартов в сутки, пауза, остановка
+  'inbox', // этап 12 (D16): источники входящих, частота опроса, комментарий назад
+  'telegram', // этап 12 (D29): привязанный владелец Telegram — отпечаток, не номер
 ] as const;
 export type ConfigSection = (typeof CONFIG_SECTIONS)[number];
 
@@ -181,6 +186,63 @@ export const CORE_ECONOMY_DEFAULTS = {
   workHabits: true,
 } as const satisfies z.infer<typeof economySectionSchema>;
 
+// ── board: пределы доски задач (этап 12, D5) ───────────────────────────────────────────────
+/**
+ * Раздел машинный, один на все проекты: доска запускает голову очереди, только пока задач в работе
+ * меньше `inWork`, доска не на паузе и за местные сутки стартов меньше `perDay` (`null` — без
+ * предела). Над распределителем мест (P141), оба действуют. `stopOnQuestion` — пока хоть одна
+ * карточка ждёт человека, новых стартов нет. Нет раздела — `BOARD_DEFAULTS`.
+ */
+export const boardSectionSchema = z.strictObject({
+  inWork: z.union([z.literal(1), z.literal(2), z.literal(4), z.literal(6)]),
+  perDay: z.number().int().min(1).max(50).nullable(),
+  paused: z.boolean(),
+  stopOnQuestion: z.boolean(),
+  defaultStop: z.enum(BOARD_STOPS),
+});
+export type BoardSection = z.infer<typeof boardSectionSchema>;
+
+/** Умолчания доски: две задачи в работе, без суточного предела, без паузы, остановка «до MR». */
+export const BOARD_DEFAULTS: BoardSection = {
+  inWork: 2,
+  perDay: null,
+  paused: false,
+  stopOnQuestion: false,
+  defaultStop: 'mr',
+};
+
+// ── telegram: привязанный владелец (этап 12, D29, P187) ──────────────────────────────────────
+/**
+ * Человек открывает канал Telegram записью `set-config` строгого класса: ядро хранит только
+ * отпечаток sha256 от `apiBase|botId|chatId|fromId` (`telegramOwnerInput`), а не номера. `null` —
+ * канал закрыт. Подпись — что показать человеку в панели, суд её не читает.
+ */
+export const telegramSectionSchema = z.strictObject({
+  owner: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/, 'sha256')
+    .nullable(),
+  label: z
+    .strictObject({ bot: z.string().min(1).max(100), account: z.string().min(1).max(200) })
+    .optional(),
+  /**
+   * Репозитории записей `/task` (W2-D): запись из Telegram несёт их в `launch.fields.repos` и
+   * стартует без выбора на доске. Пишет только человек (`set-config`, строгий класс); нет поля —
+   * запись ждёт репозиторий на доске, «В работу» не предлагается.
+   */
+  repos: z
+    .array(
+      z.strictObject({
+        path: z.string().min(1).max(1000),
+        baseRef: z.string().min(1).max(300).nullable(),
+      }),
+    )
+    .min(1)
+    .max(8)
+    .optional(),
+});
+export type TelegramSection = z.infer<typeof telegramSectionSchema>;
+
 /** Схема каждого раздела — таблица исчерпывающая: новый раздел не соберётся без своей схемы. */
 export const CONFIG_SECTION_SCHEMAS = {
   routes: routesSectionSchema,
@@ -194,6 +256,9 @@ export const CONFIG_SECTION_SCHEMAS = {
   mcpPicks: mcpPicksSchema,
   economy: economySectionSchema,
   lead: leadSectionSchema,
+  board: boardSectionSchema,
+  inbox: inboxSectionSchema,
+  telegram: telegramSectionSchema,
 } as const satisfies Record<ConfigSection, z.ZodType>;
 
 export const coreConfigSchema = z.strictObject({
@@ -210,6 +275,9 @@ export const coreConfigSchema = z.strictObject({
   mcpPicks: mcpPicksSchema.optional(),
   economy: economySectionSchema.optional(),
   lead: leadSectionSchema.optional(),
+  board: boardSectionSchema.optional(),
+  inbox: inboxSectionSchema.optional(),
+  telegram: telegramSectionSchema.optional(),
 });
 export type CoreConfig = z.infer<typeof coreConfigSchema>;
 

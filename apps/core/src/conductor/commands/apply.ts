@@ -21,6 +21,10 @@ import { applyResume } from './resume.ts';
 import { applySetCli } from './set-cli.ts';
 import { applySetModel } from './set-model.ts';
 import { applySetRoute } from './set-route.ts';
+import { applySetStop } from './set-stop.ts';
+import { applyHandBack } from './hand-back.ts';
+import { applyRework } from './rework.ts';
+import { applyTakeOver } from './take-over.ts';
 
 /**
  * Один файл на вид команды: зона подключает свой вид, заменяя тело своего файла, и не трогает
@@ -48,4 +52,9 @@ export const APPLY: Record<CommandKind, ApplyCommand> = {
   'clean-remote': applyCleanRemote,
   'set-route': applySetRoute,
   'clear-exhausted': applyClearExhausted,
+  // Этап 12: тела даёт зона Z4, до неё — 501 `not-implemented`.
+  'take-over': applyTakeOver,
+  'hand-back': applyHandBack,
+  'set-stop': applySetStop,
+  rework: applyRework,
 };

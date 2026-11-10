@@ -58,6 +58,8 @@ export interface ChatHeaderProps {
    * поэтому шапка их прячет — выход из переполнения даёт карточка ошибки.
    */
   errorOverflow?: boolean;
+  /** Ход упёрся в лимит окна: повтор ведёт ядро, кнопок повтора панели нет (этап 12, P171). */
+  limitHolds?: boolean;
   onRetry: () => void;
   onContinue: () => void;
   onAllowAndContinue: () => void;

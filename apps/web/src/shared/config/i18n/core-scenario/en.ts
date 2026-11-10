@@ -119,6 +119,7 @@ export const coreScenarioEn: typeof coreScenarioRu = {
     report: 'Report',
     'ask-human': 'Ask a human',
     custom: 'Custom step',
+    walk: 'Stand walk',
   },
   tier: {
     'lower-if-mechanical': 'Lower for mechanics',

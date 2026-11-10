@@ -14,7 +14,7 @@ import {
   type ReleaseExportFormat,
 } from '../../../domains/project-tests/export-release/export-release.ts';
 import {
-  exportLanguage,
+  askedLanguage,
   type ExportLanguage,
 } from '../../../domains/project-tests/export-run-texts.ts';
 import { guardAsync, requireRoot, type TestsDeps } from '../shared/shared.ts';
@@ -63,14 +63,21 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
       : doc;
   }
 
-  /** Язык документа — язык интерфейса, как у отчёта по прогону. */
-  const language = (): ExportLanguage => exportLanguage(deps.ctx.store.getSettings().language);
+  /**
+   * Язык документа — язык интерфейса, как у отчёта по прогону. Экран называет его сам
+   * (`lang` запроса): смена языка ложится в кеш настроек раньше, чем PATCH доходит до
+   * сервера, и карточка, перезапрошенная под ключом нового языка, получала документ на
+   * старом — и держала его в кеше. Выгрузки и печать — так же: ссылка несёт язык экрана.
+   * Без `lang` (чужой вызов) — настройка.
+   */
+  const language = (asked?: string): ExportLanguage =>
+    askedLanguage(asked, deps.ctx.store.getSettings().language);
 
   /**
    * Документ для экрана; без `release` — список вех, которые вообще есть в
    * истории. Вех нет — пустой список, а не ошибка: проект без вех нормален.
    */
-  app.get<{ Querystring: { path?: string; release?: string } }>(
+  app.get<{ Querystring: { path?: string; release?: string; lang?: string } }>(
     '/api/project-tests/release',
     async (request, reply) => {
       const root = requireRoot(request.query.path, reply);
@@ -81,14 +88,14 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
         return {
           releases: releaseNames(readRuns(root, 200)),
           // Экран — на языке панели: заметку кейса карточка показывает как есть.
-          document: await collect(root, release, language()),
+          document: await collect(root, release, language(request.query.lang)),
         };
       });
     },
   );
 
   /** Тот же документ файлом: markdown в MR, HTML — когда печатать нечем. */
-  app.get<{ Querystring: { path?: string; release?: string; format?: string } }>(
+  app.get<{ Querystring: { path?: string; release?: string; format?: string; lang?: string } }>(
     '/api/project-tests/release/export',
     async (request, reply) => {
       const root = requireRoot(request.query.path, reply);
@@ -106,7 +113,7 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
         });
       }
       return guardAsync(reply, async () => {
-        const lang = language();
+        const lang = language(request.query.lang);
         const file = exportRelease(await collect(root, release, lang), format, lang);
         return reply
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)
@@ -121,7 +128,7 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
    * (`domains/project-tests/pdf/pdf.ts`). Браузера нет — 501 с именем того, что
    * поставить, а не пустой файл.
    */
-  app.get<{ Querystring: { path?: string; release?: string } }>(
+  app.get<{ Querystring: { path?: string; release?: string; lang?: string } }>(
     '/api/project-tests/release/pdf',
     async (request, reply) => {
       const root = requireRoot(request.query.path, reply);
@@ -132,7 +139,7 @@ export function registerTestReleaseRoutes(app: FastifyInstance, deps: TestsDeps)
           .code(400)
           .send({ message: 'Не указана веха.', messageCode: 'release-unspecified' });
       return guardAsync(reply, async () => {
-        const lang = language();
+        const lang = language(request.query.lang);
         const file = await exportReleasePdf(await collect(root, release, lang), lang);
         return reply
           .type(file.contentType)

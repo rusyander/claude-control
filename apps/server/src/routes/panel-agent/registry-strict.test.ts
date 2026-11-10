@@ -122,6 +122,11 @@ const CORE_HUMAN: Readonly<Record<string, string>> = {
   'GET /api/core/tasks/:id/agents/export': 'human:download',
   'POST /api/core/supervisor/restart': 'human:consent',
   'POST /api/core/supervisor/autostart': 'human:consent',
+  // Ход на доске задач (этап 12) — очередь и запуск, человеку.
+  'POST /api/core/board/move': 'human:rights',
+  'POST /api/core/board/entries': 'human:rights',
+  // Записи во «Входящие» (этап 12, P167) — человеку.
+  'POST /api/core/inbox': 'human:rights',
 };
 
 /** Чтения ядра, которых ведущему пока не нужно, — каждая названа (лента P3). */
@@ -135,6 +140,12 @@ const CORE_GAPS: readonly string[] = [
   // Распределитель и активность локальных моделей (этап 11, зона C).
   'GET /api/core/allocator',
   'GET /api/core/local/activity',
+  // Доска задач (этап 12): ведущему пока не нужна.
+  'GET /api/core/board',
+  // Поиск во входящих (этап 12): ведущему пока не нужен.
+  'GET /api/core/inbox/search',
+  // Проход по стенду задачи (этап 12, P177): ведущему пока не нужен.
+  'GET /api/core/tasks/:id/walk',
 ];
 
 /** Служебные строки ядра: окно, потоки, обратный вызов — не возможность агента. */

@@ -1,0 +1,30 @@
+// Факты окна — две колонки «подпись — значение»: подписи одной ширины, значения переносятся.
+.facts {
+  display: grid;
+  grid-template-columns: minmax(140px, max-content) minmax(0, 1fr);
+  gap: var(--spacing-2xs) var(--spacing-md);
+  margin: 0;
+}
+
+.term {
+  color: var(--color-fg-subtle);
+  font-size: var(--font-size-body-sm);
+}
+
+.value {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-fg);
+  font-size: var(--font-size-body-sm);
+}
+
+.noData {
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+
+.section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-sm);
+}

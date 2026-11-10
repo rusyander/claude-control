@@ -5,6 +5,7 @@
  * GitLab: переходник ядра разбирает здесь ровно то, что разберёт у настоящего сервера.
  */
 
+import { globalIssues, hasLabels, issueRoutes, newestFirst } from './gitlab-inbox.mjs';
 import { pageOf } from './paging.mjs';
 
 const iso = (ms) => new Date(ms).toISOString();
@@ -34,7 +35,33 @@ export function gitlabMr(state, baseUrl, mr) {
     web_url: `${baseUrl}/${project.path}/-/merge_requests/${mr.iid}`,
     has_conflicts: mr.conflict,
     detailed_merge_status: mr.checking ? 'checking' : mr.conflict ? 'conflict' : 'mergeable',
+    labels: [...(mr.labels ?? [])],
+    reviewers: (mr.reviewerIds ?? []).map((id) => author(state, id)),
+    references: { short: `!${mr.iid}`, relative: `!${mr.iid}`, full: `${project.path}!${mr.iid}` },
   };
+}
+
+const MR_STATE = { open: 'opened', closed: 'closed', merged: 'merged' };
+
+/**
+ * `GET /merge_requests` — MR по всему сайту (входящие ядра): `scope` по умолчанию у GitLab —
+ * `created_by_me`; ревьюер — `reviewer_username` или `reviewer_id`; новые первыми, страницами.
+ */
+function globalMrs(ctx) {
+  const { state, query, actor, baseUrl } = ctx;
+  const scope = query.get('scope') ?? 'created_by_me';
+  const reviewer = query.get('reviewer_username');
+  const reviewerId = query.get('reviewer_id');
+  const authorName = query.get('author_username');
+  const asked = query.get('state');
+  const found = state.mrs
+    .filter((m) => scope !== 'created_by_me' || m.authorId === actor.id)
+    .filter((m) => !reviewer || m.reviewerIds.some((id) => state.user(id).username === reviewer))
+    .filter((m) => !reviewerId || m.reviewerIds.some((id) => String(id) === reviewerId))
+    .filter((m) => !authorName || state.user(m.authorId).username === authorName)
+    .filter((m) => !asked || asked === 'all' || MR_STATE[m.state] === asked)
+    .filter((m) => hasLabels(m, query));
+  return ok(pageOf(newestFirst(found, query), query, 20).map((m) => gitlabMr(state, baseUrl, m)));
 }
 
 function gitlabNote(state, discussion, note) {
@@ -176,7 +203,9 @@ function mrRoutes(ctx, project, rest) {
 function discussionRoutes(ctx, mr, rest) {
   const { state, method, query, body, actor } = ctx;
   const mine = state.discussions.filter((d) => d.projectId === mr.projectId && d.mrIid === mr.iid);
-  if (rest.length === 0 && method === 'GET') return ok(mine.map((d) => gitlabDiscussion(state, d)));
+  // Как у GitLab: страница `page` по `per_page` (по умолчанию 20, не больше 100), старые первыми.
+  if (rest.length === 0 && method === 'GET')
+    return ok(pageOf(mine, query, 20).map((d) => gitlabDiscussion(state, d)));
   if (rest.length === 0 && method === 'POST')
     return created(gitlabDiscussion(state, state.addDiscussion(mr, actor.id, String(body.body))));
   const discussion = mine.find((d) => d.id === rest[0]);
@@ -234,6 +263,8 @@ export function handleGitlab(ctx, path) {
   const { state, method, query } = ctx;
   if (path[0] === 'user' && path.length === 1 && method === 'GET')
     return ok({ id: ctx.actor.id, username: ctx.actor.username, name: ctx.actor.username });
+  if (path.length === 1 && method === 'GET' && path[0] === 'issues') return globalIssues(ctx);
+  if (path.length === 1 && method === 'GET' && path[0] === 'merge_requests') return globalMrs(ctx);
   if (path[0] !== 'projects' || path.length < 2) return undefined;
   const project = state.project(path[1]);
   if (!project) return notFound('Project');
@@ -247,6 +278,7 @@ export function handleGitlab(ctx, path) {
     });
   }
   if (rest[0] === 'merge_requests') return mrRoutes(ctx, project, rest.slice(1));
+  if (rest[0] === 'issues') return issueRoutes(ctx, project, rest.slice(1));
   if (rest[0] === 'pipelines' || rest[0] === 'jobs')
     return ciRoutes(ctx, project, rest[0], rest.slice(1));
   if (rest[0] === 'events' && rest.length === 1 && method === 'GET') {

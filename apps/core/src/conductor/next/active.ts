@@ -9,7 +9,8 @@ import {
   type NextInput,
   type UnitView,
 } from './next.types.ts';
-import { overTokens, stepTokens, tokenLimit, windowAction } from './window.ts';
+import { loginAnswerAction } from './login-answer.ts';
+import { overTokens, pendingSwitch, stepTokens, tokenLimit, windowAction } from './window.ts';
 
 /**
  * Суд над идущей попыткой шага (02:41-51): срок, красная проверка, конец хода без `step_done`,
@@ -137,10 +138,27 @@ function waitingHuman(input: NextInput, def: StepDef, att: Attempt): NextAction 
   const last = mine.pop();
   if (!last || last.answer === undefined) return { kind: 'wait', reason: 'ask closed unanswered' };
   if (last.source === 'budget' && last.dedupe?.startsWith('exhausted:') === true) {
-    // Исчерпанный маршрут: «ждать» — шаг в работе, но окно держит его до `clear-exhausted`.
-    return answerKey('exhausted', last.answer) === 'stop'
-      ? { kind: 'stop-step', stepId: att.stepId, reason: `${END_REASON.budget}: human stop` }
-      : { kind: 'answered', stepId: att.stepId, askId: last.askId };
+    // Исчерпанный маршрут: «ждать» — шаг в работе, но окно держит его до `clear-exhausted`;
+    // вариант `model:`/`cli:` (P169) — правка задачи кликом, основание — этот вопрос.
+    if (answerKey('exhausted', last.answer) === 'stop')
+      return { kind: 'stop-step', stepId: att.stepId, reason: `${END_REASON.budget}: human stop` };
+    const override = pendingSwitch(input.state, last.answer);
+    return {
+      kind: 'answered',
+      stepId: att.stepId,
+      askId: last.askId,
+      ...(override ? { override } : {}),
+    };
+  }
+  if (last.source === 'login') {
+    // Потерянный вход (P170): то же правило, что у шага без сессии (`login-answer.ts`).
+    return (
+      loginAnswerAction(input.state, att) ?? {
+        kind: 'answered',
+        stepId: att.stepId,
+        askId: last.askId,
+      }
+    );
   }
   if (last.source === 'budget') {
     // Ответ на срок: продление — то же, что `once-more`; «остановить» — шаг кончается.
@@ -177,7 +195,7 @@ function chatAction(input: NextInput, def: StepDef, att: Attempt): NextAction {
   const fact = input.live[stepId];
   const held = windowAction(input.state, def, att, fact, input.windows?.[stepId]);
   if (held) return held;
-  if (!fact) return { kind: 'run-step', stepId };
+  if (!fact) return loginAnswerAction(input.state, att) ?? { kind: 'run-step', stepId };
   // Вопрос «ask» (этап 10, F2): один ход — его конец и есть ответ; шаг закрывает ядро, а не
   // `end-chat`. Раньше проверки конца сессии: CLI, вышедший сразу за ответом, — не обрыв.
   if (fact.turnEnd && input.state.created?.scenario.id === ASK_PRESET) {
@@ -253,7 +271,7 @@ export function activeAction(
   const held = windowAction(state, def, att, fact, win);
   if (held) return held;
   const seat = seatWait(input, stepId);
-  if (!fact) return seat ?? { kind: 'run-step', stepId };
+  if (!fact) return loginAnswerAction(state, att) ?? seat ?? { kind: 'run-step', stepId };
   // Сеанс отдал место на вопросе человеку и ждёт его назад: ни напоминания, ни хода без места.
   if (seat && !fact.ended) return seat;
   // Просьба наблюдателя о паузе (`context-growth`, этап 8 F10) — до напоминания: напоминать

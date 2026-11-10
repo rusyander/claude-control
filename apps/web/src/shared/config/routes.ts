@@ -17,3 +17,8 @@ export const LOCAL_MODELS_ROUTE: string = '/local-models';
  * («назад») и карточка запуска (`/core/launch`) после старта.
  */
 export const CORE_TASKS_ROUTE: string = '/core';
+/**
+ * Полосы групп доски ядра — бывший раздел «Группы» (этап 12, D13): меню, обзор и агент панели
+ * ведут сюда напрямую, прежний `/groups` остался только переадресацией для старых ссылок.
+ */
+export const CORE_GROUP_LANES_SEARCH = { view: 'board', lane: 'group' } as const;

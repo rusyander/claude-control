@@ -260,7 +260,9 @@ describe('tracker-write and unreadable keys', () => {
       startedAt: 0,
       startedSeq: 1,
     };
-    expect(await read(a)).toEqual({ unknown: 'no core tracker adapter' });
+    expect(await read(a)).toEqual({
+      unknown: 'tracker comments are not readable by the core: outcome unknown',
+    });
   });
 
   it('a target/hint not in the codec shape is unknown, never absent', async () => {

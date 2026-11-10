@@ -106,7 +106,6 @@ export async function emptyConfig(page) {
         scripts: { total: 0, unused: 0 },
         mcp: { total: 0, enabled: 0, connected: 0, failed: 0 },
         permissions: { allow: 0, ask: 0, deny: 0 },
-        groups: { total: 0 },
       },
     });
   });

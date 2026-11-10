@@ -217,11 +217,11 @@ await runOnStand(
         modelTurn?.effort === 'low',
         `effort=${modelTurn?.effort}`,
       );
-      await wait(1500);
-      check(
-        'ответ пришёл',
-        (await lines()).some((line) => line.startsWith('Модель ') && /sonnet/i.test(line)),
-      );
+      // Ответ ждём до 20 с, а не полторы: под нагрузкой (параллельный стенд) лента отстаёт.
+      const answered = async () =>
+        (await lines()).some((line) => line.startsWith('Модель ') && /sonnet/i.test(line));
+      for (let tries = 0; tries < 40 && !(await answered()); tries++) await wait(500);
+      check('ответ пришёл', await answered(), (await lines()).slice(-3).join(' | '));
 
       // ---------------------------------------------------------------- chat-003
       console.log('chat-003: картинка и PDF');

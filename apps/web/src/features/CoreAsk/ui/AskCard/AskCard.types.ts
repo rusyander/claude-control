@@ -1,5 +1,5 @@
 import type { AskState } from '@agentdeck/contracts/core/states';
-import type { AskCardAsk } from '../../model/askCommands.types';
+import type { AskCardAsk } from '@agentdeck/contracts/core/ask-commands';
 
 export interface AskCardProps {
   taskId: string;

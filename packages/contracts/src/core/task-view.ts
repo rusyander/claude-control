@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BOARD_STOPS } from './board.ts';
 import { registryId, sha256Hex, uuidv7 } from './ids.ts';
 import {
   HUMAN_ASK_SOURCES,
@@ -100,6 +101,22 @@ export const askViewSchema = z.strictObject({
   stepId: uuidv7.nullable(),
   lateAnswer: z.boolean(),
   answer: z.string().nullable(),
+  /**
+   * Этап 12 (P153): действие по умолчанию из `human.asked`; `null` — вопрос блокирует, и задача
+   * «ждёт вас» (`contracts/core/waiting`). Ядро шлёт поле всегда; необязательно для видов до 12.
+   */
+  defaultAction: z.string().nullable().optional(),
+  /**
+   * Этап 12 (D29, P188): факты вопроса для карточки вне панели (бот Telegram): текст и варианты
+   * из `human.asked`; цель отказа права (пункт 5) — проект единицы шага, путь и действие решения
+   * `permit`, на которое ссылается вопрос; `answeredBy` — канал из `human.answered`.
+   */
+  question: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  permit: z
+    .strictObject({ project: z.string().min(1), target: z.string().min(1), op: z.string().min(1) })
+    .optional(),
+  answeredBy: z.string().min(1).optional(),
 });
 
 export const budgetViewSchema = z.strictObject({
@@ -115,6 +132,36 @@ export const windowViewSchema = z.strictObject({
   verdict: z.enum(WINDOW_VERDICTS),
   resetAt: nonNeg.nullable(),
   seq: nonNeg,
+});
+
+/**
+ * Этап 12: задача ждёт окна (`waiting-window`) — последнее решение `tier`: вердикт, когда окно
+ * откроется, и маршруты, на которые человек может перевести задачу кликом (`set-model`/`set-cli`).
+ * Метки — как в журнале: `alternatives` `<adapter>/<kind>:<id>`, `skipped` `<kind>:<id>=<verdict>`.
+ * Сама задача маршрут не меняет никогда (P155).
+ */
+export const windowWaitViewSchema = z.strictObject({
+  stepId: uuidv7.nullable(),
+  routeId: registryId,
+  verdict: z.enum(WINDOW_VERDICTS),
+  resetAt: nonNeg.nullable(),
+  alternatives: z.array(z.string()),
+  skipped: z.array(z.string()),
+  /**
+   * Начатая задача (P169): что человек может выбрать кликом — `cli:<переходник>` и `model:<id>`
+   * (`tier.offers`). Окно её маршрут не двигает; нет — вариантов перевода нет.
+   */
+  offers: z.array(z.string()).optional(),
+  seq: nonNeg,
+});
+
+/** Этап 12: MR единицы для карточки — личность из `publish.mr`, конец из `publish.mr-state`. */
+export const mrViewSchema = z.strictObject({
+  unitId: uuidv7,
+  url: z.string().min(1),
+  iid: nonNeg,
+  title: z.string().optional(),
+  state: z.enum(['opened', 'merged', 'closed']),
 });
 
 /** Ссылка на итоговый отчёт: тело — артефакт по sha256 (`GET /v1/tasks/:id/report`). */
@@ -188,6 +235,27 @@ export const taskViewSchema = z.strictObject({
     })
     .nullable()
     .optional(),
+  /** Этап 12: ожидание окна с вариантами перевода; `null` — задача окна не ждёт. */
+  windowWait: windowWaitViewSchema.nullable().optional(),
+  /** Этап 12 (P157): где задача остановится; нет — задача не с доски и `set-stop` не было. */
+  stop: z.enum(BOARD_STOPS).optional(),
+  /** Этап 12: открытый перехват единицы человеком; `null` — перехвата нет. */
+  takeover: z
+    .strictObject({
+      unitId: uuidv7,
+      copy: z.string().min(1),
+      seq: nonNeg,
+      chatTaskId: uuidv7.optional(),
+    })
+    .nullable()
+    .optional(),
+  /**
+   * Этап 12: эта задача — чат перехвата (`task.created.takeoverOf`): чья задача и какая единица.
+   * Панель по нему усыновляет разговор в книгу чата — «Открыть чат» ведёт в этот разговор.
+   */
+  takeoverOf: z.strictObject({ taskId: uuidv7, unitId: uuidv7 }).optional(),
+  /** Этап 12: MR единиц задачи; нет — ни одного MR не открыто. */
+  mrs: z.array(mrViewSchema).optional(),
 });
 
 export type UsageView = z.infer<typeof usageViewSchema>;
@@ -202,3 +270,5 @@ export type ReportRef = z.infer<typeof reportRefSchema>;
 export type ScenarioView = z.infer<typeof scenarioViewSchema>;
 export type SplitView = z.infer<typeof splitViewSchema>;
 export type TaskView = z.infer<typeof taskViewSchema>;
+export type WindowWaitView = z.infer<typeof windowWaitViewSchema>;
+export type MrView = z.infer<typeof mrViewSchema>;

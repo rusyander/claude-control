@@ -424,6 +424,146 @@ legend(p1, 60, bottomOf(p1) + 60, [
   { caption: 'кто что читает', edgeColour: FLOW.data },
 ]);
 
+// ─── Страница 2: Telegram и ядро задач ─────────────────────────────────────
+
+const p2 = newPage('Telegram и ядро задач', 'p2');
+heading(
+  p2,
+  60,
+  30,
+  'Telegram и ядро задач',
+  'Бот ответов говорит с ядром, пока включено «Отвечать ядру из Telegram»: вопросы — кнопками, задачи — уведомлениями, новая задача — /task. Шире вопроса — только панель или телефон.',
+  1570,
+);
+
+const TW = 330;
+const TGAP = 90;
+const tx = (i) => 60 + i * (TW + TGAP);
+/** Ряд карточек одной высоты. */
+function row(p, y, entries) {
+  const h = Math.max(...entries.map(([, , spec]) => cardH(spec, TW)));
+  return entries.map(([id, col, spec]) => card(p, id, tx(col), y, TW, { ...spec, h }));
+}
+
+const [tHuman] = row(p2, 150, [
+  [
+    't:human',
+    0,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Вы в Telegram',
+      lines: [
+        'Кнопка варианта, reply своим текстом.',
+        '«🔁 На доработку», «⏹ Стоп», «▶️ В работу», /task.',
+      ],
+    },
+  ],
+  [
+    't:bot',
+    1,
+    {
+      pal: C.panel,
+      icon: 'shape=hexagon',
+      iconText: 'панель',
+      title: 'Бот ответов панели',
+      lines: [
+        'Показывает только варианты, которые ядро примет; скрытые — строка «🔒».',
+        'Тихие часы копят уведомления в сводку «🌙».',
+      ],
+    },
+  ],
+  [
+    't:core',
+    2,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Ядро задач',
+      lines: [
+        'Узнаёт чат по отпечатку привязки.',
+        'Ответ из Telegram судит своей областью: шире — отказ.',
+      ],
+    },
+  ],
+  [
+    't:board',
+    3,
+    {
+      pal: C.group,
+      title: 'Доска и задачи',
+      lines: [
+        '/task — запись во «Входящие» с источником Telegram.',
+        'С репозиториями — «В работу» прямо из чата.',
+      ],
+    },
+  ],
+]);
+
+const T2 = tHuman.y + tHuman.h + 110;
+row(p2, T2, [
+  [
+    't:notice',
+    1,
+    {
+      pal: C.note,
+      title: 'Что уходит наружу',
+      lines: [
+        'Имя задачи и одна строка сути под маской секретов.',
+        'Ни кода, ни путей, ни промпта; ссылка в панель — текстом.',
+      ],
+    },
+  ],
+  [
+    't:panel',
+    2,
+    {
+      pal: C.warn,
+      title: 'Только панель или телефон',
+      lines: [
+        'Право шире вопроса, маршрут, настройка, перехват, публикация.',
+        'Разрешение записи в тикет.',
+      ],
+    },
+  ],
+]);
+
+rowLink(p2, 't:human', 't:bot', 'нажатие', FLOW.human);
+rowLink(p2, 't:bot', 't:core', 'команда', FLOW.fwd);
+rowLink(p2, 't:core', 't:board', 'запись', FLOW.fwd);
+link(p2, 't:core', 't:panel', 'шире — отказ', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+link(p2, 't:bot', 't:notice', 'уведомления', {
+  colour: FLOW.data,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+
+routeEdges(p2);
+legend(p2, 60, bottomOf(p2) + 60, [
+  { caption: 'человек и его нажатие', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'сервер панели', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'ядро задач', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'доска ядра', fill: C.group.tint, stroke: C.group.line },
+  { caption: 'что уходит наружу', fill: C.note.tint, stroke: C.note.line },
+  { caption: 'границы', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'кто что читает', edgeColour: FLOW.data },
+  { caption: 'отказ', edgeColour: FLOW.back, dashed: true },
+]);
+
+/** Стрелка вправо по ряду. */
+function rowLink(p, from, to, label, colour) {
+  link(p, from, to, label, { colour, exit: [1, 0.3], entry: [0, 0.3] });
+}
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -450,12 +590,12 @@ const bounds = (p) => {
   return { w: w + 60, h: h + 60 };
 };
 
-const b1 = bounds(p1);
+const sized = [p1, p2].map((p) => ({ p, ...bounds(p) }));
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n` +
+  sized.map(({ p, w, h }) => `${pageXml(p, w, h)}\n`).join('') +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
-console.log(`записано ${OUT}: ${b1.w}×${b1.h}, ячеек ${p1.cells.length}`);
+console.log(`записано ${OUT}: ${sized.map(({ w, h }) => `${w}×${h}`).join(', ')}`);

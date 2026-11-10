@@ -147,6 +147,38 @@ describe('inPlaceRootOf: where a chat unit works (Q1: in place only by the chat-
     expect(inPlaceRootOf(registry.live(copy.reply.taskId)!, 'u1')).toBeUndefined();
   });
 
+  it('a project in a repo subfolder: the repo pinned at its top with subPath, the in-place chat works in the subfolder its grant names', async () => {
+    const repo = gitRepo(root, 'root-sub');
+    const sub = join(repo, 'apps', 'web');
+    mkdirSync(sub, { recursive: true });
+    const placed = await estimateTask(
+      estimateBody([sub], {
+        scenario: { preset: 'chat' },
+        launchPolicy: 'auto',
+        placement: inPlace(sub),
+      }),
+      registry,
+      env,
+    );
+    if (placed.status === 422) throw new Error(placed.problems.join('; '));
+    const created = journal(placed.reply.taskId).find((l) => l.kind === 'task.created')!;
+    const repos = (created as JournalLine<'task.created'>).data.repos;
+    // Копия, база и ветка — от вершины; подпапка проекта — отдельным полем, через `/`.
+    expect(repos.map((r) => [realpathSync.native(r.path), r.subPath])).toEqual([
+      [realpathSync.native(repo), 'apps/web'],
+    ]);
+    expect(inPlaceRootOf(registry.live(placed.reply.taskId)!, 'u1')).toBe(realpathSync.native(sub));
+    // Проект в вершине поля не несёт: старые журналы и вершина читаются одинаково.
+    const top = await estimateTask(
+      estimateBody([repo], { scenario: { preset: 'chat' }, launchPolicy: 'auto' }),
+      registry,
+      env,
+    );
+    if (top.status === 422) throw new Error(top.problems.join('; '));
+    const topCreated = journal(top.reply.taskId).find((l) => l.kind === 'task.created')!;
+    expect((topCreated as JournalLine<'task.created'>).data.repos[0]).not.toHaveProperty('subPath');
+  });
+
   it('no grant line under the estimate key, a grant for another root or without edit: the unit goes to a copy', async () => {
     const repo = gitRepo(root, 'root-no');
     const out = await estimateTask(

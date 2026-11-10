@@ -12,6 +12,7 @@ import {
   coreChatCliOf,
   coreChatOfTask,
 } from '../../../domains/chat/core-run/core-chat-book.ts';
+import { coreChatProjectOf } from '../../../domains/chat/core-run/core-chat-adopt.ts';
 import { CORE_PERMIT_TOOL } from '../../../domains/chat/core-run/core-run.ts';
 import { ChatSession } from '../../../domains/chat/ChatSession/ChatSession.ts';
 import { apiTokenPath, readApiToken } from '../../../lib/api-token/api-token.ts';
@@ -141,6 +142,8 @@ export function registerChatRunRoutes(
    * (`automatic`) такой разговор не принимает: паузу снимает только человек.
    */
   heldOf?: (chatId: string) => boolean,
+  /** Разговор задачи ядра, которого книга не знает (чат перехвата), — усыновить его в книгу. */
+  adoptTask?: (taskId: string) => Promise<string | undefined>,
 ): void {
   // Маршруты решений человека отвечают только человеку: процесс модели —
   // потомок любого прогона или CLI панели — получает 403 (`human-only.ts`).
@@ -699,12 +702,17 @@ export function registerChatRunRoutes(
 
   /**
    * Разговор задачи ядра по книге чата (W3-17a): старая ссылка `/core/chat?id=<задача>` ведёт в
-   * `/chat` на тот же разговор. Задача, которой книга не помнит, — `chatId: null`, не ошибка.
+   * `/chat` на тот же разговор. Задача, которой книга не помнит, — чат перехвата усыновляется
+   * (этап 12: его открыло ядро, не панель); иначе `chatId: null`, не ошибка. `project` — вкладка,
+   * в чьём списке стоит разговор (`coreChatProjectOf`): переход открывает её вместе с ним.
    */
-  app.get<{ Params: { taskId: string } }>('/api/chat/core-task/:taskId', (request) => ({
-    chatId:
-      coreChatOfTask(coreChatBookPath(ctx.location.paths.appData), request.params.taskId) ?? null,
-  }));
+  app.get<{ Params: { taskId: string } }>('/api/chat/core-task/:taskId', async (request) => {
+    const { taskId } = request.params;
+    const book = coreChatBookPath(ctx.location.paths.appData);
+    const chatId = coreChatOfTask(book, taskId) ?? (await adoptTask?.(taskId)) ?? null;
+    const project = chatId ? coreChatProjectOf(book, chatId) : undefined;
+    return { chatId, ...(project ? { project } : {}) };
+  });
 
   /**
    * CLI начатого разговора по книге чата (W3-17a): шапка чата берёт каталог моделей этого CLI, а

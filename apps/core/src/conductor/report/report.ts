@@ -13,6 +13,7 @@ import { writeFileAtomic } from '../../platform/safe-io/atomic-write.ts';
 import { pathExists } from '../../platform/safe-io/files.ts';
 import type { HumanLedger } from '../human/human.types.ts';
 import { readHumanLedger } from '../human/ledger.ts';
+import { CROSS_SKIP } from '../next/lead-gate.ts';
 import type { ReportInput, WriteReportOutcome } from './report.types.ts';
 
 /**
@@ -26,6 +27,22 @@ const cut = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)
 const nonEmpty = (s: string, max: number) => cut(s.trim() || '—', max);
 
 const SUGGESTION_KINDS = FINAL_REPORT_SUGGESTIONS as readonly string[];
+
+/**
+ * Второе ревью пропущено без другого CLI (этап 12, P185): изменение смотрел один ревьюер — это
+ * непроверенное, человек видит причину. Повтор пропуска на новом круге ревью — та же строка.
+ */
+function crossSkipsOf(ledger: HumanLedger): { what: string; why: string }[] {
+  const byReason = new Map<string, { what: string; why: string }>();
+  for (const [stepId, s] of Object.entries(ledger.steps)) {
+    if (s.state !== 'skipped' || !s.reason?.startsWith(`${CROSS_SKIP}:`)) continue;
+    byReason.set(s.reason, {
+      what: `step ${stepId} (${s.stepKind}) skipped`,
+      why: nonEmpty(s.reason, 2000),
+    });
+  }
+  return [...byReason.values()];
+}
 
 export function buildFinalReport(ledger: HumanLedger, input: ReportInput): FinalReport {
   const outcome = input.at === 'ready-to-publish' ? 'ready-to-publish' : (input.ended ?? 'failed');
@@ -78,6 +95,7 @@ export function buildFinalReport(ledger: HumanLedger, input: ReportInput): Final
           2000,
         ),
       })),
+    ...crossSkipsOf(ledger),
   ];
   const residuals = [
     ...Object.entries(ledger.resources)

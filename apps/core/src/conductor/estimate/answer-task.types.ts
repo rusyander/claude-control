@@ -18,6 +18,13 @@ export interface AnswerTaskInput {
   mrIid: number;
   /** Строки `forge.event` (источник `poller`) — причина новой задачи. */
   events: JournalDataV1['forge.event'][];
+  /**
+   * Этап 12 (P162): ключ оценки носителя — `cmdId` доработки: тот же ключ дважды — та же задача
+   * (`replayEstimate`). Нет — свой новый ключ (опрос форжа: повтор держат его отметки).
+   */
+  cmdId?: string;
+  /** Этап 12 (P162): слово человека к доработке — в запрос задачи, его читает первый бриф. */
+  note?: string;
 }
 
 export type AnswerTaskOutcome =

@@ -79,7 +79,7 @@ import {
 import type { SessionKeyBook } from '../session-keys.ts';
 import { sessionPath, type LoginPathReader } from './launch-env.ts';
 import { briefWithHabits, stepEconomy } from './economy.ts';
-import { createLeaseBook, journalLease } from './lease-release.ts';
+import { createLeaseBook, journalLease, leaseInDialect } from './lease-release.ts';
 import {
   mcpPicksFor,
   sessionMcp,
@@ -197,6 +197,12 @@ export interface RoadDeps {
    * команды, когда ядро недоступно. Нет — в файле только задача, шаг и вид шага, как прежде.
    */
   sessionState?: (task: LiveTask, start: RoadStart) => SessionStateDoc | undefined;
+  /**
+   * Страницы браузера шага `walk` (этап 12, P177): страница сессии закрывается, как только её
+   * поток кончился, и все страницы задачи — в её конце. Иначе Chromium держал страницу (вход на
+   * стенд, куки) до 15 минут тишины или остановки ядра. Нет — страниц не бывает.
+   */
+  walkPages?: { release(sessionId: string): Promise<void> };
 }
 
 export interface LaunchOptions {
@@ -287,6 +293,16 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     linked.delete(sessionId);
     await unlinkHop(link, deps.note);
   };
+  // Сбой закрытия страницы — запись в журнал ядра; конец сессии и задачи из-за него не рвётся.
+  const releaseWalkPage = async (sessionId: string): Promise<void> => {
+    if (!deps.walkPages) return;
+    await deps.walkPages.release(sessionId).catch((error: unknown) =>
+      deps.note('walk.page-release-failed', {
+        sessionId,
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  };
   // Факты слоя сеансов: режим навыков, подагенты, опись — судье права и крану слоя.
   const layers = createSessionLayerBook();
   // Очередь машины — тем же выбором, что у распределителя (`createAllocatorWiring`): переменная,
@@ -332,7 +348,7 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     const coreOnly = start.task.state.created?.session?.mcp === 'core';
     const source =
       adapter?.mcpSource && !coreOnly
-        ? adapter.mcpSource({ pin, cwd: start.cwd, ...(trust ? { trust } : {}) })
+        ? adapter.mcpSource({ pin, cwd: start.workDir ?? start.cwd, ...(trust ? { trust } : {}) })
         : null;
     return sessionMcp(
       start.stepKind,
@@ -497,23 +513,28 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     // `via-gateway` — перевод диалекта звеном шлюза: метку регистрирует `afterLease` (`hop-link.ts`).
 
     // ── аренда ──
-    const acquired = start.lease === undefined;
+    // Аренда из журнала — только под диалект этой сессии: сервер маршрута на несколько диалектов,
+    // поднятый под claude, codex не прочтёт (`no_channel` при запуске).
+    const dialect = leaseDialectOf(compat);
+    const prior =
+      start.lease === undefined ? undefined : leaseInDialect(task, start.lease, dialect.dialect);
+    const acquired = prior === undefined;
     const lease: RouteLease =
-      start.lease ??
+      prior ??
       (await route.acquire(
         {
           taskId: task.taskId,
           sessionId: start.sessionId,
           // `null` — модель выбирает CLI: её берёт только вход CLI, остальные отказывают сами.
           model: start.model,
-          ...leaseDialectOf(compat),
+          ...dialect,
         },
         recorder,
       ));
     // Взятая аренда — в книгу дороги и строкой журнала до первого отказа: запуск, который так и
     // не состоялся, снимается в конце задачи, и после перезапуска ядра тоже (ревью B2r4-F06).
     leases.remember(task.taskId, { routeId: route.id, lease });
-    if (acquired) journalLease(task, start.sessionId, { routeId: route.id, lease });
+    if (acquired) journalLease(task, start.sessionId, { routeId: route.id, lease, ...dialect });
     const refuse = async (reason: string): Promise<PrepareOutcome> => {
       held.delete(start.sessionId);
       await unlink(start.sessionId);
@@ -743,7 +764,8 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     const spec: SessionSpec = {
       sessionId: start.sessionId,
       dir: start.dir,
-      cwd: start.cwd,
+      // Проект в подпапке репозитория: процесс — в подпапке копии, права и git — от корня копии.
+      cwd: start.workDir ?? start.cwd,
       // Нет модели — нет `--model`: CLI берёт свою по умолчанию.
       ...(start.model !== null ? { model: start.model } : {}),
       ...(start.effort ? { effort: start.effort } : {}),
@@ -928,6 +950,8 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
       ...(input.replayed === undefined ? {} : { replayed: input.replayed }),
       ...(input.onEvent ? { onEvent: input.onEvent } : {}),
     });
+    // Поток кончился (сама вышла, снята, упала): страница прохода этой сессии больше не нужна.
+    void attached.done.then(() => releaseWalkPage(sessionId));
     let ending: Promise<SessionEnd> | undefined;
     const end = async (mode: Parameters<RoadSession['end']>[0]): Promise<SessionEnd> => {
       const mine = held.get(sessionId);
@@ -986,12 +1010,15 @@ export function createSessionRoad(deps: RoadDeps): SessionRoad {
     contextFor,
     layerInventory: layers.inventoryOf,
     searchPath: async (prefix = []) => sessionPath('', prefix, await deps.loginPath()),
-    releaseTask: (task) =>
-      releaseTaskEnd(task, {
+    releaseTask: async (task) => {
+      // Конец задачи — и страницы всех её сессий, в том числе прикреплённых прежним ядром.
+      await Promise.all(Object.keys(task.state.sessions).map((id) => releaseWalkPage(id)));
+      return releaseTaskEnd(task, {
         liveCopies: liveCopies(),
         routes: deps.routes,
         leases: leases.of(task.taskId),
         ...(deps.stands ? { stands: deps.stands } : {}),
-      }),
+      });
+    },
   };
 }

@@ -9,6 +9,10 @@ export const coreTaskEn: typeof coreTaskRu = {
   ended: 'ended',
   attention: 'needs a human',
   waiting: (count: number) => `questions: ${count}`,
+  // «Waiting for you» on the Questions tab (stage 12): only tasks a blocking question holds.
+  waitingTitle: (count: number) => `Core tasks waiting for you: ${count}`,
+  waitingHint:
+    'Without your answer they will not go on. Questions with a default action are not listed — the task goes on by itself.',
   noAsks: 'No open questions.',
   questionPending: 'The question text has not arrived yet — you can answer in your own words.',
   ownAnswer: 'Own answer',

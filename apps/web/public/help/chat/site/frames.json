@@ -1,0 +1,106 @@
+{
+  "topic": "chat",
+  "scenario": "site",
+  "frames": [
+    {
+      "id": "01-pane",
+      "side": "panel",
+      "file": "01-pane.png",
+      "masked": 2,
+      "width": 1500,
+      "height": 900,
+      "shotAt": "2026-11-09T14:14:35.815Z",
+      "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Чаты stand-site Новый чат По названию По сообщениям Показано 0 из 0 stand-site •••••••••••• Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Haiku 5.5 · claude-haiku-5-5 Claude Sonnet 5.5 · claude-sonnet-5-5 Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты Доска Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер Перейти :64724 В «Проектах» Сайт: stand-site http://localhost:64724 Совет от Деки Файл можно бросить прямо в поле ввода — он уйдёт вложением к сообщению. Следующий совет stand-site •••••••••••• Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. Сообщение Enter — отправить, Shift+Enter — перенос строки stand-site http://localhost:64724 Выбрать элемент Наведите на элемент сайта и щёлкните — его описание уйдёт в ввод чата. Escape — отмена.",
+      "seal": {
+        "png": "d0c2c58ecdf9cffd",
+        "text": "dbb50a38d25590a4"
+      },
+      "en": {
+        "file": "01-pane.en.png",
+        "masked": 2,
+        "width": 1500,
+        "height": 900,
+        "shotAt": "2026-11-09T14:14:48.146Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Chats stand-site New chat By title In messages Showing 0 of 0 stand-site •••••••••••• Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Haiku 5.5 · claude-haiku-5-5 Claude Sonnet 5.5 · claude-sonnet-5-5 Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Local Agents Board Chat settings Project code Tests Environment Editor Dev server Open :64724 In Projects Site: stand-site http://localhost:64724 A tip from Decky Project tabs can be dragged with the mouse, and Alt+←/→ on a tab moves it one step. Next tip stand-site •••••••••••• A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. Message Enter to send, Shift+Enter for a new line stand-site http://localhost:64724 Pick an element Hover an element of the site and click: its description goes into the chat input. Escape cancels.",
+        "seal": {
+          "png": "7cca026d6bc606b2",
+          "text": "430c035c165396ec"
+        }
+      },
+      "dark": {
+        "file": "01-pane.dark.png",
+        "masked": 2,
+        "width": 1500,
+        "height": 900,
+        "shotAt": "2026-11-09T14:14:59.783Z",
+        "text": "AgentDeck Нет входа Claude Code на этой машине Свернуть панель Уведомления Агент панели Главное Обзор Поиск Аналитика Чат Поведение агента Правила 0 AGENTS.md Скиллы 0 Команды Хуки 3 Скрипты 0 Плагины Интеграции и доступы MCP-серверы 0 Права 0 Переменные Проекты Тестирование Приложение Группы 0 История изменений Сравнение Паспорт среды Настройки Защита данных Контур Локальные модели Набор панели Задачи ядра Справка Дека всё спокойно Чаты stand-site Новый чат По названию По сообщениям Показано 0 из 0 stand-site •••••••••••• Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Haiku 5.5 · claude-haiku-5-5 Claude Sonnet 5.5 · claude-sonnet-5-5 Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Оч. высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты Доска Настройки чата Код проекта Тесты Окружение Редактор Dev-сервер Перейти :64724 В «Проектах» Сайт: stand-site http://localhost:64724 Совет от Деки Агент в другом проекте закончил или ждёт ответа? Об этом скажут звук и уведомление — смотреть в экран не обязательно. Следующий совет stand-site •••••••••••• Новый разговор в каталоге проекта. Правки файлов разрешены — выключи их в меню «Настройки чата», если нужен только осмотр. Открыть в редакторе Сделай код-ревью: найди проблемы и предложи исправления. Найди потенциальные баги и объясни причину каждого. Объясни структуру проекта и основные модули. Прогони тесты и покажи, что падает. Сообщение Enter — отправить, Shift+Enter — перенос строки stand-site http://localhost:64724 Выбрать элемент Наведите на элемент сайта и щёлкните — его описание уйдёт в ввод чата. Escape — отмена.",
+        "seal": {
+          "png": "8ed2e50007f488ee",
+          "text": "8f9bc1940f3dd405"
+        }
+      },
+      "darkEn": {
+        "file": "01-pane.dark.en.png",
+        "masked": 2,
+        "width": 1500,
+        "height": 900,
+        "shotAt": "2026-11-09T14:15:11.795Z",
+        "text": "AgentDeck No Claude Code login on this machine Collapse the sidebar Notifications Panel agent Main Overview Search Analytics Chat Agent behaviour Rules 0 AGENTS.md Skills 0 Commands Hooks 3 Scripts 0 Plugins Integrations and access MCP servers 0 Permissions 0 Environment Projects Testing Application Groups 0 Change history Comparison Environment passport Settings Data protection Contour Local models Panel kit Core tasks Help Decky all quiet Chats stand-site New chat By title In messages Showing 0 of 0 stand-site •••••••••••• Opus 4.8 (1M) Fable Opus Sonnet Haiku Claude Haiku 5.5 · claude-haiku-5-5 Claude Sonnet 5.5 · claude-sonnet-5-5 Claude Opus 5.5 · claude-opus-5-5 Claude Fable 5.1 · claude-fable-5-1 Claude Opus 5 · claude-opus-5 Claude Sonnet 5 · claude-sonnet-5 Claude Fable 5 · claude-fable-5 Claude Opus 4.8 · claude-opus-4-8 Claude Opus 4.7 · claude-opus-4-7 Claude Sonnet 4.6 · claude-sonnet-4-6 Claude Opus 4.6 · claude-opus-4-6 Claude Opus 4.5 (latest) · claude-opus-4-5 Claude Opus 4.5 · claude-opus-4-5-20251101 Claude Haiku 4.5 (latest) · claude-haiku-4-5 Claude Haiku 4.5 · claude-haiku-4-5-20251001 Claude Sonnet 4.5 (latest) · claude-sonnet-4-5 Claude Sonnet 4.5 · claude-sonnet-4-5-20250929 Very high Low Medium High Very high Max Local Agents Board Chat settings Project code Tests Environment Editor Dev server Open :64724 In Projects Site: stand-site http://localhost:64724 A tip from Decky Drop a file right into the input — it goes with the message as an attachment. Next tip stand-site •••••••••••• A new conversation in the project directory. File edits are allowed — turn them off in the “Chat settings” menu if you only want a look around. Open in editor Do a code review: find problems and suggest fixes. Find potential bugs and explain the cause of each. Explain the project structure and main modules. Run the tests and show what fails. Message Enter to send, Shift+Enter for a new line stand-site http://localhost:64724 Pick an element Hover an element of the site and click: its description goes into the chat input. Escape cancels.",
+        "seal": {
+          "png": "622ac13d08335790",
+          "text": "a339cac7882854a1"
+        }
+      }
+    },
+    {
+      "id": "02-chip",
+      "side": "panel",
+      "file": "02-chip.png",
+      "masked": 0,
+      "width": 452,
+      "height": 276,
+      "shotAt": "2026-11-09T14:14:36.563Z",
+      "text": "<button> Pay for the order Сообщение Enter — отправить, Shift+Enter — перенос строки",
+      "seal": {
+        "png": "d98c70d2cb111c65",
+        "text": "76936eaea964281b"
+      },
+      "en": {
+        "file": "02-chip.en.png",
+        "masked": 0,
+        "width": 452,
+        "height": 276,
+        "shotAt": "2026-11-09T14:14:48.881Z",
+        "text": "<button> Pay for the order Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "8ac09f0f5da25a59",
+          "text": "4b3c4d63a5483ed7"
+        }
+      },
+      "dark": {
+        "file": "02-chip.dark.png",
+        "masked": 0,
+        "width": 452,
+        "height": 276,
+        "shotAt": "2026-11-09T14:15:00.481Z",
+        "text": "<button> Pay for the order Сообщение Enter — отправить, Shift+Enter — перенос строки",
+        "seal": {
+          "png": "2e3c47e92d59e22c",
+          "text": "76936eaea964281b"
+        }
+      },
+      "darkEn": {
+        "file": "02-chip.dark.en.png",
+        "masked": 0,
+        "width": 452,
+        "height": 276,
+        "shotAt": "2026-11-09T14:15:12.513Z",
+        "text": "<button> Pay for the order Message Enter to send, Shift+Enter for a new line",
+        "seal": {
+          "png": "46eb84ff4c488000",
+          "text": "4b3c4d63a5483ed7"
+        }
+      }
+    }
+  ]
+}

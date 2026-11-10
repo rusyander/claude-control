@@ -54,11 +54,15 @@ export function pluginCarryRefusal(
   // `--setting-sources` ядро и так держит `''` (у́же сужения набора), плагин едет как был. Отказ —
   // только когда `observe`/`off` попросил сам шаг: там хуки не должны действовать вовсе.
   const demotedByTrust = layer.asked === 'on' && layer.ran === 'observe';
-  const layered = (carry.plugins?.length ?? 0) > 0 || carry.settingSources !== undefined;
+  // Хуки профиля чата панели (s12) — команда из каталога панели, как плагин набора: тот же суд.
+  const layered =
+    (carry.plugins?.length ?? 0) > 0 ||
+    carry.settingSources !== undefined ||
+    Object.keys(carry.hooks ?? {}).length > 0;
   if (layered && layer.ran !== 'on' && !demotedByTrust) {
     return (
-      `session-carry-needs-layer-on: plugins and setting sources ride the human layer, ` +
-      `this step runs it '${layer.ran}' by its own mode`
+      `session-carry-needs-layer-on: plugins, panel hooks and setting sources ride the human ` +
+      `layer, this step runs it '${layer.ran}' by its own mode`
     );
   }
   for (const dir of carry.plugins ?? []) {

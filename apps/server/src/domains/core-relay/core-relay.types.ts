@@ -35,6 +35,11 @@ export interface CoreRelayCore {
 export interface RelayAsk {
   notice: RelayNotice;
   question: string;
+  /**
+   * Вопрос блокирует задачу (`askWaits` над `defaultAction` строки `human.asked`, этап 12, P175):
+   * только такой звонит на телефон; Telegram получает и неблокирующий.
+   */
+  waits: boolean;
 }
 
 export interface CoreRelayDeps {
@@ -49,13 +54,20 @@ export interface CoreRelayDeps {
   /**
    * Есть ли сейчас куда сообщать (настроен хоть один канал) — дешёвая проверка без сети. Нет —
    * ждущие вопросы не трогаются (ни вида задачи, ни попытки). Не задано — каналы считаются есть.
+   * `waits` — для блокирующего ли вопроса: у неблокирующего push не канал.
    */
-  ready?(): boolean;
+  ready?(waits: boolean): boolean;
   /** Ссылка панели на задачу с вопросом. */
   link(taskId: string, askId: string): string;
   log(line: string): void;
   /** Шаг опроса списка задач. */
   intervalMs?: number;
+  /**
+   * Каждая строка журнала из потока задачи (этап 12, D29): уведомления Telegram о концах задач и
+   * карточка окна видят тот же поток, что и пересылка вопросов, — второго подписчика на ядро нет.
+   * Исключение крючка пересылку не роняет (пишется в журнал). Не задано — пересылка как прежде.
+   */
+  onLine?(task: RelayTask, event: CoreSseEvent): void | Promise<void>;
 }
 
 export interface CoreRelay {

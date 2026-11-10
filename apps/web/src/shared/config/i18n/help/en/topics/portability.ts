@@ -141,7 +141,10 @@ export const portabilityEn = {
         'named on the card and is not a choice: it is the active CLI, not the ' +
         'environment transfer target of the other tabs. The source conversation is ' +
         'neither closed nor changed — carrying opens a new one instead of spoiling ' +
-        'the old one. A note about the carry lands in the source conversation: with ' +
+        'the old one. One exception: if the source conversation was waiting for a limit ' +
+        'window reset to send its last message again, that send is cancelled — the carry ' +
+        'is the choice of where the conversation continues, and the same word does not go ' +
+        'to the former CLI after the reset. A note about the carry lands in the source conversation: with ' +
         'another CLI it stays there for good, while with Claude the feed is its own ' +
         'transcript, which the panel never writes into — it can only speak into a ' +
         'RUNNING run, and a conversation without one says so in the outcome instead ' +

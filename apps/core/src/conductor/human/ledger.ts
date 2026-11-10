@@ -73,6 +73,28 @@ function forkFromDecision(line: JournalLine, out: HumanLedger): void {
   });
 }
 
+/**
+ * Этап 12 (P161, P162): доработка идущей задачи и записка возврата после перехвата — тоже слово
+ * человека шагу. Шаг выбирает команда (`stepId` в её исходе), текст — поле команды; исхода без
+ * `stepId` (носитель доработки, возврат без записки) — сообщения нет.
+ */
+function toStepFromOutcome(
+  r: Data<'command.received'>,
+  line: JournalLine,
+): { stepId: string; text: string } | undefined {
+  if (r.kind !== 'rework' && r.kind !== 'hand-back') return undefined;
+  const stepId = (line.data as { outcome?: { stepId?: unknown } }).outcome?.stepId;
+  const f = r.fields as { text?: unknown; note?: unknown };
+  const body = r.kind === 'rework' ? f.text : f.note;
+  if (typeof stepId !== 'string' || typeof body !== 'string' || body.trim() === '')
+    return undefined;
+  const text =
+    r.kind === 'hand-back'
+      ? `The human took this unit over by hand and handed it back with a note:\n${body.trim()}`
+      : body;
+  return { stepId, text };
+}
+
 function onCommand(line: JournalLine, out: HumanLedger, received: Map<string, JournalLine>): void {
   if (!line.cmdId) return;
   if (line.kind === 'command.received') {
@@ -82,6 +104,11 @@ function onCommand(line: JournalLine, out: HumanLedger, received: Map<string, Jo
   const got = received.get(line.cmdId);
   if (line.kind !== 'command.applied' || !got) return;
   const r = got.data as Data<'command.received'>;
+  const fromOutcome = toStepFromOutcome(r, line);
+  if (fromOutcome) {
+    out.messages[line.cmdId] = { cmdId: line.cmdId, ...fromOutcome, seq: line.seq };
+    return;
+  }
   if (r.kind !== 'message-to-step') return;
   const f = r.fields as { stepId?: unknown; text?: unknown };
   if (typeof f.stepId !== 'string' || typeof f.text !== 'string') return;

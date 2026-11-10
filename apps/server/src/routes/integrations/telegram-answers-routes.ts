@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type { ChatInbox } from '@agentdeck/contracts/chat-inbox';
+import type { TelegramCoreBindingView } from '@agentdeck/contracts/core/telegram-channel';
 import type { DeferredAskState } from '@agentdeck/contracts/deferred-asks';
 import {
   telegramAnswersSaveSchema,
@@ -17,11 +18,17 @@ import {
   type Inject,
 } from '../../domains/notify/telegram-answers/apply.ts';
 import { collectPendingAsks } from '../../domains/notify/telegram-answers/collect.ts';
+import {
+  createCoreAskButtons,
+  type CoreAskButtons,
+} from '../../domains/notify/telegram-answers/core-asks-runtime.ts';
 import { agentBotIds } from '../../domains/notify/telegram-answers/same-bot.ts';
 import { limitSharesOf } from '../../domains/notify/telegram-answers/commands.ts';
 import { ConnectWindow } from '../../domains/notify/telegram-answers/connect.ts';
 import { SentLog } from '../../domains/notify/telegram-answers/sent-log.ts';
 import { TelegramAnswersService } from '../../domains/notify/telegram-answers/service.ts';
+import { createTelegramNotices } from '../../domains/notify/telegram-notices/index.ts';
+import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 import type { TelegramAnswersCover } from '../../domains/notify/telegram.ts';
 import { AnswersStore } from '../../domains/notify/telegram-answers/store.ts';
 import type {
@@ -92,6 +99,21 @@ export interface TelegramAnswersRouteDeps {
   cover?: TelegramAnswersCover;
   /** Имя чата по ключу прогона — для `/status`. */
   chatTitle?: (chatId: string) => string | undefined;
+  /**
+   * Кнопки вопросов ядра; `null` — выключены. Не задано — настоящие, кроме прогона vitest: тесты
+   * подставляют свои, настоящее ядро машины им не трогать.
+   */
+  coreAsks?: CoreAskButtons | null;
+}
+
+/** Кнопки вопросов ядра для опроса: подмена теста, выключено под vitest или настоящие. */
+function coreAskButtonsOf(
+  deps: TelegramAnswersRouteDeps,
+  real: () => CoreAskButtons,
+): CoreAskButtons | null {
+  if (deps.coreAsks !== undefined) return deps.coreAsks;
+  if (process.env.VITEST) return null;
+  return real();
 }
 
 export function registerTelegramAnswersRoutes(
@@ -122,8 +144,29 @@ export function registerTelegramAnswersRoutes(
     return { statusCode: reply.statusCode, body: reply.body };
   };
 
+  // Вопросы ядра задач кнопками (этап 12, D29): книга вопросов и порт команд Telegram.
+  const coreAsks = coreAskButtonsOf(deps, () =>
+    createCoreAskButtons({
+      home: () => coreHomeOf(),
+      token: () => dedicatedToken() ?? notifyToken(),
+      ownerId: () => answersStore.settings.ownerId,
+    }),
+  );
+  /** Открытые вопросы ядра; ядро недоступно — их нет в этом круге, сводка панели идёт как есть. */
+  const coreAskItems = async () => {
+    if (!coreAsks) return [];
+    try {
+      await coreAsks.asks.refresh();
+    } catch (error) {
+      app.log.debug({ err: String(error) }, 'telegram answers: core asks');
+    }
+    return coreAsks.asks.items();
+  };
+
   const vanished = (target: AskTarget): Vanished => {
     switch (target.kind) {
+      case 'coreAsk':
+        return coreAsks ? coreAsks.asks.vanished(target) : { kind: 'stale' };
       case 'permission':
         return permissionVanished(deps.session, target.runKey, target.toolUseId);
       case 'question':
@@ -185,9 +228,21 @@ export function registerTelegramAnswersRoutes(
   // отправитель уведомлений (рантайм).
   const sentLog = new SentLog(appData());
 
+  // Уведомления о задачах ядра (этап 12, D29) — крючки того же цикла getUpdates; нет — как прежде.
+  const notices = createTelegramNotices({
+    coreHome: () => coreHomeOf(),
+    appData,
+    log: (message) => app.log.info(message),
+    token: () => dedicatedToken() ?? notifyToken(),
+    ownerId: () => answersStore.settings.ownerId,
+    settings: () => ctx.store.getSettings().integrations.telegram,
+    covers: () => service.covers(),
+  });
+
   const service: TelegramAnswersService = new TelegramAnswersService({
     store: store(),
     sentLog,
+    ...(notices ? { notices } : {}),
     token: () => dedicatedToken() ?? notifyToken(),
     agentBotIds: agentBots,
     // Главный выключатель карточки Telegram гасит и ответы: «выключено» значит
@@ -203,14 +258,19 @@ export function registerTelegramAnswersRoutes(
       const reply = await inject({ method: 'GET', url: '/api/chat/inbox' });
       if (reply.statusCode !== 200) throw new Error(`inbox ${reply.statusCode}`);
       const inbox = JSON.parse(reply.body) as ChatInbox;
-      return collectPendingAsks({
+      const own = collectPendingAsks({
         inbox,
         defaultCli: getProvider('claude').name,
         titleOf: (chatId) => titled(chatId).title,
         parentOf: (chatId) => ctx.store.getChatLink(chatId)?.parentChatId,
       });
+      return [...own, ...(await coreAskItems())];
     },
-    apply: (target, answer, clientId) => applyAnswer(target, answer, applyDeps(clientId)),
+    apply: (target, answer, clientId) =>
+      target.kind === 'coreAsk' && coreAsks
+        ? // Новый ключ повтора после отказа ядра живёт в цели сообщения — файл ответов пишется.
+          coreAsks.apply(target, answer).finally(() => answersStore.save())
+        : applyAnswer(target, answer, applyDeps(clientId)),
     sendToChat: (route, text, files, clientId) =>
       sendChatText(route, text, files, applyDeps(clientId)),
     ...sendGrace(),
@@ -240,6 +300,12 @@ export function registerTelegramAnswersRoutes(
   };
 
   if (deps.cover) deps.cover.covers = () => service.covers();
+  // Вопросы ядра кнопками: опрос жив и ядро признаёт чат бота владельцем — текст пересылки молчит.
+  if (deps.cover) {
+    deps.cover.coreButtons = () => service.covers() && (coreAsks?.asks.covers() ?? false);
+  }
+  // Строки потока ядра (пересылка, рантайм) — повод перечитать задачу для уведомлений.
+  if (deps.cover) deps.cover.coreLine = (task, event) => notices.onLine(task, event);
 
   registerTelegramConnectRoutes(app, ctx, {
     connect,
@@ -270,6 +336,36 @@ export function registerTelegramAnswersRoutes(
   };
 
   app.get('/api/integrations/telegram/answers', () => view());
+
+  /**
+   * Привязка ответов ядру (этап 12, D29): отпечаток чата бота ответов и признаёт ли его ядро. Запись
+   * `telegram.owner` делает окно панели само — `set-config` ядра с доказательством страницы; сервер
+   * её не пишет: строгая настройка ядра — только из браузера или с телефона.
+   */
+  app.get(
+    '/api/integrations/telegram/answers/core-binding',
+    async (): Promise<TelegramCoreBindingView> => {
+      const settings = store().settings;
+      const fingerprint = coreAsks?.fingerprint() ?? null;
+      let bound = false;
+      let reachable = coreAsks !== null;
+      if (coreAsks && fingerprint) {
+        try {
+          await coreAsks.asks.refresh();
+          bound = coreAsks.asks.covers();
+        } catch {
+          reachable = false;
+        }
+      }
+      return {
+        fingerprint,
+        bound,
+        reachable,
+        ownerName: settings.ownerName,
+        listening: service.covers(),
+      };
+    },
+  );
 
   app.put<{ Body: unknown }>('/api/integrations/telegram/answers', async (request, reply) => {
     const body = parseBody(telegramAnswersSaveSchema, request.body, reply);
@@ -329,6 +425,7 @@ export function registerTelegramAnswersRoutes(
   app.addHook('onClose', async () => {
     service.stop();
     connect.cancel();
+    notices.stop();
   });
 }
 

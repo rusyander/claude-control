@@ -1,3 +1,4 @@
+import type { SessionHooks } from '@agentdeck/contracts/core/session-carry';
 import type { GroupRunProfile } from './group-profile.types.ts';
 
 export type * from './group-profile.types.ts';
@@ -34,7 +35,7 @@ export function chatRunProfile(input: { boardHook: string }): GroupRunProfile {
 /**
  * Профиль под маршрутом, который сам решает MCP (контур, локальная модель):
  * серверы, флаг, переменная подключений claude.ai и строка о серверах — его;
- * настройки (запрет правок, хуки, навыки) и прочие переменные остаются.
+ * настройки (хуки) и прочие переменные остаются.
  */
 export function withoutMcp(profile: GroupRunProfile): GroupRunProfile {
   const env = Object.fromEntries(
@@ -49,9 +50,10 @@ const BOARD_LIST_MATCHER = 'mcp__.*__jira_(search|get_board_issues|get_sprint_is
 /**
  * Хук списка задач (5.2): без названных полей трекер отдаёт каждую задачу с
  * описанием, и разбор доски вытягивал сотни тысяч знаков. До вызова хук
- * подставляет короткий набор полей; вызов, назвавший поля, не трогает.
+ * подставляет короткий набор полей; вызов, назвавший поля, не трогает. В сеанс ядра хук едет
+ * полем `session.hooks` (`core-run/session-carry.ts`, s12): ход через ядро терял его молча.
  */
-function boardHooks(command: string): Record<string, unknown[]> {
+function boardHooks(command: string): SessionHooks {
   return {
     PreToolUse: [
       { matcher: BOARD_LIST_MATCHER, hooks: [{ type: 'command', command, timeout: 10 }] },

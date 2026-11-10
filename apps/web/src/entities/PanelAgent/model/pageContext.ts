@@ -9,6 +9,8 @@ export function sectionLabelKey(pathname: string): string | undefined {
   let best: { path: string; label: string } | undefined;
   for (const section of NAV_SECTIONS) {
     for (const item of section.items) {
+      // Пункт-ярлык (`search`) ведёт в чужой раздел — страницу подписывает её собственный пункт.
+      if (item.search) continue;
       const fits =
         item.path === '/'
           ? pathname === '/'

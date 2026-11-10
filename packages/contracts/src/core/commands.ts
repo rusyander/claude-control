@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BOARD_STOPS } from './board.ts';
 import { registryId, uuidv7 } from './ids.ts';
 import { allowedRouteSchema, COMMAND_TIMINGS, GRANT_OPS, OVERRIDE_SCOPES } from './journal-data.ts';
 import { LEAD_ROLES } from './lead.ts';
@@ -94,6 +95,17 @@ export const COMMAND_FIELDS = {
   }),
   /** Снять исчерпание маршрута (ответ 402): только человек, ядро и звено само не снимают (P122). */
   'clear-exhausted': z.strictObject({ routeId: registryId }),
+  /**
+   * Этап 12 (08e): перехват — человек ведёт единицу сам в чате её копии, конвейер задачи стоит;
+   * суд строгий, как у гранта: правка копии рукой человека мимо шагов ядра.
+   */
+  'take-over': empty,
+  /** Вернуть перехваченную единицу ядру; `note` — что человек сделал, уходит в бриф шага. */
+  'hand-back': z.strictObject({ note: line(16_000).optional() }),
+  /** Где задача остановится сама (P157); после `publish.mr` — отказ. */
+  'set-stop': z.strictObject({ stop: z.enum(BOARD_STOPS) }),
+  /** Доработка готовой работы словами человека: новый круг шага работы с этим текстом. */
+  rework: z.strictObject({ text: line(16_000) }),
 } as const;
 
 export type CommandKind = keyof typeof COMMAND_FIELDS;
@@ -112,7 +124,11 @@ export type AuthorityKind =
   | 'set-config'
   | 'save-scenario'
   | 'adopt-devices'
-  | 'learned-reset';
+  | 'learned-reset'
+  /** Этап 12: ход человека на доске (`POST /v1/board/move`) — машинный, задачи у записи ещё нет. */
+  | 'board-move'
+  /** Этап 12 (P167): записи во «Входящие» из поиска или `/task` Telegram — только записи, не задача. */
+  | 'inbox-create';
 export const COMMAND_KINDS = Object.keys(COMMAND_FIELDS) as CommandKind[];
 
 /**

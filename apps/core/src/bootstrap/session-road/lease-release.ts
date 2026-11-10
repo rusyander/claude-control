@@ -18,6 +18,8 @@ import type { TaskRelease } from './road.types.ts';
 export interface TakenLease {
   routeId: string;
   lease: RouteLease;
+  /** Диалект, под который аренда взята (`undefined` — вход CLI или журнал старше этого поля). */
+  dialect?: string;
 }
 
 /** Аренды задачи, взятые ЭТИМ ядром (память дороги): ключ — leaseId. */
@@ -48,6 +50,8 @@ const leaseDetail = z.strictObject({
   // `null` — аренда под модель по умолчанию CLI.
   model: z.string().nullable(),
   rids: z.array(z.string().min(1)),
+  // Нет — вход CLI (без адреса) или журнал старше поля: диалект аренды не известен.
+  dialect: z.string().min(1).optional(),
 });
 
 /**
@@ -68,9 +72,84 @@ export function journalLease(task: LiveTask, sessionId: string, taken: TakenLeas
         routeId: taken.routeId,
         model: taken.lease.model,
         rids: taken.lease.resources.map((r) => r.rid),
+        ...(taken.dialect ? { dialect: taken.dialect } : {}),
       }),
     },
   });
+}
+
+/** Строка `route-lease`, прочитанная: `undefined` — не она или нечитаемая. */
+function leaseDetailOf(line: JournalLine): z.infer<typeof leaseDetail> | undefined {
+  if (line.kind !== 'signal') return undefined;
+  const data = (line as JournalLine<'signal'>).data;
+  if (data.signal !== LEASE_SIGNAL) return undefined;
+  try {
+    const got = leaseDetail.safeParse(JSON.parse(data.detail));
+    return got.success ? got.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Аренда маршрута из журнала задачи (пережившая прежнее ядро или взятая прежней сессией): строка
+ * `route-lease` того же маршрута и модели, все её ресурсы ещё живы. Аренда без ресурсов (вход CLI)
+ * не переиспользуется — новая ничего не стоит. `dialect` — только аренда, взятая под этот диалект:
+ * маршрут на несколько диалектов (заглушка, шлюз) поднимает сервер под диалект сессии, и сервер
+ * claude (`anthropic-messages`) codex (`openai-responses`) не прочтёт. Строка без диалекта (журнал
+ * старше поля) годится любому — как раньше.
+ */
+export function journaledLease(
+  task: LiveTask,
+  routeId: string,
+  model: string | null,
+  dialect?: string,
+): RouteLease | undefined {
+  const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
+  const created = new Map<string, RouteResource>();
+  let found: RouteLease | undefined;
+  for (const line of lines) {
+    if (line.kind === 'resource.created') {
+      const d = (line as JournalLine<'resource.created'>).data;
+      created.set(d.rid, { rid: d.rid, kind: d.kind, ref: d.ref, release: d.release });
+      continue;
+    }
+    const detail = leaseDetailOf(line);
+    if (!detail || detail.routeId !== routeId || detail.model !== model) continue;
+    if (dialect !== undefined && detail.dialect !== undefined && detail.dialect !== dialect)
+      continue;
+    if (detail.rids.length === 0) continue;
+    if (!detail.rids.every((rid) => task.state.resources[rid]?.status === 'live')) continue;
+    const resources = detail.rids.map((rid) => created.get(rid));
+    if (resources.some((r) => r === undefined)) continue;
+    // Последняя живая — та, что держала последняя сессия этого маршрута.
+    const subject = (line as JournalLine<'signal'>).data.subject;
+    found = { leaseId: subject, routeId, model, resources: resources as RouteResource[] };
+  }
+  return found;
+}
+
+/**
+ * Аренда, которую запуск шага дал дороге (`journaledLease` без диалекта: суд `compat` ещё не
+ * назвал канал), — сверенная с диалектом, на котором заговорит сессия. Взята под другой диалект —
+ * живая аренда того же маршрута и модели под нужный, иначе `undefined` (дорога возьмёт новую).
+ */
+export function leaseInDialect(
+  task: LiveTask,
+  given: RouteLease,
+  dialect: string | undefined,
+): RouteLease | undefined {
+  if (dialect === undefined) return given;
+  const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
+  const recorded = lines
+    .filter(
+      (line) =>
+        line.kind === 'signal' && (line as JournalLine<'signal'>).data.subject === given.leaseId,
+    )
+    .map(leaseDetailOf)
+    .find((d) => d !== undefined)?.dialect;
+  if (recorded === undefined || recorded === dialect) return given;
+  return journaledLease(task, given.routeId, given.model, dialect);
 }
 
 /**
@@ -91,14 +170,7 @@ function journaledLeases(lines: JournalLine[]): TakenLease[] {
   for (const line of lines) {
     if (line.kind === 'signal') {
       const data = (line as JournalLine<'signal'>).data;
-      if (data.signal !== LEASE_SIGNAL) continue;
-      let parsed: z.infer<typeof leaseDetail> | undefined;
-      try {
-        const got = leaseDetail.safeParse(JSON.parse(data.detail));
-        parsed = got.success ? got.data : undefined;
-      } catch {
-        parsed = undefined;
-      }
+      const parsed = leaseDetailOf(line);
       if (!parsed) continue;
       out.push({
         routeId: parsed.routeId,

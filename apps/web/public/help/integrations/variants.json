@@ -264,6 +264,72 @@
         "width": 1116,
         "height": 352
       }
+    },
+    "telegram-core/01-binding": {
+      "light-ru": {
+        "file": "01-binding.png",
+        "width": 1174,
+        "height": 374
+      },
+      "light-en": {
+        "file": "01-binding.en.png",
+        "width": 1174,
+        "height": 374
+      },
+      "dark-ru": {
+        "file": "01-binding.dark.png",
+        "width": 1174,
+        "height": 374
+      },
+      "dark-en": {
+        "file": "01-binding.dark.en.png",
+        "width": 1174,
+        "height": 374
+      }
+    },
+    "telegram-core/02-repos": {
+      "light-ru": {
+        "file": "02-repos.png",
+        "width": 1166,
+        "height": 226
+      },
+      "light-en": {
+        "file": "02-repos.en.png",
+        "width": 1166,
+        "height": 226
+      },
+      "dark-ru": {
+        "file": "02-repos.dark.png",
+        "width": 1166,
+        "height": 226
+      },
+      "dark-en": {
+        "file": "02-repos.dark.en.png",
+        "width": 1166,
+        "height": 226
+      }
+    },
+    "telegram-core/03-quiet": {
+      "light-ru": {
+        "file": "03-quiet.png",
+        "width": 1174,
+        "height": 65
+      },
+      "light-en": {
+        "file": "03-quiet.en.png",
+        "width": 1174,
+        "height": 65
+      },
+      "dark-ru": {
+        "file": "03-quiet.dark.png",
+        "width": 1174,
+        "height": 65
+      },
+      "dark-en": {
+        "file": "03-quiet.dark.en.png",
+        "width": 1174,
+        "height": 65
+      }
     }
   }
 }

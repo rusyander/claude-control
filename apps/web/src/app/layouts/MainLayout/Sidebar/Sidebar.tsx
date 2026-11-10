@@ -12,6 +12,7 @@ import { PanelAgentLauncher } from '@features/PanelAgentWindow';
 import { MascotCompanion } from '@features/MascotCompanion';
 import { useOverview } from '@entities/AppConfig';
 import { usePanelUpdate } from '@entities/Changelog';
+import { useCoreGroupLaneCount } from '@entities/CoreTask';
 import { UsageLimitsMeter } from '@entities/UsageLimits';
 import {
   useProviders,
@@ -41,6 +42,7 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
   const { data: overview } = useOverview();
   const { data: providers } = useProviders();
   const { data: update } = usePanelUpdate();
+  const { count: groupLanes } = useCoreGroupLaneCount();
 
   // Навигация гейтится возможностями активного провайдера: `unsupported`-разделы
   // убраны, `planned` помечены. Пока данные не загружены — показываем всё (для
@@ -59,7 +61,8 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
     permissions: overview?.permissions
       ? overview.permissions.allow + overview.permissions.ask + overview.permissions.deny
       : undefined,
-    groups: overview?.groups.total,
+    // «Группы» ведут в полосы групп доски ядра — и число оттуда, а не прежних наборов настроек.
+    groups: groupLanes,
   };
 
   // Точка у пункта: там есть новость. Сейчас одна — вышла новая версия панели
@@ -152,8 +155,10 @@ export function Sidebar({ isCollapsed, onToggle, isNarrow = false }: SidebarProp
 
             {section.items.map((item) => (
               <Link
-                key={item.path}
+                // Ключ — `key`: путь не уникален, «Группы» — ярлык на `/core` с полосами групп.
+                key={item.key}
                 to={item.path}
+                search={item.search ?? {}}
                 className={styles.navLink}
                 // В свёрнутом виде подписи не видно — подсказка браузера её заменяет.
                 title={navItemTitle(item, navItemLabel(item, active, t), isCollapsed, t)}

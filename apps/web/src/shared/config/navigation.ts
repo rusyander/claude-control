@@ -1,5 +1,6 @@
 import type { Capability } from '@agentdeck/contracts';
 import type { IconName } from '@shared/ui/icon';
+import { CORE_GROUP_LANES_SEARCH, CORE_TASKS_ROUTE } from './routes';
 
 /**
  * Единый реестр разделов навигации. Раньше список жил в боковой панели, но его
@@ -10,6 +11,11 @@ import type { IconName } from '@shared/ui/icon';
 
 export interface NavItem {
   path: string;
+  /**
+   * Ключи адреса пункта-ярлыка в чужой раздел: «Группы» — полосы групп доски ядра (`/core`).
+   * У такого пункта путь не свой, поэтому подпись страницы по адресу его пропускает.
+   */
+  search?: Readonly<Record<string, string>>;
   /** Ключ i18n для подписи. */
   label: string;
   icon: IconName;
@@ -129,7 +135,14 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: 'nav.sectionApp',
     items: [
-      { path: '/groups', label: 'nav.groups', icon: 'groups', key: 'groups' },
+      // Страница групп свёрнута в доску ядра (этап 12, D13): пункт ведёт прямо на её полосы групп.
+      {
+        path: CORE_TASKS_ROUTE,
+        search: CORE_GROUP_LANES_SEARCH,
+        label: 'nav.groups',
+        icon: 'groups',
+        key: 'groups',
+      },
       { path: '/history', label: 'nav.history', icon: 'history', key: 'history' },
       { path: '/compare', label: 'nav.compare', icon: 'swap', key: 'compare' },
       // Паспорт среды панель-level: его смысл в том, чтобы посмотреть и на

@@ -1,0 +1,56 @@
+{
+  "topic": "core",
+  "scenario": "queue",
+  "frames": [
+    {
+      "id": "01-queue",
+      "side": "panel",
+      "file": "01-queue.png",
+      "masked": 0,
+      "width": 1594,
+      "height": 931,
+      "shotAt": "2026-11-08T17:00:30.173Z",
+      "text": "Источник Текст Задача трекера Голос Несколько пунктов Откуда требования: текст ниже, задача трекера, диктовка или несколько пунктов — одной задачей или группой. Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Ведущий Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Где остановиться до плана до MR до конца До плана — задача ждёт вашего «Запустить» после деления; до MR — открывает MR и останавливается; до конца — ведёт и дальше. Задача в очереди доски. Открыть доску Оценить В очередь",
+      "seal": {
+        "png": "791ef98b30d10c57",
+        "text": "808c24656db367b0"
+      },
+      "en": {
+        "file": "01-queue.en.png",
+        "masked": 0,
+        "width": 1594,
+        "height": 931,
+        "shotAt": "2026-11-08T17:01:12.284Z",
+        "text": "Source Text Tracker issue Voice Several items Where the requirements come from: the text below, a tracker issue, dictation or several items — as one task or as a group. Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Bug fix New feature Refactoring Review only Tracker ticket Reviewer replies Lead A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Where to stop at the plan at the MR to the end At the plan — the task waits for your “Launch” after the split; at the MR — opens the MR and stops; to the end — keeps going. The task is in the board queue. Open the board Estimate To queue",
+        "seal": {
+          "png": "8766672f1c8a3a74",
+          "text": "63f7bf85701baafb"
+        }
+      },
+      "dark": {
+        "file": "01-queue.dark.png",
+        "masked": 0,
+        "width": 1594,
+        "height": 931,
+        "shotAt": "2026-11-08T17:01:53.540Z",
+        "text": "Источник Текст Задача трекера Голос Несколько пунктов Откуда требования: текст ниже, задача трекера, диктовка или несколько пунктов — одной задачей или группой. Название Коротко: что должно получиться. Требования Текст задачи целиком — ядро хранит его как источник требований. Репозитории Путь к репозиторию База Ветка или коммит; пусто — ветка по умолчанию. Добавить репозиторий Сценарий Исправление ошибки Новая возможность Рефакторинг Только ревью Задача из трекера Ответы ревьюерам Ведущий Пресет ядра или сохранённый сценарий из библиотеки. Ждать CI после публикации По умолчанию выключено: ядро не ждёт пайплайн, пока вы не попросите для этой задачи. Файл репозитория это решение не включает. Где остановиться до плана до MR до конца До плана — задача ждёт вашего «Запустить» после деления; до MR — открывает MR и останавливается; до конца — ведёт и дальше. Задача в очереди доски. Открыть доску Оценить В очередь",
+        "seal": {
+          "png": "38d5f899ab9774cc",
+          "text": "808c24656db367b0"
+        }
+      },
+      "darkEn": {
+        "file": "01-queue.dark.en.png",
+        "masked": 0,
+        "width": 1594,
+        "height": 931,
+        "shotAt": "2026-11-08T17:02:34.845Z",
+        "text": "Source Text Tracker issue Voice Several items Where the requirements come from: the text below, a tracker issue, dictation or several items — as one task or as a group. Title Briefly: what should come out. Requirements The whole task text — the core stores it as the requirements source. Repositories Repository path Base Branch or commit; empty — the default branch. Add repository Scenario Bug fix New feature Refactoring Review only Tracker ticket Reviewer replies Lead A core preset or a saved scenario from the library. Wait for CI after publishing Off by default: the core does not wait for the pipeline unless you ask for this task. A repository file cannot turn it on. Where to stop at the plan at the MR to the end At the plan — the task waits for your “Launch” after the split; at the MR — opens the MR and stops; to the end — keeps going. The task is in the board queue. Open the board Estimate To queue",
+        "seal": {
+          "png": "565194829fa6e4ca",
+          "text": "63f7bf85701baafb"
+        }
+      }
+    }
+  ]
+}

@@ -235,7 +235,10 @@ export const kitEn: typeof kitRu = {
       'repository’s (the repository’s own files still do not reach such a session). If the ' +
       'step’s layer hooks are narrowed by the scenario or a contour rule, the kit folder ' +
       'declares MCP servers or is missing, the chat does not start and names the reason and ' +
-      'what to fix. Qwen Code «Ours» on a local model gets its own QWEN_HOME, Codex «both ' +
+      'what to fix. The hooks of the panel’s own chat profile ride their own session field and ' +
+      'are judged the same way as the kit plugin; the core carries no other profile settings ' +
+      'than hooks — such a turn refuses with their names instead of losing them silently. Qwen ' +
+      'Code «Ours» on a local model gets its own QWEN_HOME, Codex «both ' +
       'kits» gets the rules and the skill list after the core brief. The project local layer ' +
       '(«Projects» page) rides its own session field next to the kit: the setting sources ' +
       'drop «project», the layer’s instructions follow the core brief, its skills come as a ' +

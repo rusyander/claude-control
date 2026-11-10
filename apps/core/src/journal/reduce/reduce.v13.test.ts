@@ -39,8 +39,8 @@ const decided = (seq: number, outcome: Outcome, by: 'core' | 'human') =>
 const twice = `split ${SPLIT} decided twice`;
 
 describe('fold v13: the human approval of a checked split', () => {
-  it('pins the reducer version at 13', () => {
-    expect(REDUCER_VERSION).toBe(13);
+  it('the reducer version is at least 13 (v14: stage 12, `reduce.v14.test.ts`)', () => {
+    expect(REDUCER_VERSION).toBeGreaterThanOrEqual(13);
   });
 
   it.each([

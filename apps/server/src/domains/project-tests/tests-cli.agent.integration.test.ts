@@ -107,6 +107,46 @@ describe('tests-cli case / record', () => {
     expect(shown.out).toContain('Метки: live, e2e');
   });
 
+  it('case по id с archived — кейс агента уходит в архив и возвращается; у кейса человека — черновик и слово об этом', () => {
+    // W1-D 08.11: `case` тихо выбрасывал `archived` — кейсы на убранные файлы архивировали руками в JSON.
+    cli(project, 'case', '--group', 'gui', '--json', '{"title":"Выход","steps":["выйти"]}');
+    const archived = cli(
+      project,
+      'case',
+      '--group',
+      'gui',
+      '--json',
+      '{"id":"gui-002","archived":true}',
+    );
+    expect(archived.code, archived.out).toBe(0);
+    const caseOf = (id: string) => readGroups(project)[0]?.cases.find((item) => item.id === id);
+    expect(caseOf('gui-002')).toMatchObject({ title: 'Выход', archived: true });
+    expect(cli(project, 'list', '--group', 'gui').out).toContain('(архив)');
+    const back = cli(
+      project,
+      'case',
+      '--group',
+      'gui',
+      '--json',
+      '{"id":"gui-002","archived":false}',
+    );
+    expect(back.code, back.out).toBe(0);
+    expect(caseOf('gui-002')?.archived).toBeFalsy();
+    // Кейс человека агент не архивирует: правка — черновиком, и вывод это говорит, а не молчит.
+    const human = cli(
+      project,
+      'case',
+      '--group',
+      'gui',
+      '--json',
+      '{"id":"gui-001","archived":true}',
+    );
+    expect(human.code, human.out).toBe(0);
+    expect(human.out).toContain('черновиком');
+    expect(human.out).toContain('Архив кейса человека');
+    expect(caseOf('gui-001')?.archived).toBeFalsy();
+  });
+
   it('--project из подкаталога — ближайший вверх с .agent/tests, но не выше корня git', () => {
     // g0 26.10: после `cd inst-api` `--project .` искал файлы в `inst-api/.agent/tmp`.
     const sub = join(project, 'pkg', 'src');

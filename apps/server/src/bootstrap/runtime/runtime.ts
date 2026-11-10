@@ -83,6 +83,10 @@ import { PanelPendingActions } from '../../domains/panel-agent/pending/pending.t
 import { reapPanelAgentOrphans } from '../../domains/panel-agent/processes/processes.ts';
 import { createCoreCaller } from '../../domains/core-ask/core-ask.ts';
 import { createCoreChatPort } from '../../domains/chat/core-run/core-chat-port.ts';
+import {
+  coreTaskListOver,
+  createCoreStepSessions,
+} from '../../domains/chat/core-run/core-step-sessions.ts';
 import { coreChatBookPath } from '../../domains/chat/core-run/core-chat-book.ts';
 import {
   createCoreChatHistory,
@@ -610,7 +614,13 @@ export function createRuntime(
   };
 
   // Одни ручки ядра на разговоры, что заводит сервер, и на историю разговоров чужого CLI.
-  const coreChatPort = createCoreChatPort(createCoreCaller(() => coreHomeOf()));
+  const coreCaller = createCoreCaller(() => coreHomeOf());
+  const coreChatPort = createCoreChatPort(coreCaller);
+  // Сеансы шагов задач ядра — не разговоры человека: списки чатов их прячут.
+  const coreStepSessions = createCoreStepSessions({
+    tasks: coreTaskListOver(coreCaller.call),
+    view: (taskId) => coreChatPort.view(taskId),
+  });
 
   return {
     projectRunner,
@@ -628,8 +638,10 @@ export function createRuntime(
     handoffChains,
     treePause,
     pendingAsks,
-    coreHistory: createCoreChatHistory(coreChatPort, () =>
-      coreChatBookPath(ctx.location.paths.appData),
+    coreHistory: createCoreChatHistory(
+      coreChatPort,
+      () => coreChatBookPath(ctx.location.paths.appData),
+      coreStepSessions,
     ),
     foreignCarry,
     dlpProxy,

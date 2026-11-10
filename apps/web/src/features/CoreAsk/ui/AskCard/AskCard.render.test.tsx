@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { HumanAskSource } from '@agentdeck/contracts/core/journal';
 import { i18n } from '@shared/config/i18n';
-import type { AskCardAsk } from '../../model/askCommands.types';
+import type { AskCardAsk } from '@agentdeck/contracts/core/ask-commands';
 import { AskCard } from './AskCard';
 
 /**
@@ -42,6 +42,18 @@ function questionTag(source: HumanAskSource): string {
 describe('AskCard question language', () => {
   it('reconcile question is in the task language: no lang="en"', () => {
     expect(questionTag('reconcile')).not.toContain('lang="en"');
+  });
+
+  it('core questions in the task language (intake, login, tracker-write): no lang="en", own badge label', () => {
+    for (const source of ['intake', 'login', 'tracker-write'] as const) {
+      expect(questionTag(source)).not.toContain('lang="en"');
+      const html = renderToStaticMarkup(
+        <QueryClientProvider client={new QueryClient()}>
+          <AskCard taskId="t1" ask={ask(source)} state="open" />
+        </QueryClientProvider>,
+      );
+      expect(html).not.toContain('coreTimeline.ask.source.');
+    }
   });
 
   it('a model question (ask_human) stays English prose: lang="en"', () => {

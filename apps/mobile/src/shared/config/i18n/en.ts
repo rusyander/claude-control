@@ -561,9 +561,10 @@ export const en: Dictionary = {
     languageEn: 'English',
     notifications: 'Notifications',
     notificationsAbout:
-      'They arrive when work is finished, has failed, waits for a permission or the agent asks a ' +
-      'question. Only the kind of event, the project folder name and a random machine number ' +
-      'leave the machine — no text, no code.',
+      'They arrive only when work waits for you: a permission is needed, the agent asks a ' +
+      'question, or a core task asks and cannot go on without an answer. "Done" and "failed" do ' +
+      'not ring — you see them in the chat and on the board. Only the kind of event, the project ' +
+      'folder name and a random machine number leave the machine — no text, no code.',
     enableHere: 'Enable on this phone',
     panelNotifies: 'The panel sends notifications',
     testNotification: 'Test notification',
@@ -651,7 +652,9 @@ export const en: Dictionary = {
   push: {
     channel: 'Agent runs',
     denied: 'Notifications are blocked in the system settings',
-    noProjectId: 'No EAS projectId — run `eas init` in apps/mobile',
+    noProjectId:
+      'Push is not set up: this build has no EAS project id. Build the APK with ' +
+      'AGENTDECK_EAS_PROJECT_ID and AGENTDECK_GOOGLE_SERVICES — until then questions show in the Questions tab.',
     noToken: 'The Expo service did not issue a token',
   },
 

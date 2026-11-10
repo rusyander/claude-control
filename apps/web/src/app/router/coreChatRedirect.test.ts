@@ -14,10 +14,29 @@ describe('old /core/chat address lands in /chat', () => {
   });
 
   it('a task the chat book knows opens its conversation; an unknown one opens plain /chat', () => {
-    expect(coreChatTarget({ id: 'task-1', project: 'C:/w/app' }, 'conv-1')).toEqual({
+    expect(coreChatTarget({ id: 'task-1', project: 'C:/w/app' }, { chatId: 'conv-1' })).toEqual({
       to: '/chat',
       search: { id: 'conv-1', project: 'C:/w/app' },
     });
     expect(coreChatTarget({ id: 'task-0' }, null)).toEqual({ to: '/chat', search: {} });
+    expect(coreChatTarget({ id: 'task-0' }, { chatId: null })).toEqual({ to: '/chat', search: {} });
+  });
+
+  it('without a project in the address the tab is the one the server names for the conversation (takeover chat in a unit copy)', () => {
+    expect(coreChatTarget({ id: 'task-2' }, { chatId: 'conv-2', project: 'C:/w/repo' })).toEqual({
+      to: '/chat',
+      search: { id: 'conv-2', project: 'C:/w/repo' },
+    });
+    // Проект адреса сильнее; без разговора вкладку сервера не открываем.
+    expect(
+      coreChatTarget(
+        { id: 'task-2', project: 'C:/w/app' },
+        { chatId: 'conv-2', project: 'C:/w/repo' },
+      ),
+    ).toEqual({ to: '/chat', search: { id: 'conv-2', project: 'C:/w/app' } });
+    expect(coreChatTarget({ id: 'task-3' }, { chatId: null, project: 'C:/w/repo' })).toEqual({
+      to: '/chat',
+      search: {},
+    });
   });
 });

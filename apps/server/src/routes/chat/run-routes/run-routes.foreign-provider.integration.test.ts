@@ -24,6 +24,8 @@ import {
   coreChatBookPath,
   createCoreChatBook,
 } from '../../../domains/chat/core-run/core-chat-book.ts';
+import { adoptTakeoverChat } from '../../../domains/chat/core-run/core-chat-adopt.ts';
+import type { TaskView } from '@agentdeck/contracts/core/task-view';
 import { registerChatRunRoutes } from './run-routes.ts';
 import { registerChatHandoffRoutes } from '../handoff-routes.ts';
 
@@ -112,6 +114,7 @@ describe('чат при активном чужом CLI: ход через яд�
   let registry: ChatRunRegistry;
   let app: FastifyInstance;
   let savedPath: string | undefined;
+  let ctx: ServerContext;
   /** Ходы, отданные фабрике прогонов (в сборке — ядру). */
   let started: RunOptions[];
 
@@ -128,7 +131,7 @@ describe('чат при активном чужом CLI: ход через яд�
     store = new AppStore(join(root, 'agentdeck'));
     // Фабрика прогонов — граница с ядром: записывает, что ей отдали.
     registry = new ChatRunRegistry(() => new RecordingRun(started));
-    const ctx = {
+    ctx = {
       store,
       location: {
         paths: {
@@ -280,6 +283,60 @@ describe('чат при активном чужом CLI: ход через яд�
     expect(known.json()).toEqual({ chatId: 'qwen-conv-9' });
     const unknown = await app.inject({ method: 'GET', url: '/api/chat/core-task/task-0' });
     expect(unknown.json()).toEqual({ chatId: null });
+  });
+
+  // Этап 12 (B5): «Открыть чат» перехваченной задачи — чат открыло ядро, книга его не знает.
+  it('GET /api/chat/core-task/:taskId — чат перехвата усыновляется в книгу; повтор — из книги', async () => {
+    const chat = '01a1bb30-0000-7000-8000-0000000000c1';
+    const source = '01a1bb30-0000-7000-8000-0000000000c2';
+    const step = '01a1bb30-0000-7000-8000-0000000000c3';
+    const first = '01a1bb30-0000-7000-8000-0000000000c4';
+    const unit = '01a1bb30-0000-7000-8000-0000000000c5';
+    const views: Record<string, TaskView> = {
+      [chat]: {
+        taskId: chat,
+        takeoverOf: { taskId: source, unitId: unit },
+        steps: [{ stepId: step, stepKind: 'chat', startedSeq: 2 }],
+        sessions: [{ sessionId: first, stepId: step, cli: 'claude', startedSeq: 3 }],
+      } as unknown as TaskView,
+      [source]: {
+        taskId: source,
+        steps: [],
+        sessions: [],
+        takeover: { unitId: unit, copy: join(root, 'copy'), seq: 5, chatTaskId: chat },
+      } as unknown as TaskView,
+    };
+    const asked: string[] = [];
+    const bookFile = coreChatBookPath(join(root, 'agentdeck'));
+    const adopting = Fastify();
+    registerChatRunRoutes(adopting, ctx, registry, new ChatSession(registry), undefined, (id) =>
+      adoptTakeoverChat(
+        {
+          view: async (taskId) => {
+            asked.push(taskId);
+            return views[taskId] ?? null;
+          },
+        },
+        bookFile,
+        id,
+      ),
+    );
+    await adopting.ready();
+    try {
+      const got = await adopting.inject({ method: 'GET', url: `/api/chat/core-task/${chat}` });
+      // Вкладка — папка разговора (копия здесь не git, основной копии нет): без неё «Открыть чат»
+      // ставил разговор на домашнюю вкладку, где списка у него нет.
+      expect(got.json()).toEqual({ chatId: first, project: join(root, 'copy') });
+      expect(createCoreChatBook(bookFile).get(first)).toEqual({ taskId: chat, stepId: step });
+      asked.length = 0;
+      const again = await adopting.inject({ method: 'GET', url: `/api/chat/core-task/${chat}` });
+      expect(again.json()).toEqual({ chatId: first, project: join(root, 'copy') });
+      expect(asked).toEqual([]);
+      const stranger = await adopting.inject({ method: 'GET', url: '/api/chat/core-task/task-0' });
+      expect(stranger.json()).toEqual({ chatId: null });
+    } finally {
+      await adopting.close();
+    }
   });
 
   // Шапка чата берёт каталог моделей CLI разговора (W3-17a), а не активного провайдера.

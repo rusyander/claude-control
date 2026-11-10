@@ -26,7 +26,9 @@ import { STATE_TONE } from './TestsReleaseCard.constants';
  * заводили. Поэтому здесь нет ни одного своего счёта — только показ.
  */
 export function TestsReleaseCard({ projectPath, releases }: TestsReleaseCardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // Файл — на языке экрана, а не сохранённой настройки (PATCH мог ещё не дойти).
+  const lang = i18n.language;
   const navigate = useNavigate();
   // Свежая веха выбрана сама: чаще всего спрашивают про неё, а список приходит
   // от свежей к старой.
@@ -95,13 +97,13 @@ export function TestsReleaseCard({ projectPath, releases }: TestsReleaseCardProp
           {/* Документ файлом — туда, где панели нет: приёмка, заказчик,
               соседняя команда. PDF печатает браузер этой машины, поэтому ссылка
               может привести к честному отказу, а не к файлу. */}
-          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'md')}>
+          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'md', lang)}>
             {t('tests.release.exportMd')}
           </a>
-          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'html')}>
+          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'html', lang)}>
             {t('tests.release.exportHtml')}
           </a>
-          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'pdf')}>
+          <a className={styles.runLink} href={releaseExportUrl(projectPath, release, 'pdf', lang)}>
             {t('tests.release.exportPdf')}
           </a>
         </Stack>

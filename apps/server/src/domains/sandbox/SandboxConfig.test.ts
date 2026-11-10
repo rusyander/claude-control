@@ -245,11 +245,18 @@ describe('SandboxConfig', () => {
     async function holdWorkDir(ms: number): Promise<ChildProcess> {
       const { workDir } = sandboxPaths(sandboxId);
       mkdirSync(workDir, { recursive: true });
-      const child = spawn(process.execPath, ['-e', `setTimeout(() => {}, ${ms})`], {
-        cwd: workDir,
-        stdio: 'ignore',
+      // «spawn» приходит, когда процесс создан, а текущую папку Windows открывает ему чуть позже, при
+      // старте: удаление в этот зазор проходит, и тест ловил гонку вместо занятой папки. Ждём строку
+      // от самого процесса — к ней он уже стоит в папке.
+      const child = spawn(
+        process.execPath,
+        ['-e', `process.stdout.write('ready\\n'); setTimeout(() => {}, ${ms})`],
+        { cwd: workDir, stdio: ['ignore', 'pipe', 'ignore'] },
+      );
+      await new Promise<void>((ready, fail) => {
+        child.once('error', fail);
+        child.stdout?.once('data', () => ready());
       });
-      await new Promise((ready) => child.once('spawn', ready));
       return child;
     }
     const exited = (child: ChildProcess) =>

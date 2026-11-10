@@ -1,6 +1,7 @@
 import type { WindowDecision } from '@agentdeck/contracts/core/economy';
 import type { Scenario } from '@agentdeck/contracts/core/scenario';
 import type { StepRecord, TaskFoldState } from '../../journal/reduce/reduce.types.ts';
+import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { XlChildren } from '../split/xl-wait.ts';
 
 /**
@@ -74,7 +75,16 @@ export type NextAction =
   /** Продление бюджета токенов шага (G10): строка `budget.state` области `tokens:step:<id>`. */
   | { kind: 'extend-tokens'; stepId: string; limitTokens: number }
   /** Ответ на вопрос шага пришёл: `waiting-human` / `round-capped` → `running`. */
-  | { kind: 'answered'; stepId: string; askId: string }
+  | {
+      kind: 'answered';
+      stepId: string;
+      askId: string;
+      /**
+       * Ответ точки 7 исчерпанного маршрута выбрал вариант `model:<id>` / `cli:<id>` (P169):
+       * исполнитель пишет правку задачи с основанием — id вопроса — до перехода шага.
+       */
+      override?: { field: 'model' | 'adapter'; value: string };
+    }
   /** Шаг `ask-human` закрыт ответом человека (точка 8). */
   | { kind: 'close-human-step'; stepId: string; askId: string }
   /** Шаг `chat` закрыт командой человека `end-chat` (`cmdId` — основание в `step.ended`). */
@@ -115,7 +125,18 @@ export type NextAction =
    * Ждать: `untilWorkMs` — рабочее время задачи, когда истечёт ближайший срок шага;
    * `untilWallMs` — стена, когда окно маршрута сбросится (03:157).
    */
-  | { kind: 'wait'; reason: string; untilWorkMs?: number; untilWallMs?: number };
+  | {
+      kind: 'wait';
+      reason: string;
+      untilWorkMs?: number;
+      untilWallMs?: number;
+      /**
+       * Ждёт окно маршрута без живой сессии (этап 12): задача входит в `waiting-window` (01:119 —
+       * время работы его не считает), выходит из него, когда суд велит не ждать. Нет — другое
+       * ожидание (сессия, место, вопрос).
+       */
+      window?: { stepId: string; routeId: string };
+    };
 
 /** Факты живой сессии шага в этом процессе — их нет в журнале (конец хода не журналится, F08). */
 export interface LiveStepFact {
@@ -154,18 +175,27 @@ export interface NextInput {
    * на запуске; нет — задача не родитель XL.
    */
   children?: XlChildren;
+  /**
+   * Активный контур панели (уровень 1, s10 G7): второе ревью судит набор CLI после контура — тот
+   * же, что суд `tier` шага (W3-D). Нет — без контура.
+   */
+  contour?: ContourPolicy;
 }
 
 /**
  * Окно маршрута, куда идёт попытка шага модели (этап 5, W): вердикты судьи `economy/window`
- * по этому маршруту сейчас и сколько других годных маршрутов у шага (P110 — есть куда уйти,
- * точка 7 при исчерпании не нужна). Вердикт `offline` проводка ставит только маршрутам, которым
- * нужна сеть (P116).
+ * по этому маршруту сейчас. Точка 7 при исчерпании — при любом числе других годных маршрутов
+ * (P169): уйти на них можно только кликом. Вердикт `offline` проводка ставит только маршрутам,
+ * которым нужна сеть (P116).
  */
 export interface StepWindow {
   routeId: string;
   decisions: readonly WindowDecision[];
-  alternatives: number;
+  /**
+   * Варианты клика человека у начатой задачи (P169, `tier.offers`): `model:<id>` и `cli:<id>`.
+   * Окно её маршрут не двигает — точка 7 при исчерпании предлагает их. Нет — пусто.
+   */
+  offers?: readonly string[];
 }
 
 /** Попытка шага сценария: одна строка `step.started` и её свёртка. */

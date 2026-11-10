@@ -47,6 +47,8 @@ export interface BootEconomyDeps {
   contour?: () => ContourPolicy | undefined;
   /** Окно маршрута × модели — книга окон загрузки (`route-windows.ts`), та же у наблюдателя. */
   windowOf?: (routeId: string, model: string | null) => number | null;
+  /** Модели маршрута — та же книга (`route-windows.ts`): варианты клика суда `tier`. */
+  servedModels?: (routeId: string) => readonly string[] | null;
   now?: () => number;
 }
 
@@ -185,6 +187,7 @@ export function bootEconomy(deps: BootEconomyDeps): BootEconomy {
           journaledSessionDir(where.task, where.sessionId),
         ),
     ...(deps.windowOf ? { windowOf: deps.windowOf } : {}),
+    ...(deps.servedModels ? { servedModels: deps.servedModels } : {}),
     // Раздел ведущего — на каждый шаг, как у распределителя мест: правка доходит без перезапуска.
     facts: {
       leadSection,

@@ -7,7 +7,7 @@
  * считается по её тексту, а положение подписи ребра подбирается перебором
  * свободных мест.
  *
- * Две страницы, обе намеренно узкие: экспорт уезжает в справку, которую читают
+ * Три страницы, все намеренно узкие: экспорт уезжает в справку, которую читают
  * и с телефона. Плотный информационный лист скилла `drawio-architect` здесь
  * был бы нечитаем — это то же осознанное отступление, что уже сделано в
  * `docs/diagrams/platform-guide`, и конвенции взяты оттуда же, а не изобретены
@@ -16,6 +16,8 @@
  * Страница 1 — где живёт набор и кто в него пишет: у раздела нет своей базы,
  *              и запись прогона собирается из файлов кейсов.
  * Страница 2 — что краснит вердикт вехи и чего НЕ краснит карантин.
+ * Страница 3 — записанный сценарий: модель при записи и на первом расхождении, между
+ *              ними прогоны без модели; решение по расхождению — за человеком.
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -579,6 +581,129 @@ legend(p2, 60, bottomOf(p2) + 60, [
   { caption: 'путь провала в карантине', edgeColour: FLOW.admin },
 ]);
 
+// ─── Страница 3: записанный сценарий — модель дважды за жизнь ─────────────
+
+const p3 = newPage('3. Записанный сценарий', 'p3');
+heading(
+  p3,
+  60,
+  30,
+  'Записанный сценарий: модель работает дважды за его жизнь',
+  'При записи и на первом расхождении со стендом. Все прогоны между ними идут без модели.',
+  1000,
+);
+
+card(p3, 'p3:walk', 310, 130, B_W, {
+  pal: C.actor,
+  icon: 'shape=umlActor',
+  iconText: 'walk',
+  title: 'Проход ядра по стенду',
+  lines: [
+    'Человек пишет цель словами, ядро один раз проходит стенд в браузере. Каждое действие — шаг журнала; доступ стенда — только по имени.',
+  ],
+});
+
+card(p3, 'p3:spec', 310, 320, B_W, {
+  pal: C.store,
+  icon: 'shape=note;size=12',
+  iconText: 'spec',
+  title: 'Спек и кейс',
+  lines: [
+    'Спек собирается из шагов без модели и без часов: те же шаги — тот же файл. Кейс привязан к нему файлом и полным именем теста; пробелы прохода стоят в кейсе «не проверено».',
+  ],
+});
+
+card(p3, 'p3:replay', 310, 510, B_W, {
+  pal: C.svc,
+  icon: 'shape=process',
+  iconText: 'run',
+  title: '«Прогнать все»',
+  lines: [
+    'Обычный прогон блока по окружению: спеки идут один за другим и встают на первом упавшем шаге — дальше гнать нечего.',
+  ],
+});
+
+row(
+  p3,
+  700,
+  B_W,
+  [B1, B2],
+  [
+    {
+      id: 'p3:green',
+      pal: C.ext,
+      title: 'Все прошли',
+      lines: ['Запись в истории, полоска прогонов зеленеет. Модель не вызывалась ни разу.'],
+    },
+    {
+      id: 'p3:mismatch',
+      pal: C.warn,
+      title: 'Первое расхождение',
+      lines: [
+        'Открывается ровно одна задача прохода — с упавшего шага. Остальные сценарии в этом прогоне не запускались.',
+      ],
+    },
+  ],
+);
+
+row(
+  p3,
+  890,
+  B_W,
+  [B1, B2],
+  [
+    {
+      id: 'p3:defect',
+      pal: C.warn,
+      title: 'Дефект продукта',
+      lines: [
+        'Сценарий остаётся как есть: он поймал поломку и останется красным, пока её не починят.',
+      ],
+    },
+    {
+      id: 'p3:stale',
+      pal: C.note,
+      title: 'Сценарий устарел',
+      lines: [
+        'Когда новый проход кончится, тот же кейс перезаписывается его шагами — новый спек, та же история.',
+      ],
+    },
+  ],
+);
+
+link(p3, 'p3:walk', 'p3:spec', 'шаги прохода', { colour: FLOW.data });
+link(p3, 'p3:spec', 'p3:replay', 'без модели', { colour: FLOW.client });
+link(p3, 'p3:replay', 'p3:green', 'нет провалов', {
+  colour: FLOW.client,
+  exit: [0.2, 1],
+  entry: [0.5, 0],
+});
+link(p3, 'p3:replay', 'p3:mismatch', 'шаг упал', {
+  colour: FLOW.admin,
+  exit: [0.8, 1],
+  entry: [0.5, 0],
+});
+link(p3, 'p3:mismatch', 'p3:defect', 'решает человек', {
+  colour: FLOW.admin,
+  exit: [0.2, 1],
+  entry: [0.8, 0],
+});
+link(p3, 'p3:mismatch', 'p3:stale', 'решает человек', { colour: FLOW.admin });
+
+routeEdges(p3);
+legend(p3, 60, bottomOf(p3) + 60, [
+  { caption: 'значок роли карточки', fill: '#FFFFFF', stroke: C.svc.line },
+  { caption: 'проход ядра (модель)', fill: C.actor.tint, stroke: C.actor.line },
+  { caption: 'файлы проекта', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'что делает панель', fill: C.svc.tint, stroke: C.svc.line },
+  { caption: 'красное: расхождение и дефект', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'перезапись', fill: C.note.tint, stroke: C.note.line },
+  { caption: 'зелёный прогон', fill: C.ext.tint, stroke: C.ext.line },
+  { caption: 'шаги прохода в файл', edgeColour: FLOW.data },
+  { caption: 'прогон без модели', edgeColour: FLOW.client },
+  { caption: 'путь расхождения', edgeColour: FLOW.admin },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -607,14 +732,15 @@ const bounds = (p) => {
 
 const b1 = bounds(p1);
 const b2 = bounds(p2);
+const b3 = bounds(p3);
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p2, b2.w, b2.h)}\n` +
+  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p2, b2.w, b2.h)}\n${pageXml(p3, b3.w, b3.h)}\n` +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
 console.log(
   `записано ${OUT}: страница 1 ${b1.w}×${b1.h}, страница 2 ${b2.w}×${b2.h}, ` +
-    `ячеек ${p1.cells.length + p2.cells.length}`,
+    `страница 3 ${b3.w}×${b3.h}, ячеек ${p1.cells.length + p2.cells.length + p3.cells.length}`,
 );

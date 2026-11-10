@@ -64,3 +64,39 @@ describe('ChatPreviewPane — узел субагента', () => {
     expect(html).not.toContain('Чужой узел');
   });
 });
+
+/** Окно сайта (этап 12, D20): пока оно открыто, столбец занят только им — iframe через прокси. */
+describe('ChatPreviewPane — окно сайта', () => {
+  it('показывает сайт через прокси в песочнице, а не узел субагента рядом', () => {
+    const client = new QueryClient();
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={client}>
+        <ChatPreviewPane
+          chatId="chat-1"
+          site={{
+            preview: {
+              siteId: 'site-1',
+              url: 'http://127.0.0.1:41234/',
+              nonce: 'n0nce-0123456789abcdef',
+            },
+            name: 'stand-site',
+            siteUrl: 'http://localhost:5173/',
+            onPick: () => {},
+            onClose: () => {},
+          }}
+          agent={{ chatId: 'chat-1', agentId: NODE_ID }}
+          width={480}
+          onResize={() => {}}
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+    expect(html).toContain('data-site-preview');
+    expect(html).toContain('src="http://127.0.0.1:41234/"');
+    expect(html).toContain('sandbox="allow-scripts allow-same-origin allow-forms allow-popups"');
+    expect(html).toContain('title="Сайт проекта stand-site"');
+    expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('href="http://localhost:5173/"');
+    expect(html).not.toContain('data-agent-pane');
+  });
+});

@@ -38,12 +38,20 @@ export function tierDecisionBody(tier: TierDecision): DecisionBody {
           ? { rungs: tier.promotion.rungs, evidence: [...tier.promotion.evidence] }
           : null,
         learnedKey: tier.learnedKey ? { ...tier.learnedKey } : null,
+        // Этап 12 (P169): решение для начатой задачи — окно маршрут не двигало.
+        started: tier.started === true,
       }
     : {
         refused: true,
         alternatives: tier.alternatives.map((a) => `${a.adapter}/${routeLabel(a.route)}`),
         skipped: tier.skipped.map((s) => `${routeLabel(s.route.route)}=${s.verdict}`),
         basis: tier.basis,
+        started: tier.started === true,
+        // Отказ начатой задачи: какой маршрут шаг ждёт и что человек может выбрать кликом.
+        ...(tier.waits
+          ? { waits: `${tier.waits.route.adapter}/${routeLabel(tier.waits.route.route)}` }
+          : {}),
+        ...(tier.offers ? { offers: [...tier.offers] } : {}),
       };
   return {
     class: 'tier',

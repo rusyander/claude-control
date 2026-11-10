@@ -153,6 +153,8 @@ export const QWEN_CAPS: AdapterCaps = {
   channels: QWEN_CHANNELS,
   windowEvent: false,
   limitsChannel: 'settings-file',
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 export function bindQwenEndpoint(

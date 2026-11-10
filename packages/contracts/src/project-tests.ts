@@ -138,7 +138,17 @@ export interface ProjectTestAutomation {
    * не совпадает — кейс чей-то, и панель его не трогает.
    */
   suiteDigest?: string;
+  /**
+   * Предел прогона этого кейса в минутах — для `tests-cli run` вместо общего (10 мин на файл
+   * или `AGENTDECK_TESTS_CASE_TIMEOUT`); `--case-timeout` в команде сильнее. Живой обход всех окон
+   * панели идёт ~16 мин, и общий предел снимал его в каждом прогоне без записи в историю.
+   * Число больше 0 и не больше {@link PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES}; 0 во входе — «очисти».
+   */
+  timeoutMinutes?: number;
 }
+
+/** Потолок своего предела кейса: час — больше уже повисший прогон, а не долгая проверка. */
+export const PROJECT_TEST_CASE_TIMEOUT_MAX_MINUTES = 60;
 
 /** Как трекер отвечает про судьбу заведённого дефекта. */
 export type ProjectTestDefectState = 'open' | 'closed' | 'unknown';

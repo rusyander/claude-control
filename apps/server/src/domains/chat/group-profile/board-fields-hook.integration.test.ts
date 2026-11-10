@@ -89,10 +89,8 @@ describe('board-fields-hook: список задач без описаний', (
   });
 
   it('матчер профиля и матчер хука — одна строка (повторены в двух местах)', () => {
-    const hooks = chatRunProfile({ boardHook: 'x' }).settings.hooks as {
-      PreToolUse: { matcher: string }[];
-    };
-    const matcher = hooks.PreToolUse[0]?.matcher ?? '';
+    const hooks = chatRunProfile({ boardHook: 'x' }).settings.hooks;
+    const matcher = hooks?.PreToolUse?.[0]?.matcher ?? '';
     expect(matcher).toContain('jira_');
     expect(readFileSync(HOOK, 'utf8')).toContain(`'${matcher}'`);
   });

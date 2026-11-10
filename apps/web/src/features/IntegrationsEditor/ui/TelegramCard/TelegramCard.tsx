@@ -22,12 +22,14 @@ import {
   isTelegramConnected,
   minutesValid,
   notifyBody,
+  quietValid,
   saveTelegramCard,
 } from '../../model/telegramCard';
 import type { TelegramCardDraft } from '../../model/telegramCard.types';
 import { showsAnswersToken } from '../../model/telegramAnswersView';
 import { TelegramConnect } from '../TelegramConnect/TelegramConnect';
 import { TelegramAdvanced } from '../TelegramAdvanced/TelegramAdvanced';
+import { TelegramCoreBinding } from '../TelegramCoreBinding';
 import { TelegramCardView } from './TelegramCardView';
 import styles from './TelegramCard.module.scss';
 
@@ -74,6 +76,7 @@ export function TelegramCard({
   const valid =
     (!draft.finished || minutesValid(draft.doneAfterMinutes)) &&
     (!draft.waits || minutesValid(draft.afterMinutes)) &&
+    (!draft.quietOn || quietValid(draft)) &&
     /^\d{0,20}$/.test(draft.ownerId.trim());
 
   const onSave = () => {
@@ -180,30 +183,33 @@ export function TelegramCard({
       reconnecting={reconnecting}
       onReconnect={() => setReconnecting((open) => !open)}
       advanced={
-        <TelegramAdvanced
-          draft={draft}
-          onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
-          token={token}
-          onToken={setToken}
-          {...(status?.hasToken ? { maskedToken: status.maskedToken } : {})}
-          onForget={() => forget.mutate('telegram')}
-          {...(view && showsAnswersToken(view)
-            ? {
-                answersToken: {
-                  value: answersToken,
-                  onChange: setAnswersToken,
-                  ...(view.hasToken ? { masked: view.maskedToken } : {}),
-                },
-              }
-            : {})}
-          onCheck={() => check.mutate('telegram')}
-          checking={check.isPending}
-          {...(checkText ? { checkDetail: checkText } : {})}
-          onRestart={() => restart.mutate()}
-          restarting={restart.isPending}
-          {...(status?.lastSend ? { lastSend: status.lastSend } : {})}
-          {...(answersStateText ? { answersState: answersStateText } : {})}
-        />
+        <>
+          <TelegramAdvanced
+            draft={draft}
+            onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
+            token={token}
+            onToken={setToken}
+            {...(status?.hasToken ? { maskedToken: status.maskedToken } : {})}
+            onForget={() => forget.mutate('telegram')}
+            {...(view && showsAnswersToken(view)
+              ? {
+                  answersToken: {
+                    value: answersToken,
+                    onChange: setAnswersToken,
+                    ...(view.hasToken ? { masked: view.maskedToken } : {}),
+                  },
+                }
+              : {})}
+            onCheck={() => check.mutate('telegram')}
+            checking={check.isPending}
+            {...(checkText ? { checkDetail: checkText } : {})}
+            onRestart={() => restart.mutate()}
+            restarting={restart.isPending}
+            {...(status?.lastSend ? { lastSend: status.lastSend } : {})}
+            {...(answersStateText ? { answersState: answersStateText } : {})}
+          />
+          <TelegramCoreBinding connected={connected} />
+        </>
       }
     />
   );

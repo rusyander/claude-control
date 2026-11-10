@@ -5,3 +5,6 @@ export { MAX_FILE_BYTES } from './lib/attachments';
 export type { AttachRejection } from './ui/ChatComposer/ChatComposer.types';
 // Состояние меню «Режим» собирает страница: доступность считает сервер, а не композер.
 export type { ComposerMode, ComposerModeState } from './ui/ChatComposer/ChatComposer.types';
+// Чипы описаний (выбранный элемент сайта): кладёт страница, показывает поле, блоки — в сообщение.
+export { composerChips, withChipBlocks, COMPOSER_CHIPS_MAX } from './model/composerChips';
+export type { ComposerChip } from './model/composerChips.types';

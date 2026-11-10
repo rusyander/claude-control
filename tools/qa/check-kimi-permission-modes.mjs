@@ -78,26 +78,44 @@ try {
     cases.set(`stale-${mode}.toml`, { mode, accept: false });
   }
 
-  const mount = `${work.replace(/\\/g, '/')}:/cfg:ro`;
+  // Файлы уходят в контейнер потоком tar через stdin, как в core-linux.mjs, а не монтированием
+  // папки: монтирование диска Windows в Docker Desktop ломается само (`mkdir /run/desktop/mnt/host/c:
+  // file exists`) до его перезапуска, а поток от этого не зависит.
+  const tar = spawnSync(
+    process.platform === 'win32'
+      ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+      : 'tar',
+    ['-cf', '-', '-C', work, '.'],
+    { maxBuffer: 16 * 1024 * 1024 },
+  );
+  if (tar.status !== 0) {
+    check(false, `архив файлов на суд собран (tar вышел с ${tar.status})`);
+    throw new Error('stop');
+  }
   const script =
-    'for f in /cfg/*.toml; do kimi doctor config "$f" >/tmp/o 2>&1; c=$?; ' +
+    'mkdir -p /tmp/cfg && tar -xf - -C /tmp/cfg && ' +
+    'for f in /tmp/cfg/*.toml; do kimi doctor config "$f" >/tmp/o 2>&1; c=$?; ' +
     'printf "@@ %s %s %s\\n" "$(basename "$f")" "$c" "$(grep -c "Invalid input" /tmp/o)"; done';
   const run = spawnSync(
     'docker',
     [
       'run',
+      '-i',
       '--rm',
       '--label',
       'claude.ephemeral=1',
-      '-v',
-      mount,
       '--entrypoint',
       'sh',
       IMAGE,
       '-c',
       script,
     ],
-    { encoding: 'utf8', env: { ...process.env, MSYS_NO_PATHCONV: '1' }, timeout: 300_000 },
+    {
+      input: tar.stdout,
+      encoding: 'utf8',
+      env: { ...process.env, MSYS_NO_PATHCONV: '1' },
+      timeout: 300_000,
+    },
   );
   const verdicts = new Map(
     [...run.stdout.matchAll(/^@@ (\S+) (\d+) (\d+)$/gm)].map((m) => [

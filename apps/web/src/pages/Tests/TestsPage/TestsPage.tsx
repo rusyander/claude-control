@@ -22,6 +22,7 @@ import { TestsLibraryTab } from '../TestsLibraryTab/TestsLibraryTab';
 import { TestsRunsTab } from '../TestsRunsTab/TestsRunsTab';
 import { TestsReportTab } from '../TestsReportTab/TestsReportTab';
 import { TestsCoverageTab } from '../TestsCoverageTab/TestsCoverageTab';
+import { TestsRecordedTab } from '../TestsRecordedTab/TestsRecordedTab';
 import { testsProjectState } from '../model/projectState';
 import { runnerStartOffer } from '../model/runnerStart';
 import styles from './TestsPage.module.scss';
@@ -291,7 +292,8 @@ export function TestsPage() {
           <Stack direction="row" gap="var(--spacing-2xs)" align="center" wrap>
             {TABS.map((item) => (
               <TabButton key={item} isActive={item === active} onClick={() => setTab(item)}>
-                {t(`tests.tab.${item}`)}
+                {/* Подпись «Сценариев» — в словаре своей вкладки (`tests-recorded`). */}
+                {item === 'recorded' ? t('testsRecorded.tab') : t(`tests.tab.${item}`)}
               </TabButton>
             ))}
           </Stack>
@@ -319,6 +321,14 @@ export function TestsPage() {
               onStartManual={(planId, environment) =>
                 void openManual({ planId, environmentId: environment })
               }
+            />
+          )}
+
+          {active === 'recorded' && (
+            <TestsRecordedTab
+              projectPath={projectPath}
+              environments={board.environments}
+              groups={board.groups}
             />
           )}
 

@@ -8,8 +8,10 @@ import { checksInFlight, decideSafepoint } from '../safepoint/safepoint.ts';
 import { pendingDeliveries, recordDelivery } from '../human/deliver.ts';
 import type { HumanLedger } from '../human/human.types.ts';
 import { readHumanLedger } from '../human/ledger.ts';
+import { settleLoginLost } from '../human/login-ask.ts';
 import { applyAskUpkeep, decideAskUpkeep } from '../human/upkeep.ts';
 import * as hook from './hooks.ts';
+import { chatReopened, chatReopening, type LastTurn, type Reopening } from './chat-reopen.ts';
 import { closeTask, endUnclosed } from './close.ts';
 import { briefText, perform, stepCtx, stepLine, type PerformCtx } from './perform.ts';
 import { END_REASON } from '../next/next.types.ts';
@@ -23,7 +25,8 @@ import type {
   RunHandle,
   StepCtx,
 } from './run.types.ts';
-import { stepWindows, windowWakeMs } from './windows.ts';
+import { endSession, taskMove } from './moves.ts';
+import { journalWaitTier, stepWindows, windowWakeMs } from './windows.ts';
 import {
   dropAllSeats,
   dropSeat,
@@ -61,6 +64,27 @@ export function workNow(state: TaskFoldState, now: number): number {
   return state.work.activeMs + Math.max(0, tail);
 }
 
+/**
+ * Вход и выход `waiting-window` (этап 12): суд велит ждать окно маршрута, а ни одна сессия не
+ * в ходе — задача ждёт окна (`window-wait`); ждущая окна задача получила другое решение (окно
+ * открылось, человек перевёл её, вопрос точки 7) — снова идёт (`window-reset`). `true` — переход
+ * записан, суд надо спросить заново.
+ */
+export function windowMove(task: LiveTask, action: NextAction, busy: boolean): boolean {
+  const st = task.state;
+  if (st.ended !== null) return false;
+  const waitsWindow = action.kind === 'wait' && action.window !== undefined;
+  if (st.task === 'running' && waitsWindow && !busy) {
+    taskMove(task, 'window-wait');
+    return true;
+  }
+  if (st.task === 'waiting-window' && !waitsWindow) {
+    taskMove(task, 'window-reset');
+    return true;
+  }
+  return false;
+}
+
 export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
   const live = new Map<string, LiveSession>();
   const hooked = new Set<string>();
@@ -72,6 +96,8 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
   let idleWaiters: ((why: string) => void)[] = [];
   /** Действие, которое ничего не сдвинуло: повтор того же без нового события не пишется. */
   let stuck: string | null = null;
+  /** Как кончился последний ход шага (этап 12, L3): по нему продолжение чата шлёт слово или нет. */
+  const lastTurn = new Map<string, LastTurn>();
 
   const note = (event: string, data: Record<string, unknown>) => deps.note?.(event, data);
   const wake = () => {
@@ -120,26 +146,70 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
     s: StepCtx,
     sessionId: string,
     sections: BriefSection[],
-  ): Promise<string> => {
+  ): Promise<Reopening | null> => {
     // Чат открывается словом человека, а не брифом шага: в виде сеанса первым пузырём стоит то,
-    // что человек написал, и модель отвечает на него (этап 10).
+    // что человек написал, и модель отвечает на него (этап 10). Продолжение чата после снятия
+    // (окно, этап 12 L3) — слово без ответа ещё раз или ничего (`chat-reopen.ts`).
     if (s.def.kind === 'chat') {
+      if (chatReopened(task, s.stepId, sessionId))
+        return chatReopening(task, s.stepId, lastTurn.get(s.stepId));
       const first = chatOpeningOf(task);
-      if (first) return first;
+      if (first) return { text: first, origin: 'platform' };
     }
     const economy = deps.economy;
-    if (!economy?.opening) return briefText(s, sections);
-    return (await economy.opening(task, s, sessionId, sections)) ?? stepLine(s);
+    if (!economy?.opening) return { text: briefText(s, sections), origin: 'platform' };
+    const text = (await economy.opening(task, s, sessionId, sections)) ?? stepLine(s);
+    return { text, origin: 'platform' };
+  };
+
+  /**
+   * Ошибка хода с текстом «войдите заново» (P170): конец хода ждёт перечитанного входа. «Нет» —
+   * вопрос пункта 4 поднят, сессия снимается (шаг ждёт человека); иначе — обычный конец хода.
+   */
+  const settleLogin = async (s: StepCtx, own: LiveSession, text: string): Promise<void> => {
+    let got: 'asked' | 'normal' = 'normal';
+    try {
+      got = await settleLoginLost(
+        task,
+        { stepId: s.stepId, sessionId: own.sessionId, text, step: s.def },
+        { ...(deps.loginState ? { loginState: deps.loginState } : {}), raise: deps.raise, note },
+      );
+    } catch (err) {
+      note('login.settle-failed', { stepId: s.stepId, reason: String(err) });
+    }
+    const ctx = got === 'asked' && live.get(s.stepId) === own ? ctxFor() : null;
+    if (ctx) await endSession(ctx, s.stepId, 'tree');
+    else own.turnEnd = { seq: task.state.seq };
+    liveVersion += 1;
+    wake();
   };
 
   const openSession = async (s: StepCtx, sections: BriefSection[]): Promise<string | null> => {
     let entry: LiveSession | null = null;
+    // Этап 12 (P170): текст «войдите заново» в ошибке этого хода — до его конца.
+    let loginSuspect: string | null = null;
+    // Этап 12 (L3): ход кончился ошибкой — слово человека осталось без ответа.
+    let turnFailed = false;
     const got = await deps.sessions.open(s, [], {
+      loginLost: (text) => {
+        if (entry && !entry.warming) loginSuspect = text;
+      },
+      turnError: () => {
+        if (entry && !entry.warming) turnFailed = true;
+      },
       turnEnded: () => {
         if (!entry) return;
         if (entry.warming) {
           // Конец хода прогрева: шаг стоит, где стоял, — прежний конец хода остаётся в силе.
           entry.warming = false;
+          return;
+        }
+        lastTurn.set(s.stepId, turnFailed ? 'failed' : 'answered');
+        turnFailed = false;
+        if (loginSuspect !== null) {
+          const text = loginSuspect;
+          loginSuspect = null;
+          void settleLogin(s, entry, text);
           return;
         }
         entry.turnEnd = { seq: task.state.seq };
@@ -178,21 +248,36 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
     };
     live.set(s.stepId, entry);
     liveVersion += 1;
-    let text: string;
+    let opening: Reopening | null;
     try {
-      text = await openingOf(s, got.sessionId, sections);
+      opening = await openingOf(s, got.sessionId, sections);
     } catch (err) {
       // Дельта сверх бюджета (C бросает `BriefOverBudget`): сессия без задания не остаётся.
       live.delete(s.stepId);
       await deps.sessions.end(got.sessionId, 'tree');
       return `${END_REASON.briefOverBudget}: ${String((err as Error).message ?? err)}`;
     }
+    if (opening === null) {
+      // Продолжение чата после отвеченного хода: слать нечего, сессия стоит в конце хода — слово
+      // человека дойдёт обычной доставкой (`deliverIdle`).
+      entry.turnEnd = { seq: task.state.seq };
+      liveVersion += 1;
+      wake();
+      return null;
+    }
     // Ключ дубля — сам шаг: та же сессия после перезапуска ядра получит «дубль», не второй бриф.
+    // Продолжение чата после снятия — ключ этой сессии: ключ-UUID становится uuid сообщения CLI,
+    // а Claude, продолжая тот же разговор (`--resume`), молча отбрасывает сообщение с uuid, который
+    // в разговоре уже есть, — повтор слова с ключом шага не доходил до модели вовсе (этап 12, L3).
+    const cmdId =
+      s.def.kind === 'chat' && chatReopened(task, s.stepId, got.sessionId)
+        ? `${s.stepId}:reopen:${got.sessionId}`
+        : s.stepId;
     // Картинки вопроса едут только с первым словом чата: модель видит их в том же ходе.
-    const images = s.def.kind === 'chat' ? chatImagesOf(task) : [];
+    const images = s.def.kind === 'chat' && opening.origin === 'platform' ? chatImagesOf(task) : [];
     if (images.length > 0)
-      await deps.sessions.send(got.sessionId, text, s.stepId, 'platform', images);
-    else await deps.sessions.send(got.sessionId, text, s.stepId, 'platform');
+      await deps.sessions.send(got.sessionId, opening.text, cmdId, opening.origin, images);
+    else await deps.sessions.send(got.sessionId, opening.text, cmdId, opening.origin);
     return null;
   };
 
@@ -436,6 +521,7 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
       if (unseen) continue;
       if (seats) pruneSeatWaits(task, seats);
       const children = deps.xl?.childrenOf(task) ?? null;
+      const contour = economy?.contour?.();
       const decision = decideNext({
         state: task.state,
         scenario: ctx.scenario,
@@ -446,8 +532,15 @@ export function runTask(task: LiveTask, deps: RunDeps): RunHandle {
         ...(economy?.learnedTokens ? { learnedTokens: learnedOf(economy, ctx.scenario) } : {}),
         ...(seats ? { seats: seatWaits(task) } : {}),
         ...(children ? { children } : {}),
+        ...(contour ? { contour } : {}),
       });
       const action = decision.action;
+      // Ожидание окна без живой сессии — состояние задачи (01:119: время работы его не считает).
+      if (windowMove(task, action, working())) {
+        if (task.state.task === 'waiting-window' && action.kind === 'wait' && action.window)
+          journalWaitTier(task, ctx.scenario, economy, action.window.stepId);
+        continue;
+      }
       const key = JSON.stringify(action);
       arm(action);
       armWindow(

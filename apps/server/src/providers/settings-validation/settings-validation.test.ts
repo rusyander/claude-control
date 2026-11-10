@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { settingsPatchSchema, importStateSchema } from './settings-validation.ts';
+import {
+  settingsPatchSchema,
+  importStateSchema,
+  integrationSettingsSchemas,
+} from './settings-validation.ts';
 import { NOTIFY_EVENTS } from '@agentdeck/contracts/integrations';
 import { importStateSchema as contractImportStateSchema } from '@agentdeck/contracts';
 
@@ -189,6 +193,21 @@ describe('importStateSchema — ничего не теряется при пер
       });
       expect(parsed.success ? 'ok' : `${event}: ${JSON.stringify(parsed.error.issues)}`).toBe('ok');
     }
+  });
+
+  it('тихие часы Telegram доходят через карточку; кривое время — отказ, а не молчаливый срез', () => {
+    const card = (quiet: unknown) =>
+      integrationSettingsSchemas.telegram.safeParse({
+        enabled: true,
+        chatId: '1',
+        events: [],
+        quiet,
+      });
+    const kept = card({ from: '23:00', to: '08:00', asks: true });
+    expect(kept.success && kept.data.quiet).toEqual({ from: '23:00', to: '08:00', asks: true });
+    expect(card({ from: '24:00', to: '08:00', asks: false }).success).toBe(false);
+    expect(card({ from: '7:00', to: '08:00', asks: false }).success).toBe(false);
+    expect(card(undefined).success).toBe(true);
   });
 });
 

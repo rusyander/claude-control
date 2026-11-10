@@ -49,6 +49,8 @@ export function createState(options = {}) {
   const discussions = [];
   const pipelines = [];
   const events = [];
+  const issues = [];
+  const issueLinks = [];
   const hooks = { mrCreated: [] };
 
   const user = (ref) => {
@@ -87,6 +89,8 @@ export function createState(options = {}) {
       updatedAt: at,
       conflict: false,
       checking: false,
+      labels: [...(input.labels ?? [])],
+      reviewerIds: [...(input.reviewerIds ?? [])],
     };
     mrs.push(mr);
     event(projectId, 'mr-open', authorId, { mrIid: iid, objectId: String(mr.id) });
@@ -98,6 +102,7 @@ export function createState(options = {}) {
     if (input.title !== undefined) mr.title = input.title;
     if (input.body !== undefined) mr.body = input.body;
     if (input.draft !== undefined) mr.draft = Boolean(input.draft);
+    if (input.labels !== undefined) mr.labels = [...input.labels];
     mr.updatedAt = now();
     event(mr.projectId, 'mr-update', authorId, { mrIid: mr.iid, objectId: String(mr.id) });
     return mr;
@@ -155,6 +160,47 @@ export function createState(options = {}) {
     return pipeline;
   }
 
+  /** Задача форжа (входящие ядра): номер свой в проекте, как у GitLab; связи — отдельно. */
+  function createIssue(projectId, authorId, input) {
+    const at = now();
+    const issue = {
+      id: next(),
+      iid: issues.filter((i) => i.projectId === projectId).length + 1,
+      projectId,
+      title: input.title,
+      body: input.body ?? '',
+      labels: [...(input.labels ?? [])],
+      assigneeIds: [...(input.assigneeIds ?? [])],
+      authorId,
+      state: 'opened',
+      createdAt: input.createdAt ?? at,
+      updatedAt: at,
+      epic: input.epic ?? null,
+    };
+    issues.push(issue);
+    return issue;
+  }
+
+  function updateIssue(issue, input) {
+    if (input.title !== undefined) issue.title = input.title;
+    if (input.body !== undefined) issue.body = input.body;
+    if (input.labels !== undefined) issue.labels = [...input.labels];
+    if (input.state !== undefined) issue.state = input.state;
+    issue.updatedAt = now();
+    return issue;
+  }
+
+  /** Связь задач у GitLab двусторонняя: одна запись видна с обеих сторон. */
+  function linkIssues(source, target) {
+    const link = {
+      id: next(),
+      source: { projectId: source.projectId, iid: source.iid },
+      target: { projectId: target.projectId, iid: target.iid },
+    };
+    issueLinks.push(link);
+    return link;
+  }
+
   return {
     now,
     users,
@@ -163,6 +209,8 @@ export function createState(options = {}) {
     discussions,
     pipelines,
     events,
+    issues,
+    issueLinks,
     hooks,
     user,
     userByToken,
@@ -174,6 +222,9 @@ export function createState(options = {}) {
     addNote,
     resolveDiscussion,
     addPipeline,
+    createIssue,
+    updateIssue,
+    linkIssues,
     nextId: next,
   };
 }

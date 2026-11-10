@@ -16,7 +16,7 @@ import type {
 } from '../../conductor/run/run.types.ts';
 import { resolveScenario } from '../../conductor/scenario/index.ts';
 import { learnedFor, readLearnedDurations } from '../../conductor/schedule/index.ts';
-import { linesOf, runSplitPoint } from '../../conductor/split/index.ts';
+import { linesOf, runSoloWithoutSplitPoint, runSplitPoint } from '../../conductor/split/index.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { unitBaseOf } from '../../conductor/units/index.ts';
@@ -193,6 +193,9 @@ function buildSplitEnv(deps: ConductorWiringDeps): SplitEnv {
     // Дочерние задачи XL (W3-18): тот же путь оценки над этой же средой (`splitEnvFor` — одна на `deps`).
     childTasks: (parent, splitId, units, only) =>
       createChildTasks(deps.registry, splitEnvFor(deps), parent, splitId, units, only),
+    // Сценарий без точки деления (проход по стенду): соло сразу на оценке, над этой же средой.
+    soloWithoutSplitPoint: (task, scenario) =>
+      runSoloWithoutSplitPoint(task, scenario, splitEnvFor(deps)),
   };
 }
 

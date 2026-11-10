@@ -5,7 +5,7 @@ import type { StepDef } from '@agentdeck/contracts/core/scenario';
 import { startStubForge, type StubForge } from '@agentdeck/stub-forge';
 import { createForgePort } from '../../../adapters/forge/index.ts';
 import { createUnitCopy } from '../../../conductor/copy/create.ts';
-import { estimateTask, type SplitEnv } from '../../../conductor/estimate/index.ts';
+import { estimateTask, type CreateSeed, type SplitEnv } from '../../../conductor/estimate/index.ts';
 import { seedSession } from '../../../conductor/model-tools/__fixtures__/seed.ts';
 import type { StepCtx, UnitCtx } from '../../../conductor/run/run.types.ts';
 import { presetOf } from '../../../conductor/scenario/index.ts';
@@ -60,7 +60,8 @@ export interface World extends Published {
   env: SplitEnv;
   notes: { event: string; data: Record<string, unknown> }[];
   /** Ещё одна задача-источник с MR в том же проекте. */
-  publishSource(title: string, file: string): Promise<Published>;
+  /** `seed` — дополнения оценки (этап 12: `boardEntry` источника с доски). */
+  publishSource(title: string, file: string, seed?: CreateSeed): Promise<Published>;
   /** `run` — запуск git опроса (тест считает процессы круга); по умолчанию настоящий. */
   poller(run?: GitRunner): ReturnType<typeof createPollWiring>;
   enable(repos?: string[]): void;
@@ -133,8 +134,12 @@ export async function world(options: WorldOptions = {}): Promise<World> {
     },
     { git, forgeFor: () => ({ port, credential: null }) },
   );
-  const publishSource = async (title: string, file: string): Promise<Published> => {
-    const est = await estimateTask(estimateBody([st.main], { title }), registry, env);
+  const publishSource = async (
+    title: string,
+    file: string,
+    seed?: CreateSeed,
+  ): Promise<Published> => {
+    const est = await estimateTask(estimateBody([st.main], { title }), registry, env, seed);
     if (est.status !== 202) throw new Error(`estimate: ${JSON.stringify(est)}`);
     const source = registry.live(est.reply.taskId)!;
     const [unitId, unit] = Object.entries(source.state.units)[0]!;

@@ -9,7 +9,7 @@
       "source": "dca4810b4d582895",
       "width": 1101,
       "height": 1452,
-      "exportedAt": "2026-11-03T15:46:23.561Z"
+      "exportedAt": "2026-11-09T13:57:27.474Z"
     },
     {
       "name": "deferred-asks",
@@ -18,7 +18,25 @@
       "source": "0a66e175a6ee0e1c",
       "width": 1141,
       "height": 1612,
-      "exportedAt": "2026-11-03T15:46:26.839Z"
+      "exportedAt": "2026-11-09T13:57:30.486Z"
+    },
+    {
+      "name": "diff-notes",
+      "file": "diff-notes.png",
+      "page": 3,
+      "source": "7654b05e1ed6a980",
+      "width": 1661,
+      "height": 672,
+      "exportedAt": "2026-11-09T13:57:33.400Z"
+    },
+    {
+      "name": "site-pick",
+      "file": "site-pick.png",
+      "page": 4,
+      "source": "a8251ccb7e2656d3",
+      "width": 1661,
+      "height": 682,
+      "exportedAt": "2026-11-09T13:57:36.366Z"
     }
   ]
 }

@@ -25,6 +25,13 @@ import { z } from 'zod';
  *   `sessionCarry.systemPrompt`; прочим дорога отказывает по имени поля.
  * - `localLayer` — локальный слой проекта вместо источника `project` (s10 G14 p6, см. ниже); только
  *   при `settingSources` без `project` и слое человека `on`.
+ * - `hooks` — хуки профиля чата панели (s12: хук списка задач трекера `tools/board-fields-hook.mjs`
+ *   — доска заголовками, без описаний). Прежний исполнитель клал их своим `--settings`; ход через
+ *   ядро терял их молча (этап 11). Та же форма групп, что `localLayer.hooks`; ядро кладёт их в
+ *   свой `--settings` рядом с хуками слоя, хук ядра — последним. Права не расширяет: хук ядра
+ *   (судья права) идёт после и решает сам. Как плагины набора — только при хуках шага `on` (или
+ *   `observe` от недоверия к папке: команда — каталог панели, не репозитория); только переходник
+ *   с `sessionCarry.hooks`, прочим дорога отказывает по имени поля.
  */
 
 export const SETTING_SOURCES = ['user', 'project', 'local'] as const;
@@ -64,6 +71,12 @@ const hookGroup = z.looseObject({
   matcher: z.string().max(1000).optional(),
   hooks: z.array(hookEntry).min(1).max(32),
 });
+/** Таблица хуков `--settings` Claude Code: событие → группы (слой проекта, профиль чата). */
+export const sessionHooksSchema = z.record(
+  z.string().regex(/^[A-Za-z]{1,64}$/),
+  z.array(hookGroup).max(64),
+);
+export type SessionHooks = z.infer<typeof sessionHooksSchema>;
 const permissionRules = z.array(z.string().min(1).max(2000)).max(1000);
 
 /**
@@ -86,7 +99,7 @@ const permissionRules = z.array(z.string().min(1).max(2000)).max(1000);
 export const localLayerCarrySchema = z.strictObject({
   plugin: absolutePath.optional(),
   instructions: z.string().min(1).max(LOCAL_LAYER_INSTRUCTIONS_MAX).optional(),
-  hooks: z.record(z.string().regex(/^[A-Za-z]{1,64}$/), z.array(hookGroup).max(64)).optional(),
+  hooks: sessionHooksSchema.optional(),
   permissions: z
     .strictObject({
       allow: permissionRules.optional(),
@@ -109,6 +122,7 @@ export const sessionCarryShape = {
   builtinTools: z.array(builtinTool).min(1).max(64).refine(unique).optional(),
   systemPrompt: z.string().min(1).max(SESSION_SYSTEM_PROMPT_MAX).optional(),
   localLayer: localLayerCarrySchema.optional(),
+  hooks: sessionHooksSchema.optional(),
 };
 
 export const sessionCarrySchema = z.strictObject(sessionCarryShape);

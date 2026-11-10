@@ -23,6 +23,7 @@ import { BaselineViewer } from '@features/TestBaselines';
 import { TestsRunPublish } from '../TestsRunPublish/TestsRunPublish';
 import { TestsRunDiff } from '../TestsRunDiff/TestsRunDiff';
 import { TestsRunsOriginFilter } from '../TestsRunsOriginFilter/TestsRunsOriginFilter';
+import { TestsToBoard } from '../TestsToBoard/TestsToBoard';
 import { queryView } from '../model/queryView';
 import { foreignAgentName } from '../model/runAgent';
 import { linkedRunToFollow } from '../model/runLink';
@@ -226,16 +227,25 @@ export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: Test
                 )}
                 {/* Отчёт файлом — для тех, у кого панели нет: приёмка, заказчик,
                     соседняя команда. Обычная ссылка, имя файла даёт сервер. */}
-                <a className={styles.runLink} href={runExportUrl(projectPath, record.id, 'md')}>
+                <a
+                  className={styles.runLink}
+                  href={runExportUrl(projectPath, record.id, 'md', i18n.language)}
+                >
                   {t('tests.runs.exportMd')}
                 </a>
-                <a className={styles.runLink} href={runExportUrl(projectPath, record.id, 'csv')}>
+                <a
+                  className={styles.runLink}
+                  href={runExportUrl(projectPath, record.id, 'csv', i18n.language)}
+                >
                   {t('tests.runs.exportCsv')}
                 </a>
                 {/* PDF — то, что уходит приёмке и заказчику: markdown им не
                     посылают. Рисует его браузер на этой машине, поэтому ссылка
                     может привести к честному отказу, а не к файлу. */}
-                <a className={styles.runLink} href={runExportUrl(projectPath, record.id, 'pdf')}>
+                <a
+                  className={styles.runLink}
+                  href={runExportUrl(projectPath, record.id, 'pdf', i18n.language)}
+                >
                   {t('tests.runs.exportPdf')}
                 </a>
               </Stack>
@@ -372,6 +382,14 @@ export function TestsRunsTab({ projectPath, groups, isRunning, openRunId }: Test
                           >
                             {t('projectTests.generateRegression')}
                           </Button>
+                          {projectPath && (
+                            <TestsToBoard
+                              projectPath={projectPath}
+                              runId={record.id}
+                              title={titleOf(result.groupId, result.caseId)}
+                              result={result}
+                            />
+                          )}
                         </Stack>
                       )}
                       {(result.attachments ?? []).length > 0 && (

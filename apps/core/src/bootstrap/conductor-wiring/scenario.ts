@@ -1,6 +1,7 @@
 import type { StepDef } from '@agentdeck/contracts/core/scenario';
 import type { SkillFlow, UserLayerInventory } from '@agentdeck/contracts/core/user-layer';
 import type { BriefPartId } from '../../context/brief/index.ts';
+import { chatOpeningOf } from '../../conductor/estimate/index.ts';
 import type {
   BriefSection,
   BriefSectionId,
@@ -22,6 +23,8 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 export const BRIEF_IDS_MATCH: Same<BriefSectionId, BriefPartId> = true;
 
 const FROM = 'conductor/scenario';
+/** Виды шагов, которые читают запрос человека сами: проход по стенду и разбор запроса. */
+const REQUEST_READERS: ReadonlySet<string> = new Set(['walk', 'intake']);
 
 /** Порядок шагов навыка по имени навыка — из описи слоя (`agentdeck.steps`, 02:33). */
 export type SkillFlows = ReadonlyMap<string, SkillFlow>;
@@ -132,6 +135,15 @@ export function scenarioHooks(deps: ScenarioWiringDeps): ConductorHooks {
           }),
         );
       const sections = scenarioSections(state, s, read.flows);
+      // Запрос человека живёт только в `request.md`. Проход по стенду (этап 12) берёт из него стенд,
+      // окружение, имена доступов и цель — разбора у прохода нет; разбор запроса (`intake`) обязан
+      // перечислить каждый его пункт. Без этой части модель видит одну подпись задачи. Дальше по
+      // пути шаги читают извлечённые требования, а не вторую копию запроса.
+      if (REQUEST_READERS.has(s.def.kind)) {
+        const live = deps.registry.live(s.taskId);
+        const asked = live ? chatOpeningOf(live) : null;
+        if (asked) sections.push({ id: 'human-message', text: asked, from: FROM });
+      }
       const known = sections.find((x) => x.id === 'knowledge');
       if (read.note && known) known.text = `${known.text}\n${read.note}`;
       else if (read.note) sections.push({ id: 'knowledge', text: read.note, from: FROM });

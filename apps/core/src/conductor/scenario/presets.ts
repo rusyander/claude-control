@@ -11,8 +11,8 @@ import {
 import { REVIEW_DECIDE_STEP, REVIEW_LINK_ASKS, REVIEW_PUSH_STEP } from './review-link-asks.ts';
 
 /**
- * Семь готовых сценариев (02 §Scenario; шестой — ответы ревьюерам, его открывает опрос форжа,
- * седьмой — чат панели, этап 10) — в коде и с версией: правка пресета — новая версия
+ * Готовые сценарии (02 §Scenario; ответы ревьюерам открывает опрос форжа, чат — панель, этап 10,
+ * проход по стенду — этап 12) — в коде и с версией: правка пресета — новая версия
  * здесь же, а не перезапись старой, иначе задача, начатая на `bug-fix@1`, после выпуска ядра
  * читала бы другой сценарий под той же ссылкой. Библиотека человека (`<дом ядра>/scenarios/`)
  * id пресетов не занимает: они зарезервированы за кодом.
@@ -94,10 +94,27 @@ const v1 = (id: PresetId, title: string, steps: StepDef[]): Scenario => ({
 });
 
 /**
+ * Второе ревью (этап 12, перекрёстное): тот же дифф глазами другого семейства моделей — маршрут
+ * выбирает `economy/tier` по `crossOf` (не CLI ревью `review`). Только профиль «Максимум
+ * качества»: при другом профиле или без профиля шаг пропускается (`next/lead-gate.ts`). Ворот нет.
+ * Объявлен перед правками, поэтому идёт раньше них (`topoOrder` — порядок объявления); `fix` по-прежнему
+ * ждёт только `review`, чтобы пропуск второго ревью не менял путь задачи без него.
+ */
+function crossReview(): StepDef {
+  return {
+    ...presetStep('review-cross', 'review', 'Второе ревью', ['review'], {
+      text: 'Review the same change as the review step, independently: git diff <review base>...HEAD in the copy. Report every finding in step_done findings (file, line, severity, text). Do not change files.',
+    }),
+    crossOf: 'review',
+    onlyProfile: ['max-quality'],
+  };
+}
+
+/**
  * Ведущий (этап 11, P133-P137): разведка только читает и сдаёт карту, разбор собирает карточку
  * (развилки — одним вопросом), класс решает форму: план — только M и шире, ревью — у всех.
  */
-function leadSteps(): StepDef[] {
+function leadSteps(cross = false): StepDef[] {
   return [
     presetStep('recon', 'research', 'Разведка', [], {
       text: 'Map the area of the task without changing anything: step_done.map with at most 20 lines, the files with why each matters, the tests and the owners. Never paste file bodies.',
@@ -108,6 +125,7 @@ function leadSteps(): StepDef[] {
     { ...presetStep('plan', 'plan', 'План', ['intake']), onlyFor: ['M', 'L', 'XL'] },
     presetStep('work', 'work', 'Работа', ['plan']),
     presetStep('review', 'review', 'Ревью', ['work'], { gate: [NO_BLOCKING] }),
+    ...(cross ? [crossReview()] : []),
     presetStep('fix', 'fix', 'Правки по ревью', ['review']),
     ...delivery('fix'),
     // Единица интеграции (W3-18b): только эти два шага, прочие единицы их пропускают
@@ -214,6 +232,29 @@ export const PRESETS: readonly Scenario[] = [
       }),
     ],
   },
+  // Ведущий, вторая версия (этап 12): второе ревью при «Максимуме качества» (`crossReview`). @1
+  // заморожен — задачи, начатые на нём, читают прежние шаги.
+  { id: 'lead', version: 2, title: 'Ведущий', steps: leadSteps(true) },
+  {
+    id: 'tracker-ticket',
+    version: 3,
+    title: 'Задача из трекера',
+    presetOf: { id: 'lead', version: 2 },
+    steps: [
+      ...leadSteps(true),
+      presetStep('tracker-status', 'custom', 'Статус в трекере', ['answer-reviewers'], {
+        text: 'Update the tracker ticket status to reflect the published merge request.',
+      }),
+    ],
+  },
+  // Проход по стенду (этап 12, P177): один шаг `walk` — только чтение и инструменты браузера
+  // ядра; итог — шаги `browse.step` и пробелы `browse.gap`, из них спек записи. Хвоста доставки
+  // нет: проход ничего не меняет в коде, публиковать нечего.
+  v1('browser-walk', 'Проход по стенду', [
+    presetStep('walk', 'walk', 'Проход по стенду', [], {
+      text: 'Walk the stand as a user would, with the browse_* tools only: open the start page, act through semantic targets (role and name, test id, label, text), assert what a user sees with browse_expect. A step the tools cannot do (hover, drag, file pick) goes to browse_gesture and is reported as a gap. Never type a secret value: name it. Do not change files.',
+    }),
+  ]),
 ];
 
 export function isPresetId(id: string): id is PresetId {

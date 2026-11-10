@@ -1,5 +1,15 @@
 import { useTranslation } from 'react-i18next';
-import { HelpSection, StorageCard, Callout, OptionCards, StepList } from '../../ui';
+import {
+  HelpSection,
+  StorageCard,
+  Callout,
+  OptionCards,
+  StepList,
+  GuideSteps,
+  GuideStep,
+  HelpShot,
+  HelpDiagram,
+} from '../../ui';
 import { ChatGuideSections } from '../ChatGuideSections/ChatGuideSections';
 import { ChatParallelSections } from '../ChatParallelSections/ChatParallelSections';
 import { ChatFieldSections } from '../ChatFieldSections/ChatFieldSections';
@@ -158,6 +168,37 @@ export function ChatTopic() {
         </Callout>
       </HelpSection>
 
+      {/* Заметки живут в том же окне «Код проекта», поэтому стоят сразу за
+          ним: человек, который смотрит правку, ищет, как ответить на неё. */}
+      <HelpSection title={tr('lineNotesTitle')} caption={tr('lineNotesCaption')}>
+        <GuideSteps>
+          <GuideStep title={tr('lineNotesAdd')} text={tr('lineNotesAddText')}>
+            <HelpShot topic="chat" scenario="notes" frame="01-notes" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('lineNotesTray')} text={tr('lineNotesTrayText')} />
+          <GuideStep title={tr('lineNotesSend')} text={tr('lineNotesSendText')} />
+        </GuideSteps>
+        <HelpDiagram topic="chat" name="diff-notes" />
+      </HelpSection>
+
+      {/* Окно сайта — второй способ показать агенту, О ЧЁМ речь, не описывая это словами: рядом с
+          заметками к строкам, тем же «выбрал → чип/лоток → одно сообщение». */}
+      <HelpSection title={tr('siteTitle')} caption={tr('siteCaption')}>
+        <GuideSteps>
+          <GuideStep title={tr('siteOpen')} text={tr('siteOpenText')} />
+          <GuideStep title={tr('sitePick')} text={tr('sitePickText')}>
+            <HelpShot topic="chat" scenario="site" frame="01-pane" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('siteChip')} text={tr('siteChipText')}>
+            <HelpShot topic="chat" scenario="site" frame="02-chip" side="panel" />
+          </GuideStep>
+        </GuideSteps>
+        <Callout tone="info" title={tr('siteTrust')}>
+          {tr('siteTrustText')}
+        </Callout>
+        <HelpDiagram topic="chat" name="site-pick" />
+      </HelpSection>
+
       {/* Тесты выросли из кнопки на вкладке проекта в собственный раздел, и
           документ у них теперь свой. Здесь остаётся указатель: искать их будут
           там, где раньше нашли, — в справке по чату. */}
@@ -189,6 +230,21 @@ export function ChatTopic() {
         <Callout tone="warning" title={tr('failTitle')}>
           {tr('failText')}
         </Callout>
+      </HelpSection>
+
+      {/* Лимит — тоже ожидание, только не человека, а окна подписки; рядом с
+          вопросами его и ищут. Схема окна общая с документом «Ядро». */}
+      <HelpSection title={tr('limitTitle')} caption={tr('limitCaption')}>
+        <GuideSteps>
+          <GuideStep title={tr('limitCard')} text={tr('limitCardText')}>
+            <HelpShot topic="chat" scenario="limit" frame="01-limit-card" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('limitSwitch')} text={tr('limitSwitchText')} />
+          <GuideStep title={tr('limitBoard')} text={tr('limitBoardText')}>
+            <HelpShot topic="chat" scenario="limit" frame="02-board-button" side="panel" />
+          </GuideStep>
+        </GuideSteps>
+        <HelpDiagram topic="core" name="limit-window" />
       </HelpSection>
 
       <HelpSection title={tr('panelTitle')}>

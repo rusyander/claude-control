@@ -58,6 +58,15 @@ export const COMMAND_PROOF_CLASS: Record<AuthorityKind, ProofClass> = {
   // Сброс ключа обучения (этап 11, P140): таблица обучения общая для всех задач машины — строже
   // задачи, как настройка; модель и сессия до неё не дотягиваются.
   'learned-reset': 'human-strict',
+  // Этап 12 (08e): перехват — правка копии рукой человека мимо шагов ядра, строго, как грант.
+  'take-over': 'human-strict',
+  // Возврат, остановка, доработка и ход на доске — ходы человека в своей задаче, как пауза и запуск.
+  'hand-back': 'human',
+  'set-stop': 'human',
+  rework: 'human',
+  'board-move': 'human',
+  // Записи во «Входящие» (P167): только записи, задачу из них запускает доска — как ход на доске.
+  'inbox-create': 'human',
 };
 
 export type AuthorityDecision =
@@ -70,6 +79,30 @@ export type AuthorityRefusal =
   | 'nonce-invalid'
   | 'signature-invalid'
   | 'signature-required';
+
+/**
+ * Виды, которые шлёт бот Telegram (этап 12, D29, P187) — список, а не класс: ни один путь Telegram
+ * не выдаёт `grant`, `set-route`, `set-config`, `take-over`, `publish-now`… Аккаунт владельца
+ * достижим с этой же машины (файлы Telegram Desktop, MCP пользовательского аккаунта), поэтому
+ * Telegram слабее ключа телефона: только ходы внутри копии и маршрута задачи, которые кончаются MR
+ * со слиянием руками. Поле строгих (`answer`, `approve-split`) сужает суд области
+ * (`conductor/commands/telegram-scope.ts`).
+ */
+const TELEGRAM_KINDS: ReadonlySet<AuthorityKind> = new Set<AuthorityKind>([
+  'cancel',
+  'rework',
+  'set-model',
+  'set-cli',
+  'board-move',
+  'inbox-create',
+  'answer',
+  'approve-split',
+]);
+
+/** Пир `telegram` вправе подать вид: он в списке и пришёл токеном ядра (звено панели). */
+function telegramMay(kind: AuthorityKind, proof: CommandProof): boolean {
+  return proof.token === 'core' && TELEGRAM_KINDS.has(kind);
+}
 
 export function decideAuthority(kind: AuthorityKind, proof: CommandProof): AuthorityDecision {
   if (proof.token === 'session' || proof.peer === 'session-descendant') {
@@ -89,6 +122,14 @@ export function decideAuthority(kind: AuthorityKind, proof: CommandProof): Autho
       allow: false,
       code: 'signature-invalid',
       reason: 'device signature not accepted',
+      signal: null,
+    };
+  }
+  if (proof.peer === 'telegram' && !telegramMay(kind, proof)) {
+    return {
+      allow: false,
+      code: 'signature-required',
+      reason: `peer telegram: ${kind} is not a Telegram command — only the panel or a device signature`,
       signal: null,
     };
   }

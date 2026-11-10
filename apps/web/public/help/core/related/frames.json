@@ -1,0 +1,156 @@
+{
+  "topic": "core",
+  "scenario": "related",
+  "frames": [
+    {
+      "id": "01-chip",
+      "side": "panel",
+      "file": "01-chip.png",
+      "masked": 0,
+      "width": 252,
+      "height": 289,
+      "shotAt": "2026-11-09T18:47:03.144Z",
+      "text": "Входящие 3 Разобрать журнал сборки вручную PROJ-10 Форма входа трекер связано: 1 PROJ-11 Ошибки входа трекер связано: 1",
+      "seal": {
+        "png": "13da95ff22f43ff7",
+        "text": "d49fb8297b91c300"
+      },
+      "en": {
+        "file": "01-chip.en.png",
+        "masked": 0,
+        "width": 252,
+        "height": 289,
+        "shotAt": "2026-11-09T18:47:08.110Z",
+        "text": "Inbox 3 Triage the build log manual PROJ-10 Login form tracker related: 1 PROJ-11 Login errors tracker related: 1",
+        "seal": {
+          "png": "b38a43c98c6b56a7",
+          "text": "99fbdc4ed1f6f428"
+        }
+      },
+      "dark": {
+        "file": "01-chip.dark.png",
+        "masked": 0,
+        "width": 252,
+        "height": 289,
+        "shotAt": "2026-11-09T18:47:13.143Z",
+        "text": "Входящие 3 Разобрать журнал сборки вручную PROJ-10 Форма входа трекер связано: 1 PROJ-11 Ошибки входа трекер связано: 1",
+        "seal": {
+          "png": "6c256c25742877dd",
+          "text": "d49fb8297b91c300"
+        }
+      },
+      "darkEn": {
+        "file": "01-chip.dark.en.png",
+        "masked": 0,
+        "width": 252,
+        "height": 289,
+        "shotAt": "2026-11-09T18:47:18.008Z",
+        "text": "Inbox 3 Triage the build log manual PROJ-10 Login form tracker related: 1 PROJ-11 Login errors tracker related: 1",
+        "seal": {
+          "png": "590aa6c592b8e1a8",
+          "text": "99fbdc4ed1f6f428"
+        }
+      }
+    },
+    {
+      "id": "02-merge",
+      "side": "panel",
+      "file": "02-merge.png",
+      "masked": 0,
+      "width": 852,
+      "height": 214,
+      "shotAt": "2026-11-09T18:47:03.961Z",
+      "text": "Связанные карточки Записи, которые ядро сочло связанными по фактам тикетов. Отмеченные складываются в эту: их тикеты остаются на ней и уходят в работу одной задачей. Само ничего не объединяется. PROJ-11 Ошибки входа общий эпик или родитель, общий путь в обоих тикетах Объединить в эту (1)",
+      "seal": {
+        "png": "052cf4d6c1b30a0a",
+        "text": "07ff921b1ad88dfb"
+      },
+      "en": {
+        "file": "02-merge.en.png",
+        "masked": 0,
+        "width": 852,
+        "height": 196,
+        "shotAt": "2026-11-09T18:47:08.876Z",
+        "text": "Related cards Entries the core found related by ticket facts. Checked entries merge into this one: their tickets stay on it and go to work as one task. Nothing merges by itself. PROJ-11 Login errors same epic or parent, same path in both tickets Merge into this card (1)",
+        "seal": {
+          "png": "fc924e1a0114d20d",
+          "text": "952c277fdb03d22e"
+        }
+      },
+      "dark": {
+        "file": "02-merge.dark.png",
+        "masked": 0,
+        "width": 852,
+        "height": 214,
+        "shotAt": "2026-11-09T18:47:13.910Z",
+        "text": "Связанные карточки Записи, которые ядро сочло связанными по фактам тикетов. Отмеченные складываются в эту: их тикеты остаются на ней и уходят в работу одной задачей. Само ничего не объединяется. PROJ-11 Ошибки входа общий эпик или родитель, общий путь в обоих тикетах Объединить в эту (1)",
+        "seal": {
+          "png": "cd67228f5817f880",
+          "text": "07ff921b1ad88dfb"
+        }
+      },
+      "darkEn": {
+        "file": "02-merge.dark.en.png",
+        "masked": 0,
+        "width": 852,
+        "height": 196,
+        "shotAt": "2026-11-09T18:47:18.793Z",
+        "text": "Related cards Entries the core found related by ticket facts. Checked entries merge into this one: their tickets stay on it and go to work as one task. Nothing merges by itself. PROJ-11 Login errors same epic or parent, same path in both tickets Merge into this card (1)",
+        "seal": {
+          "png": "7930aeff1439fd0a",
+          "text": "952c277fdb03d22e"
+        }
+      }
+    },
+    {
+      "id": "03-refused",
+      "side": "panel",
+      "file": "03-refused.png",
+      "masked": 0,
+      "width": 852,
+      "height": 261,
+      "shotAt": "2026-11-09T18:47:04.751Z",
+      "text": "Связанные карточки Записи, которые ядро сочло связанными по фактам тикетов. Отмеченные складываются в эту: их тикеты остаются на ней и уходят в работу одной задачей. Само ничего не объединяется. PROJ-11 Ошибки входа общий эпик или родитель, общий путь в обоих тикетах Объединить в эту (1) Объединение не принято: PROJ-11 уже не во «Входящих» — объединяются только записи «Входящих»",
+      "seal": {
+        "png": "8044084b11cde245",
+        "text": "de47993cc589adf0"
+      },
+      "en": {
+        "file": "03-refused.en.png",
+        "masked": 0,
+        "width": 852,
+        "height": 224,
+        "shotAt": "2026-11-09T18:47:09.611Z",
+        "text": "Related cards Entries the core found related by ticket facts. Checked entries merge into this one: their tickets stay on it and go to work as one task. Nothing merges by itself. PROJ-11 Login errors same epic or parent, same path in both tickets Merge into this card (1) Merge refused: PROJ-11 has left the Inbox — only Inbox entries merge",
+        "seal": {
+          "png": "ec90bd90208b66c3",
+          "text": "5987fdbc086c8e46"
+        }
+      },
+      "dark": {
+        "file": "03-refused.dark.png",
+        "masked": 0,
+        "width": 852,
+        "height": 261,
+        "shotAt": "2026-11-09T18:47:14.662Z",
+        "text": "Связанные карточки Записи, которые ядро сочло связанными по фактам тикетов. Отмеченные складываются в эту: их тикеты остаются на ней и уходят в работу одной задачей. Само ничего не объединяется. PROJ-11 Ошибки входа общий эпик или родитель, общий путь в обоих тикетах Объединить в эту (1) Объединение не принято: PROJ-11 уже не во «Входящих» — объединяются только записи «Входящих»",
+        "seal": {
+          "png": "c0cf995a52753595",
+          "text": "de47993cc589adf0"
+        }
+      },
+      "darkEn": {
+        "file": "03-refused.dark.en.png",
+        "masked": 0,
+        "width": 852,
+        "height": 224,
+        "shotAt": "2026-11-09T18:47:19.561Z",
+        "text": "Related cards Entries the core found related by ticket facts. Checked entries merge into this one: their tickets stay on it and go to work as one task. Nothing merges by itself. PROJ-11 Login errors same epic or parent, same path in both tickets Merge into this card (1) Merge refused: PROJ-11 has left the Inbox — only Inbox entries merge",
+        "seal": {
+          "png": "737e49832e07d046",
+          "text": "5987fdbc086c8e46"
+        }
+      }
+    }
+  ]
+}

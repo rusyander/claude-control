@@ -23,6 +23,16 @@
   pointer-events: none;
 }
 
+// Стопка внутри модального окна: вверху по центру экрана, над заголовком окна, а не в углу, где
+// у окна подвал с кнопками.
+.inDialog {
+  top: var(--spacing-lg);
+  bottom: auto;
+  right: auto;
+  left: 50%;
+  translate: -50% 0;
+}
+
 .toast {
   pointer-events: auto;
 
@@ -35,7 +45,7 @@
   border: 1px solid var(--color-border);
   // Левая грань окрашивается в цвет тона — маркер типа, заметный периферийным зрением.
   border-left: 3px solid var(--tone-color, var(--color-border));
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   box-shadow: var(--shadow-lg);
 }
 
@@ -93,7 +103,7 @@
   color: var(--color-fg-subtle);
   background: transparent;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   cursor: pointer;
   transition:
     color var(--duration-fast),

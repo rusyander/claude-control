@@ -286,6 +286,116 @@
         "width": 1140,
         "height": 543
       }
+    },
+    "limit/01-limit-card": {
+      "light-ru": {
+        "file": "01-limit-card.png",
+        "width": 808,
+        "height": 246
+      },
+      "light-en": {
+        "file": "01-limit-card.en.png",
+        "width": 808,
+        "height": 228
+      },
+      "dark-ru": {
+        "file": "01-limit-card.dark.png",
+        "width": 808,
+        "height": 246
+      },
+      "dark-en": {
+        "file": "01-limit-card.dark.en.png",
+        "width": 808,
+        "height": 228
+      }
+    },
+    "limit/02-board-button": {
+      "light-ru": {
+        "file": "02-board-button.png",
+        "width": 876,
+        "height": 141
+      },
+      "light-en": {
+        "file": "02-board-button.en.png",
+        "width": 876,
+        "height": 141
+      },
+      "dark-ru": {
+        "file": "02-board-button.dark.png",
+        "width": 876,
+        "height": 141
+      },
+      "dark-en": {
+        "file": "02-board-button.dark.en.png",
+        "width": 876,
+        "height": 141
+      }
+    },
+    "notes/01-notes": {
+      "light-ru": {
+        "file": "01-notes.png",
+        "width": 1500,
+        "height": 984
+      },
+      "light-en": {
+        "file": "01-notes.en.png",
+        "width": 1500,
+        "height": 984
+      },
+      "dark-ru": {
+        "file": "01-notes.dark.png",
+        "width": 1500,
+        "height": 984
+      },
+      "dark-en": {
+        "file": "01-notes.dark.en.png",
+        "width": 1500,
+        "height": 984
+      }
+    },
+    "site/01-pane": {
+      "light-ru": {
+        "file": "01-pane.png",
+        "width": 1500,
+        "height": 900
+      },
+      "light-en": {
+        "file": "01-pane.en.png",
+        "width": 1500,
+        "height": 900
+      },
+      "dark-ru": {
+        "file": "01-pane.dark.png",
+        "width": 1500,
+        "height": 900
+      },
+      "dark-en": {
+        "file": "01-pane.dark.en.png",
+        "width": 1500,
+        "height": 900
+      }
+    },
+    "site/02-chip": {
+      "light-ru": {
+        "file": "02-chip.png",
+        "width": 452,
+        "height": 276
+      },
+      "light-en": {
+        "file": "02-chip.en.png",
+        "width": 452,
+        "height": 276
+      },
+      "dark-ru": {
+        "file": "02-chip.dark.png",
+        "width": 452,
+        "height": 276
+      },
+      "dark-en": {
+        "file": "02-chip.dark.en.png",
+        "width": 452,
+        "height": 276
+      }
     }
   }
 }

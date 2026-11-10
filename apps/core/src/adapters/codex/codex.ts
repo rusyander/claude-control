@@ -83,6 +83,8 @@ export const CODEX_CAPS: AdapterCaps = {
   channels: CODEX_CHANNELS,
   windowEvent: false,
   limitsChannel: null,
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 const toml = (value: string): string => JSON.stringify(value);

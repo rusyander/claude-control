@@ -70,6 +70,11 @@ export interface RunEconomyDeps {
    */
   windowOf?(routeId: string, model: string | null): number | null;
   /**
+   * Модели маршрута (та же книга `route-windows.ts`): суд `tier` не предлагает кликом модель,
+   * которой маршрут не обслуживает. Нет — варианты по шаблону набора, как раньше.
+   */
+  servedModels?(routeId: string): readonly string[] | null;
+  /**
    * Факты шага суда `tier` (этап 11, `routing-facts.ts`): раздел ведущего, политика машины, подъём
    * по обучению. Нет — роль, эскалация и автор всё равно из журнала, строки роли без правок.
    */
@@ -164,10 +169,18 @@ export function createRunEconomy(deps: RunEconomyDeps): RunEconomy {
       ...deps.facts,
       leadSection: () => (section ??= { value: deps.facts?.leadSection?.() }).value,
     };
+    // Список моделей читается заранее, на каждом проходе: вариант клика нужен, когда окно уже
+    // держит маршрут, и к тому времени книга отвечает прочитанным, а не «ещё читается».
+    const servedModels = deps.servedModels?.bind(deps);
+    for (const id of routes) servedModels?.(id);
+    const tier = {
+      ...(deps.ladders ? { ladders: deps.ladders } : {}),
+      ...(servedModels ? { servedModels } : {}),
+    };
     return {
       windows: routes.flatMap((id) => deps.windows.decide(id, now)),
       ...(contour ? { contour } : {}),
-      ...(deps.ladders ? { tier: { ladders: deps.ladders } } : {}),
+      ...(Object.keys(tier).length > 0 ? { tier } : {}),
       step: (state, step) => routingFacts(state, (lines ??= linesOf(task)), step, facts),
       continuation: (candidate) => {
         const read = (lines ??= linesOf(task));
@@ -213,6 +226,7 @@ export function createRunEconomy(deps: RunEconomyDeps): RunEconomy {
   return {
     windows: (routeId) => deps.windows.decide(routeId, deps.now()),
     routingEnv,
+    ...(deps.contour ? { contour: deps.contour } : {}),
     ...(deps.context
       ? {
           briefRefusal: (_task, s, sections) =>

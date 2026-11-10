@@ -13,16 +13,21 @@ import { testKeys } from './keys';
  *
  * Запрос идёт, только когда веху выбрали: за требованиями сервер ходит в Jira,
  * и платить этим за каждый показ отчёта незачем.
+ *
+ * Язык документа запрос называет сам — тот, что в ключе: смена языка доходит до
+ * интерфейса раньше, чем PATCH настроек до сервера, и без `lang` под ключом
+ * нового языка оседал документ на старом.
  */
 export function useTestRelease(path: string | undefined, release: string | undefined) {
   const { i18n } = useTranslation();
+  const lang = i18n.language;
   return useQuery({
-    queryKey: testKeys.release(path, release, i18n.language),
+    queryKey: testKeys.release(path, release, lang),
     queryFn: async () => {
       const { data } = await apiClient.get<{
         releases: string[];
         document?: ProjectTestReleaseDocument;
-      }>('/project-tests/release', { params: { path, release } });
+      }>('/project-tests/release', { params: { path, release, lang } });
       return data;
     },
     enabled: Boolean(path) && Boolean(release),

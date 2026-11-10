@@ -339,7 +339,9 @@ export const permissionsEn: typeof permissionsRu = {
       'set to «Permissions auto», grants the task edits on the whole repository — no such questions then. Only the core ' +
       'publishes: the agent does not push, open MRs or write to the forge itself, and the core ' +
       'refuses such a command whatever the toggle says (the «Chat» document). Your MCP server ' +
-      'that talks to GitLab or GitHub only reads in a core task. In a terminal your rules still ' +
+      'that talks to GitLab or GitHub only reads in a core task. A takeover chat («Take over» on ' +
+      'the board, the «Core tasks» document) may edit only the task copy, not the project root. ' +
+      'In a terminal your rules still ' +
       'decide; a PowerShell(…) rule matches regardless of case, as PowerShell itself does.',
     noteProviderTitle: 'Other providers use a different model',
     noteProviderText:

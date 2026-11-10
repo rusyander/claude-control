@@ -105,6 +105,89 @@ describe('stub-forge server', () => {
     ]);
   });
 
+  it('serves site-wide inbox reads: assigned issues with links and epic, MRs by reviewer and author', async () => {
+    let now = 1_000;
+    const s = await start({ now: () => (now += 1_000) });
+    const open = (title: string, extra: Record<string, unknown> = {}) =>
+      (
+        s.act('reviewer', {
+          type: 'issue-open',
+          title,
+          labels: ['core', 'ready'],
+          assignees: ['publisher'],
+          ...extra,
+        }) as { iid: number }
+      ).iid;
+    const a = open('a', { epic: { id: 5, iid: 2, groupId: 7 } });
+    const b = open('b');
+    open('c', { labels: ['core'] });
+    open('theirs', { assignees: ['reviewer'] });
+    const closed = open('closed');
+    s.act('reviewer', { type: 'issue-update', iid: closed, state: 'closed' });
+    s.act('reviewer', { type: 'issue-link', iid: a, targetIid: b });
+
+    type Issue = { iid: number; references: { full: string }; epic: { group_id: number } | null };
+    const mine = await body<Issue[]>(
+      call(s, '/api/v4/issues?scope=assigned_to_me&state=opened&labels=core,ready'),
+    );
+    expect(mine.map((i) => i.iid)).toEqual([b, a]);
+    expect(mine[1]).toMatchObject({
+      references: { full: `acme/app#${a}` },
+      epic: { iid: 2, group_id: 7 },
+    });
+    // `scope` по умолчанию у GitLab — `created_by_me`: учётка publisher ничего не заводила.
+    expect(await body<Issue[]>(call(s, '/api/v4/issues'))).toEqual([]);
+    const paged = await body<Issue[]>(
+      call(
+        s,
+        '/api/v4/issues?scope=assigned_to_me&state=opened&labels=core,ready&per_page=1&page=2',
+      ),
+    );
+    expect(paged.map((i) => i.iid)).toEqual([a]);
+    // Связь видна с обеих сторон.
+    const fromB = await body<Issue[]>(call(s, `/api/v4/projects/101/issues/${b}/links`));
+    expect(fromB.map((i) => i.iid)).toEqual([a]);
+    expect((await call(s, '/api/v4/projects/101/issues/999')).status).toBe(404);
+
+    const mr = (as: string, branch: string, reviewers?: string[]) =>
+      (
+        s.act(as, {
+          type: 'mr-open',
+          sourceBranch: branch,
+          targetBranch: 'main',
+          title: branch,
+          labels: ['core'],
+          ...(reviewers ? { reviewers } : {}),
+        }) as { iid: number }
+      ).iid;
+    const review = mr('reviewer', 'r1', ['publisher']);
+    mr('reviewer', 'r2');
+    const own = mr('publisher', 'p1');
+    const gone = mr('reviewer', 'r3', ['publisher']);
+    s.act('reviewer', { type: 'mr-close', mrIid: gone });
+    type Mr = { iid: number; reviewers: { username: string }[]; labels: string[] };
+    const asked = await body<Mr[]>(
+      call(s, '/api/v4/merge_requests?scope=all&state=opened&reviewer_username=publisher'),
+    );
+    expect(asked.map((m) => m.iid)).toEqual([review]);
+    expect(asked[0]).toMatchObject({ reviewers: [{ username: 'publisher' }], labels: ['core'] });
+    const byId = await body<Mr[]>(call(s, '/api/v4/merge_requests?scope=all&reviewer_id=1'));
+    expect(byId.map((m) => m.iid)).toEqual([gone, review]);
+    const mineMrs = await body<Mr[]>(call(s, '/api/v4/merge_requests?state=opened'));
+    expect(mineMrs.map((m) => m.iid)).toEqual([own]);
+    expect(s.state().issueLinks).toHaveLength(1);
+  });
+
+  it('pages MR discussions like GitLab: 20 by default, per_page up to 100', async () => {
+    const s = await start();
+    s.act('publisher', { type: 'mr-open', sourceBranch: 'f', targetBranch: 'main', title: 't' });
+    for (let n = 0; n < 25; n += 1) s.act('reviewer', { type: 'note', mrIid: 1, body: `n${n}` });
+    const path = '/api/v4/projects/101/merge_requests/1/discussions';
+    expect(await body<unknown[]>(call(s, path))).toHaveLength(20);
+    expect(await body<unknown[]>(call(s, `${path}?page=2`))).toHaveLength(5);
+    expect(await body<unknown[]>(call(s, `${path}?per_page=100`))).toHaveLength(25);
+  });
+
   it('filters MRs by created_after and keeps the draft flag across a title edit', async () => {
     let now = 1_000_000;
     const s = await start({ now: () => now });

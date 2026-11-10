@@ -42,6 +42,8 @@ export class ProjectRunnerRegistry {
     port: number;
   }) => void;
   private readonly readyTimeoutMs: number;
+  /** Кому сказать, что запись цели ушла: окно сайта закрывает свой прокси (P173). */
+  private readonly goneListeners = new Set<(path: string) => void>();
 
   constructor(deps: RunnerDeps = {}) {
     // Node исполняет TS в strip-only режиме — parameter properties не работают.
@@ -49,6 +51,17 @@ export class ProjectRunnerRegistry {
     this.resolveLaunch = deps.resolveLaunch ?? resolveRunCommand;
     this.onPortDiscovered = deps.onPortDiscovered;
     this.readyTimeoutMs = deps.readyTimeoutMs ?? READY_TIMEOUT_MS;
+  }
+
+  /** Подписка на уход записи цели (стоп, падение, выход панели): путь цели; вернуть — отписка. */
+  onGone(listener: (path: string) => void): () => void {
+    this.goneListeners.add(listener);
+    return () => this.goneListeners.delete(listener);
+  }
+
+  /** Слушатели зовутся синхронно и не бросают: окно сайта закрывает прокси само, асинхронно. */
+  private gone(path: string): void {
+    for (const listener of this.goneListeners) listener(path);
   }
 
   /** Список запущенных серверов — для клиента (поллинг). */
@@ -250,6 +263,7 @@ export class ProjectRunnerRegistry {
         entry.status = 'error';
         entry.error = lastLines(entry.output) || `Процесс завершился с кодом ${code}`;
       }
+      this.gone(entry.path); // упал сам — окно сайта над ним закрывается
     });
 
     void this.awaitReady(entry);
@@ -326,6 +340,7 @@ export class ProjectRunnerRegistry {
       const entry = this.runs.get(key);
       if (entry) this.killEntry(entry);
       this.runs.delete(key);
+      if (entry) this.gone(entry.path);
     }
   }
 
@@ -333,6 +348,7 @@ export class ProjectRunnerRegistry {
   private retire(key: string, entry: RunEntry): void {
     this.runs.delete(key);
     this.finished.keep(key, this.runLog(entry));
+    this.gone(entry.path);
   }
 
   private runLog(entry: RunEntry): RunLog {

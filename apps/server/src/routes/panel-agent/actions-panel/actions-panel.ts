@@ -117,8 +117,7 @@ const overview = definePanelAction({
   name: 'overview',
   section: 'overview',
   risk: 'read',
-  description:
-    'Configuration summary: counts of rules, hooks, skills, scripts, MCP, permissions, groups.',
+  description: 'Configuration summary: counts of rules, hooks, skills, scripts, MCP, permissions.',
   input: z.object({}),
   route: () => ({ method: 'GET', url: '/api/overview' }),
   shape: (_input, body) => body as Overview,

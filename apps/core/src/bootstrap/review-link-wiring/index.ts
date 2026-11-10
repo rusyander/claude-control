@@ -51,7 +51,12 @@ export interface ReviewLinkWiringOptions {
 
 export interface ReviewLinkWiring {
   hooks: ConductorHooks;
-  open(body: ReviewLinkBody, env: SplitEnv): Promise<ReviewLinkOpenOutcome>;
+  /** `extra.boardEntry` — старт с доски (этап 12): факт ложится в `task.created`. */
+  open(
+    body: ReviewLinkBody,
+    env: SplitEnv,
+    extra?: Parameters<typeof openReviewLink>[2],
+  ): Promise<ReviewLinkOpenOutcome>;
 }
 
 /** Форж из настроек панели; форж без API (generic) — `null`, как у публикатора. */
@@ -64,12 +69,39 @@ export function panelForgeFor(panelAppData: string | null | undefined) {
   };
 }
 
-/** Замечания последнего сданного ревью единицы. */
+/**
+ * Замечания последнего круга ревью единицы: каждое сданное ревью после последней правки, что
+ * началась до последнего ревью (первое ревью и второе, `review-cross`), — по последней попытке
+ * каждого шага, без повторов (файл, строка, текст). Раньше бралось одно последнее ревью, и при
+ * втором ревью в MR уходили только его замечания (этап 12, W3-D).
+ */
 function findingsOf(task: LiveTask, unitId: string): Finding[] {
-  const review = Object.values(task.state.steps)
-    .filter((st) => st.unitId === unitId && st.stepKind === 'review' && st.state === 'done')
-    .sort((a, b) => b.startedSeq - a.startedSeq)[0];
-  return review?.claim?.call.findings ?? [];
+  const steps = Object.values(task.state.steps).filter((st) => st.unitId === unitId);
+  const reviews = steps
+    .filter((st) => st.stepKind === 'review' && st.state === 'done')
+    .sort((a, b) => b.startedSeq - a.startedSeq);
+  const last = reviews[0];
+  if (!last) return [];
+  const fixedAt = Math.max(
+    0,
+    ...steps
+      .filter((st) => st.stepKind === 'fix' && st.startedSeq < last.startedSeq)
+      .map((st) => st.startedSeq),
+  );
+  const latestPerDef = new Map<string, (typeof reviews)[number]>();
+  for (const st of reviews)
+    if (st.startedSeq > fixedAt && !latestPerDef.has(st.stepDefId))
+      latestPerDef.set(st.stepDefId, st);
+  const seen = new Set<string>();
+  const out: Finding[] = [];
+  for (const st of [...latestPerDef.values()].sort((a, b) => a.startedSeq - b.startedSeq))
+    for (const f of st.claim?.call.findings ?? []) {
+      const key = `${f.file}|${f.line}|${f.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(f);
+    }
+  return out;
 }
 
 const why = (f: { unknown: string } | { absent: true } | { unsupported: string }): string =>
@@ -198,6 +230,7 @@ export function createReviewLinkWiring(
 
   return {
     hooks: { preStep, onPublish },
-    open: (body, env) => openReviewLink(body, { registry: deps.registry, env, git, forgeFor }),
+    open: (body, env, extra) =>
+      openReviewLink(body, { registry: deps.registry, env, git, forgeFor }, extra),
   };
 }

@@ -4,6 +4,7 @@ import type { UserLayerInventory, UserLayerReport } from '@agentdeck/contracts/c
 import type { LayerText } from '../lint/launch-lint.ts';
 import type { Fact } from '@agentdeck/contracts/core/facts';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
+import type { StepDef } from '@agentdeck/contracts/core/scenario';
 import type { HumanPointRaise } from '../run/run.types.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { LearnedTable } from '../../economy/learned/index.ts';
@@ -94,6 +95,16 @@ export interface SplitEnv {
    */
   taskEnv?: { put(taskId: string, values: Readonly<Record<string, string>>): void };
   /**
+   * Этап 12: сценарий без точки деления (проход по стенду, `browser-walk`) — соло сразу после
+   * единицы 0, тем же решением деления и политикой запуска (`conductor/split/flow.ts`). Портом, не
+   * импортом: деление само зовёт оценку (дочерние задачи), прямой импорт замкнул бы кольцо. Нет
+   * порта — такая задача ждёт в `estimating`, как до этапа 12.
+   */
+  soloWithoutSplitPoint?(
+    task: LiveTask,
+    scenario: { id: string; steps: readonly StepDef[] },
+  ): Promise<unknown>;
+  /**
    * Этап 11 (W3-18): дочерние задачи XL — по задаче на часть деления, тем же путём оценки
    * (`conductor/split/children.ts`). Нет порта — XL делится единицами одной задачи.
    */
@@ -128,6 +139,8 @@ export interface LaunchLayer {
 export interface PinnedRepoView {
   repoKey: string;
   path: string;
+  /** Подпапка проекта в репозитории (git `--show-prefix`); нет — проект в вершине. */
+  subPath?: string;
   sha: string;
   pin: { ref: string; source: 'fresh' | 'local'; note: string | null };
 }
@@ -159,12 +172,19 @@ export interface CreateSeed {
    * поэтому может нести то, что предпроверка базы узнала (общий предок MR). `launchPolicy` сильнее
    * поля оценки: `split` в `lead.alwaysAsk` ведущего — всегда `confirm` (D25).
    */
-  created?(
-    pinned: readonly PinnedRepoView[],
-  ): Partial<
+  created?(pinned: readonly PinnedRepoView[]): Partial<
     Pick<
       JournalDataV1['task.created'],
-      'review' | 'lead' | 'launchPolicy' | 'groupId' | 'parentTaskId'
+      | 'review'
+      | 'lead'
+      | 'launchPolicy'
+      | 'groupId'
+      | 'parentTaskId'
+      // Этап 12: старт с доски (Z1) и чат перехвата (Z4) несут свой факт в `task.created`.
+      | 'boardEntry'
+      | 'takeoverOf'
+      // Этап 12 (P117): «платный при отказе» — только явное «да» человека записи доски.
+      | 'paidOnRefusal'
     >
   >;
   /** Строки после `unit.created` единицы 0 (ключ единицы уже известен). */

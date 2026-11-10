@@ -59,6 +59,21 @@ describe('callback-data', () => {
     expect(parseCallback('t:zz9:37:short')).toBeUndefined();
     expect(parseCallback(undefined)).toBeUndefined();
   });
+
+  it('приставка `n` (уведомления ядра): своя подпись, чужой приставкой не разбирается и не сходится', () => {
+    const secret = newSecret();
+    const nonce = newNonce();
+    const notice = signCallback(secret, 'zz9', 3, nonce, 'n');
+    expect(notice.startsWith('n:zz9:3:')).toBe(true);
+    // Нажатие `n` — не нажатие ожидания: разбор `t` его не видит, и наоборот.
+    expect(parseCallback(notice)).toBeUndefined();
+    expect(parseCallback(signCallback(secret, 'zz9', 3, nonce), 'n')).toBeUndefined();
+    const parsed = parseCallback(notice, 'n')!;
+    expect(verifyCallback(secret, parsed, nonce, 'n')).toBe(true);
+    // Та же соль, тот же номер: подпись `n` за `t` не сходится — приставка в подписи.
+    expect(verifyCallback(secret, parsed, nonce)).toBe(false);
+    expect(() => signCallback(secret, 'zz9', 3, nonce, 'nn')).toThrow();
+  });
 });
 
 describe('collect', () => {

@@ -65,8 +65,8 @@ export const panelAgentEn: typeof panelAgentRu = {
       'connected in «Integrations». The agent names which of the two a step belongs to.',
     linksGroupWord: 'The word «group»',
     linksGroupWordText:
-      'Either a former group in «Groups» (the agent only shows those), or a case group in ' +
-      '«Tests». When the request does not make clear which, the agent asks.',
+      'A former group (the agent only shows those), a core task group — a lane on the «Core ' +
+      'tasks» board, where the «Groups» entry leads too — or a case group in «Tests». When the request does not make clear which, the agent asks.',
     linksRulesWord: 'The word «rule»',
     linksRulesWordText:
       'Either a standing instruction in «Rules» (CLAUDE.md), a permission rule in «Permissions» ' +
@@ -201,8 +201,9 @@ export const panelAgentEn: typeof panelAgentRu = {
       'Groups are the former way of running work; tasks now run in the core. The agent only ' +
       'shows groups: the list is a read, the group’s variables are visible, secret ones masked, ' +
       'a disabled group’s included. The agent cannot create, edit, delete or run a group — ' +
-      'nothing does that any more. Only you can move a former group into the core, with the ' +
-      '«To core» button on the Groups page.',
+      'nothing does that any more. Only you can turn a former group’s Path into a core scenario, ' +
+      'with the «Import items» button on the «Core tasks» board. The configuration summary no ' +
+      'longer counts groups: their number is the core group lanes on the board.',
     secCore: 'Core tasks',
     secCoreText:
       'Read-only. The task list (state, whether it runs, what waits for the human), one task — ' +

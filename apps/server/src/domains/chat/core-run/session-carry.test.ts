@@ -235,3 +235,63 @@ describe('buildCarry', () => {
     });
   });
 });
+
+/**
+ * s12: хуки профиля чата (хук списка задач трекера, `chatRunProfile`) прежний исполнитель клал
+ * своим `--settings`; ход через ядро терял их молча. Теперь — полем `session.hooks`, иной ключ
+ * настроек профиля — отказ по имени.
+ */
+describe('carryOfRunOptions — panel profile hooks ride session.hooks (s12)', () => {
+  const BOARD = {
+    PreToolUse: [
+      {
+        matcher: 'mcp__.*__jira_(search|get_board_issues|get_sprint_issues)',
+        hooks: [
+          { type: 'command', command: 'node "C:/x/tools/board-fields-hook.mjs"', timeout: 10 },
+        ],
+      },
+    ],
+  };
+  const OPTIONS = { prompt: 'p', cwd: 'C:/p' } as RunOptions;
+
+  it('profile hooks become session.hooks verbatim; the core estimate schema takes them', () => {
+    const got = carryOfRunOptions({ ...OPTIONS, platformSettings: { hooks: BOARD } });
+    if (!got.ok) throw new Error(got.reason);
+    expect(got.carry.session.hooks).toEqual(BOARD);
+    expect(estimateFieldsSchema.safeParse({ ...FIELDS, session: got.carry.session }).success).toBe(
+      true,
+    );
+  });
+
+  it('no profile settings or an empty hook table — no field', () => {
+    for (const platformSettings of [undefined, {}, { hooks: {} }]) {
+      const got = carryOfRunOptions({
+        ...OPTIONS,
+        ...(platformSettings ? { platformSettings } : {}),
+      });
+      expect(got.ok && 'hooks' in got.carry.session).toBe(false);
+    }
+  });
+
+  it('another settings key or a malformed hook group is refused by name, never dropped', () => {
+    const foreign = carryOfRunOptions({
+      ...OPTIONS,
+      platformSettings: { hooks: BOARD, skillOverrides: {} } as RunOptions['platformSettings'],
+    });
+    expect(foreign).toEqual({
+      ok: false,
+      reason:
+        'panel profile settings skillOverrides have no core session field — the core carries only hooks',
+    });
+    const broken = carryOfRunOptions({
+      ...OPTIONS,
+      platformSettings: {
+        hooks: { PreToolUse: [{ hooks: [] }] },
+      } as RunOptions['platformSettings'],
+    });
+    expect(broken.ok).toBe(false);
+    expect(!broken.ok && broken.reason).toMatch(
+      /^panel profile hooks do not fit the core session: /,
+    );
+  });
+});

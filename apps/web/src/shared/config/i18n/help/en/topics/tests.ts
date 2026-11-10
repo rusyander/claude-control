@@ -631,7 +631,9 @@ export const testsEn: typeof testsRu = {
       'in the history, not words in a reply. A manual case it records with tests-cli record — ' +
       'the history marks that record “by hand”; record refuses an automated case, only run ' +
       'checks it. A case you wrote the ' +
-      'agent does not rewrite — its edit arrives as a draft for you to accept. The “Write it ' +
+      'agent does not rewrite — its edit arrives as a draft for you to accept; a draft cannot ' +
+      'archive such a case or bring it back from the archive — that is yours alone, and ' +
+      'tests-cli says so. The “Write it ' +
       'into the project’s CLAUDE.md” button appends a ' +
       'block with the format and the rules to the end of the file; it is read in EVERY ' +
       'conversation. Your text is left alone, and pressing again adds nothing.',
@@ -804,6 +806,21 @@ export const testsEn: typeof testsRu = {
     runsSessionText:
       'An agent run has a CLI session, and it opens in the chat as an ordinary conversation: ' +
       'you can see what the agent did step by step and why it decided the case had failed.',
+
+    boardTitle: 'A red case — to the core board',
+    boardCaption:
+      'A run failure can go straight to the task core: the entry lands in the board «Inbox» as a ' +
+      '“fix the defect” task, and the case becomes its check.',
+    boardOpen: 'Expand the run',
+    boardOpenText:
+      'The «Runs» tab, a run card — the arrow expands its cases. The «To the board» button sits ' +
+      'only on a failed case; a passed or blocked one has none.',
+    boardSend: '«To the board»',
+    boardSendText:
+      'The entry goes to «Inbox» with the «tests» source and the «Bug fix» scenario: the title ' +
+      '“Test fails: …”, the step, expected and actual, the run note and the project repository. ' +
+      'The button turns into «On the board»; a second press does not create a second entry. A ' +
+      'core refusal shows next to the button. You queue the entry yourself, on the board.',
 
     evidenceTitle: 'A failure with no proof',
     evidenceCaption:
@@ -1089,7 +1106,9 @@ export const testsEn: typeof testsRu = {
       'Values go into the core task environment: the task journal gets only the names, the ' +
       'core keeps the values in memory until the task ends. The prompt lists only the names ' +
       'too — enough for the agent to read them itself. A name the core does not give a task ' +
-      'is named by the run as a line in the log.',
+      'is named by the run as a line in the log. In a stand walk (the “Scenarios” tab) the ' +
+      'model gets no values at all: it names a secret, and the core types it itself, only on ' +
+      'the page of its own stand.',
     secretsMissing: 'A missing value does not cancel the run',
     secretsMissingText:
       'A colleague who cloned the repository sees the declared name and «not set». The run ' +
@@ -1590,8 +1609,11 @@ export const testsEn: typeof testsRu = {
         'tests after it stay unseen. ' +
         'run waits no longer than a cap: 10 ' +
         'minutes per case (per case file), times the number of files. Change it with ' +
-        '--case-timeout <min> or the AGENTDECK_TESTS_CASE_TIMEOUT variable; the command’s own ' +
-        'timeoutMinutes wins when it is shorter. Past the cap, the run is stopped together with ' +
+        '--case-timeout <min> or the AGENTDECK_TESTS_CASE_TIMEOUT variable. A case’s own limit ' +
+        '(automation.timeoutMinutes, up to 60 minutes) replaces the common one for its file — a ' +
+        'file with several such cases takes the longest, and run names those cases; ' +
+        '--case-timeout named in the command beats it. Without the flag, the own command’s ' +
+        'timeoutMinutes sets the cap of the whole run. Past the cap, the run is stopped together with ' +
         'every process under it, and its cases are recorded in history as failed with the ' +
         'reason "Time limit", exit code 124; the stopped run names the files that did not ' +
         'finish and how long they were silent. A vitest test that reports a timeout yet ran ' +
@@ -1685,8 +1707,113 @@ export const testsEn: typeof testsRu = {
         'path in two packages is not guessed — such a run is recognised when started from the ' +
         'project root.',
     },
+    recorded: {
+      title: 'Scenarios: recorded stand walks',
+      caption:
+        'The core walks the stand in a browser once; the walk becomes a spec and a case. After ' +
+        'that the scenario replays as an ordinary run without a model; the model is called again ' +
+        'only on the first mismatch with the stand.',
+      record: '1. Record a scenario',
+      recordText:
+        'The Scenarios tab → "Record a scenario". Describe in words what to walk ("log in as ' +
+        'demo and see the greeting") and pick an environment: the stand address and its ' +
+        'credentials come from it, and the model sees a password only by name. The core opens a ' +
+        'walk task, and after the estimate it starts by itself — there is no separate launch; the ' +
+        'window counts steps as they come. You may close the window or reload the page mid-walk — ' +
+        'the walk is not lost, the window comes back to it; "New walk" forgets it (the task stays ' +
+        'in the Core section) and opens an empty form. Once the walk ends, name the scenario, ' +
+        'pick a group (scenarios by default) and press "Record into a case and a spec". The spec ' +
+        'lands in .agent/tests/recorded/<group>/<case>.recorded.mjs and is built from the steps ' +
+        'with no model and no clock: the same steps give the same file. Walk gaps (a captcha, a ' +
+        'failed step) stand in the case as "Not checked" lines. A walk without a single passed ' +
+        'step cannot be recorded, and the window says so.',
+      list: '2. The list and the run strip',
+      listText:
+        'Each scenario is a row: its name, the status of the last run, the spec path, how many ' +
+        'steps are "not recorded" and a strip of the last twenty runs (newest on the left, a red ' +
+        'mark is a failure) with a summary in words: "N of M passed". The "Walk task" link opens ' +
+        'the walk the spec was built from in the Core section.',
+      replay: '3. Replay all',
+      replayText:
+        'The button runs every recorded scenario as an ordinary run of the block against the ' +
+        'chosen environment, without a model, and stops at the first failed step: the rest are ' +
+        'not started in that run (the history shows them as not started). If all pass, the line ' +
+        'says so and the model was never called. The same run without the panel: pnpm tests run ' +
+        '--case <cases> --env <environment> --max-failures 1.',
+      mismatch: '4. The mismatch and the decision',
+      mismatchText:
+        'When it stops, a card appears: which scenario, which step, the failure line and exactly ' +
+        'one open walk task starting from that step. You decide. "Product defect" keeps the ' +
+        'scenario as is: it caught the breakage. "Scenario is stale": once the new walk ends, ' +
+        '"Re-record from the walk" rewrites the same case from its steps: a new spec, the same ' +
+        'history.',
+      walkTitle: 'Where a walk may go',
+      walkText:
+        'A walk page is only a project stand (the address of a non-archived Tests environment) ' +
+        'or loopback (localhost, 127.*). A project in a subfolder of a git repository walks the ' +
+        'environments of that subfolder. Leaving the stands — opening a foreign address, a server ' +
+        'redirect, a link or a page script after an action — is stopped before the request ' +
+        'leaves: the foreign site gets nothing, the page is reset and the walk gets an "other" ' +
+        'gap. The panel itself is never a walk page, even if an environment names its address: ' +
+        'there the walk would act on your behalf. Links that open a new window do nothing in a ' +
+        'walk.',
+      secretsTitle: 'A stand secret in a walk and in a scenario',
+      secretsText:
+        'The model names a secret only by name; the core types the value — and only on the page ' +
+        'of the stand whose environment the secret belongs to; if the page has already moved to ' +
+        'another stand, nothing is typed. A recorded scenario keeps the same rule: the secret is ' +
+        'typed only on its stand address, a redirect elsewhere stops the step with "secret NAME ' +
+        'is not for this page", an empty value with "no value for secret NAME". If a step error ' +
+        'echoes the typed value, it is masked in the failure line.',
+      refusalsCaption:
+        'Walk refusals: the model gets a refusal instead of the action — a code and a reason — ' +
+        'and decides what to do next.',
+      refusalsCode: 'Code',
+      refusalsMeaning: 'What it means',
+      refusalNoBrowser:
+        'Chromium for the core browser is not installed; the refusal names the install command ' +
+        'for this OS (pnpm qa:setup).',
+      refusalOrigin:
+        'The page is outside the project stands and loopback, or it is a port of the panel ' +
+        'itself; the page is reset, the walk gets an "other" gap.',
+      refusalNotForPage:
+        'The secret is not for this page: no environment with the page address lists it, the ' +
+        'page is not open yet, or it moved to another stand before typing.',
+      refusalMissing:
+        'The secret is declared in the environment but has no value on this machine — set it in ' +
+        '«Credentials».',
+      refusalUnwired: 'The core runs without panel data — stand secrets have nowhere to come from.',
+      refusalNoProject:
+        'The task has no project folder whose environments to look the secret up in.',
+      refusalUnreadable: 'The panel key store or environments.json could not be read.',
+      refusalUnmaskable:
+        'The value is shorter than 4 characters: its echo could not be masked, so it is not typed.',
+      refusalUnsupported:
+        'Hover, drag, file pick: the page is untouched, the walk gets a gap — a "not checked" ' +
+        'step in the case.',
+      limitsTitle: 'What scenarios do not do',
+      limitsText:
+        'Accessibility-tree snapshots do not go into the spec: only actions and checks replay. ' +
+        'A case written by a human is never overwritten by a recorded walk. The mismatch card ' +
+        'remembers the last run until the panel restarts; the run itself and its outcome stay in ' +
+        'the block history.',
+    },
   },
   shots: {
+    recorded: {
+      '01-list':
+        'The Scenarios tab: two recorded walks, a strip of twenty runs and "Replay all" with an environment',
+      '02-record':
+        'The "Record a scenario" window after the walk: the step outcome, the scenario name and the group before recording into a case and a spec',
+      '03-mismatch':
+        'The run stopped at the first mismatch: the step, the failure line, one walk task and the choice of "Product defect" or "Scenario is stale"',
+      '04-rerecord':
+        'The scenario is marked stale: the new walk ended and "Re-record from the walk" is open',
+    },
+    board: {
+      '01-to-board':
+        'An expanded run: the red case has «To the board», the passed and blocked ones do not',
+    },
     workspace: {
       '01-empty':
         'The section with no cases: the console on top and the three steps that start a suite',
@@ -1758,5 +1885,7 @@ export const testsEn: typeof testsRu = {
       'Where the suite lives and who writes into it: a human, a CLI agent and someone else’s CI run all put their result into the project’s own files. The section has no database.',
     'what-turns-red':
       'What turns the milestone verdict red and what quarantine does not: the two paths of one failure — an ordinary one, and one stripped of the right to colour the gate.',
+    'recorded-replay':
+      'A recorded scenario: the model works at recording and on the first mismatch, the runs between them go without a model; a human decides what broke.',
   },
 };

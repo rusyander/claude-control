@@ -1,4 +1,5 @@
 import type { JournalDataV1, JournalLine } from '@agentdeck/contracts/core/journal';
+import { crossStepsOf } from '../../economy/cross-steps.ts';
 import type { RequirementsInput } from './requirements.types.ts';
 
 /**
@@ -16,6 +17,8 @@ function data<K extends keyof JournalDataV1>(line: JournalLine, kind: K): Journa
 export function requirementsInputOf(lines: readonly JournalLine[]): JudgedInput {
   const out: JudgedInput = { requirements: [], waivers: [], claims: [], derived: [], reviews: [] };
   const kindOf = new Map<string, string>();
+  // Второе ревью (P185) ничего не одобряет: его «извлечение полное» не в счёт, «неполное» — в счёт.
+  const cross = crossStepsOf(lines);
   for (const line of lines) {
     const started = data(line, 'step.started');
     if (started) kindOf.set(started.stepId, started.stepKind);
@@ -39,11 +42,12 @@ export function requirementsInputOf(lines: readonly JournalLine[]): JudgedInput 
         stepId: claimed.stepId,
         stepKind: kindOf.get(claimed.stepId) ?? 'unknown',
         claim: claimed.claim,
+        ...(cross.has(claimed.stepId) ? { cross: true as const } : {}),
       });
     const ended = data(line, 'step.ended');
     if (ended?.basis === 'derived') out.derived.push({ stepId: ended.stepId, seq: line.seq });
     const reviewed = data(line, 'requirement.reviewed');
-    if (reviewed)
+    if (reviewed && !(reviewed.complete && cross.has(reviewed.stepId)))
       out.reviews.push({
         stepId: reviewed.stepId,
         complete: reviewed.complete,
@@ -58,7 +62,7 @@ export function requirementsInputOf(lines: readonly JournalLine[]): JudgedInput 
 export function citedEvidence(input: JudgedInput): string[] {
   const latest = new Map<string, string[]>();
   for (const row of input.claims)
-    for (const c of row.claim.requirements)
+    for (const c of row.cross ? [] : row.claim.requirements)
       latest.set(c.id, c.state === 'covered' ? c.evidence : []);
   return [...new Set([...latest.values()].flat())].sort();
 }

@@ -325,6 +325,13 @@ export const integrationSettingsSchemas = {
     chatId: string(),
     events: array(zodEnum(NOTIFY_EVENTS)),
     doneAfterMinutes: number().int().min(0).max(1440).optional(),
+    // Тихие часы (этап 12, P194) — как `telegramSettingsSchema` в contracts: без поля здесь
+    // `PUT /api/integrations/telegram` молча срезал окно, и галочка на карточке отскакивала.
+    quiet: object({
+      from: string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM'),
+      to: string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM'),
+      asks: boolean(),
+    }).optional(),
   }),
   zephyr: tmsSystem(false),
   xray: tmsSystem(false),

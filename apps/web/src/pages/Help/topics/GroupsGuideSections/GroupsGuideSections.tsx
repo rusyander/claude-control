@@ -1,23 +1,27 @@
-import { HelpSection, GuideSteps, GuideStep, HelpShot } from '../../ui';
+import { HelpSection, GuideSteps, GuideStep, HelpShot, HelpDiagram } from '../../ui';
 import type { SectionProps } from './GroupsGuideSections.types';
 
 /**
- * Страница групп в кадрах (`groups/page`): задачи ядра с прежними запусками, сетка прежних групп и
- * окно «В ядро». Кадры сняты на одноразовом стенде с настоящим ядром — шаги в окне перевода
- * пришли из его `fromPath`, а не нарисованы.
+ * Группы на доске в кадрах (`groups/lanes`, этап 12): полосы «По группам», «Закрытые» с прежними
+ * запусками и «Импорт пунктов» в два окна. Кадры снимает `tools/help-shots/core-board.mjs` на
+ * заглушках. Схема полос лежит в наборе «Ядро» — доска одна на оба документа.
  */
 export function GroupsGuideSections({ tr }: SectionProps) {
   return (
-    <HelpSection title={tr('pageTitle')} caption={tr('pageCaption')}>
+    <HelpSection title={tr('lanesTitle')} caption={tr('lanesCaption')}>
+      <HelpDiagram topic="core" name="group-lanes" />
       <GuideSteps>
-        <GuideStep title={tr('pageTasks')} text={tr('pageTasksText')}>
-          <HelpShot topic="groups" scenario="page" frame="01-core-tasks" side="panel" />
+        <GuideStep title={tr('lanesBoard')} text={tr('lanesBoardText')}>
+          <HelpShot topic="groups" scenario="lanes" frame="01-lanes" side="panel" />
         </GuideStep>
-        <GuideStep title={tr('pageGrid')} text={tr('pageGridText')}>
-          <HelpShot topic="groups" scenario="page" frame="02-legacy-grid" side="panel" />
+        <GuideStep title={tr('lanesClosed')} text={tr('lanesClosedText')}>
+          <HelpShot topic="groups" scenario="lanes" frame="02-closed" side="panel" />
         </GuideStep>
-        <GuideStep title={tr('pageImport')} text={tr('pageImportText')}>
-          <HelpShot topic="groups" scenario="page" frame="03-core-import" side="panel" />
+        <GuideStep title={tr('lanesPick')} text={tr('lanesPickText')}>
+          <HelpShot topic="groups" scenario="lanes" frame="03-import-pick" side="panel" />
+        </GuideStep>
+        <GuideStep title={tr('lanesSteps')} text={tr('lanesStepsText')}>
+          <HelpShot topic="groups" scenario="lanes" frame="04-import-steps" side="panel" />
         </GuideStep>
       </GuideSteps>
     </HelpSection>

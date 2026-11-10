@@ -870,8 +870,8 @@ export const chatEn: typeof chatRu = {
       'apart someone else’s merge request). The directory appears next to the ' +
       'project: <project>-worktrees/<branch>. A finished copy opens as a tab at once. The chat ' +
       'no longer offers a copy by itself: there is no “First edit — where do we work?” card — ' +
-      'a core task conversation works in the folder it was started in, and starting the chat ' +
-      'is the permission to edit there.',
+      'a core task conversation works in the folder it was started in (a subfolder of a git ' +
+      'repository included), and starting the chat is the permission to edit there.',
     parallelWork: 'Working in a copy',
     parallelWorkText:
       'The copy’s tab is an ordinary project tab: its own chat list, its own agent, ' +
@@ -1136,7 +1136,8 @@ export const chatEn: typeof chatRu = {
       'panel groups left together with their executor. Whom to call is decided by the core from a ' +
       'closed list of action types, never from the question text. Merging, deleting on the remote ' +
       'or in a foreign copy, writing to a database and changing a service address, credentials, ' +
-      'granting access and integrations always wait for a human — the model cannot lift that ' +
+      'granting access, integrations and a comment back into the tracker ticket always wait for a ' +
+      'human — the model cannot lift that ' +
       'block. The task’s own delivery — push, MR, replies in discussions — never waits for a ' +
       'human. Everything outside the list is not a question but a fork in the final report: the ' +
       'step carries on with the model’s recommendation. An edit to a path that requires a grant ' +
@@ -1323,7 +1324,10 @@ export const chatEn: typeof chatRu = {
       'no new trees or parent summaries, and old splits keep their summary read-only (section below). ' +
       'Work in parts is a core task: the «Core tasks» section, launch with an estimate, a task feed with ' +
       'the «why». Answers to MR comments, part boundaries and the tracker status are steps and checks of ' +
-      'the core scenario, not chat buttons.',
+      'the core scenario, not chat buttons. Sessions the core opens for task steps (triage, plan, ' +
+      'work, review) stay out of the chat list, even though Claude puts their transcripts next to ' +
+      'the conversations: they belong in the task’s agent tree. A chat through the core and a ' +
+      'takeover chat are human conversations and stay in the list.',
     coreMovedAutonomy: 'Autonomy and permissions',
     coreMovedAutonomyText:
       'The chat menu has no «Autonomous — pick the recommended» item. The chat runs right in the project ' +
@@ -1791,8 +1795,9 @@ export const chatEn: typeof chatRu = {
       'reloading the tab does not reset it — the client just pulls the value again.',
     spendLimit: 'The limit badge',
     spendLimitText:
-      'Appears only when a limit was hit: it shows when the limit resets. How much of ' +
-      'each subscription window is used is shown by the «Plan usage limits» block at the ' +
+      'Appears only when a limit was hit: it shows when the limit resets. Meanwhile the ' +
+      'limit card sits in the feed under the refused turn (section “Subscription limit: wait ' +
+      'or switch”). How much of each subscription window is used is shown by the «Plan usage limits» block at the ' +
       'top of the sidebar.',
     spendStep: 'The numbers to the right of an action',
     spendStepText:
@@ -1948,6 +1953,85 @@ export const chatEn: typeof chatRu = {
       'the contour route (step “Open the project and start a conversation” above). What a CLI ' +
       'can do in a core turn is up to its adapter; a CLI the core refuses gets a refusal line ' +
       'with a code in the feed (section “Edits in another CLI’s chat”).',
+
+    limitTitle: 'Subscription limit: wait or switch',
+    limitCaption:
+      'A turn hit the subscription window — the conversation does not change its route by itself. ' +
+      'A card in the feed says when the window opens and switches the conversation in one click.',
+    limitCard: 'The limit card in the feed',
+    limitCardText:
+      'It sits under the turn the subscription refused by its window: “Subscription limit”, “The ' +
+      'window opens at 19:30” and a promise — after the reset the last message goes out once more, ' +
+      'once, by itself. There is no need to press “Retry”: the panel never sends a second turn of ' +
+      'the same message. “Wait for reset” only confirms the wait. When the reset time is unknown ' +
+      'the card says so: the core rechecks the window itself. The card leaves with the first reply ' +
+      'after the reset.',
+    limitSwitch: 'Switch without waiting',
+    limitSwitchText:
+      '“Other model: …” — the next turn goes to another model of the same CLI. “Move to …” is ' +
+      'offered for every CLI found in PATH and already configured, except the conversation’s own: ' +
+      'the panel switches the active provider and carries the conversation there, and it continues ' +
+      'there. Here the message is not sent again after the reset — the carry cancels the old ' +
+      'conversation’s core task. A conversation missing from the carry list is named on the card, ' +
+      'not passed over in silence.',
+    limitBoard: 'The “Board” button in the header',
+    limitBoardText:
+      'On the right of the chat header is the core task board button. When cards wait for a ' +
+      'human it carries a number: “Board · waiting for you: 2” — the whole board, not only this ' +
+      'chat’s tasks. When the core is silent it is just “Board”. A click opens the Core tasks ' +
+      'section on the board.',
+
+    lineNotesTitle: 'Notes on changed lines',
+    lineNotesCaption:
+      'Remarks on the agent’s edits are written right at the line in the “Project code” window and ' +
+      'go out as one message — each with its file and line number.',
+    lineNotesAdd: 'A note at a line',
+    lineNotesAddText:
+      'Open “Project code” and a changed file. A click on “+” by the line number — or the “Note” ' +
+      'button above the editor for the line under the cursor — opens the field “What should change ' +
+      'in this line?”. “Add” (or Ctrl+Enter) puts the note into the tray, and the line gets a dot.',
+    lineNotesTray: 'The tray under the editor',
+    lineNotesTrayText:
+      'Each note is “path:line” and its text, each with a cross to remove it. Drafts belong to ' +
+      'each conversation. “Clear” removes them all at once.',
+    lineNotesSend: '“Now” or “Queue”',
+    lineNotesSendText:
+      'All notes go out as one message “Notes on changes (N):” with “path:line” blocks. While the ' +
+      'agent works, “Now” is a word mid-turn that the core delivers to the step at a turn ' +
+      'boundary, and “Queue” goes with the next turn. When the agent is idle both buttons mean a ' +
+      'plain send. The tray empties only once the message is accepted: a refusal leaves the notes ' +
+      'in place.',
+
+    siteTitle: 'The site window and the element pick',
+    siteCaption:
+      'The project site the panel started opens to the right of the chat; an element picked on it ' +
+      'with the mouse goes to the agent as a description — address, selector, text, place and markup.',
+    siteOpen: 'The “Site: <project>” strip',
+    siteOpenText:
+      'When the project dev server runs from the panel (“Dev server” on the project tab), a ' +
+      '“Site: <project>” strip with the address shows above the feed. A click opens the site in the ' +
+      'right column. The site is shown through the panel proxy on 127.0.0.1 — only the dev server ' +
+      'the panel itself started; the proxy opens no other address. The server stops or restarts — ' +
+      'the window closes by itself, and the “Site:” strip opens the new run again.',
+    sitePick: '“Pick an element”',
+    sitePickText:
+      'The button turns picking on: the element under the mouse is outlined, a click picks it, ' +
+      'Escape cancels. Beside it — “Reload the page”, “Open in the browser” and “Close the site ' +
+      'window”. An image, deck or agent window takes the same column and closes the site window. ' +
+      'While keyboard focus is inside the site, a ring shows around the window.',
+    siteChip: 'A chip in the composer',
+    siteChipText:
+      'The picked element sits above the composer as a “<tag> text” chip, its cross removes it. On ' +
+      'send a block “Element from the site page…” is appended to your text: address, unique ' +
+      'selector, tag, text, place on the page and markup (at most 4 KB). The panel masks secrets in ' +
+      'the address, selector, text and markup before the block reaches the composer. The chip goes ' +
+      'once the message is ' +
+      'accepted; a refusal leaves it in place.',
+    siteTrust: 'A foreign page cannot fake a pick',
+    siteTrustText:
+      'A pick is accepted only from its own site window, from the address of its proxy and with the ' +
+      'one-time key of that window. A message from another tab, a stale window or a page the site ' +
+      'opened inside itself is dropped — no text can be slipped to the agent from outside.',
   },
   shots: {
     basics: {
@@ -1981,11 +2065,35 @@ export const chatEn: typeof chatRu = {
         'The “Awaiting decision (3)” strip expanded: D-n items of two groups and a single ' +
         'chat, the owner filter, and the reason and answers on each',
     },
+    limit: {
+      '01-limit-card':
+        'The “Subscription limit” card: the window opens at 19:30, the message goes again by ' +
+        'itself; “Wait for reset”, another model and a move to codex or gemini',
+      '02-board-button':
+        'The chat header: the “Board · waiting for you: 2” button beside the agents console',
+    },
+    notes: {
+      '01-notes':
+        'The “Project code” window: two notes on lines 2 and 3 marked with dots, the tray under ' +
+        'the editor with “path:line”, “Now” and “Queue”',
+    },
+    site: {
+      '01-pane':
+        'The “Site: stand-site” strip above the feed and the site on the right: “Pick an element” ' +
+        'is pressed, the “Pay for the order” button is outlined',
+      '02-chip':
+        'The “<button> Pay for the order” chip above the composer and a request to the agent — the ' +
+        'description block is appended on send',
+    },
   },
   diagrams: {
     'message-path':
       'The path of one message: composer to panel server to CLI process to the transcript on disk, and the answer back as a stream. The panel has no database of its own.',
     'deferred-asks':
       'The former path of a call only a human decides (before the core): a refusal with a D-n number, work goes on, an answer from the panel, the phone or Telegram. Now the answer is only recorded and does not resume the work.',
+    'diff-notes':
+      'Notes on changed lines: “+” at a line, the tray under the editor, one message; the agent works — “Now” mid-turn or “Queue”, the agent is idle — a plain send.',
+    'site-pick':
+      'The site window and the element pick: a dev server the panel started, the panel proxy on 127.0.0.1 with the pick script, the site window in the chat, the source, address and key check, secret masking, a chip in the composer, the description block in the message to the agent.',
   },
 };

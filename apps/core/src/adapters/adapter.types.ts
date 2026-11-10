@@ -11,7 +11,11 @@ import type {
 } from '@agentdeck/contracts/core/user-layer';
 import type { AgentEndHow, BgEndHow, BgKind } from '@agentdeck/contracts/core/agents';
 import type { SendImage } from '@agentdeck/contracts/core/ask';
-import type { LocalLayerCarry, SettingSource } from '@agentdeck/contracts/core/session-carry';
+import type {
+  LocalLayerCarry,
+  SessionHooks,
+  SettingSource,
+} from '@agentdeck/contracts/core/session-carry';
 import type { Identity } from '../session-host/protocol.ts';
 import type {
   CoreSessionVars,
@@ -225,6 +229,8 @@ export interface SessionLayerCarry {
   systemPrompt?: string;
   /** Локальный слой проекта вместо источника `project` (s10 G14 p6, `LocalLayerCarry`). */
   localLayer?: LocalLayerCarry;
+  /** Хуки профиля чата панели (s12, `session.hooks`): в `--settings` ядра, хук ядра — последним. */
+  hooks?: SessionHooks;
 }
 
 /**
@@ -729,6 +735,13 @@ export interface CliAdapter {
    */
   mcpSource?(input: McpSourceInput): McpSourceRead;
   caps: AdapterCaps;
+  /**
+   * Этап 12 (P170): текст ошибки хода зовёт войти в CLI заново — только подозрение, решает
+   * `loginState`. Нет метода — потерю входа этот CLI не называет (`caps.loginLost`).
+   */
+  loginLost?(text: string): boolean;
+  /** Перечитать вход CLI задокументированным чтением; нет — `unknown`. */
+  loginState?(): Promise<'up' | 'absent' | 'unknown'>;
   bindEndpoint(
     channel: AdapterChannelSummary,
     endpoint: BoundEndpoint,

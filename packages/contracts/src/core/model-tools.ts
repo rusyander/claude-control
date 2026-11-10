@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  BROWSE_EXPECTS,
+  BROWSE_GAP_ACTIONS,
+  browseSecretSchema,
+  browseTargetSchema,
+} from './browse.ts';
 import { uuidv7 } from './ids.ts';
 import { LEAD_ROLES, reconMapSchema } from './lead.ts';
 import { stepDefId, TASK_CLASSES, type CoreStepKind, type StepKind } from './scenario.ts';
@@ -16,6 +22,23 @@ export const CORE_MCP_SERVER = 'agentdeck';
 export const PERMIT_MCP_SERVER = 'agentdeck-permit';
 export const PERMIT_TOOL = 'approve';
 
+/**
+ * Инструменты прохода по стенду (этап 12, D23, P177): только у шага `walk`, ядро водит браузер
+ * само и пишет каждое действие строкой `browse.step`. `browse_gesture` — просьба о том, чего ядро
+ * не умеет (наведение, перетаскивание, выбор файла): ответ `unsupported`, пробел в отчёте.
+ */
+export const BROWSER_TOOL_NAMES = [
+  'browse_open',
+  'browse_click',
+  'browse_fill',
+  'browse_press',
+  'browse_select',
+  'browse_expect',
+  'browse_snapshot',
+  'browse_gesture',
+] as const;
+export type BrowserToolName = (typeof BROWSER_TOOL_NAMES)[number];
+
 export const MODEL_TOOL_NAMES = [
   'step_done',
   'check',
@@ -23,8 +46,13 @@ export const MODEL_TOOL_NAMES = [
   'blocker',
   'core_state',
   'unit_diff',
+  ...BROWSER_TOOL_NAMES,
 ] as const;
 export type ModelToolName = (typeof MODEL_TOOL_NAMES)[number];
+
+export function isBrowserToolName(name: string): name is BrowserToolName {
+  return (BROWSER_TOOL_NAMES as readonly string[]).includes(name);
+}
 
 /**
  * Виды шагов, у которых есть сессия модели (02 §Scenario). `check`, `final-gate`, `publish`,
@@ -42,6 +70,8 @@ export const SESSION_STEP_KINDS = [
   'report',
   'custom',
   'chat',
+  /** Проход по стенду (этап 12, D23): браузер — инструментами ядра, правки копии нет. */
+  'walk',
 ] as const;
 export type SessionStepKind = (typeof SESSION_STEP_KINDS)[number];
 
@@ -66,6 +96,8 @@ const READ_ONLY_KINDS: ReadonlySet<string> = new Set([
   'research',
   'review',
   'report',
+  // Проход по стенду только смотрит и жмёт в браузере (P177): ни правки копии, ни команд.
+  'walk',
 ]);
 /** `check` нужен там, где код меняют или судят; отчёт и разбор задачи проверок не зовут. */
 const CHECK_KINDS: ReadonlySet<string> = new Set([
@@ -86,6 +118,8 @@ const NO_STEP_DONE_KINDS: ReadonlySet<string> = new Set(['chat']);
  * ревьюерам. Пакет ревью сверх предела называет файлы списком, тело берётся этим инструментом.
  */
 const UNIT_DIFF_KINDS: ReadonlySet<string> = new Set(['review', 'answer-reviewers']);
+/** Браузер ядра — только шагу прохода: другой шаг страницу не трогает (P177). */
+const BROWSER_KINDS: ReadonlySet<string> = new Set(['walk']);
 
 export interface StepToolPlan {
   /** Встроенные инструменты CLI: `read-only` — без правки файлов и без команд, меняющих копию. */
@@ -101,7 +135,8 @@ export function toolPlanFor(stepKind: string): StepToolPlan | null {
     (t) =>
       (t !== 'check' || CHECK_KINDS.has(stepKind)) &&
       (t !== 'unit_diff' || UNIT_DIFF_KINDS.has(stepKind)) &&
-      (t !== 'step_done' || !NO_STEP_DONE_KINDS.has(stepKind)),
+      (t !== 'step_done' || !NO_STEP_DONE_KINDS.has(stepKind)) &&
+      (!isBrowserToolName(t) || BROWSER_KINDS.has(stepKind)),
   );
   return { builtins: READ_ONLY_KINDS.has(stepKind) ? 'read-only' : 'all', modelTools };
 }
@@ -344,6 +379,59 @@ export const coreStateSchema = z.strictObject({});
 export const unitDiffSchema = z.strictObject({ file: z.string().min(1).max(4096) });
 export type UnitDiffCall = z.infer<typeof unitDiffSchema>;
 
+// ── Проход по стенду (шаг `walk`, D23) ────────────────────────────────────────────────────
+const browseValue = z.string().max(4000);
+export const browseOpenSchema = z.strictObject({ url: line(4000) });
+export const browseClickSchema = z.strictObject({ target: browseTargetSchema });
+/** Ввод: ровно одно из значения и секрета стенда — секрет ядро подставит само (P178). */
+export const browseFillSchema = z
+  .strictObject({
+    target: browseTargetSchema,
+    value: browseValue.optional(),
+    secret: browseSecretSchema.optional(),
+  })
+  .refine((v) => (v.value === undefined) !== (v.secret === undefined), {
+    message: 'exactly one of value, secret',
+  });
+export const browsePressSchema = z.strictObject({
+  key: line(64),
+  target: browseTargetSchema.optional(),
+});
+export const browseSelectSchema = z.strictObject({
+  target: browseTargetSchema,
+  value: line(4000),
+});
+/**
+ * Ожидание: `url` — без цели, со значением; `visible` / `hidden` — цель без значения; `text` /
+ * `value` — цель и значение. Пара не та — ошибка поля, а не догадка ядра.
+ */
+export const browseExpectSchema = z
+  .strictObject({
+    expect: z.enum(BROWSE_EXPECTS),
+    target: browseTargetSchema.optional(),
+    value: browseValue.optional(),
+  })
+  .refine(
+    (v) =>
+      v.expect === 'url'
+        ? v.target === undefined && v.value !== undefined
+        : v.target !== undefined &&
+          (v.value !== undefined) === (v.expect !== 'visible' && v.expect !== 'hidden'),
+    {
+      message:
+        'url: value without target; visible|hidden: target only; text|value: target and value',
+    },
+  );
+export const browseSnapshotSchema = z.strictObject({ target: browseTargetSchema.optional() });
+export const browseGestureSchema = z.strictObject({
+  action: z.enum(BROWSE_GAP_ACTIONS),
+  target: browseTargetSchema.optional(),
+  why: line(2000),
+});
+export type BrowseFillCall = z.infer<typeof browseFillSchema>;
+export type BrowseExpectCall = z.infer<typeof browseExpectSchema>;
+export type BrowseGestureCall = z.infer<typeof browseGestureSchema>;
+
 export const MODEL_TOOL_SCHEMAS = {
   step_done: stepDoneSchema,
   check: checkCallSchema,
@@ -351,6 +439,14 @@ export const MODEL_TOOL_SCHEMAS = {
   blocker: blockerSchema,
   core_state: coreStateSchema,
   unit_diff: unitDiffSchema,
+  browse_open: browseOpenSchema,
+  browse_click: browseClickSchema,
+  browse_fill: browseFillSchema,
+  browse_press: browsePressSchema,
+  browse_select: browseSelectSchema,
+  browse_expect: browseExpectSchema,
+  browse_snapshot: browseSnapshotSchema,
+  browse_gesture: browseGestureSchema,
 } as const satisfies Record<ModelToolName, z.ZodType>;
 
 /** Описания для `tools/list` — модель читает их, поэтому по-английски (как и ответы). */
@@ -371,6 +467,23 @@ export const MODEL_TOOL_DESCRIPTIONS: Record<ModelToolName, string> = {
   unit_diff:
     'Read the diff of one file of the reviewed unit against its base. Only files listed in the ' +
     'review pack; the body is masked and, when long, cut with a marker naming where to read on.',
+  browse_open:
+    'Open a URL of the stand in the core browser. The reply is the page address and the core checks ' +
+    '(console errors, failed same-origin requests, blank page).',
+  browse_click:
+    'Click an element named by its meaning: {role, name}, {testId}, {label} or {text} — never a CSS selector.',
+  browse_fill:
+    'Fill a field named by its meaning with a value, or with {secret: {name}} — the core fills the ' +
+    'stand secret itself; its value never reaches you.',
+  browse_press: 'Press a key (Enter, Escape, Tab…), on an element or on the page.',
+  browse_select: 'Pick an option of a select named by its meaning.',
+  browse_expect:
+    'Assert what the page shows: visible / hidden (target), text / value (target and value), url (value).',
+  browse_snapshot:
+    'Read the accessibility tree of the page or of one element: roles, names and states, masked.',
+  browse_gesture:
+    'Hover, drag and file picking are not supported: name the gesture and why it was needed; the ' +
+    'gap goes into the report as not checked and the page is not touched.',
 };
 
 export type FieldIssueCode = 'unknown-field' | 'missing-field' | 'invalid-field';

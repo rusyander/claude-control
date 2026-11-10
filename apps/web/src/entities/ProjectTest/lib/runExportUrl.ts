@@ -18,11 +18,14 @@ export function runExportUrl(
   path: string | undefined,
   id: string,
   format: RunExportFormat,
+  /** Язык экрана — раньше сохранённой настройки, как у документа вехи (`releaseExportUrl`). */
+  lang?: string,
 ): string {
+  const language: Record<string, string> = lang ? { lang } : {};
   if (format === 'pdf') {
-    const print = new URLSearchParams({ path: path ?? '', id });
+    const print = new URLSearchParams({ path: path ?? '', id, ...language });
     return `/api/project-tests/run/pdf?${print.toString()}`;
   }
-  const query = new URLSearchParams({ path: path ?? '', id, format });
+  const query = new URLSearchParams({ path: path ?? '', id, format, ...language });
   return `/api/project-tests/run/export?${query.toString()}`;
 }

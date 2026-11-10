@@ -517,7 +517,7 @@ describe('ChatRunRegistry — происхождение прогона и ма�
       env: { ENABLE_CLAUDEAI_MCP_SERVERS: 'false' },
       mcp: { ids: ['gitlab'], config: { mcpServers: { gitlab: { command: 'gl' } } } },
       note: 'MCP servers in this run: gitlab.',
-      settings: { skillOverrides: { dataviz: 'name-only' } },
+      settings: { hooks: { Stop: [{ hooks: [{ type: 'command', command: 'group' }] }] } },
     };
 
     it('группа получает профиль, а не группа — нет, и продолжение его не наследует', () => {
@@ -552,7 +552,9 @@ describe('ChatRunRegistry — происхождение прогона и ма�
       const withEnv = {
         ...profile,
         env: { ...profile.env, PROFILE_TOOL_HOME: 'q' },
-        settings: { permissions: { deny: ['Edit'] } },
+        settings: {
+          hooks: { PreToolUse: [{ matcher: 'Edit', hooks: [{ type: 'command', command: 'e' }] }] },
+        },
       };
       registry.setGroupProfileResolver(() => withEnv);
       registry.setPlatformRouting(() => ({
@@ -596,6 +598,7 @@ describe('ChatRunRegistry — происхождение прогона и ма�
       },
       status: {} as never,
     };
+    const GROUP_HOOKS = { Stop: [{ hooks: [{ type: 'command', command: 'group' }] }] };
 
     it('обычный прогон получает слой полем ядра, профиль группы остаётся своим полем', () => {
       const asked: string[] = [];
@@ -607,14 +610,14 @@ describe('ChatRunRegistry — происхождение прогона и ма�
         args: [],
         env: {},
         note: '',
-        settings: { model: 'group' },
+        settings: { hooks: GROUP_HOOKS },
       }));
       registry.start('l1', OPTIONS, {});
       const options = registry.describe('l1')?.options;
       expect(asked).toEqual([OPTIONS.cwd]);
       expect(options?.platformArgs).toEqual(['--setting-sources', 'user,local']);
       expect(options?.platformAppend).toBe('');
-      expect(options?.platformSettings).toEqual({ model: 'group' });
+      expect(options?.platformSettings).toEqual({ hooks: GROUP_HOOKS });
       expect(options?.localLayer).toEqual({
         plugin: 'P',
         instructions: layer.append,

@@ -301,7 +301,16 @@ export async function pinRepos(
       continue;
     }
     const { ref, sha, source, note } = base.value;
-    pinned.push({ repoKey, path: tree.value.top, sha, pin: { ref, source, note } });
+    // Проект в подпапке: копия и база — от вершины, а корень проекта (доступы стенда, чат на
+    // месте с грантом на эту подпапку) — вершина + подпапка; без неё он тихо становился вершиной.
+    const subPath = tree.value.prefix || undefined;
+    pinned.push({
+      repoKey,
+      path: tree.value.top,
+      ...(subPath ? { subPath } : {}),
+      sha,
+      pin: { ref, source, note },
+    });
   }
   return { pinned, problems };
 }
@@ -405,7 +414,12 @@ export async function createTask(
   }
   const task = await registry.create({
     title: fields.title,
-    repos: pinned.map((p) => ({ repoKey: p.repoKey, path: p.path, baseRef: p.sha })),
+    repos: pinned.map((p) => ({
+      repoKey: p.repoKey,
+      path: p.path,
+      baseRef: p.sha,
+      ...(p.subPath ? { subPath: p.subPath } : {}),
+    })),
     build: env.build,
     scenario: ref,
     profilePins: [],
@@ -518,6 +532,11 @@ export async function createTask(
   const zero = unitZeroOf((pinned[0] as PinnedRepo).repoKey, seed.branch);
   task.append({ kind: 'unit.created', actor: 'core', unitId: zero.unitId, cmdId, data: zero });
   seed.afterUnitZero?.(task, zero, cmdId);
+  // Без точки деления (проход по стенду) оценке негде кончиться: соло сразу, решает политика запуска.
+  await env.soloWithoutSplitPoint?.(task, {
+    id: scenario.scenario.id,
+    steps: scenario.scenario.steps,
+  });
   return { status: 202, reply: replyOf(registry, task.taskId, false) };
 }
 

@@ -10,6 +10,7 @@ import {
   HelpShot,
   HelpDiagram,
 } from '../../ui';
+import { CoreBoardSections } from '../CoreBoardSections/CoreBoardSections';
 
 /**
  * Документ «Задачи ядра».
@@ -17,7 +18,8 @@ import {
  * Первое, на чём спотыкается читатель, — «раздел пустой»: ядро — свой процесс, и `pnpm dev` его
  * не запускает. Поэтому запуск ядра стоит раньше экрана запуска задачи, а карточка «не запущено» —
  * в том же разделе. Плашка «звено не записано» — отдельным разделом: без неё отказ команды
- * `signature-required` выглядит поломкой.
+ * `signature-required` выглядит поломкой. Доска — сразу за запуском (`CoreBoardSections`): с неё
+ * раздел открывается.
  */
 export function CoreTopic() {
   const { t } = useTranslation();
@@ -72,6 +74,8 @@ export function CoreTopic() {
           rows={[row('cmdCore', true), row('cmdDev', true), row('cmdKeepalive', true)]}
         />
       </HelpSection>
+
+      <CoreBoardSections />
 
       <HelpSection title={tr('launchTitle')} caption={tr('launchCaption')}>
         <GuideSteps>
@@ -141,6 +145,7 @@ export function CoreTopic() {
             { title: tr('leadParallel'), text: tr('leadParallelText') },
             { title: tr('leadSpend'), text: tr('leadSpendText') },
             { title: tr('leadEscalation'), text: tr('leadEscalationText') },
+            { title: tr('leadCross'), text: tr('leadCrossText') },
             { title: tr('leadPromotion'), text: tr('leadPromotionText') },
             { title: tr('leadIntegration'), text: tr('leadIntegrationText') },
             { title: tr('leadXl'), text: tr('leadXlText') },
@@ -165,6 +170,9 @@ export function CoreTopic() {
             row('askKindCap'),
             row('askKindPermit'),
             row('askKindHuman'),
+            row('askKindLogin'),
+            row('askKindExhausted'),
+            row('askKindTrackerWrite'),
           ]}
         />
       </HelpSection>

@@ -168,6 +168,7 @@ export const testsEn: Record<TestsMessageCode, string> = {
   'case-title-required': 'A test must have a name.',
   'case-link-invalid': 'Link “{{url}}”: needs a full address starting with http:// or https://.',
   'case-duration-invalid': 'Duration “{{value}}”: whole minutes from 1 to 1440, 0 clears it.',
+  'case-timeout-invalid': 'Run limit “{{value}}”: minutes above 0 and up to {{max}}, 0 clears it.',
   'case-id-not-in-group':
     'Case “{{caseId}}” is not in group “{{groupId}}”: a new case is saved without an id.',
   'case-not-in-named-group': 'Case “{{caseId}}” is not in group “{{groupId}}”.',

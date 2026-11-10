@@ -6,7 +6,29 @@ import { apiClient } from '@shared/api/client';
 import { applySettingsUpdate } from '../lib/applySettingsUpdate';
 import { changedSettings } from '../lib/changedSettings';
 import { refreshSettingsFromServer } from '../lib/refreshSettingsFromServer';
-import { sendSettingsPatch } from '../lib/sendSettingsPatch';
+import { hasUnsentSettings, sendSettingsPatch } from '../lib/sendSettingsPatch';
+import { patchSettings } from '../lib/patchSettings';
+
+describe('patchSettings — PATCH переживает перезагрузку страницы', () => {
+  it('обычный патч уходит fetch-запросом с keepalive', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValue({ data: settings({}) });
+    await patchSettings({ theme: 'dark' });
+    expect(patch).toHaveBeenCalledWith(
+      '/settings',
+      { theme: 'dark' },
+      { adapter: 'fetch', fetchOptions: { keepalive: true } },
+    );
+    patch.mockRestore();
+  });
+
+  it('патч больше предела keepalive уходит обычным запросом', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockResolvedValue({ data: settings({}) });
+    const big = { claudeDir: 'x'.repeat(60_000) } as AppSettingsPatch;
+    await patchSettings(big);
+    expect(patch).toHaveBeenCalledWith('/settings', big, undefined);
+    patch.mockRestore();
+  });
+});
 
 const settings = (patch: Partial<AppSettings>): AppSettings => appSettingsSchema.parse(patch);
 
@@ -204,6 +226,26 @@ describe('sendSettingsPatch — очередь быстрых правок (F-28
       language: 'en',
       backupKeep: 3,
     });
+  });
+
+  // F5 стирает только неушедшую правку: ушедший PATCH доводит keepalive (patchSettings).
+  it('неушедшая правка держит защиту ухода со страницы, пока запрос не ушёл', async () => {
+    const client = seed();
+    client.setQueryData(queryKeys.settings, settings({}));
+    const first = deferred();
+    const send = vi
+      .fn<(patch: AppSettingsPatch) => Promise<AppSettings>>()
+      .mockReturnValueOnce(first.promise)
+      .mockImplementation(async (patch) => settings({ ...patch }));
+
+    const a = sendSettingsPatch(client, { theme: 'dark' }, send);
+    expect(hasUnsentSettings()).toBe(false);
+    const b = sendSettingsPatch(client, { language: 'en' }, send);
+    expect(hasUnsentSettings()).toBe(true);
+    first.resolve(settings({ theme: 'dark' }));
+    await Promise.all([a, b]);
+
+    expect(hasUnsentSettings()).toBe(false);
   });
 
   it('правка после ухода слитого запроса не теряется, а уходит своим', async () => {

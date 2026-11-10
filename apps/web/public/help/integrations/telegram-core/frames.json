@@ -1,0 +1,156 @@
+{
+  "topic": "integrations",
+  "scenario": "telegram-core",
+  "frames": [
+    {
+      "id": "01-binding",
+      "side": "panel",
+      "file": "01-binding.png",
+      "masked": 0,
+      "width": 1174,
+      "height": 374,
+      "shotAt": "2026-11-09T11:33:15.093Z",
+      "text": "Отвечать ядру из Telegram Ядро узнаёт этот чат: вопросы задач идут кнопками. Вопросы задач ядра придут в бота ответов кнопками. Из Telegram можно ответить на вопрос, разрешить один спрошенный вызов, отменить или доработать задачу, сменить модель или CLI, отправить запись во «Входящие». Выдать право шире вопроса, сменить маршрут или настройку, перехватить задачу, опубликовать — только в панели или с телефона: ваш аккаунт Telegram достижим с этой же машины, ключ телефона — нет. Репозитории для задач из Telegram Строка на репозиторий: путь, при желании « @ ветка». Запись /task понесёт их и запустится кнопкой «В работу» прямо из Telegram. Пусто — запись ждёт репозиторий на доске, кнопки в Telegram нет. Сохранить репозитории",
+      "seal": {
+        "png": "edbf59bd7445a293",
+        "text": "3b31a2e32b62f6af"
+      },
+      "en": {
+        "file": "01-binding.en.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 374,
+        "shotAt": "2026-11-09T11:33:31.152Z",
+        "text": "Answer the core from Telegram The core recognises this chat: task questions come with buttons. Core task questions arrive in the answers bot with buttons. From Telegram you can answer a question, allow the one asked call, cancel or rework a task, switch its model or CLI, add an Inbox entry. Granting more than the question asks, changing a route or a setting, taking over, publishing stay in the panel or on the phone: your Telegram account is reachable from this same machine, the phone key is not. Repositories for Telegram tasks One repository per line: a path, optionally \" @ branch\". A /task entry carries them and starts from Telegram with «Start work». Empty — the entry waits for a repository on the board, Telegram shows no button. Save repositories",
+        "seal": {
+          "png": "0ab8175e759edb28",
+          "text": "488df88e85c3d894"
+        }
+      },
+      "dark": {
+        "file": "01-binding.dark.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 374,
+        "shotAt": "2026-11-09T11:33:48.632Z",
+        "text": "Отвечать ядру из Telegram Ядро узнаёт этот чат: вопросы задач идут кнопками. Вопросы задач ядра придут в бота ответов кнопками. Из Telegram можно ответить на вопрос, разрешить один спрошенный вызов, отменить или доработать задачу, сменить модель или CLI, отправить запись во «Входящие». Выдать право шире вопроса, сменить маршрут или настройку, перехватить задачу, опубликовать — только в панели или с телефона: ваш аккаунт Telegram достижим с этой же машины, ключ телефона — нет. Репозитории для задач из Telegram Строка на репозиторий: путь, при желании « @ ветка». Запись /task понесёт их и запустится кнопкой «В работу» прямо из Telegram. Пусто — запись ждёт репозиторий на доске, кнопки в Telegram нет. Сохранить репозитории",
+        "seal": {
+          "png": "bbb83983f6576c12",
+          "text": "3b31a2e32b62f6af"
+        }
+      },
+      "darkEn": {
+        "file": "01-binding.dark.en.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 374,
+        "shotAt": "2026-11-09T11:34:06.242Z",
+        "text": "Answer the core from Telegram The core recognises this chat: task questions come with buttons. Core task questions arrive in the answers bot with buttons. From Telegram you can answer a question, allow the one asked call, cancel or rework a task, switch its model or CLI, add an Inbox entry. Granting more than the question asks, changing a route or a setting, taking over, publishing stay in the panel or on the phone: your Telegram account is reachable from this same machine, the phone key is not. Repositories for Telegram tasks One repository per line: a path, optionally \" @ branch\". A /task entry carries them and starts from Telegram with «Start work». Empty — the entry waits for a repository on the board, Telegram shows no button. Save repositories",
+        "seal": {
+          "png": "4d9921b2024e471e",
+          "text": "488df88e85c3d894"
+        }
+      }
+    },
+    {
+      "id": "02-repos",
+      "side": "panel",
+      "file": "02-repos.png",
+      "masked": 0,
+      "width": 1166,
+      "height": 226,
+      "shotAt": "2026-11-09T11:33:15.768Z",
+      "text": "Репозитории для задач из Telegram Строка на репозиторий: путь, при желании « @ ветка». Запись /task понесёт их и запустится кнопкой «В работу» прямо из Telegram. Пусто — запись ждёт репозиторий на доске, кнопки в Telegram нет. Сохранить репозитории",
+      "seal": {
+        "png": "f00f955d0c1a828f",
+        "text": "d1cec708b1faa589"
+      },
+      "en": {
+        "file": "02-repos.en.png",
+        "masked": 0,
+        "width": 1166,
+        "height": 226,
+        "shotAt": "2026-11-09T11:33:31.850Z",
+        "text": "Repositories for Telegram tasks One repository per line: a path, optionally \" @ branch\". A /task entry carries them and starts from Telegram with «Start work». Empty — the entry waits for a repository on the board, Telegram shows no button. Save repositories",
+        "seal": {
+          "png": "8a6ee9954507d166",
+          "text": "b197d4d81d109085"
+        }
+      },
+      "dark": {
+        "file": "02-repos.dark.png",
+        "masked": 0,
+        "width": 1166,
+        "height": 226,
+        "shotAt": "2026-11-09T11:33:49.336Z",
+        "text": "Репозитории для задач из Telegram Строка на репозиторий: путь, при желании « @ ветка». Запись /task понесёт их и запустится кнопкой «В работу» прямо из Telegram. Пусто — запись ждёт репозиторий на доске, кнопки в Telegram нет. Сохранить репозитории",
+        "seal": {
+          "png": "956e940770043367",
+          "text": "d1cec708b1faa589"
+        }
+      },
+      "darkEn": {
+        "file": "02-repos.dark.en.png",
+        "masked": 0,
+        "width": 1166,
+        "height": 226,
+        "shotAt": "2026-11-09T11:34:06.937Z",
+        "text": "Repositories for Telegram tasks One repository per line: a path, optionally \" @ branch\". A /task entry carries them and starts from Telegram with «Start work». Empty — the entry waits for a repository on the board, Telegram shows no button. Save repositories",
+        "seal": {
+          "png": "f247c2074a212305",
+          "text": "b197d4d81d109085"
+        }
+      }
+    },
+    {
+      "id": "03-quiet",
+      "side": "panel",
+      "file": "03-quiet.png",
+      "masked": 0,
+      "width": 1174,
+      "height": 65,
+      "shotAt": "2026-11-09T11:33:16.948Z",
+      "text": "Тихие часы — уведомления копятся и приходят одной сводкой в конце, с до держать и вопросы, без ответа на которые агент стоит",
+      "seal": {
+        "png": "50f60314349f1e17",
+        "text": "2b30431a0338b39d"
+      },
+      "en": {
+        "file": "03-quiet.en.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 65,
+        "shotAt": "2026-11-09T11:33:32.513Z",
+        "text": "Quiet hours — notices pile up and arrive as one digest at the end, from to hold questions the agent is blocked on too",
+        "seal": {
+          "png": "fe0f0c28209a3424",
+          "text": "ff5ec85109fb66cd"
+        }
+      },
+      "dark": {
+        "file": "03-quiet.dark.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 65,
+        "shotAt": "2026-11-09T11:33:50.030Z",
+        "text": "Тихие часы — уведомления копятся и приходят одной сводкой в конце, с до держать и вопросы, без ответа на которые агент стоит",
+        "seal": {
+          "png": "6154fb606e9d4740",
+          "text": "2b30431a0338b39d"
+        }
+      },
+      "darkEn": {
+        "file": "03-quiet.dark.en.png",
+        "masked": 0,
+        "width": 1174,
+        "height": 65,
+        "shotAt": "2026-11-09T11:34:07.632Z",
+        "text": "Quiet hours — notices pile up and arrive as one digest at the end, from to hold questions the agent is blocked on too",
+        "seal": {
+          "png": "180531c48039e75d",
+          "text": "ff5ec85109fb66cd"
+        }
+      }
+    }
+  ]
+}

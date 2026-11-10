@@ -1,7 +1,5 @@
 import { join } from 'node:path';
-import type { JournalLine } from '@agentdeck/contracts/core/journal';
 import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
-import type { RouteLease, RouteResource } from '@agentdeck/contracts/core/routes';
 import type { DenySet } from '../../adapters/adapter.types.ts';
 import { unitCopyOf } from '../../conductor/copy/index.ts';
 import { ASK_SYSTEM_ARTIFACT } from '../../conductor/ask/index.ts';
@@ -10,9 +8,10 @@ import type { StepCtx } from '../../conductor/run/run.types.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import { SESSION_OS_ENV_NAMES } from '../../platform/base-env.ts';
+import { projectRootOf } from '../../platform/paths.ts';
 import { readBytesSync } from '../../platform/safe-io/files.ts';
 import { scratchDirOf } from '../../platform/scratch.ts';
-import { LEASE_SIGNAL } from '../session-road/lease-release.ts';
+import { journaledLease } from '../session-road/lease-release.ts';
 import type { RoadStart } from '../session-road.ts';
 import type { RoadResume } from '../session-road/road.types.ts';
 import { conversationOf } from '../economy-wiring/continuation.ts';
@@ -57,45 +56,8 @@ export function processPin(env: NodeJS.ProcessEnv = process.env): Record<string,
   return pin;
 }
 
-/**
- * Аренда маршрута, пережившая прежнее ядро: строка `route-lease` того же маршрута и модели, все
- * её ресурсы ещё живы. Аренда без ресурсов (вход CLI) не переиспользуется — новая ничего не стоит.
- */
-export function journaledLease(
-  task: LiveTask,
-  routeId: string,
-  model: string | null,
-): RouteLease | undefined {
-  const lines = readJournalLines(task.dir, task.taskId).lines as JournalLine[];
-  const created = new Map<string, RouteResource>();
-  let found: RouteLease | undefined;
-  for (const line of lines) {
-    if (line.kind === 'resource.created') {
-      const d = (line as JournalLine<'resource.created'>).data;
-      created.set(d.rid, { rid: d.rid, kind: d.kind, ref: d.ref, release: d.release });
-      continue;
-    }
-    if (line.kind !== 'signal') continue;
-    const d = (line as JournalLine<'signal'>).data;
-    if (d.signal !== LEASE_SIGNAL) continue;
-    let detail: { routeId?: unknown; model?: unknown; rids?: unknown };
-    try {
-      detail = JSON.parse(d.detail) as typeof detail;
-    } catch {
-      continue;
-    }
-    if (detail.routeId !== routeId || detail.model !== model || !Array.isArray(detail.rids))
-      continue;
-    const rids = detail.rids.filter((r): r is string => typeof r === 'string');
-    if (rids.length === 0) continue;
-    if (!rids.every((rid) => task.state.resources[rid]?.status === 'live')) continue;
-    const resources = rids.map((rid) => created.get(rid));
-    if (resources.some((r) => r === undefined)) continue;
-    // Последняя живая — та, что держала последняя сессия этого маршрута.
-    found = { leaseId: d.subject, routeId, model, resources: resources as RouteResource[] };
-  }
-  return found;
-}
+/** Аренда маршрута из журнала задачи — правило живёт у книги аренд дороги. */
+export { journaledLease };
 
 /** Системная часть брифа: шаг и копия; само задание (части зон) уходит первым сообщением. */
 export function systemBrief(s: StepCtx, copyDir: string): string {
@@ -208,6 +170,13 @@ export function sessionPin(input: StartInputs): Record<string, string> {
  * (`session.append`, G6: строка о тестах, строка профиля, блок набора) — после брифа ядра и без
  * него: системный промпт несёт каждый переходник, так она доходит до любого CLI.
  */
+/** Репозиторий единицы (`unit.repoKey`; без ключа — первый). */
+function unitRepoOf(task: LiveTask, unitId: string): { subPath?: string | undefined } | undefined {
+  const repoKey = task.state.units[unitId]?.repoKey;
+  const repos = task.state.created?.repos ?? [];
+  return repos.find((r) => r.repoKey === repoKey) ?? (repoKey ? undefined : repos[0]);
+}
+
 function chatBriefOf(task: LiveTask, s: StepCtx, cwd: string, inPlace: boolean): string {
   const session = task.state.created?.session;
   const own = session?.brief === 'none' ? '' : chatBrief(s, cwd, inPlace);
@@ -227,6 +196,8 @@ function sessionLayer(task: LiveTask, s: StepCtx): RoadStart['layer'] {
     ...(session?.builtinTools ? { builtinTools: [...session.builtinTools] } : {}),
     ...(session?.systemPrompt ? { systemPrompt: session.systemPrompt } : {}),
     ...(session?.localLayer ? { localLayer: session.localLayer } : {}),
+    // Хуки профиля чата панели (s12) — тем же путём: суд дороги и переходника решает, нести ли.
+    ...(session?.hooks ? { hooks: session.hooks } : {}),
   };
   return {
     hooks: s.def.userLayer.hooks,
@@ -251,6 +222,10 @@ export function stepStart(input: StartInputs, s: StepCtx, sessionId: string): St
   const placed = inPlace ? undefined : unitCopyOf(task, s.unitId);
   const cwd = inPlace ?? placed?.dir ?? s.copyDir;
   if (!cwd) return { ok: false, reason: `unit ${s.unitId} has no copy` };
+  // Проект в подпапке репозитория: копия — всего репозитория, CLI идёт в той же подпапке копии
+  // (его CLAUDE.md, MCP и транскрипт — там). Чат на месте уже стоит в подпапке (`inPlaceRootOf`).
+  const subPath = inPlace ? undefined : unitRepoOf(task, s.unitId)?.subPath;
+  const workDir = subPath ? projectRootOf({ path: cwd, subPath }) : undefined;
   // `null` — модель по умолчанию CLI: `--model` не передаётся, `modelAsked` в журнале — `null`;
   // маршрут с адресом без модели отказывает дорога, называя причину.
   const model = tier.model;
@@ -271,9 +246,10 @@ export function stepStart(input: StartInputs, s: StepCtx, sessionId: string): St
       sessionId,
       dir: journaledSessionDir(task, sessionId),
       cwd,
+      ...(workDir ? { workDir } : {}),
       brief:
         s.def.kind === 'chat'
-          ? chatBriefOf(task, s, cwd, inPlace !== undefined)
+          ? chatBriefOf(task, s, workDir ?? cwd, inPlace !== undefined)
           : systemBrief(s, cwd),
       deny: STEP_DENY,
       tools: toolPlanFor(s.def.kind)?.builtins ?? 'read-only',

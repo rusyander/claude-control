@@ -22,4 +22,11 @@ export interface TelegramCardDraft extends TelegramGroups {
   /** «Задача закрыта или агент ждёт решения» — сообщать о конце хода после долгой работы. */
   finished: boolean;
   doneAfterMinutes: string;
+  /** «Тихие часы» (этап 12): окно, в котором уведомления копятся до одной сводки. */
+  quietOn: boolean;
+  /** Начало и конец окна, `ЧЧ:ММ` по часам машины панели (через полночь можно). */
+  quietFrom: string;
+  quietTo: string;
+  /** Держать тишиной и блокирующие вопросы (агент стоит до ответа). */
+  quietAsks: boolean;
 }

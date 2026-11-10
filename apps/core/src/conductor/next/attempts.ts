@@ -108,9 +108,23 @@ export function staleBy(
   return null;
 }
 
-/** Ревью, за которым идёт правка: первое из `after` вида `review`. */
-export function reviewOf(scenario: Scenario, fix: StepDef): StepDef | undefined {
-  return scenario.steps.find((s) => s.kind === 'review' && fix.after.includes(s.id));
+/**
+ * Ревью, за которым идёт правка: первое из `after` вида `review`. С видом единицы (этап 12, P185) —
+ * и второе ревью (`crossOf` на это ревью): его блокирующая находка ведёт к правке, когда у первого
+ * их нет; чистое второе ревью блокирующее первое не снимает — его вердикт ничего не одобряет.
+ */
+export function reviewOf(scenario: Scenario, fix: StepDef, view?: UnitView): StepDef | undefined {
+  const primary = scenario.steps.find((s) => s.kind === 'review' && fix.after.includes(s.id));
+  if (!view || !primary) return primary;
+  const blocked = (d: StepDef): boolean => {
+    const a = latest(view, d.id);
+    return a !== undefined && hasBlocking(a.rec);
+  };
+  if (blocked(primary)) return primary;
+  const cross = scenario.steps.find(
+    (s) => s.kind === 'review' && s.crossOf === primary.id && blocked(s),
+  );
+  return cross ?? primary;
 }
 
 function kindOf(scenario: Scenario, id: string): string | undefined {

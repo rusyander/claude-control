@@ -22,6 +22,7 @@ import {
 import { reduceStage4 } from './stage4.ts';
 import { initialStage5, recordBudget, reduceStage5 } from './stage5.ts';
 import { initialPublish, reducePublish } from './publish.ts';
+import { reduceStage12 } from './stage12.ts';
 
 /**
  * `reduce(state, event)` — чистая свёртка журнала (01 §State). Зовут её только `resume()` и вид
@@ -307,6 +308,7 @@ function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
         dedupe: data.dedupe,
         stepId: line.stepId ?? null,
         lateAnswer: false,
+        defaultAction: data.defaultAction,
       };
       return { ...next, asks: { ...next.asks, [data.askId]: ask } };
     }
@@ -476,7 +478,12 @@ function reduceBase(state: TaskFoldState, line: JournalLine): TaskFoldState {
     default:
       // Виды этапов 4 и 5 — свои модули; прочие (телеметрия, решения…) состояния задачи не
       // меняют: их читают по журналу части, которым они нужны.
-      return reduceStage4(next, line, anomaly) ?? reduceStage5(next, line, anomaly) ?? next;
+      return (
+        reduceStage4(next, line, anomaly) ??
+        reduceStage5(next, line, anomaly) ??
+        reduceStage12(next, line, anomaly) ??
+        next
+      );
   }
 }
 

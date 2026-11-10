@@ -260,8 +260,10 @@ export const settingsEn: typeof settingsRu = {
       'device must connect again.',
     remoteNotify: 'Notifications',
     remoteNotifyText:
-      'The panel pushes when work is done, has failed, waits for a permission or the ' +
-      'agent has asked a question. Only the KIND of event and the project folder name ' +
+      'The panel pushes only about what waits for you: a permission, an agent question and ' +
+      'a core task question with no default action — one push per question, even when both ' +
+      'the chat and the core relay learned of it. “Done” and “failed” are not pushed — they ' +
+      'show in the chat and on the board. Only the KIND of event and the project folder name ' +
       'leave the machine — no conversation text, no code, no paths. The “Test ' +
       'notification” button exercises the whole path: without it “nothing arrived” is ' +
       'discovered on a real run, which is too late.',

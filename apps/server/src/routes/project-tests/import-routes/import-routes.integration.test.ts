@@ -88,6 +88,13 @@ describe('project-tests import routes', () => {
     expect(english.statusCode).toBe(200);
     expect(english.body).toContain('# Run: import from CI');
     expect(english.body).not.toContain('Прогон');
+    // Ссылка экрана несёт его язык раньше настройки: PATCH языка мог ещё не дойти.
+    const asked = await app.inject({
+      method: 'GET',
+      url: '/api/project-tests/run/export',
+      query: { path: project, id: runId ?? '', format: 'md', lang: 'ru' },
+    });
+    expect(asked.body).toContain('# Прогон: импорт из CI');
   });
 
   it('кейсы из CSV приезжают в указанную группу', async () => {

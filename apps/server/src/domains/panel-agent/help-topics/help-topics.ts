@@ -32,30 +32,73 @@ export interface HelpTopicText {
 }
 
 const TOPICS_FILE = join('pages', 'Help', 'model', 'topics.constants.ts');
+const ROUTES_FILE = join('shared', 'config', 'routes.ts');
 
 /** Исходники веба рядом с сервером: справка живёт там и только там. */
 export const DEFAULT_HELP_WEB_SRC = fileURLToPath(
   new URL('../../../../../web/src/', import.meta.url),
 );
 
-let indexCache: { file: string; mtime: number; topics: HelpTopicRef[] } | undefined;
+let indexCache: { file: string; mtime: string; topics: HelpTopicRef[] } | undefined;
+
+/**
+ * Константы маршрутов веба (`shared/config/routes.ts`): строки (`export const X: string = '/x'`)
+ * и наборы параметров адреса (`export const Y = { k: 'v' } as const`). Тема справки может
+ * ссылаться на них вместо литерала — так раздел и справка ведут на один адрес.
+ */
+function readRouteConstants(file: string): {
+  paths: Map<string, string>;
+  searches: Map<string, Record<string, string>>;
+} {
+  const paths = new Map<string, string>();
+  const searches = new Map<string, Record<string, string>>();
+  if (!existsSync(file)) return { paths, searches };
+  const source = readFileSync(file, 'utf8');
+  for (const m of source.matchAll(/export const (\w+)(?::\s*string)?\s*=\s*'([^']*)'/g))
+    paths.set(m[1] as string, m[2] as string);
+  for (const m of source.matchAll(/export const (\w+)\s*=\s*\{([^{}]*)\}/g)) {
+    const search: Record<string, string> = {};
+    for (const pair of (m[2] as string).matchAll(/(\w+):\s*'([^']*)'/g))
+      search[pair[1] as string] = pair[2] as string;
+    searches.set(m[1] as string, search);
+  }
+  return { paths, searches };
+}
 
 /** Порядок и страницы тем из `HELP_GROUPS`. */
 export function readHelpIndex(webSrc: string): HelpTopicRef[] {
   const file = join(webSrc, TOPICS_FILE);
-  const mtime = statSync(file).mtimeMs;
+  const routesFile = join(webSrc, ROUTES_FILE);
+  const mtime = `${statSync(file).mtimeMs}:${existsSync(routesFile) ? statSync(routesFile).mtimeMs : 0}`;
   if (indexCache?.file === file && indexCache.mtime === mtime) return indexCache.topics;
   const source = readFileSync(file, 'utf8');
   const start = source.indexOf('HELP_GROUPS');
   if (start < 0) throw new Error(`HELP_GROUPS не найден в ${file}`);
+  const routes = readRouteConstants(routesFile);
   const topics: HelpTopicRef[] = [];
   let group = '';
   // Запись группы — `labelKey: '…'`, запись темы — объект с `id` и `pagePath`
-  // (в одну строку или разнесённый форматером на несколько).
-  const pattern = /labelKey:\s*'([^']+)'|\{\s*id:\s*'([^']+)',[^{}]*?pagePath:\s*'([^']*)'/g;
+  // (в одну строку или разнесённый форматером на несколько). `pagePath` — литерал или
+  // константа маршрута, `pageSearch` — константа набора параметров; оба из `routes.ts`.
+  const pattern = /labelKey:\s*'([^']+)'|\{\s*id:\s*'([^']+)',([^{}]*)\}/g;
   for (const match of source.slice(start).matchAll(pattern)) {
-    if (match[1]) group = match[1];
-    else if (match[2]) topics.push({ id: match[2], pagePath: match[3] ?? '', group });
+    if (match[1]) {
+      group = match[1];
+      continue;
+    }
+    const id = match[2] as string;
+    const body = match[3] ?? '';
+    const path = /pagePath:\s*(?:'([^']*)'|([A-Z_][A-Z0-9_]*))/.exec(body);
+    if (!path) continue;
+    const pagePath = path[1] ?? routes.paths.get(path[2] as string);
+    if (pagePath === undefined)
+      throw new Error(`Help topic ${id}: route constant ${path[2]} not found in ${routesFile}`);
+    const searchName = /pageSearch:\s*([A-Z_][A-Z0-9_]*)/.exec(body)?.[1];
+    const search = searchName ? routes.searches.get(searchName) : undefined;
+    if (searchName && !search)
+      throw new Error(`Help topic ${id}: search params ${searchName} not found in ${routesFile}`);
+    const query = search ? new URLSearchParams(search).toString() : '';
+    topics.push({ id, pagePath: query ? `${pagePath}?${query}` : pagePath, group });
   }
   if (topics.length === 0) throw new Error(`В HELP_GROUPS не разобрано ни одной темы (${file})`);
   indexCache = { file, mtime, topics };

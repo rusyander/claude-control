@@ -54,6 +54,29 @@ describe('readIntegrations', () => {
     expect(readIntegrations(settings).telegram.events).toEqual(['runDone', 'question']);
   });
 
+  it('порог «закончил» и тихие часы доходят до карточки; испорченные — как не заданы', () => {
+    const kept = {
+      integrations: {
+        telegram: {
+          chatId: '1',
+          doneAfterMinutes: 12,
+          quiet: { from: '23:00', to: '08:00', asks: true },
+        },
+      },
+    } as unknown as AppSettings;
+    expect(readIntegrations(kept).telegram).toMatchObject({
+      doneAfterMinutes: 12,
+      quiet: { from: '23:00', to: '08:00', asks: true },
+    });
+    const broken = {
+      integrations: {
+        telegram: { doneAfterMinutes: '12', quiet: { from: '25:00', to: '08:00' } },
+      },
+    } as unknown as AppSettings;
+    expect(readIntegrations(broken).telegram).not.toHaveProperty('doneAfterMinutes');
+    expect(readIntegrations(broken).telegram).not.toHaveProperty('quiet');
+  });
+
   it('не-строка и не-массив на месте значения не протекают наружу', () => {
     const settings = {
       integrations: { ci: { repo: 42, artifact: null }, telegram: { events: 'runDone' } },

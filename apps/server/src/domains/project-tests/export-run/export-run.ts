@@ -11,7 +11,7 @@ import { reasonOf } from '../point-reason/point-reason.ts';
 import { RUN_TEXTS, type ExportLanguage } from '../export-run-texts.ts';
 
 export { reasonOf };
-export { exportLanguage, type ExportLanguage } from '../export-run-texts.ts';
+export { askedLanguage, exportLanguage, type ExportLanguage } from '../export-run-texts.ts';
 
 /**
  * Отчёт по ОДНОМУ прогону файлом — то, что отдают наружу.

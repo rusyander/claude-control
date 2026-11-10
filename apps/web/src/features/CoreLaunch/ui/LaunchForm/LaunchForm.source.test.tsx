@@ -29,6 +29,20 @@ vi.mock('../../api/launchApi', () => ({
   useScenarioListing: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
+// «В очередь» — запрос к доске ядра; форме хватает состояния с подменённой отправкой.
+const queueSend = vi.fn<(fields: EstimateFields) => Promise<void>>(async () => {});
+vi.mock('../../model/useQueueEntry', () => ({
+  useQueueEntry: () => ({
+    stop: 'mr',
+    setStop: () => {},
+    queue: queueSend,
+    pending: false,
+    retrying: false,
+    queued: null,
+    refusal: null,
+  }),
+}));
+
 const { LaunchForm } = await import('./LaunchForm');
 
 /** Первый элемент дерева, чьи свойства подходят под условие. */
@@ -115,6 +129,17 @@ describe('LaunchForm — источник задачи', () => {
     submit(initial);
 
     await vi.waitFor(() => expect(pickerProblem(initial)).toBe('tracker-unread'));
+    expect(onEstimate).not.toHaveBeenCalled();
+  });
+
+  it('«В очередь» отправляет те же поля, что «Оценить», и оценку не запускает', async () => {
+    queueSend.mockClear();
+    const initial: Partial<LaunchDraft> = { title: 'Очередь', request: 'сделать', repos: REPO };
+    const button = find(render(initial), (p) => p['data-queue-button'] === true);
+    (button?.onClick as () => void)();
+
+    await vi.waitFor(() => expect(queueSend).toHaveBeenCalledTimes(1));
+    expect(queueSend.mock.calls[0]?.[0]).toMatchObject({ title: 'Очередь', request: 'сделать' });
     expect(onEstimate).not.toHaveBeenCalled();
   });
 });

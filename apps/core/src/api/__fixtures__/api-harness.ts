@@ -126,6 +126,12 @@ export async function startStand(
     allocator?: ApiDeps['allocator'];
     localActivity?: ApiDeps['localActivity'];
     learned?: ApiDeps['learned'];
+    /** Этап 12: доска задач (`conductor/board/__fixtures__/board-stand.ts`). */
+    board?: ApiDeps['board'];
+    /** Этап 12 (Z7): входящие (`bootstrap/inbox-wiring.ts`). */
+    inbox?: ApiDeps['inbox'];
+    /** Этап 12 (D29): отпечаток привязанного владельца Telegram — как у загрузки из настройки. */
+    telegramOwner?: () => string | null;
   } = {},
 ): Promise<Stand> {
   const layout = layoutOf(tasksDir ? dirname(tasksDir) : tempDir('api-'));
@@ -151,6 +157,7 @@ export async function startStand(
     },
     isSessionDescendant: async (pid) => peer.sessionPids.has(pid),
     trustedHopPids: new Set([TRUSTED_HOP_PID]),
+    ...(opts.telegramOwner ? { telegramOwner: opts.telegramOwner } : {}),
   };
   const app = buildApi({
     registry,
@@ -184,6 +191,8 @@ export async function startStand(
     ...(opts.allocator ? { allocator: opts.allocator } : {}),
     ...(opts.localActivity ? { localActivity: opts.localActivity } : {}),
     ...(opts.learned ? { learned: opts.learned } : {}),
+    ...(opts.board ? { board: opts.board } : {}),
+    ...(opts.inbox ? { inbox: opts.inbox } : {}),
   });
   await app.listen({ host: '127.0.0.1', port: 0 });
   const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;

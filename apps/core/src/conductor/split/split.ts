@@ -7,6 +7,7 @@ import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { samePath } from '../../platform/paths.ts';
 import type { SplitEnv } from '../estimate/estimate.types.ts';
+import { humanChannel } from '../human/channel.ts';
 import { closeLaunchAsks } from '../human/launch-ask.ts';
 import { journalPreflight, publishesOf, runTaskPreflight } from '../estimate/preflight-run.ts';
 import { resolveScenario, scenarioPrecedence, titleLangOf } from '../scenario/index.ts';
@@ -61,9 +62,9 @@ export function proposedOfClaim(
 
 const toCheck = (u: ProposedUnit): SplitUnit => ({ ...u });
 
-/** Автор строки человека — тот же канал, что у приёма команды (`process.ts`). */
+/** Автор строки человека — тот же канал, что у приёма команды (`process.ts`), включая Telegram. */
 export function humanActorOf(task: LiveTask, cmdId: string): string {
-  return task.state.commands[cmdId]?.proof.signature === 'valid' ? 'human:device' : 'human:panel';
+  return humanChannel(task, cmdId).actor;
 }
 
 /** Решение проверки — данные JSON (только строки, числа, массивы): строка `decision` его хранит. */

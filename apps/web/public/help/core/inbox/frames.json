@@ -1,0 +1,206 @@
+{
+  "topic": "core",
+  "scenario": "inbox",
+  "frames": [
+    {
+      "id": "01-row",
+      "side": "panel",
+      "file": "01-row.png",
+      "masked": 0,
+      "width": 1628,
+      "height": 100,
+      "shotAt": "2026-11-09T11:36:27.199Z",
+      "text": "Входящие из трекера 2 источника · выключено: 1 · опрос раз в 5 мин Источники Найти в трекере",
+      "seal": {
+        "png": "dc682ec471d6212d",
+        "text": "338ff3acd306d4c4"
+      },
+      "en": {
+        "file": "01-row.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 100,
+        "shotAt": "2026-11-09T11:36:41.097Z",
+        "text": "Inbox from the tracker 2 sources · off: 1 · polled every 5 min Sources Find in the tracker",
+        "seal": {
+          "png": "136681c5e6ea930f",
+          "text": "e37a332f2a3021db"
+        }
+      },
+      "dark": {
+        "file": "01-row.dark.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 100,
+        "shotAt": "2026-11-09T11:36:47.426Z",
+        "text": "Входящие из трекера 2 источника · выключено: 1 · опрос раз в 5 мин Источники Найти в трекере",
+        "seal": {
+          "png": "d6f913dfaba05e2d",
+          "text": "338ff3acd306d4c4"
+        }
+      },
+      "darkEn": {
+        "file": "01-row.dark.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 100,
+        "shotAt": "2026-11-09T11:36:54.339Z",
+        "text": "Inbox from the tracker 2 sources · off: 1 · polled every 5 min Sources Find in the tracker",
+        "seal": {
+          "png": "1fa48d0fd4afe163",
+          "text": "e37a332f2a3021db"
+        }
+      }
+    },
+    {
+      "id": "02-sources",
+      "side": "panel",
+      "file": "02-sources.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-09T11:36:28.161Z",
+      "text": "Источники входящих Ядро само опрашивает эти источники и кладёт новые тикеты во «Входящие» доски — одна запись на тикет. В очередь их ставите вы, пока у источника не включено «Сам в очередь». Jira Имя источника Латиница в нижнем регистре, цифры и дефис; по имени и ключу тикета ядро узнаёт повтор. Сам в очередь: jira Новые записи этого источника пойдут в очередь сами; доказательство старта — эта запись настройки. Выключите — запись вернётся во «Входящие» с причиной. Метки Через запятую; тикет с любой из меток попадёт во «Входящие». Только назначенные на меня: jira Свой запрос JQL Вместо меток. Запрос судит сам трекер — через модель он не идёт. Репозитории Строка на проект: «путь на форже = локальная папка». Без строки задача встанет с причиной «нет локального репозитория». Метки дефекта Через запятую; пусто — «bug». Такой тикет идёт пресетом «исправить дефект». GitLab Имя источника Латиница в нижнем регистре, цифры и дефис; по имени и ключу тикета ядро узнаёт повтор. Сам в очередь: gitlab Новые записи этого источника пойдут в очередь сами; доказательство старта — эта запись настройки. Выключите — запись вернётся во «Входящие» с причиной. Метки задач Через запятую; тикет с любой из меток попадёт во «Входящие». Задачи, назначенные на меня: gitlab MR, где я ревьюер: gitlab Мои MR с открытыми обсуждениями: gitlab Репозитории Строка на проект: «путь на форже = локальная папка». Без строки задача встанет с причиной «нет локального репозитория». Метки дефекта Через запятую; пусто — «bug». Такой тикет идёт пресетом «исправить дефект». Система источника Jira GitLab GitHub — не поддерживается GitHub: входящие не поддерживаются — только Jira и GitLab. Добавить источник Опрос раз в 1 мин раз в 5 мин раз в 15 мин раз в 30 мин раз в 60 мин Ответ в тикет После открытия MR ядро оставит в тикете одну строку со ссылкой на него. Отмена Сохранить",
+      "seal": {
+        "png": "be9abb363d772d58",
+        "text": "8e77ab064143b882"
+      },
+      "en": {
+        "file": "02-sources.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:41.918Z",
+        "text": "Inbox sources The core polls these sources itself and puts new tickets into the board Inbox — one entry per ticket. You queue them, unless the source has \"Queue by itself\" on. Jira Source name Lowercase latin letters, digits and hyphens; the name plus the ticket key is how the core spots a repeat. Queue by itself: jira New entries of this source queue themselves; the start proof is this settings write. Turn it off and the entry returns to the Inbox with the reason. Labels Comma-separated; a ticket with any of them reaches the Inbox. Only assigned to me: jira Own JQL query Instead of labels. The tracker itself judges the query — it never passes through a model. Repositories One line per project: \"forge path = local folder\". Without a line the task stops with \"no local repository\". Bug labels Comma-separated; empty means \"bug\". Such a ticket runs the \"fix a bug\" preset. GitLab Source name Lowercase latin letters, digits and hyphens; the name plus the ticket key is how the core spots a repeat. Queue by itself: gitlab New entries of this source queue themselves; the start proof is this settings write. Turn it off and the entry returns to the Inbox with the reason. Issue labels Comma-separated; a ticket with any of them reaches the Inbox. Issues assigned to me: gitlab MRs where I review: gitlab My MRs with open threads: gitlab Repositories One line per project: \"forge path = local folder\". Without a line the task stops with \"no local repository\". Bug labels Comma-separated; empty means \"bug\". Such a ticket runs the \"fix a bug\" preset. Source system Jira GitLab GitHub — not supported GitHub: the inbox is not supported — Jira and GitLab only. Add a source Polling every 1 min every 5 min every 15 min every 30 min every 60 min Reply in the ticket Once the MR is open the core leaves one line in the ticket with its link. Cancel Save",
+        "seal": {
+          "png": "6cb93be83fc45446",
+          "text": "58100f0bf08e810c"
+        }
+      },
+      "dark": {
+        "file": "02-sources.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:48.212Z",
+        "text": "Источники входящих Ядро само опрашивает эти источники и кладёт новые тикеты во «Входящие» доски — одна запись на тикет. В очередь их ставите вы, пока у источника не включено «Сам в очередь». Jira Имя источника Латиница в нижнем регистре, цифры и дефис; по имени и ключу тикета ядро узнаёт повтор. Сам в очередь: jira Новые записи этого источника пойдут в очередь сами; доказательство старта — эта запись настройки. Выключите — запись вернётся во «Входящие» с причиной. Метки Через запятую; тикет с любой из меток попадёт во «Входящие». Только назначенные на меня: jira Свой запрос JQL Вместо меток. Запрос судит сам трекер — через модель он не идёт. Репозитории Строка на проект: «путь на форже = локальная папка». Без строки задача встанет с причиной «нет локального репозитория». Метки дефекта Через запятую; пусто — «bug». Такой тикет идёт пресетом «исправить дефект». GitLab Имя источника Латиница в нижнем регистре, цифры и дефис; по имени и ключу тикета ядро узнаёт повтор. Сам в очередь: gitlab Новые записи этого источника пойдут в очередь сами; доказательство старта — эта запись настройки. Выключите — запись вернётся во «Входящие» с причиной. Метки задач Через запятую; тикет с любой из меток попадёт во «Входящие». Задачи, назначенные на меня: gitlab MR, где я ревьюер: gitlab Мои MR с открытыми обсуждениями: gitlab Репозитории Строка на проект: «путь на форже = локальная папка». Без строки задача встанет с причиной «нет локального репозитория». Метки дефекта Через запятую; пусто — «bug». Такой тикет идёт пресетом «исправить дефект». Система источника Jira GitLab GitHub — не поддерживается GitHub: входящие не поддерживаются — только Jira и GitLab. Добавить источник Опрос раз в 1 мин раз в 5 мин раз в 15 мин раз в 30 мин раз в 60 мин Ответ в тикет После открытия MR ядро оставит в тикете одну строку со ссылкой на него. Отмена Сохранить",
+        "seal": {
+          "png": "b8512d758e8ab000",
+          "text": "8e77ab064143b882"
+        }
+      },
+      "darkEn": {
+        "file": "02-sources.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:55.168Z",
+        "text": "Inbox sources The core polls these sources itself and puts new tickets into the board Inbox — one entry per ticket. You queue them, unless the source has \"Queue by itself\" on. Jira Source name Lowercase latin letters, digits and hyphens; the name plus the ticket key is how the core spots a repeat. Queue by itself: jira New entries of this source queue themselves; the start proof is this settings write. Turn it off and the entry returns to the Inbox with the reason. Labels Comma-separated; a ticket with any of them reaches the Inbox. Only assigned to me: jira Own JQL query Instead of labels. The tracker itself judges the query — it never passes through a model. Repositories One line per project: \"forge path = local folder\". Without a line the task stops with \"no local repository\". Bug labels Comma-separated; empty means \"bug\". Such a ticket runs the \"fix a bug\" preset. GitLab Source name Lowercase latin letters, digits and hyphens; the name plus the ticket key is how the core spots a repeat. Queue by itself: gitlab New entries of this source queue themselves; the start proof is this settings write. Turn it off and the entry returns to the Inbox with the reason. Issue labels Comma-separated; a ticket with any of them reaches the Inbox. Issues assigned to me: gitlab MRs where I review: gitlab My MRs with open threads: gitlab Repositories One line per project: \"forge path = local folder\". Without a line the task stops with \"no local repository\". Bug labels Comma-separated; empty means \"bug\". Such a ticket runs the \"fix a bug\" preset. Source system Jira GitLab GitHub — not supported GitHub: the inbox is not supported — Jira and GitLab only. Add a source Polling every 1 min every 5 min every 15 min every 30 min every 60 min Reply in the ticket Once the MR is open the core leaves one line in the ticket with its link. Cancel Save",
+        "seal": {
+          "png": "4f85d7b226fb57c4",
+          "text": "58100f0bf08e810c"
+        }
+      }
+    },
+    {
+      "id": "03-search",
+      "side": "panel",
+      "file": "03-search.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-09T11:36:32.776Z",
+      "text": "Найти в трекере Источник jira gitlab (выключен) Запрос JQL или ключ задачи; пусто — запрос самого источника. Через модель запрос не идёт. Найти Выбрать все PROJ-1 задача · Story Проверить вход по ссылке agent PROJ-2 задача · Bug Кнопка «Сохранить» не гаснет agent PROJ-3 задача · Story Экспорт заказов в CSV agent Во входящие (2)",
+      "seal": {
+        "png": "0bf454efb8889b87",
+        "text": "f4dd246a540fa119"
+      },
+      "en": {
+        "file": "03-search.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:43.129Z",
+        "text": "Find in the tracker Source jira gitlab (off) Query JQL or an issue key; empty means the source own query. The query never passes through a model. Find Pick all PROJ-1 issue · Story Check the login link agent PROJ-2 issue · Bug The Save button stays enabled agent PROJ-3 issue · Story Export orders to CSV agent To the inbox (2)",
+        "seal": {
+          "png": "53e675ee440b693c",
+          "text": "205f534d38b0b1d8"
+        }
+      },
+      "dark": {
+        "file": "03-search.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:49.390Z",
+        "text": "Найти в трекере Источник jira gitlab (выключен) Запрос JQL или ключ задачи; пусто — запрос самого источника. Через модель запрос не идёт. Найти Выбрать все PROJ-1 задача · Story Проверить вход по ссылке agent PROJ-2 задача · Bug Кнопка «Сохранить» не гаснет agent PROJ-3 задача · Story Экспорт заказов в CSV agent Во входящие (2)",
+        "seal": {
+          "png": "8e84812f0e2f0026",
+          "text": "f4dd246a540fa119"
+        }
+      },
+      "darkEn": {
+        "file": "03-search.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:56.393Z",
+        "text": "Find in the tracker Source jira gitlab (off) Query JQL or an issue key; empty means the source own query. The query never passes through a model. Find Pick all PROJ-1 issue · Story Check the login link agent PROJ-2 issue · Bug The Save button stays enabled agent PROJ-3 issue · Story Export orders to CSV agent To the inbox (2)",
+        "seal": {
+          "png": "96267014db46ef23",
+          "text": "205f534d38b0b1d8"
+        }
+      }
+    },
+    {
+      "id": "04-preset",
+      "side": "panel",
+      "file": "04-preset.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-09T11:36:36.993Z",
+      "text": "PROJ-1: экспорт заказов в CSV Входящие Стадия Входящие Состояние во входящих Остановка до плана Класс и профиль нет данных Источник трекер PROJ-1 Запуск с доски Ход по единицам нет данных Агенты нет данных Расход нет данных Оценка до запуска нет данных MR нет данных Сценарий Задача из трекера Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Сценарий Новая возможность Исправление ошибки Рефакторинг Только ревью Задача из трекера Ведущий Каким сценарием запись запустится. Сменить можно, пока задача не стартовала. Ходы карточки В очередь Отклонить",
+      "seal": {
+        "png": "efd8454718f5887b",
+        "text": "e155b20b3ffce131"
+      },
+      "en": {
+        "file": "04-preset.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:43.923Z",
+        "text": "PROJ-1: export orders to CSV Inbox Stage Inbox State in the inbox Stop at the plan Class and profile no data Source tracker PROJ-1 Launch from the board Progress by unit no data Agents no data Spend no data Estimate before launch no data MR no data Scenario Tracker ticket Created Nov 8, 2026, 02:00 PM Started no data Scenario New feature Bug fix Refactoring Review only Tracker ticket Lead Which scenario the entry starts with. You can change it until the task has started. Card moves To queue Reject",
+        "seal": {
+          "png": "a587c89b717eaf8c",
+          "text": "1760cdec395788bc"
+        }
+      },
+      "dark": {
+        "file": "04-preset.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:50.194Z",
+        "text": "PROJ-1: экспорт заказов в CSV Входящие Стадия Входящие Состояние во входящих Остановка до плана Класс и профиль нет данных Источник трекер PROJ-1 Запуск с доски Ход по единицам нет данных Агенты нет данных Расход нет данных Оценка до запуска нет данных MR нет данных Сценарий Задача из трекера Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Сценарий Новая возможность Исправление ошибки Рефакторинг Только ревью Задача из трекера Ведущий Каким сценарием запись запустится. Сменить можно, пока задача не стартовала. Ходы карточки В очередь Отклонить",
+        "seal": {
+          "png": "e107b3b204fef4b7",
+          "text": "e155b20b3ffce131"
+        }
+      },
+      "darkEn": {
+        "file": "04-preset.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-09T11:36:57.224Z",
+        "text": "PROJ-1: export orders to CSV Inbox Stage Inbox State in the inbox Stop at the plan Class and profile no data Source tracker PROJ-1 Launch from the board Progress by unit no data Agents no data Spend no data Estimate before launch no data MR no data Scenario Tracker ticket Created Nov 8, 2026, 02:00 PM Started no data Scenario New feature Bug fix Refactoring Review only Tracker ticket Lead Which scenario the entry starts with. You can change it until the task has started. Card moves To queue Reject",
+        "seal": {
+          "png": "7dfefcf1f8f06b98",
+          "text": "1760cdec395788bc"
+        }
+      }
+    }
+  ]
+}

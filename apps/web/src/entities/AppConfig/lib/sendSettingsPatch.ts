@@ -32,6 +32,29 @@ interface QueuedSend {
 // мутации над одним кешем.
 const queues = new WeakMap<QueryClient, PatchQueue>();
 
+/**
+ * Очереди, у которых есть правка, ещё не ушедшая на сервер (`next`). Ушедший запрос
+ * переживает перезагрузку сам (`keepalive` в `patchSettings`), а неушедшая правка живёт
+ * только в памяти страницы: F5 стёр бы её молча, хотя на экране она уже видна.
+ */
+const unsent = new Set<PatchQueue>();
+
+/** Есть ли правка настроек, которую уход со страницы потеряет. */
+export function hasUnsentSettings(): boolean {
+  return unsent.size > 0;
+}
+
+let unloadGuarded = false;
+
+/** Уход со страницы с неушедшей правкой спрашивает браузерным «Покинуть сайт?». */
+function guardUnload(): void {
+  if (unloadGuarded || typeof window === 'undefined') return;
+  unloadGuarded = true;
+  window.addEventListener('beforeunload', (event) => {
+    if (hasUnsentSettings()) event.preventDefault();
+  });
+}
+
 function queueOf(queryClient: QueryClient): PatchQueue {
   let queue = queues.get(queryClient);
   if (!queue) {
@@ -100,7 +123,10 @@ export function sendSettingsPatch(
   queue.pending += 1;
   const run = async (): Promise<AppSettings> => {
     // С этого мига запрос ушёл: следующие правки копятся уже в новый.
-    if (queue.next === waiting) queue.next = undefined;
+    if (queue.next === waiting) {
+      queue.next = undefined;
+      unsent.delete(queue);
+    }
     const sent = waiting.patch;
     try {
       const settings = await send(sent);
@@ -117,7 +143,11 @@ export function sendSettingsPatch(
   // Свободная очередь отправляет сразу; занятая — после ответа текущего запроса,
   // а до тех пор этот запрос принимает следующие правки.
   const idle = queue.pending === 1;
-  if (!idle) queue.next = waiting;
+  if (!idle) {
+    queue.next = waiting;
+    unsent.add(queue);
+    guardUnload();
+  }
   waiting.result = idle ? run() : queue.tail.then(run, run);
   queue.tail = waiting.result.catch(() => undefined);
   return waiting.result;

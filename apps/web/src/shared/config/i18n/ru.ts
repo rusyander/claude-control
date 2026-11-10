@@ -1,8 +1,6 @@
 import { serverMessagesRu } from './server-messages/ru.ts';
 import { panelAgentRu } from './panel-agent/ru.ts';
 import { attachRu } from './attach/ru.ts';
-import { groupKnobsRu, groupPathRu, groupSourcesRu } from './groups/ru.ts';
-import { groupsPageRu } from './groups/page-ru.ts';
 import { groupBuilderRu } from './groups/builder-ru.ts';
 import { testsE2eRu } from './tests-e2e/ru.ts';
 import { pageTabsRu } from './page-tabs/ru.ts';
@@ -30,6 +28,13 @@ import { coreTimelineRu } from './core-timeline/ru.ts';
 import { coreLaunchRu } from './core-launch/ru.ts';
 import { coreScenarioRu } from './core-scenario/ru.ts';
 import { coreChatRu } from './core-chat/ru.ts';
+import { coreBoardRu } from './core-board/ru.ts';
+import { coreInboxRu } from './core-inbox/ru.ts';
+import { diffNotesRu } from './diff-notes/ru.ts';
+import { limitCardRu } from './limit-card/ru.ts';
+import { coreTakeoverRu } from './core-takeover/ru.ts';
+import { sitePreviewRu } from './site-preview/ru.ts';
+import { testsRecordedRu } from './tests-recorded/ru.ts';
 
 export const ru = {
   /** Тексты сервера по коду — `server-message.ts`, `contracts/server-messages.ts`. */
@@ -44,11 +49,6 @@ export const ru = {
   panelAgent: panelAgentRu,
   /** Картинки в полях агента: кнопка, перетаскивание, вставка — `attach/ru.ts`. */
   attach: attachRu,
-  /** Путь группы и откуда группы берутся — `groups/ru.ts`. */
-  groupPath: groupPathRu,
-  groupSources: groupSourcesRu,
-  groupKnobs: groupKnobsRu,
-  groupsPage: groupsPageRu,
   groupBuilder: groupBuilderRu,
   /** Карточка папки e2e раздела «Тесты» — `tests-e2e/ru.ts`. */
   testsE2e: testsE2eRu,
@@ -83,6 +83,15 @@ export const ru = {
   coreScenario: coreScenarioRu,
   /** Чат через ядро (этап 10): новый чат — задача `chat@1` в папке проекта — `core-chat/ru.ts`. */
   coreChat: coreChatRu,
+  /** Ядро задач (этап 12): доска, заметки к диффу, карточка лимита, перехват — свои модули. */
+  coreBoard: coreBoardRu,
+  coreInbox: coreInboxRu,
+  diffNotes: diffNotesRu,
+  limitCard: limitCardRu,
+  coreTakeover: coreTakeoverRu,
+  /** Этап 12, волна 3: окно сайта в чате и записанные проходы по стенду — свои модули. */
+  sitePreview: sitePreviewRu,
+  testsRecorded: testsRecordedRu,
   /** Окно «Окружение» из чата проекта — `environment/ru.ts`. */
   environment: environmentRu,
   /** Раздел «Проекты — конфигурация»: шапка проекта, вкладки, документ инструкций — `projects/ru.ts`. */
@@ -628,13 +637,14 @@ export const ru = {
     brokenHooks: 'хуков со сломанным путём',
     mcpFailed: 'серверов не отвечают',
     unusedScripts: 'не привязано к событиям',
-    // Склоняется по числу (суффиксы Intl.PluralRules): «1 набор», «2 набора», «5 наборов».
-    groupsHint_one: '{{count}} набор настроек',
-    groupsHint_few: '{{count}} набора настроек',
-    groupsHint_many: '{{count}} наборов настроек',
-    groupsHint_other: '{{count}} наборов настроек',
+    // Склоняется по числу (суффиксы Intl.PluralRules): «1 группа», «2 группы», «5 групп».
+    groupsHint_one: '{{count}} группа ядра в работе',
+    groupsHint_few: '{{count}} группы ядра в работе',
+    groupsHint_many: '{{count}} групп ядра в работе',
+    groupsHint_other: '{{count}} группы ядра в работе',
     permissionsAsk: 'с подтверждением',
-    groupsEmpty: 'пока не созданы',
+    groupsEmpty: 'нет групп в работе',
+    groupsUnknown: 'ядро не отвечает',
     allScriptsUsed: 'все привязаны к хукам',
     backups: 'Резервные копии',
     backupsLast: 'последняя',

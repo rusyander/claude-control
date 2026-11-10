@@ -5,6 +5,7 @@ import type {
   IntegrationId,
   IntegrationsSettings,
   TelegramEvent,
+  TelegramSettings,
   TmsSystemSettings,
 } from '@agentdeck/contracts';
 import { INTEGRATION_ORDER } from '@agentdeck/contracts/integrations';
@@ -89,6 +90,28 @@ function readTelegramEvents(value: unknown): TelegramEvent[] {
   return TELEGRAM_EVENTS.filter((event) => value.includes(event));
 }
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Telegram с порогом «закончил» и тихими часами: без них карточка показывала умолчание
+ * вместо сохранённого, и первое же «Сохранить» затирало порог и выключало тишину.
+ */
+function readTelegram(raw: Partial<TelegramSettings>): TelegramSettings {
+  const done = raw.doneAfterMinutes;
+  const quiet = raw.quiet;
+  return {
+    enabled: asFlag(raw.enabled),
+    chatId: asText(raw.chatId),
+    events: readTelegramEvents(raw.events),
+    ...(typeof done === 'number' && Number.isInteger(done) && done >= 0
+      ? { doneAfterMinutes: done }
+      : {}),
+    ...(quiet && HHMM.test(asText(quiet.from)) && HHMM.test(asText(quiet.to))
+      ? { quiet: { from: quiet.from, to: quiet.to, asks: asFlag(quiet.asks) } }
+      : {}),
+  };
+}
+
 function readSite(raw: Partial<AtlassianSiteSettings> = {}): AtlassianSiteSettings {
   return {
     enabled: asFlag(raw.enabled),
@@ -123,11 +146,7 @@ export function readIntegrations(settings: AppSettings | undefined): Integration
     confluence: readSite(raw.confluence),
     gitlab: readForge(raw.gitlab),
     github: readForge(raw.github),
-    telegram: {
-      enabled: asFlag(telegram.enabled),
-      chatId: asText(telegram.chatId),
-      events: readTelegramEvents(telegram.events),
-    },
+    telegram: readTelegram(telegram),
     zephyr: readTms(raw.zephyr),
     xray: readTms(raw.xray),
     testit: readTms(raw.testit),

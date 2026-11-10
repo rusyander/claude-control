@@ -3,6 +3,7 @@ import type { ForgeKind, ForgeMr, ForgePort } from '@agentdeck/contracts/core/fo
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 import { forgeActionKey, mrBodyHash } from '../../adapters/forge/index.ts';
 import type { OutboxPort } from '../push/push.types.ts';
+import { afterMrOpened, type TrackerCommentPort } from '../tracker-comment.ts';
 
 /**
  * MR единицы (05 §Push and MR, P31): личность MR — ТОЛЬКО id, который вернул форж на создание,
@@ -21,6 +22,8 @@ export interface MrDeps {
   outbox: OutboxPort;
   /** Свой аккаунт форжа (`whoAmI`), прочитанный один раз за попытку. */
   self: string;
+  /** Комментарий назад в тикет задачи из входящих (Z7, P166); нет — комментария нет. */
+  commentBack?: TrackerCommentPort;
 }
 
 export interface MrInput {
@@ -44,7 +47,18 @@ export type MrOutcome =
   | { kind: 'unknown'; reason: string }
   | { kind: 'unsupported'; reason: string };
 
-function recordOf(forgeKind: ForgeKind, unitId: string, mr: ForgeMr, actionId: string): MrRecord {
+/**
+ * `title` — заголовок, с которым публикатор открывал MR (этап 12, B10a): карточка доски показывает
+ * его, а не ветку. И после краха (чтение по ветке) — тот же: MR создавался этим заголовком.
+ */
+function recordOf(
+  forgeKind: ForgeKind,
+  unitId: string,
+  mr: ForgeMr,
+  actionId: string,
+  title: string,
+): MrRecord {
+  const shown = title.trim().slice(0, 500);
   return {
     unitId,
     forge: forgeKind,
@@ -53,6 +67,7 @@ function recordOf(forgeKind: ForgeKind, unitId: string, mr: ForgeMr, actionId: s
     url: mr.url,
     sourceBranch: mr.sourceBranch,
     actionId,
+    ...(shown ? { title: shown } : {}),
   };
 }
 
@@ -70,11 +85,17 @@ export async function ensureMr(deps: MrDeps, input: MrInput): Promise<MrOutcome>
       author: deps.self,
     });
     if ('value' in found) {
-      return {
+      return afterMrOpened(deps.commentBack, {
         kind: 'identified',
-        record: recordOf(deps.forgeKind, input.unitId, found.value, input.priorCreate.actionId),
+        record: recordOf(
+          deps.forgeKind,
+          input.unitId,
+          found.value,
+          input.priorCreate.actionId,
+          input.title,
+        ),
         via: 'read',
-      };
+      } as const);
     }
     if (!('absent' in found)) return { kind: 'unknown', reason: `mr by branch: ${why(found)}` };
   }
@@ -108,11 +129,11 @@ export async function ensureMr(deps: MrDeps, input: MrInput): Promise<MrOutcome>
     return { ok: false, code: 'forge-unknown', detail: res.unknown };
   });
   if (got.ok && box.created) {
-    return {
+    return afterMrOpened(deps.commentBack, {
       kind: 'identified',
-      record: recordOf(deps.forgeKind, input.unitId, box.created, got.actionId),
+      record: recordOf(deps.forgeKind, input.unitId, box.created, got.actionId, input.title),
       via: 'create',
-    };
+    } as const);
   }
   if (box.unsupported !== null) return { kind: 'unsupported', reason: box.unsupported };
   return { kind: 'unknown', reason: got.ok ? 'create returned no MR' : got.code };

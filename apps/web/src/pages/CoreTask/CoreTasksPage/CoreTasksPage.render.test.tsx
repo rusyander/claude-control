@@ -38,7 +38,8 @@ async function render(lang: 'ru' | 'en'): Promise<string> {
   // Ссылка «Открыть ленту» — роутерная: страница рисуется под настоящим роутером.
   const router = createRouter({
     routeTree: createRootRoute({ component: () => <CoreTasksPage /> }),
-    history: createMemoryHistory({ initialEntries: ['/core'] }),
+    // Список — переключатель рядом с доской (этап 12): по умолчанию раздел рисует доску.
+    history: createMemoryHistory({ initialEntries: ['/core?view=list'] }),
   });
   await router.load();
   return renderToStaticMarkup(

@@ -248,8 +248,8 @@
     "why": "outbound notification to an external channel (Telegram, Expo push) about a core-task question: head, where to answer, the refusal to a Telegram reply, the task link line (stage 10, zone D)"
   },
   "domains/notify/telegram-answers/apply.ts": {
-    "n": 9,
-    "why": "Telegram answers: refusal details for the server log, never sent to a panel client (23.10); +2 reply into a chat: empty reply, unknown project folder (25.10); +1 a read-only question of a session outside the panel (25.10); -1 foreign-chat permission kind left with the panel's foreign runner (02.11); -1 branch-gate answer kind left with ChatBranchGate (G14, 03.11)"
+    "n": 10,
+    "why": "Telegram answers: refusal details for the server log, never sent to a panel client (23.10); +2 reply into a chat: empty reply, unknown project folder (25.10); +1 a read-only question of a session outside the panel (25.10); -1 foreign-chat permission kind left with the panel's foreign runner (02.11); -1 branch-gate answer kind left with ChatBranchGate (G14, 03.11); +1 core ask buttons not configured detail (Z16, 09.11)"
   },
   "domains/notify/telegram-answers/bot-api.ts": {
     "n": 1,
@@ -268,12 +268,20 @@
     "why": "unclassified"
   },
   "domains/notify/telegram-answers/commands.ts": {
-    "n": 22,
-    "why": "outbound notification to an external channel (Telegram bot): command menu, /status, /waiting, /help replies and the connect greeting (25.10); +2 /clear in the command menu and /help (25.10); -1 /status takes the «📁 проект · сессия» place from compose (25.10)"
+    "n": 25,
+    "why": "outbound notification to an external channel (Telegram bot): command menu, /status, /waiting, /help replies and the connect greeting (25.10); +2 /clear in the command menu and /help (25.10); -1 /status takes the «📁 проект · сессия» place from compose (25.10); +3 /task in the command menu and /help, core task notices line in /help (Z17, 09.11)"
   },
   "domains/notify/telegram-answers/compose.ts": {
-    "n": 51,
-    "why": "outbound notification to an external channel (Telegram answers): ask text, buttons, outcome lines, toasts (23.10); HTML message format 25.10: type lines (ВОПРОС, РАЗРЕШЕНИЕ, РЕШЕНИЕ), «Открыть чат →», «…и ещё N — в панели»; 12б/13б 25.10: «вид · суть» first line, collapsed outcome lines; final layout 25.10: «вид · 📁 проект · сессия», суть второй строкой, без хэштегов; read-only question of a session outside the panel: «Терминал», «Ответь в VS Code / в терминале / на компьютере — отсюда ответ туда не дойдёт» (25.10); +2 OUTCOME.coreOnly and TOAST.coreOnly «Ответ ядру — в панели или с телефона», a core task's permission ask Telegram cannot answer (core-s10, 02.11); -5 branch-gate card left with ChatBranchGate: «Первая правка в основной копии» title, «Писать здесь» / «Не писать» buttons and outcome lines (G14, 03.11); -1 OUTCOME.deferred «Отложено как D-n» left with the defer path — a permission card no longer becomes a D-n record (core-s10 G12 pass 8, 03.11)"
+    "n": 55,
+    "why": "outbound notification to an external channel (Telegram answers): ask text, buttons, outcome lines, toasts (23.10); HTML message format 25.10: type lines (ВОПРОС, РАЗРЕШЕНИЕ, РЕШЕНИЕ), «Открыть чат →», «…и ещё N — в панели»; 12б/13б 25.10: «вид · суть» first line, collapsed outcome lines; final layout 25.10: «вид · 📁 проект · сессия», суть второй строкой, без хэштегов; read-only question of a session outside the panel: «Терминал», «Ответь в VS Code / в терминале / на компьютере — отсюда ответ туда не дойдёт» (25.10); +2 OUTCOME.coreOnly and TOAST.coreOnly «Ответ ядру — в панели или с телефона», a core task's permission ask Telegram cannot answer (core-s10, 02.11); -5 branch-gate card left with ChatBranchGate: «Первая правка в основной копии» title, «Писать здесь» / «Не писать» buttons and outcome lines (G14, 03.11); -1 OUTCOME.deferred «Отложено как D-n» left with the defer path — a permission card no longer becomes a D-n record (core-s10 G12 pass 8, 03.11); +2 TOAST.rebind «включите „Отвечать ядру из Telegram“ заново» and TOAST.changed «Вопрос изменился — свежая копия ниже», core ask buttons (Z16, 09.11); +1 «Открыть задачу →» link line of a core ask button message (W2-D F2, 09.11); +1 «Остальные варианты — в панели или с телефона» under a core ask whose hidden options Telegram cannot choose (review telegram, 09.11)"
+  },
+  "domains/notify/telegram-answers/core-ask-press.ts": {
+    "n": 7,
+    "why": "Telegram answers, core ask buttons (Z16, 09.11): refusal details shown as a press toast or the server log — no binding, core unreachable, shown text drifted, no Telegram command for the choice, no repeat key; the cancel reason recorded by the core"
+  },
+  "domains/notify/telegram-answers/core-asks.ts": {
+    "n": 10,
+    "why": "outbound notification to an external channel (Telegram answers), core ask buttons (Z16, 09.11): option button labels («Разрешить этот вызов», «Отказать», «Модель …»…), the settling reconcile answers hidden from Telegram, the «Задача ядра» title fallback; the point-9 «Разрешить комментарий» hidden from Telegram (review telegram, 09.11)"
   },
   "domains/notify/telegram-answers/describe.ts": {
     "n": 2,
@@ -290,6 +298,14 @@
   "domains/notify/telegram-api.ts": {
     "n": 1,
     "why": "Telegram: token placeholder that replaces a token in Bot API error details, moved from telegram.ts (25.10)"
+  },
+  "domains/notify/telegram-notices/compose.ts": {
+    "n": 53,
+    "why": "outbound notification to an external channel (Telegram bot): core task notices — done / MR / failed / window card texts and button labels, quiet-hours digest head, /status core task lines and state words, /task replies, press toasts and outcome lines, core refusal and binding hint (only on 401/403, split literal) (Z17, 09.11); TEXT.returned → TEXT.notRecognised «ход из Telegram не признан ядром», count unchanged (W2-D F2, 09.11)"
+  },
+  "domains/notify/telegram-notices/launch.ts": {
+    "n": 20,
+    "why": "outbound notification to an external channel (Telegram bot): why a /task entry did not start, in Russian — launcher reasons, estimate repo problems (not a git repository, base not found) and board move codes mapped to owner words, the generic «причина на доске» line, «Открыть доску →» link, the no-repos hint; core prose and paths never reach Telegram (W2-D F2, 09.11)"
   },
   "domains/notify/telegram-text.ts": {
     "n": 20,
@@ -555,6 +571,26 @@
     "n": 10,
     "why": "runName: the run title shown in the chat list (the task itself is English, D-E); REGRESSION_TAGS/regressionTag: the regression tag value in the library language (F-63) — data the human filters by, not a message"
   },
+  "domains/project-tests/recorded/codegen.ts": {
+    "n": 30,
+    "why": "recorded walks: text written INTO the generated Playwright spec and its case steps — step labels («открыть», «ввести доступ NAME»), «Не проверено» lines, the fillSecret refusals («доступ NAME не для этой страницы», «нет значения доступа NAME») that come back as JUnit failure text; spec/case content, not a server response"
+  },
+  "domains/project-tests/recorded/history.ts": {
+    "n": 1,
+    "why": "recorded walks: prefix match «Не проверено» on stored case steps (data written by codegen.ts), not a message"
+  },
+  "domains/project-tests/recorded/record.ts": {
+    "n": 8,
+    "why": "recorded walks: refusals of writing a walk into a case (hand-written case, bad rows, no title, no passed step, case missing) and the precondition/expected text written into the case store; same class as automation.ts; no new server messageCodes (owner 12.10)"
+  },
+  "domains/project-tests/recorded/replay.ts": {
+    "n": 6,
+    "why": "recorded walks: refusals of «Прогнать все» (run already going, no recorded scenarios, no mismatch to decide), the mismatch title stored in replay state and the short-run reason; same class as automation.ts; no new server messageCodes (owner 12.10)"
+  },
+  "domains/project-tests/recorded/walk-port.ts": {
+    "n": 1,
+    "why": "recorded walks: refusal when the browser-walk estimate fields do not parse; no new server messageCodes (owner 12.10)"
+  },
   "domains/project-tests/red-filter/red-filter.ts": {
     "n": 11,
     "why": "reasons printed by the Russian tests-cli (tools/tests-cli-base.mjs) when a base run cannot narrow to red tests; terminal only"
@@ -726,6 +762,10 @@
   "domains/scripts/scripts.ts": {
     "n": 6,
     "why": "path-rejection reason composed inside the error class"
+  },
+  "domains/site-preview/pick-script.ts": {
+    "n": 1,
+    "why": "site preview pick (P174): the Cyrillic is a code comment inside the browser script string the proxy serves into the site page; never shown to anyone"
   },
   "domains/skills/write.ts": {
     "n": 1,
@@ -944,8 +984,8 @@
     "why": "test fixture: a rule heading seeded into a throwaway config dir for the secret sweep, never shipped"
   },
   "routes/panel-agent/sections/sections.ts": {
-    "n": 1,
-    "why": "internal invariant error: an empty section list"
+    "n": 2,
+    "why": "internal invariant error: an empty section list + the /groups description for the panel agent quotes the board button label «Импорт пунктов» verbatim (model-facing, never shown to the human)"
   },
   "routes/panel-agent/tests-block-kit.ts": {
     "n": 5,
@@ -994,5 +1034,9 @@
   "routes/project-local-routes.ts": {
     "n": 1,
     "why": "400 invalid_mode for a raw API caller; the panel only sends auto/on/off from a fixed control"
+  },
+  "routes/project-tests/recorded-routes/recorded-routes.ts": {
+    "n": 6,
+    "why": "recorded walks: route refusals of the recorded tab (no group, no walk task, no goal, goal too long, bad verdict) and the core task title «Проход по стенду: …»; no new server messageCodes (owner 12.10)"
   }
 }

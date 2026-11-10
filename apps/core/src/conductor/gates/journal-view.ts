@@ -1,4 +1,5 @@
 import type { JournalDataV1, JournalLine } from '@agentdeck/contracts/core/journal';
+import { crossStepsOf } from '../../economy/cross-steps.ts';
 import type { ReviewStanding } from './gates.types.ts';
 
 /**
@@ -21,6 +22,7 @@ export function gateFactsOf(lines: readonly JournalLine[], stepDefId: string): G
   const out: GateLines = { review: null, confirmations: {}, latestRecords: {} };
   const kindOf = new Map<string, string>();
   const runs = new Map<string, string>();
+  const crossSteps = crossStepsOf(lines);
   for (const line of lines) {
     const started = data(line, 'step.started');
     if (started) kindOf.set(started.stepId, started.stepKind);
@@ -31,13 +33,14 @@ export function gateFactsOf(lines: readonly JournalLine[], stepDefId: string): G
     if (recorded && checkId !== undefined) out.latestRecords[checkId] = recorded.recordId;
     const claimed = data(line, 'step.claimed');
     if (!claimed || kindOf.get(claimed.stepId) !== 'review') continue;
-    out.review = {
-      stepId: claimed.stepId,
-      blocking: (claimed.claim.findings ?? []).filter((f) => f.severity === 'blocking').length,
-    };
+    // Второе ревью (P185) ничего не одобряет: его чистое заявление не снимает находку первого,
+    // его подтверждение ворот не в счёт; его блокирующая находка и опровержение — в счёт.
+    const cross = crossSteps.has(claimed.stepId);
+    const blocking = (claimed.claim.findings ?? []).filter((f) => f.severity === 'blocking').length;
+    if (!cross || blocking > 0) out.review = { stepId: claimed.stepId, blocking };
     for (const c of claimed.claim.confirmations ?? [])
       if (c.target.kind === 'gate' && c.target.stepDefId === stepDefId)
-        out.confirmations[c.target.index] = c.verdict;
+        if (!cross || c.verdict === 'refuted') out.confirmations[c.target.index] = c.verdict;
   }
   return out;
 }

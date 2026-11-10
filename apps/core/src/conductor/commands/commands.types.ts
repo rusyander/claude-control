@@ -9,6 +9,8 @@ import type { LiveTask } from '../../journal/resume.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
 import type { CoreHomeLayout } from '../../platform/core-home.ts';
 import type { SplitEnv } from '../estimate/index.ts';
+import type { BoardCommandPort } from '../board/board.types.ts';
+import type { ReworkPort, TakeoverPort } from '../takeover/takeover.types.ts';
 
 export type CommandResult = CommandOutcome & { state?: TaskFoldState };
 
@@ -43,6 +45,12 @@ export interface CommandEnv {
    * действие всё равно снова начатое в журнале, его прочтёт следующая загрузка ядра.
    */
   reconcile?(): ReconcileRecheckPort | undefined;
+  /** Этап 12 (Z1): запускатель доски — такт после освобождения места; нет — отказ `board-unwired`. */
+  board?(): BoardCommandPort | undefined;
+  /** Этап 12 (Z4): перехват и возврат единицы; нет — отказ `takeover-unwired`. */
+  takeover?(): TakeoverPort | undefined;
+  /** Этап 12 (Z4): доработка словами человека; нет — отказ `rework-unwired`. */
+  rework?(): ReworkPort | undefined;
 }
 
 /** Повторная сверка по таймеру загрузки: названное действие идёт в ближайший проход. */

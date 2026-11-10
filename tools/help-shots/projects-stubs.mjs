@@ -486,7 +486,6 @@ function overview(state) {
     scripts: { total: 0, unused: 0 },
     mcp: { total: state.mcp.length, enabled: on(state.mcp), connected: 0, failed: 0 },
     permissions: { allow: decision('allow'), ask: decision('ask'), deny: decision('deny') },
-    groups: { total: state.groups.length },
   };
 }
 

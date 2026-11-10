@@ -157,7 +157,8 @@ function spawnFakeCli(root, id) {
 }
 
 await runOnStand(
-  { label: 'analytics-sessions', fakeCli: { claude: PANEL_CLI } },
+  // Чат панели ведёт ядро: без ядра стенда `qa-panel` не запускается вовсе.
+  { label: 'analytics-sessions', fakeCli: { claude: PANEL_CLI }, core: true },
   async (stand, check) => {
     // Завершённая = тише окна «идёт» (10 мин) и всё ещё «сегодня» — вкладка по
     // умолчанию показывает день. Прогон в 00:35 клал её во вчера, и «Перейти»

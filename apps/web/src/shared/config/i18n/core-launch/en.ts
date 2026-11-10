@@ -285,6 +285,7 @@ export const coreLaunchEn: typeof coreLaunchRu = {
       split: 'Split',
       review: 'Review',
       report: 'Report',
+      walk: 'Stand walk',
     },
   },
   routes: {

@@ -140,9 +140,11 @@ export function forgeActionReaders(deps: ForgeReaderDeps = {}) {
     'mr-update': mrUpdate,
     'thread-reply': threadReply,
     'mr-comment': mrComment,
-    // Трекера в ядре нет (решение G3): запись в трекер не доказать — всегда спросить человека.
+    // Комментарий назад в тикет (P166): порт трекера ядра (Jira панели, `adapters/tracker`) только
+    // пишет — читать комментарии по хешу ему нечем. Исход записи не доказать: всегда `unknown` →
+    // сверка спрашивает человека (пункт 4), повтора записи нет (`wrote` видит начатое действие).
     'tracker-write': () => () => {
-      throw new Error('no core tracker adapter');
+      throw new Error('tracker comments are not readable by the core: outcome unknown');
     },
   } satisfies Record<string, ActionFactReader>;
 }

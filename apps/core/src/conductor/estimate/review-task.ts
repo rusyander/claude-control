@@ -1,5 +1,6 @@
 import type { EstimateBody } from '@agentdeck/contracts/core/estimate';
 import type { ForgeMr } from '@agentdeck/contracts/core/forge';
+import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 import { REVIEW_LINK_PRESET } from '@agentdeck/contracts/core/review-link';
 import { newId } from '../../lib/ids/uuidv7.ts';
 import { commitOf, mergeBaseOf, type CopyGitOptions } from '../../platform/copy-git.ts';
@@ -28,6 +29,8 @@ export interface ReviewTaskInput {
   forge: 'gitlab' | 'github';
   mr: Pick<ForgeMr, 'id' | 'iid' | 'url' | 'sourceBranch' | 'targetBranch'> & { title: string };
   lang?: 'ru' | 'en';
+  /** Этап 12: задача пришла с доски — запись, остановка, источник и доказательство старта. */
+  boardEntry?: JournalDataV1['task.created']['boardEntry'];
 }
 
 /** Текст запроса: какой MR и что от ревью ждут; нити и дифф шаги читают сами. */
@@ -119,6 +122,7 @@ async function createReviewTask(
         targetBranch: mr.targetBranch,
         reviewBase: reviewBase!,
       },
+      ...(input.boardEntry ? { boardEntry: input.boardEntry } : {}),
     }),
     afterUnitZero(task: LiveTask, zero, cmdId) {
       // Личность MR от форжа (P31): публикатор пушит в этот MR. `actionId` — свой, без действия

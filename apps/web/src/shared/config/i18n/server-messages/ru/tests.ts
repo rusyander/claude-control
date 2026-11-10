@@ -163,6 +163,8 @@ export const testsRu: Record<TestsMessageCode, string> = {
   'case-link-invalid': 'Ссылка «{{url}}»: нужен полный адрес, начинающийся с http:// или https://.',
   'case-duration-invalid':
     'Длительность «{{value}}»: целое число минут от 1 до 1440, 0 — очистить.',
+  'case-timeout-invalid':
+    'Предел прогона «{{value}}»: минуты больше 0 и не больше {{max}}, 0 — очистить.',
   'case-id-not-in-group':
     'Кейса «{{caseId}}» в группе «{{groupId}}» нет: новый кейс сохраняют без id.',
   'case-not-in-named-group': 'Кейса «{{caseId}}» в группе «{{groupId}}» нет.',

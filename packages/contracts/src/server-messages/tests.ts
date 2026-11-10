@@ -137,6 +137,7 @@ export const testsMessageParams = {
   'case-title-required': [],
   'case-link-invalid': ['url'],
   'case-duration-invalid': ['value'],
+  'case-timeout-invalid': ['value', 'max'],
   'case-id-not-in-group': ['caseId', 'groupId'],
   'case-not-in-named-group': ['caseId', 'groupId'],
   'record-automated-case': ['cases'],

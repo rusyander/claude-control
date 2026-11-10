@@ -10,6 +10,8 @@ import type {
   SetRoutePorts,
 } from '../conductor/commands/commands.types.ts';
 import { ladderRank } from '../conductor/commands/set-model.ts';
+import type { BoardCommandPort } from '../conductor/board/board.types.ts';
+import type { ReworkPort, TakeoverPort } from '../conductor/takeover/takeover.types.ts';
 import type { SplitEnv } from '../conductor/estimate/index.ts';
 import type { TaskRegistry } from '../conductor/tasks.ts';
 import type { TierLadder } from '../economy/tier.types.ts';
@@ -25,7 +27,9 @@ import { processPin } from './conductor-wiring/session-start.ts';
 import { createMcpOffersPort } from './mcp-offers.ts';
 import type { SessionRuntime } from './session-runtime.ts';
 import type { TrustedHops } from './trusted-hops.ts';
+import type { WalkPort } from '../adapters/browser/index.ts';
 import { createSessionPeerCheck, sessionRootsOf } from './session-peers.ts';
+import { telegramOwnerOf } from './telegram-owner.ts';
 import { unitDiffWiring } from './unit-diff-wiring.ts';
 import type { VerifierWiring } from './verifier-wiring/index.ts';
 
@@ -59,6 +63,8 @@ export interface BootApiDeps {
   split: () => SplitEnv | undefined;
   /** Секреты окружения сеанса (P61, `bootEconomy.known`): тело `unit_diff` маскирует и их. */
   known?: (taskId: string, sessionId: string) => readonly string[];
+  /** Браузер шага `walk` и доступы стенда (этап 12, P177/P178); нет — инструменты `not-wired`. */
+  walk?: WalkPort;
   /**
    * Реестр маршрутов загрузки для команды `set-route`; без него команда отказывает
    * `routes-unwired` — так было на собранном ядре до W2b (команда не применялась никогда).
@@ -103,6 +109,14 @@ export interface BootApiDeps {
   localActivity?: ApiDeps['localActivity'];
   /** Этап 11 (P140): сброс ключа обучения человеком — порт проводки экономики. */
   learned?: ApiDeps['learned'];
+  /** Этап 12 (Z1): доска для `/v1/board*` и запускатель для команд; нет — 501 и `board-unwired`. */
+  board?: ApiDeps['board'];
+  boardCommands?: () => BoardCommandPort | undefined;
+  /** Этап 12 (Z6/Z7): входящие для `/v1/inbox*`; нет — 501. */
+  inbox?: ApiDeps['inbox'];
+  /** Этап 12 (Z4): перехват и доработка; нет — отказы `takeover-unwired` / `rework-unwired`. */
+  takeover?: () => TakeoverPort | undefined;
+  rework?: () => ReworkPort | undefined;
 }
 
 export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
@@ -124,6 +138,9 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       ...(deps.ladders ? { modelRank: ladderRank(deps.ladders) } : {}),
       // Суд `set-cli` по возможностям переходника до набора (W3-17a): тот же реестр, что у сеансов.
       ...(deps.adapters ? { adapterOf: (id: string) => deps.adapters?.get(id) } : {}),
+      ...(deps.boardCommands ? { board: deps.boardCommands } : {}),
+      ...(deps.takeover ? { takeover: deps.takeover } : {}),
+      ...(deps.rework ? { rework: deps.rework } : {}),
     },
     tokens: {
       core: deps.coreToken,
@@ -140,6 +157,8 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       }),
       // Звенья пересылки пишет только надзор (P131): пусто — пересланная команда без доверия.
       trustedHopPids: deps.trustedHops?.pids ?? new Set(),
+      // Владелец Telegram — из действующей настройки на каждом запросе: дрейф закрывает канал сразу.
+      telegramOwner: () => telegramOwnerOf(deps.config?.()),
     },
     signature: {
       // Читается на каждой подписи, а не при загрузке: перенос устройств меняет номер на номер
@@ -169,6 +188,8 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
     ...(deps.allocator ? { allocator: deps.allocator } : {}),
     ...(deps.localActivity ? { localActivity: deps.localActivity } : {}),
     ...(deps.learned ? { learned: deps.learned } : {}),
+    ...(deps.board ? { board: deps.board } : {}),
+    ...(deps.inbox ? { inbox: deps.inbox } : {}),
     // Ключи телефона в устройства ядра (G9): тот же дом и журнал, что у чтения списка выше.
     devices: () => devicesPort,
   });
@@ -182,6 +203,7 @@ export function buildCoreApi(deps: BootApiDeps): FastifyInstance {
       check: verifier.queue.check,
       unitDiff: unitDiffWiring(deps.known),
       humanPolicy: humanPolicyOf(deps.layout),
+      ...(deps.walk ? { walk: deps.walk } : {}),
     },
     // Кодек права даёт переходник прикреплённой сессии; сессии нет в рантайме (не прикреплена,
     // поток кончился) — вопрос о праве отказывается (503, fail-closed), а не разрешается.

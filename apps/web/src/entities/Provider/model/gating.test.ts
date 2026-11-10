@@ -119,10 +119,14 @@ describe('гейтинг навигации по провайдеру', () => {
 
   it('codex: панель-level разделы (настройки/история/поиск/обзор/группы/справка) видны всегда', () => {
     const gated = gateNavSections(NAV_SECTIONS, CODEX);
-    const paths = gated.flatMap((section) => section.items).map((item) => item.path);
-    for (const panelPath of ['/', '/search', '/groups', '/history', '/settings', '/help']) {
+    const items = gated.flatMap((section) => section.items);
+    const paths = items.map((item) => item.path);
+    for (const panelPath of ['/', '/search', '/history', '/settings', '/help']) {
       expect(paths).toContain(panelPath);
     }
+    // «Группы» свёрнуты в доску ядра (этап 12, D13): пункт ведёт прямо на её полосы групп.
+    const groups = items.find((item) => item.key === 'groups');
+    expect(groups).toMatchObject({ path: '/core', search: { view: 'board', lane: 'group' } });
   });
 
   it('codex: раздел инструкций (claude-md) готов — заглушки нет', () => {

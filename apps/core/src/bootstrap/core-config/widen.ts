@@ -65,5 +65,29 @@ export function configWidenings(before: CoreConfig, after: CoreConfig): ConfigWa
   for (const row of missing(picked(after), picked(before))) {
     out.push({ section: 'mcpPicks', detail: `added ${row}` });
   }
+  // Этап 12 (08e, P183): автоочередь источника входящих — записи стартуют без хода человека;
+  // комментарий назад — запись в трекер и форж от задач из входящих (D18).
+  const queued = (doc: CoreConfig): string[] =>
+    (doc.inbox?.sources ?? []).filter((s) => s.enabled && s.autoQueue === true).map((s) => s.id);
+  for (const id of missing(queued(after), queued(before))) {
+    out.push({ section: 'inbox', detail: `autoQueue on ${id}` });
+  }
+  if (after.inbox?.commentBack === true && before.inbox?.commentBack !== true) {
+    out.push({ section: 'inbox', detail: 'commentBack on' });
+  }
+  // Этап 12 (D29, P187): привязанный владелец Telegram открывает человеческий канал; новая привязка
+  // поверх прежней — другой человек или бот, тоже расширение. Снятая (`null`) молчит.
+  const owner = after.telegram?.owner ?? null;
+  if (owner !== null && owner !== (before.telegram?.owner ?? null)) {
+    out.push({
+      section: 'telegram',
+      detail: before.telegram?.owner ? 'owner rebound' : 'owner bound',
+    });
+  }
+  // W2-D: репозиторий записей `/task` — запись из Telegram стартует в нём без выбора на доске.
+  const tgRepos = (doc: CoreConfig): string[] => (doc.telegram?.repos ?? []).map((r) => r.path);
+  for (const path of missing(tgRepos(after), tgRepos(before))) {
+    out.push({ section: 'telegram', detail: `task repo ${path}` });
+  }
   return out;
 }

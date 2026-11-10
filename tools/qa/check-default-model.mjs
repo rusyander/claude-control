@@ -29,8 +29,17 @@ await runOnStand({ label: 'default-model' }, async (stand, check) => {
     console.log(`  идентификаторов в каталоге: ${ids.length} (${ids.slice(0, 4).join(', ')}…)`);
     check('каталог моделей с идентификаторами claude-…', ids.length >= 3, ids.join(', '));
 
+    // Правку настроек судят ворота «только человек» (таблица TCP и процессов): первая на стенде
+    // идёт около 3 с. Ждём ответ PATCH, а не секунду — иначе F5 рвёт ещё не принятую правку.
+    const savedReply = page
+      .waitForResponse(
+        (r) => r.url().includes('/api/settings') && r.request().method() === 'PATCH',
+        { timeout: 30_000 },
+      )
+      .catch(() => null);
     await select.selectOption({ label: 'Sonnet' });
-    await wait(1000);
+    const reply = await savedReply;
+    check('правка ушла и принята (PATCH 200)', reply?.status() === 200, String(reply?.status()));
     const saved = stored().chatModel;
     check(
       'выбор сохранён в state.json',

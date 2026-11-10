@@ -84,6 +84,45 @@ describe('roadSessionPort (zone B session port over the core road)', () => {
     expect(r.calls).toEqual(['started', 'attach:new:false']);
   });
 
+  it('stage 12: an error turn end reports turnError before turnEnded; loginLost only when the adapter names the text', async () => {
+    const r = road();
+    const base = r.deps.adapterOf;
+    r.deps.adapterOf = (...a: Parameters<typeof base>) =>
+      ({
+        ...base(...a),
+        loginLost: (text: string) => text.endsWith('Please run /login'),
+      }) as CliAdapter;
+    const port = roadSessionPort(r.deps);
+    const seen: string[] = [];
+    await port.open(STEP, [], {
+      turnEnded: () => seen.push('turn'),
+      tool: () => undefined,
+      ended: () => undefined,
+      turnError: (t) => seen.push(`error:${t}`),
+      loginLost: (t) => seen.push(`login:${t}`),
+    });
+    const end = (isError: boolean, text: string) =>
+      r.emit({
+        type: 'turn.ended',
+        attribution: 'a',
+        origin: 'user' as never,
+        isError,
+        numTurns: 1,
+        text,
+      });
+    end(true, 'Not logged in · Please run /login');
+    end(true, "You've hit your limit");
+    end(false, 'Please run /login');
+    expect(seen).toEqual([
+      'error:Not logged in · Please run /login',
+      'login:Not logged in · Please run /login',
+      'turn',
+      "error:You've hit your limit",
+      'turn',
+      'turn',
+    ]);
+  });
+
   it('G9 a new session is measured right after it is journaled; a resumed one is not', async () => {
     const r = road();
     const fresh = roadSessionPort({

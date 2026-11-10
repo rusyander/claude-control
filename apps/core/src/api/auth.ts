@@ -2,6 +2,11 @@ import type { IncomingMessage } from 'node:http';
 import { isUuidv7 } from '@agentdeck/contracts/core/ids';
 import { SIGNATURE_NONCE_TTL_MS } from '@agentdeck/contracts/phone-signing';
 import type { CommandEnvelope } from '@agentdeck/contracts/core/commands';
+import {
+  HUMAN_CHANNEL_HEADER,
+  TELEGRAM_CHANNEL,
+  TELEGRAM_OWNER_HEADER,
+} from '@agentdeck/contracts/core/telegram-channel';
 import { tokenEquals } from '../platform/token-file.ts';
 import type { CommandProof } from '../policy/authority/authority.ts';
 import type { NonceStore } from '../policy/authority/nonce.ts';
@@ -58,6 +63,11 @@ export interface PeerDeps {
   isSessionDescendant(pid: number): Promise<boolean | 'unknown'>;
   /** pid звеньев, которым разрешено пересылать pid пира (их записал надзор при загрузке). */
   trustedHopPids: ReadonlySet<number>;
+  /**
+   * Этап 12 (D29, P187): отпечаток владельца Telegram из ДЕЙСТВУЮЩЕЙ настройки (`telegram.owner`);
+   * `null` — канал закрыт (раздела нет, дрейф). Нет поля — пира `telegram` не бывает.
+   */
+  telegramOwner?: () => string | null;
 }
 
 export const FORWARDED_PEER_HEADER = 'x-agentdeck-peer-pid';
@@ -67,7 +77,9 @@ const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 export async function classifyPeer(request: IncomingMessage, deps: PeerDeps): Promise<PeerClass> {
   const socket = request.socket;
   if (!socket.remoteAddress || !LOOPBACK.has(socket.remoteAddress)) return 'remote';
-  if (!socket.localPort || !socket.remotePort) return 'unknown';
+  if (!socket.localPort || !socket.remotePort) {
+    return telegramClaimOf(request) ? 'untrusted-forward' : 'unknown';
+  }
   // Строка таблицы сверяется по обоим концам соединения и по владельцу серверной половины —
   // API работает в процессе ядра, его pid и есть сервер (ревью F-16).
   const direct = await deps.peerPid({
@@ -77,9 +89,19 @@ export async function classifyPeer(request: IncomingMessage, deps: PeerDeps): Pr
     clientAddress: socket.remoteAddress,
     serverPid: process.pid,
   });
+  const forwarded = request.headers[FORWARDED_PEER_HEADER];
+  const claim = telegramClaimOf(request);
+  // Заявка канала Telegram (этап 12, D29, P187) судится раньше пересылки pid: пир `telegram` —
+  // только звено панели с обоими заголовками, без pid пира и с отпечатком действующего владельца.
+  // Любая другая смесь — `untrusted-forward` (только подпись): заявка человека без доказательства.
+  if (claim) {
+    const hop = 'value' in direct && deps.trustedHopPids.has(direct.value);
+    return hop && forwarded === undefined && ownerMatches(claim, deps)
+      ? 'telegram'
+      : 'untrusted-forward';
+  }
   if (!('value' in direct)) return 'unknown';
   let pid = direct.value;
-  const forwarded = request.headers[FORWARDED_PEER_HEADER];
   // Звено пересылки без заголовка — источник не назван: pid самого звена (панельный сервер) не
   // из сессии и дал бы `clear`, то есть «человек» для любого, кто дошёл через звено. Пир
   // неизвестен — строгая команда требует подписи устройства (W2-C, вопрос A).
@@ -94,6 +116,33 @@ export async function classifyPeer(request: IncomingMessage, deps: PeerDeps): Pr
   const inSession = await deps.isSessionDescendant(pid);
   if (inSession === 'unknown') return 'unknown';
   return inSession ? 'session-descendant' : 'clear';
+}
+
+/** Заголовки канала из запроса: хоть один есть — это заявка Telegram, и судится она целиком. */
+function telegramClaimOf(
+  request: IncomingMessage,
+): { channel: string | undefined; owner: string | undefined } | null {
+  const one = (name: string): string | undefined => {
+    const raw = request.headers[name];
+    return Array.isArray(raw) ? raw[0] : raw;
+  };
+  const channel = one(HUMAN_CHANNEL_HEADER);
+  const owner = one(TELEGRAM_OWNER_HEADER);
+  if (channel === undefined && owner === undefined) return null;
+  return { channel, owner };
+}
+
+/**
+ * Отпечаток обновления бота равен привязанному владельцу ДЕЙСТВУЮЩЕЙ настройки. Нет поставщика,
+ * владелец не задан (`null`, дрейф) или заголовок канала не `telegram` — не равен.
+ */
+function ownerMatches(
+  claim: { channel: string | undefined; owner: string | undefined },
+  deps: PeerDeps,
+): boolean {
+  if (claim.channel !== TELEGRAM_CHANNEL || !claim.owner) return false;
+  const bound = deps.telegramOwner?.() ?? null;
+  return bound !== null && tokenEquals(bound, claim.owner);
 }
 
 export interface SignatureDeps {

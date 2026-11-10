@@ -29,6 +29,7 @@ export function useStreamState(run: AgentRun, isRunning: boolean): StreamState {
       sessionId: run.sessionId,
       costUsd: run.costUsd,
       limitResetsAt: run.limitResetsAt,
+      limitHit: run.limitHit,
     }),
     [run, isRunning],
   );

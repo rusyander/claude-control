@@ -1,5 +1,6 @@
 import type { ChatComposerMode } from './pageTarget.types';
 import type { PanelPageTarget } from '@agentdeck/contracts/panel-agent';
+import { CORE_GROUP_LANES_SEARCH } from '@shared/config/routes';
 import {
   CONTOUR_KEY_PREFIX,
   MCP_SECRET_PREFIX,
@@ -134,10 +135,15 @@ export function pageNavigation(page: PanelPageTarget): PageNavigation {
   if (LIST_ALL_TAB_PAGES.has(path) && page.focus) {
     return { to: path, search: { ...search, tab: LIST_ALL_TAB }, anchor: page.focus };
   }
-  // Вкладку группы (глобальные или проектные) знает только страница — по
-  // области группы; `?show=` просит её выбрать, якорь подсвечивает карточку.
-  if (path === '/groups' && page.focus) {
-    return { to: path, search: { ...search, show: page.focus }, anchor: page.focus };
+  // Страница «Группы» свёрнута в доску ядра (этап 12, D13): `/groups` — полосы групп доски, а
+  // группа — полоса с её `groupId`; якорь подсвечивает полосу. Прежних карточек групп больше нет,
+  // поэтому без перевода агент вёл бы на редирект с якорем, которого нет в разметке.
+  if (path === '/groups') {
+    return {
+      to: '/core',
+      search: { ...CORE_GROUP_LANES_SEARCH },
+      ...(page.focus ? { anchor: page.focus } : {}),
+    };
   }
   const key = FOCUS_AS_SEARCH[path];
   if (page.focus && key) return { to: path, search: { ...search, [key]: page.focus } };

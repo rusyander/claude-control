@@ -6,7 +6,14 @@ import { usageOf } from '../../journal/reduce/fold-view.ts';
 import { budgetTokens } from '../../economy/cost.ts';
 import { tokenScopeOf } from '../../economy/budget/index.ts';
 import { STEP_BUDGET_SCOPE } from '../../journal/reduce/stage4.ts';
-import { CONDUCTOR_QUESTIONS, answerKey, askLangOf, labelOf, optionsOf } from './answers.ts';
+import {
+  CONDUCTOR_QUESTIONS,
+  answerKey,
+  askLangOf,
+  labelOf,
+  optionsOf,
+  switchAnswerOf,
+} from './answers.ts';
 import {
   END_REASON,
   type Attempt,
@@ -68,11 +75,28 @@ export function windowGate(win: StepWindow | undefined, def: StepDef): WindowGat
   };
 }
 
-const waitOn = (g: WindowGate, what: string): NextAction => ({
+const waitOn = (g: WindowGate, what: string, stepId?: string): NextAction => ({
   kind: 'wait',
   reason: `window ${g.routeId} ${g.verdicts.join(',')}: ${what}`,
   ...(g.resumeAt === null ? {} : { untilWallMs: g.resumeAt }),
+  ...(stepId === undefined ? {} : { window: { stepId, routeId: g.routeId } }),
 });
+
+/**
+ * Вариант перевода точки 7 (`tier.offers`, P169), ещё не применённый: `model:<id>` — правка
+ * модели, `cli:<id>` — правка CLI задачи. Другой текст, или последняя правка задачи по этому полю
+ * уже несёт это значение, — `null`. Что вариант был среди предложенных, сверяет исполнитель по
+ * строке вопроса (`conductor/run/perform.ts`).
+ */
+export function pendingSwitch(
+  state: TaskFoldState,
+  answer: string | undefined,
+): { field: 'model' | 'adapter'; value: string } | null {
+  const asked = switchAnswerOf(answer);
+  if (!asked) return null;
+  const last = state.overrides.filter((o) => o.scope === 'task' && o.field === asked.field).at(-1);
+  return last?.value === asked.value ? null : asked;
+}
 
 function asksOf(state: TaskFoldState, dedupe: string): (AskRecord & { askId: string })[] {
   return Object.entries(state.asks)
@@ -98,18 +122,21 @@ export function windowAction(
     if (fact.safe) return { kind: 'park-session', stepId: att.stepId, mode: 'soft', why: 'window' };
     return waitOn(gate, 'not at a safe point');
   }
-  if (gate.exhausted && (win?.alternatives ?? 0) === 0) {
+  // Окно держит маршрут, а не уводит шаг: у начатой задачи годные маршруты — только варианты
+  // клика (P169), у новой отказ `tier` значит, что уйти некуда. Точка 7 — при любом их числе.
+  if (gate.exhausted) {
     const dedupe = exhaustedKey(gate.routeId, att.stepId);
     const ask = asksOf(state, dedupe).pop();
     if (!ask) {
       const lang = askLangOf(state);
+      const offers = [...(win?.offers ?? [])];
       return {
         kind: 'raise',
         point: 7,
         stepId: att.stepId,
         dedupe,
-        question: CONDUCTOR_QUESTIONS.exhausted(lang, gate.routeId, def),
-        options: optionsOf('exhausted', lang),
+        question: CONDUCTOR_QUESTIONS.exhausted(lang, gate.routeId, def, offers.length),
+        options: [...optionsOf('exhausted', lang), ...offers],
         recommendation: labelOf('exhausted', lang, 'wait'),
         capStep: false,
       };
@@ -120,8 +147,12 @@ export function windowAction(
         stepId: att.stepId,
         reason: `${END_REASON.budget}: route ${gate.routeId} exhausted, human stop`,
       };
+    // Ответ отпустил шаг сам (`answer` → running): перевод кликом применяет исполнитель.
+    const override = pendingSwitch(state, ask.answer);
+    if (override) return { kind: 'answered', stepId: att.stepId, askId: ask.askId, override };
   }
-  return waitOn(gate, fact ? 'session parked' : 'step waits');
+  // Живой сессии нет (снята или не начиналась): задача ждёт окно — `waiting-window`.
+  return waitOn(gate, fact ? 'session parked' : 'step waits', att.stepId);
 }
 
 /** Токены бюджета шага (G10): вход + запись кэша + выход по свёртке v7. */

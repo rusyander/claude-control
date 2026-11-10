@@ -49,7 +49,26 @@ export function draftOfTelegram(
     afterMinutes: String(answers?.afterMinutes ?? 3),
     finished: done > 0,
     doneAfterMinutes: String(done > 0 ? done : TELEGRAM_DONE_AFTER_MINUTES),
+    quietOn: Boolean(settings.quiet),
+    quietFrom: settings.quiet?.from ?? QUIET_DEFAULT.from,
+    quietTo: settings.quiet?.to ?? QUIET_DEFAULT.to,
+    quietAsks: settings.quiet?.asks ?? false,
   };
+}
+
+/** Окно тишины, которое предлагается при первом включении: ночь. */
+export const QUIET_DEFAULT = { from: '23:00', to: '08:00' } as const;
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Окно тишины годится: оба края `ЧЧ:ММ` (как схема сервера) и не совпадают — у сервера
+ * `from === to` значит «тишины нет», и включённая галочка молча ничего бы не делала.
+ */
+export function quietValid(draft: Pick<TelegramCardDraft, 'quietFrom' | 'quietTo'>): boolean {
+  const from = draft.quietFrom.trim();
+  const to = draft.quietTo.trim();
+  return HHMM.test(from) && HHMM.test(to) && from !== to;
 }
 
 /** Целые минуты от 0 до суток. */
@@ -69,6 +88,16 @@ export function notifyBody(draft: TelegramCardDraft, enabled: boolean): Telegram
     chatId: draft.chatId.trim(),
     events,
     doneAfterMinutes: draft.finished ? Number(draft.doneAfterMinutes.trim()) : 0,
+    // Тихие часы: выключены — поля нет (сервер читает «нет» как «тишины нет»).
+    ...(draft.quietOn
+      ? {
+          quiet: {
+            from: draft.quietFrom.trim(),
+            to: draft.quietTo.trim(),
+            asks: draft.quietAsks,
+          },
+        }
+      : {}),
   };
 }
 

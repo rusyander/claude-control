@@ -55,6 +55,27 @@ export function pendingDeliveries(ledger: HumanLedger, stepId: string): Outgoing
 }
 
 /**
+ * Последнее доставленное шагу сообщение человека — тем же текстом с меткой, что ушло (этап 12,
+ * L3): ход на него кончился ошибкой (окно отказало), новая сессия чата получает его ещё раз.
+ * `null` — сообщений не было: последним словом человека было первое (`request.md`).
+ */
+export function lastHumanWord(ledger: HumanLedger, stepId: string): Outgoing | null {
+  let last: { seq: number; item: Outgoing } | null = null;
+  for (const m of Object.values(ledger.messages)) {
+    if (m.stepId !== stepId || !ledger.deliveries[m.cmdId]) continue;
+    if (last && last.seq > m.seq) continue;
+    last = {
+      seq: m.seq,
+      item: {
+        text: marked('Message from the human to this step:', m.text),
+        ref: { kind: 'message', id: m.cmdId },
+      },
+    };
+  }
+  return last?.item ?? null;
+}
+
+/**
  * Строка доставки — после отправки, один раз на ссылку (F26). Напоминание — не доставка слова
  * человека, строки у него нет (его считает `ask-reminder`). Пакет подсказок наблюдателя (`hint`,
  * этап 8 F8) строку получает: она снимает его подсказки в свёртке, и перезапуск их не повторит.

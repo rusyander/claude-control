@@ -13,6 +13,7 @@ import {
 import { useChatPrefs } from '@shared/lib/chat-prefs';
 import { useDraftBox } from '@shared/lib/draft';
 import { WorkspaceTabs } from '@features/WorkspaceTabs';
+import { limitHolds } from '@features/ChatLimitCard';
 import { AssistantKeyGate } from '@features/AssistantKeyGate';
 import { ProjectGitControls } from '@features/ProjectGit';
 import { useRunModelName } from '@features/ChatModelPicker';
@@ -50,12 +51,15 @@ import { useChatModelPrefs } from '../model/useChatModelPrefs';
 import { useChatCliModels } from '../model/useChatCliModels';
 import { useChatFeed } from '../model/useChatFeed';
 import { useChatAutoApprove } from '../model/useChatAutoApprove';
-import { useCoreAutoGrant } from '../model/useCoreAutoGrant';
+import { coreTaskOf, useCoreAutoGrant } from '../model/useCoreAutoGrant';
 import { useLocalRun } from '../model/useLocalRun';
 import { useStreamState } from '../model/useStreamState';
-import { coreRefusalOf } from './coreRefusal';
+import { useRefusalStream } from './useRefusalStream';
 import { CoreRefusalLine } from './CoreRefusalLine';
 import { useProjectParam } from './useProjectParam';
+import { useSitePick } from './useSitePick';
+import { ChatSiteStrip } from './ChatSiteStrip';
+import { dockSend } from './dockSend';
 import { downloadChatExport } from '../lib/downloadChatExport';
 import { keepPending } from '../lib/pending';
 import { runAssignment } from '../lib/runAssignment';
@@ -97,26 +101,22 @@ export function ChatPage() {
   // ходят: всё это живёт в одном месте — здесь только читаем.
   const session = useChatSession({ chats: chats.data });
   const { activeChat, chatId, projectPath, isProjectContext, draftKey, preview, pending } = session;
-  // `?project=` — вкладка этого проекта (W3-17a: туда ведёт и старый адрес `/core/chat`).
-  // Пока список грузится — `undefined` (вкладка ждёт имени из списка); ошибка списка — `[]`.
-  useProjectParam(projects.isPending ? undefined : (projects.data ?? []), session.openProject);
+  // `?project=` — вкладка этого проекта (W3-17a: туда ведёт и старый адрес `/core/chat`), `?id=`
+  // остаётся открытым в ней. Пока список грузится — `undefined`; ошибка списка — `[]`.
+  useProjectParam(projects.isPending ? undefined : (projects.data ?? []), session.openAddressTab);
   const run = useAgentRun(chatId);
   // Авторежим прав этого чата: выбор чата сильнее глобальной настройки (подробности — в хуке).
   const autoMode = useChatAutoApprove(chatId, run.sessionId, settings?.chatAutoMode);
   // Ход через ядро: тумблер включён — грант правки задаче шлёт это окно (сервер не вправе).
   useCoreAutoGrant(chatId, run, autoMode.autoApprove);
+  // Задача ядра хода — карточке лимита: варианты перевода и точный сброс из её вида (этап 12, L3).
+  const coreTaskId = coreTaskOf(chatId, run)?.taskId;
   // Досланное из очереди сразу встаёт в ленту своим пузырём (см. хук).
   useQueuedAsPending(run.sentFromQueue, session.setPending);
   const isRunning = run.status === 'running';
   const runStream = useStreamState(run, isRunning);
-  // Отказ ядра запуску CLI (W3-17a) — строкой на месте композера; карточка ошибки ленты его не
-  // повторяет. Иная ошибка хода идёт карточкой, как была.
-  const refusal = useMemo(() => coreRefusalOf(runStream), [runStream]);
-  const stream = useMemo(() => {
-    if (!refusal) return runStream;
-    const { error: _shownAsLine, ...rest } = runStream;
-    return rest;
-  }, [refusal, runStream]);
+  // Отказ ядра запуску CLI (W3-17a) — строкой на месте композера, лента его не повторяет.
+  const { refusal, stream } = useRefusalStream(runStream);
 
   const draft = useDraftBox(draftKey);
   const fromWindow = useAskFromWindow(draft, () => setProjectWindow(undefined));
@@ -236,23 +236,13 @@ export function ChatPage() {
     ask: (text) => dispatch(text, []),
     closePreview: () => session.setPreview(undefined),
   });
+  // Окно сайта проекта (этап 12, D20): полоса над лентой, окно справа, выбор — чипом в поле.
+  const site = useSitePick({ session, draft, media, agentPane: feed.agentPane });
   // Столбец один: открытый результат сильнее предпросмотра артефакта — его
   // только что попросили, а предпросмотр открывали раньше.
-  const isRightOpen = Boolean(preview || media.shownImage || media.shownDeck || feed.agentPane);
-
-  /**
-   * Отправка в режиме картинки или презентации.
-   *
-   * Поле очищается ЗДЕСЬ и только после приёма — ровно как в `useChatSend.send`.
-   * Своей очистки у композера нет (он снимает лишь чипы вложений), поэтому без
-   * этой строки описание оставалось в поле после удачной отправки: человек видел,
-   * что панель уже рисует, и не знал, ушло ли то, что осталось на экране.
-   */
-  const sendMedia = async (): Promise<boolean> => {
-    const accepted = await media.submit(draft.get());
-    if (accepted) draft.set('');
-    return accepted;
-  };
+  const isRightOpen = Boolean(
+    site.pane || preview || media.shownImage || media.shownDeck || feed.agentPane,
+  );
 
   return (
     <div className={styles.shell}>
@@ -340,6 +330,7 @@ export function ChatPage() {
             onAutoApproveChange={autoMode.toggle}
             runStatus={run.status}
             errorOverflow={run.errorOverflow}
+            limitHolds={limitHolds(stream)}
             onRetry={() => chatId && agentRuns.retry(chatId)}
             onContinue={() => dispatch(t('chat.continueWord'), [])}
             onAllowAndContinue={() => chatId && agentRuns.retry(chatId, { fullAccess: true })}
@@ -359,6 +350,7 @@ export function ChatPage() {
           {isProjectContext && projectPath && (
             <ProjectGitControls path={projectPath} variant="strip" isRunning={isRunning} />
           )}
+          <ChatSiteStrip site={site} />
 
           <ChatArtifactsBar
             artifacts={artifacts}
@@ -367,6 +359,7 @@ export function ChatPage() {
             onPreview={(artifact) => {
               media.close();
               closeAgentPane(false);
+              site.close();
               session.setPreview(artifact);
             }}
             onDelete={askDelete}
@@ -375,6 +368,7 @@ export function ChatPage() {
           <ChatThread
             messages={[...feed.shownHistory, ...pending]}
             conversationId={activeChat?.id}
+            liveConversationId={activeChat?.id ?? run.sessionId}
             stream={stream}
             modelName={modelName}
             isLoading={feed.messages.isLoading}
@@ -387,6 +381,7 @@ export function ChatPage() {
             runStartedAt={run.startedAt}
             localRun={localRun}
             chatId={chatId}
+            {...(coreTaskId ? { coreTaskId } : {})}
             permissions={run.permissions}
             queued={pendingBubbles(run)}
             onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
@@ -437,10 +432,8 @@ export function ChatPage() {
               queued={run.queued}
               onCancelQueued={(queuedId) => chatId && agentRuns.cancelQueued(chatId, queuedId)}
               draft={draft}
-              // В неттекстовом режиме отправка делает, а не пишет агенту: на
-              // дорогах панели запрос в транскрипт не попадает вовсе, а на дороге
-              // агента он уходит обычным сообщением — просьбой ответить блоком.
-              onSend={media.isMediaMode ? sendMedia : send}
+              // Режим картинки делает сам, текст уходит агенту с блоками чипов сайта.
+              onSend={dockSend(media, draft, send, site)}
               onStop={() => chatId && agentRuns.stop(chatId)}
               onHandoff={handoff.askHandoff}
               modes={media.modes}
@@ -453,6 +446,7 @@ export function ChatPage() {
             // Картинке разговор не нужен — её адрес свой; артефакт без разговора
             // не появляется, и пустая строка до него не доходит.
             chatId={chatId ?? ''}
+            site={site.pane}
             {...(media.shownImage ? { image: media.shownImage } : {})}
             {...(media.shownDeck ? { deck: media.shownDeck } : {})}
             {...(preview ? { artifact: preview } : {})}
@@ -485,6 +479,12 @@ export function ChatPage() {
         isProjectContext={isProjectContext}
         projectPath={projectPath}
         activeChatId={activeChat?.id}
+        diffNotesSend={{
+          chatId,
+          isRunning,
+          dispatch: (prompt) => dispatch(prompt, []),
+          message: { allowEdits, autoApprove: autoMode.override, ...models.effective },
+        }}
         projectWindow={projectWindow}
         onProjectWindowChange={setProjectWindow}
         onAskAgent={fromWindow.askAgent}

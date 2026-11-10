@@ -18,9 +18,11 @@ import {
   scenarioValue,
 } from '../../model/launchDraft';
 import { sourceFieldsOf } from '../../model/launchSource';
+import { useQueueEntry } from '../../model/useQueueEntry';
 import type { DraftProblem, LaunchDraft, RepoDraft } from '../../model/launch.types';
 import { LaunchSection } from '../LaunchSection/LaunchSection';
 import { SourcePicker } from '../SourcePicker/SourcePicker';
+import { QueueRow } from './QueueRow';
 import styles from './LaunchForm.module.scss';
 
 interface LaunchFormProps {
@@ -41,6 +43,7 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
   const scenarios = useScenarioListing();
   const [draft, setDraft] = useState<LaunchDraft>(() => ({ ...emptyDraft(), ...initial }));
   const [problems, setProblems] = useState<DraftProblem[]>([]);
+  const queue = useQueueEntry();
   const P = 'coreLaunch.form';
 
   const set = <K extends keyof LaunchDraft>(key: K, value: LaunchDraft[K]) =>
@@ -62,19 +65,30 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
     return t(`${P}.problems.${p.message === 'forge-only' ? 'forge-only' : field}`);
   };
 
-  const submit = async () => {
+  /** Готовые поля оценки или `null` с проблемами в форме: «Оценить» и «В очередь» шлют одно и то же. */
+  const collect = async (): Promise<EstimateFields | null> => {
     const source = await sourceFieldsOf(draft);
     if (!source.ok) {
       setProblems([{ field: 'source', message: source.problem }]);
-      return;
+      return null;
     }
     const got = fieldsOf(draft, i18n.language, source.fields);
     if (!got.ok) {
       setProblems(got.problems);
-      return;
+      return null;
     }
     setProblems([]);
-    onEstimate(got.fields);
+    return got.fields;
+  };
+
+  const submit = async () => {
+    const fields = await collect();
+    if (fields) onEstimate(fields);
+  };
+
+  const toQueue = async () => {
+    const fields = await collect();
+    if (fields) await queue.queue(fields);
   };
 
   return (
@@ -189,11 +203,21 @@ export function LaunchForm({ pending, retrying, onEstimate, initial }: LaunchFor
             </Typography>
           </Stack>
         </Stack>
-        <div>
+        <QueueRow queue={queue} />
+        <Stack direction="row" gap="var(--spacing-xs)" wrap>
           <Button onClick={() => void submit()} isLoading={pending} data-estimate-button>
             {retrying ? t(`${P}.retry`) : t(`${P}.estimate`)}
           </Button>
-        </div>
+          <Button
+            variant="secondary"
+            onClick={() => void toQueue()}
+            isLoading={queue.pending}
+            title={t('coreBoard.queue.buttonHint')}
+            data-queue-button
+          >
+            {queue.retrying ? t('coreBoard.queue.retry') : t('coreBoard.queue.button')}
+          </Button>
+        </Stack>
       </Stack>
     </LaunchSection>
   );

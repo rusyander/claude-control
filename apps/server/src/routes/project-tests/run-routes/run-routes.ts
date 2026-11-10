@@ -14,7 +14,7 @@ import {
   runSecrets,
 } from '../../../domains/project-tests/project-tests.ts';
 import {
-  exportLanguage,
+  askedLanguage,
   exportRunPdf,
 } from '../../../domains/project-tests/export-run/export-run.ts';
 import {
@@ -263,7 +263,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
    * может честно ответить «нечем» (501 с именем того, что поставить). Остальные
    * форматы того же отчёта (md, csv, html) отдаёт `GET /run/export`.
    */
-  app.get<{ Querystring: { path?: string; id?: string } }>(
+  app.get<{ Querystring: { path?: string; id?: string; lang?: string } }>(
     '/api/project-tests/run/pdf',
     async (request, reply) => {
       const root = requireRoot(request.query.path, reply);
@@ -274,7 +274,7 @@ export function registerTestRunRoutes(app: FastifyInstance, deps: TestsDeps): vo
         const file = await exportRunPdf(
           root,
           id,
-          exportLanguage(deps.ctx.store.getSettings().language),
+          askedLanguage(request.query.lang, deps.ctx.store.getSettings().language),
         );
         return reply
           .type(file.contentType)

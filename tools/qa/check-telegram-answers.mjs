@@ -4,8 +4,9 @@
  * бота → сообщение владельцу с кнопками → нажатие → решение дошло до хука,
  * то есть до CLI.
  *
- * С этапа 10 ход `/chat` — задача ядра, и вопрос права ядра Telegram только
- * сообщает (ответ ядру — в панели или с телефона). Кнопки Telegram остались у
+ * С этапа 10 ход `/chat` — задача ядра, и вопрос права ядра непривязанный чат Telegram
+ * только сообщает (ответ ядру — в панели, с телефона или кнопками после привязки,
+ * `check-telegram-core.mjs`). Кнопки Telegram остались у
  * запросов, которые решает панель; здесь — запрос сессии вне панели: его держит
  * НАСТОЯЩИЙ хук `outside-relay-hook.mjs` (Claude Code запускает его так же — со
  * строкой JSON во входе), транскрипт сессии лежит в доме стенда, как его пишет CLI.
@@ -22,8 +23,8 @@
  *   - нажатие владельца решает запрос: хук вывел CLI allow, сообщение
  *     переписано «✅ Разрешено»; повтор той же кнопки — «Уже отвечено», второго
  *     решения нет; «⛔ Запретить» второго — хук вывел deny, кнопки сняты;
- *   - вопрос ядра (ядро стенда поднимает задачу с открытым вопросом) приходит
- *     в Telegram только уведомлением: «Ядро ждёт ответа», без кнопок, и
+ *   - вопрос ядра (ядро стенда поднимает задачу с открытым вопросом), чат ядру не
+ *     привязан — приходит в Telegram только уведомлением: «Ядро ждёт ответа», без кнопок, и
  *     сообщения с кнопками про него нет;
  *   - вебхук у бота — статус `webhook`, `deleteWebhook` не звался ни разу;
  *   - 409 на опросе — статус `conflict`, опрос стоит (без повторов вплотную);
@@ -41,10 +42,10 @@
  * Запуск: node tools/qa/check-telegram-answers.mjs
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { freePort, REPO, runOnStand, wait } from './throwaway-stand.mjs';
+import { REPO, runOnStand, wait } from './throwaway-stand.mjs';
+import { startBotStub } from './telegram-bot-stub.mjs';
 
 const OWNER = 424242;
 const STRANGER = 999001;
@@ -132,123 +133,15 @@ function startHook({ apiUrl, tokenFile, transcriptPath, cwd, command }) {
 }
 
 // ---- заглушка Bot API ---------------------------------------------------------------------------
-const bot = {
-  calls: [],
-  updates: [],
-  webhookUrl: '',
-  conflict: false,
-  nextMessageId: 500,
-  nextUpdateId: 1,
-};
-const tgPort = await freePort();
-const tg = createServer((req, res) => {
-  const chunks = [];
-  req.on('data', (chunk) => chunks.push(chunk));
-  req.on('end', async () => {
-    let body = {};
-    try {
-      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
-      // пустое тело — тоже вызов
-    }
-    const match = /^\/bot([^/]+)\/(\w+)/.exec(req.url ?? '');
-    const method = match?.[2] ?? '';
-    const tokenSeen = match?.[1] ?? '';
-    bot.calls.push({
-      method,
-      body,
-      tokenOk: tokenSeen === TOKEN || tokenSeen === NOTIFY_TOKEN,
-      at: Date.now(),
-    });
-    const send = (status, payload) => {
-      res.writeHead(status, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(payload));
-    };
-    const ok = (result) => send(200, { ok: true, result });
-    switch (method) {
-      case 'getMe':
-        return ok({ id: 7000001, is_bot: true, username: 'qa_answers_bot', first_name: 'QA' });
-      case 'getWebhookInfo':
-        return ok({ url: bot.webhookUrl, pending_update_count: 0 });
-      case 'getUpdates': {
-        if (bot.conflict) {
-          return send(409, {
-            ok: false,
-            error_code: 409,
-            description: 'Conflict: terminated by other getUpdates request',
-          });
-        }
-        // Очередь у каждого бота своя, и, как у Telegram, `offset` подтверждает:
-        // всё раньше него из очереди уходит, `-1` оставляет только последнее.
-        const offset = Number(body.offset ?? 0);
-        const own = (update) => update.token === tokenSeen;
-        if (offset === -1) {
-          const last = bot.updates.filter(own).at(-1);
-          bot.updates = bot.updates.filter((update) => !own(update) || update === last);
-          return ok(last ? [last.update] : []);
-        }
-        if (offset > 0) {
-          bot.updates = bot.updates.filter((u) => !own(u) || u.update.update_id >= offset);
-        }
-        for (let i = 0; i < 8; i += 1) {
-          const ready = bot.updates.filter(own).map((u) => u.update);
-          if (ready.length > 0) return ok(ready);
-          await wait(100);
-        }
-        return ok([]);
-      }
-      case 'sendMessage':
-        return ok({
-          message_id: bot.nextMessageId++,
-          chat: { id: Number(body.chat_id) },
-          date: Math.floor(Date.now() / 1000),
-        });
-      case 'editMessageText':
-      case 'answerCallbackQuery':
-      case 'deleteWebhook':
-      case 'setMyCommands':
-      case 'deleteMessage':
-      case 'deleteMessages':
-        return ok(true);
-      default:
-        return send(404, { ok: false, error_code: 404, description: 'Not Found' });
-    }
-  });
+const tgStub = await startBotStub({
+  botId: 7000001,
+  username: 'qa_answers_bot',
+  tokens: [TOKEN, NOTIFY_TOKEN],
+  owner: OWNER,
 });
-await new Promise((done) => tg.listen(tgPort, '127.0.0.1', done));
-
-const callsOf = (method) => bot.calls.filter((call) => call.method === method);
-/** Сообщение в личный чат бота: `/start`, `/status`… */
-const say = (text, { from = OWNER, chat = from, type = 'private', token = TOKEN } = {}) =>
-  bot.updates.push({
-    token,
-    update: {
-      update_id: bot.nextUpdateId++,
-      message: {
-        message_id: bot.nextUpdateId,
-        date: Math.floor(Date.now() / 1000),
-        text,
-        chat: { id: chat, type },
-        from: { id: from, is_bot: false, first_name: 'Анна', username: 'anna_qa' },
-      },
-    },
-  });
-const press = (data, messageId, { from = OWNER, chat = OWNER } = {}) => {
-  const id = `cb-${bot.nextUpdateId}`;
-  bot.updates.push({
-    token: TOKEN,
-    update: {
-      update_id: bot.nextUpdateId++,
-      callback_query: {
-        id,
-        from: { id: from, is_bot: false, first_name: 'Q' },
-        message: { message_id: messageId, chat: { id: chat, type: 'private' } },
-        data,
-      },
-    },
-  });
-  return id;
-};
+const { bot, callsOf, say, press } = tgStub;
+const tgPort = tgStub.port;
+const tg = { close: () => void tgStub.close() };
 async function until(probe, ms = 20_000, step = 200) {
   const deadline = Date.now() + ms;
   for (;;) {
@@ -634,10 +527,11 @@ try {
         }),
       );
 
-      // ── вопрос ядра — только уведомлением ────────────────────────────
+      // ── вопрос ядра без привязки — только уведомлением ───────────────
       // Задача ядра с открытым вопросом ждала с запуска: до подтверждения у карточки не было ни
-      // токена, ни события «вопрос». Ответ ядру Telegram не доказывает (human-strict), поэтому
-      // сообщение без кнопок, и опрос ответов своего сообщения с кнопками о нём не шлёт.
+      // токена, ни события «вопрос». Чат здесь ядру не привязан (`telegram.owner` не задан), поэтому
+      // сообщение без кнопок, и опрос ответов своего сообщения с кнопками о нём не шлёт. Кнопки
+      // после привязки (этап 12, D29) — `check-telegram-core.mjs`.
       const coreNotice = await until(
         () =>
           callsOf('sendMessage').find((call) =>
@@ -649,7 +543,7 @@ try {
         (call) => call.body.reply_markup && String(call.body.text ?? '').includes(CORE_TITLE),
       );
       check(
-        'вопрос ядра — уведомление «Ядро ждёт ответа» с заголовком задачи и ссылкой, без кнопок',
+        'вопрос ядра без привязки — уведомление «Ядро ждёт ответа» с заголовком задачи и ссылкой, без кнопок',
         coreNotice?.body?.chat_id === String(CONNECTED) &&
           String(coreNotice?.body?.text ?? '').includes(CORE_TITLE) &&
           String(coreNotice?.body?.text ?? '').includes('/core?id=') &&
@@ -668,11 +562,11 @@ try {
       }, 10_000);
       check('после подтверждения опрос ответов слушает', Boolean(polling), JSON.stringify(polling));
       check(
-        'меню команд бот получил: /status, /waiting, /clear, /help',
+        'меню команд бот получил: /status, /waiting, /task, /clear, /help',
         callsOf('setMyCommands').some(
           (call) =>
             (call.body.commands ?? []).map((one) => one.command).join(',') ===
-            'status,waiting,clear,help',
+            'status,waiting,task,clear,help',
         ),
       );
       const toStranger = () =>

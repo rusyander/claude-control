@@ -245,4 +245,21 @@ describe('answer, late answer, message, grant', () => {
     ]);
     s.task.close();
   });
+
+  it('a task in a folder without git: the grant to its unit key is journaled (review stage 12)', async () => {
+    const { task, taskId } = await openFresh(undefined, deps({ clock: fakeClock() }));
+    task.append({ kind: 'task.created', actor: 'core', data: { ...CREATED, repos: [] } });
+    seedSession(task, { stepKind: 'work' });
+    const fields = { project: 'r1', globs: ['**'], ops: ['edit'] };
+    const got = await processCommand(task, cmd(taskId, 'grant', fields), proof, commandEnv());
+    expect(got).toMatchObject({ status: 'applied', outcome: { project: 'r1' } });
+    const other = await processCommand(
+      task,
+      cmd(taskId, 'grant', { ...fields, project: 'other' }),
+      proof,
+      commandEnv(),
+    );
+    expect(other).toMatchObject({ status: 'rejected', code: 'unknown-project' });
+    task.close();
+  });
 });

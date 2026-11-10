@@ -1,6 +1,8 @@
 import type {
   ForgeActivity,
   ForgeActivityType,
+  ForgeInboxMr,
+  ForgeIssue,
   ForgeJob,
   ForgeJobStatus,
   ForgeMr,
@@ -9,7 +11,7 @@ import type {
 } from '@agentdeck/contracts/core/forge';
 import { FORGE_JOB_STATUSES } from '@agentdeck/contracts/core/forge';
 import { asArray, isRecord, ms } from './http.ts';
-import { mrBodyHash, noteHash, stripDraft } from './hash.ts';
+import { mrBodyHash, noteHash, sha256Hex, stripDraft } from './hash.ts';
 
 /**
  * Ответы GitLab v4 → типы ядра. Разбор строгий: нет обязательного поля — `null`, и метод
@@ -50,6 +52,111 @@ export function gitlabMr(v: unknown): ForgeMr | null {
     createdAt,
     bodyHash: mrBodyHash(clean, body),
   };
+}
+
+/** Путь проекта из `references.full` (`group/name#12`, `group/name!7`) без хвоста номера. */
+function projectOfRef(v: Record<string, unknown>, mark: '#' | '!'): string | null {
+  const refs = isRecord(v.references) ? v.references : null;
+  const full = refs ? str(refs.full) : null;
+  const cut = full ? full.lastIndexOf(mark) : -1;
+  return full && cut > 0 ? full.slice(0, cut) : null;
+}
+
+function labelsOf(v: unknown): string[] | null {
+  const list = asArray(v);
+  if (!list) return null;
+  const out = list.filter((l): l is string => typeof l === 'string');
+  return out.length === list.length ? out : null;
+}
+
+/**
+ * Отпечаток для «тикет изменён»: заголовок, описание, метки (без порядка) и то, что
+ * переходник добавил сам (нити, голова). Время правки не входит: комментарий — не правка.
+ */
+function digestOf(fields: Record<string, unknown>): string {
+  return sha256Hex(JSON.stringify(fields));
+}
+
+/** Эпик задачи: `<группа>&<номер>` — одинаков у задач одного эпика (подсказка D26). */
+function epicOf(v: Record<string, unknown>): string | undefined {
+  const epic = isRecord(v.epic) ? v.epic : null;
+  const iid = epic ? num(epic.iid) : null;
+  const group = epic ? num(epic.group_id) : null;
+  return iid !== null && group !== null ? `${group}&${iid}` : undefined;
+}
+
+/** Задача GitLab для входящих; `links` дочитывает порт отдельным запросом. */
+export function gitlabIssue(v: unknown, links?: string[]): ForgeIssue | null {
+  if (!isRecord(v)) return null;
+  const iid = num(v.iid);
+  const title = str(v.title);
+  const url = str(v.web_url);
+  const labels = labelsOf(v.labels);
+  const project = projectOfRef(v, '#');
+  if (iid === null || title === null || url === null || labels === null || project === null)
+    return null;
+  const description = str(v.description) ?? '';
+  const epic = epicOf(v);
+  const sorted = [...labels].sort();
+  return {
+    iid,
+    project,
+    title,
+    url,
+    labels,
+    // Связи — отдельный запрос без гарантии порядка: в отпечатке отсортированы, как и метки.
+    digest: digestOf({ title, description, labels: sorted, links: [...(links ?? [])].sort() }),
+    ...(description ? { description } : {}),
+    ...(epic ? { epic } : {}),
+    ...(links ? { links } : {}),
+  };
+}
+
+/** Ссылка связанной задачи — тот же ключ, что у записи входящих: `<путь проекта>#<iid>`. */
+export function gitlabIssueLinks(v: unknown): string[] | null {
+  const list = asArray(v);
+  if (!list) return null;
+  const out: string[] = [];
+  for (const raw of list) {
+    const issue = gitlabIssue(raw);
+    if (!issue) return null;
+    out.push(`${issue.project}#${issue.iid}`);
+  }
+  return out;
+}
+
+/** MR для входящих: личность и метки; нерешённые нити считает порт по обсуждениям. */
+export function gitlabInboxMr(v: unknown, openThreads = 0): ForgeInboxMr | null {
+  if (!isRecord(v)) return null;
+  const iid = num(v.iid);
+  const title = str(v.title);
+  const url = str(v.web_url);
+  const labels = labelsOf(v.labels);
+  const project = projectOfRef(v, '!');
+  if (iid === null || title === null || url === null || labels === null || project === null)
+    return null;
+  const description = str(v.description) ?? '';
+  return {
+    iid,
+    project,
+    title: stripDraft(title),
+    url,
+    labels,
+    digest: digestOf({
+      title,
+      description,
+      labels: [...labels].sort(),
+      head: str(v.sha),
+      openThreads,
+    }),
+    openThreads,
+  };
+}
+
+/** Нерешённые нити MR: разрешимые и не разрешённые (системные заметки — не нити). */
+export function gitlabOpenThreads(v: unknown): number | null {
+  const threads = gitlabThreads(v);
+  return threads ? threads.filter((t) => t.resolvable && !t.resolved).length : null;
 }
 
 export function gitlabMrList(v: unknown): ForgeMr[] | null {

@@ -1,5 +1,8 @@
 import type { InboxClient, InboxLaunch, InboxQuestion } from '@agentdeck/contracts/chat-inbox';
-import type { TelegramAnswersSettings } from '@agentdeck/contracts/telegram-answers';
+import type {
+  TelegramAnswersSettings,
+  TelegramCoreAskTarget,
+} from '@agentdeck/contracts/telegram-answers';
 
 /** Итог вызова Bot API: значение, а не исключение — опросу нужен код. */
 export type BotCall<T> =
@@ -58,7 +61,8 @@ export interface BotMessage extends SentBotMessage {
   /** Размеры одного фото, от меньшего к большему. */
   photo?: BotPhotoSize[];
   document?: BotDocument;
-  reply_to_message?: { message_id: number };
+  /** Сообщение, на которое ответили; `text` — каким его видит Telegram (сверка вопроса ядра, P189). */
+  reply_to_message?: { message_id: number; text?: string };
 }
 export interface BotUpdate {
   update_id: number;
@@ -67,7 +71,19 @@ export interface BotUpdate {
     id: string;
     from: BotUser;
     data?: string;
-    message?: { message_id: number; chat: BotChat };
+    /**
+     * Сообщение с кнопкой, как его ПОКАЗАЛ Telegram: текст и клавиатура. Нажатие на вопрос ядра
+     * сверяет с ними подпись кнопки и вопрос (этап 12, P189): правка сообщения или файла ответов
+     * между показом и нажатием — ни одной команды.
+     */
+    message?: {
+      message_id: number;
+      chat: BotChat;
+      text?: string;
+      reply_markup?: { inline_keyboard?: InlineKeyboard };
+      /** На какое сообщение ответило нажатое: у ответа на `/task` — сам `/task` (ключ записи). */
+      reply_to_message?: { message_id: number };
+    };
   };
 }
 
@@ -106,7 +122,21 @@ export type AskTarget =
    * копию чужой сессии, а диалог там остался бы висеть.
    */
   | { kind: 'outsideQuestion'; chatId: string; client?: InboxClient }
-  | { kind: 'deferred'; id: string };
+  | { kind: 'deferred'; id: string }
+  | CoreAskTarget;
+
+/**
+ * Вопрос ядра задач с кнопками (этап 12, D29, P188). `cmdIds[i]` — ключ повтора варианта `i`,
+ * последний — своего текста: повтор нажатия шлёт тот же ключ, ядро второй строки не пишет (P189).
+ * `question` — вопрос, как его показали (сверка с живым вопросом перед отправкой); `freeText` —
+ * принимает ли ядро из Telegram свой текст (`ask_human`, `blocker`, `scenario-step`).
+ */
+export type CoreAskTarget = TelegramCoreAskTarget & {
+  question: string;
+  freeText: boolean;
+  /** Часть вариантов из Telegram не выбрать (открытие точки 3, решение сверки, «разрешить» пункта 9). */
+  panelOnly?: boolean;
+};
 
 /** Что сейчас ждёт человека — одно ожидание, собранное из всех источников. */
 export interface PendingAskItem {
@@ -133,6 +163,8 @@ export interface PendingAskItem {
   reason?: string;
   /** Чат, куда отвечать текстом (reply на сообщение бота). */
   chat?: ChatRoute;
+  /** Вопрос ядра с действием по умолчанию (P153): неблокирующий — тихие часы его держат. */
+  defaultAction?: string | null;
 }
 
 /**
@@ -271,4 +303,13 @@ export type Vanished = { kind: 'inPanel' } | { kind: 'stale' } | { kind: 'coreOn
 export type ApplyOutcome =
   | { ok: true }
   | { ok: false; gone: true; detail?: string }
-  | { ok: false; gone?: false; detail: string; coreOnly?: true };
+  | {
+      ok: false;
+      gone?: false;
+      detail: string;
+      coreOnly?: true;
+      /** Вопрос ядра: ядро не признало чат владельцем — кнопки остаются, нужна новая привязка. */
+      rebind?: true;
+      /** Вопрос ядра: показанное разошлось с живым вопросом — ничего не отправлено, свежая копия. */
+      changed?: true;
+    };

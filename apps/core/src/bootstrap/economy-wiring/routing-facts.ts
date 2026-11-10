@@ -2,6 +2,8 @@ import type { JournalLine } from '@agentdeck/contracts/core/journal';
 import type { LearnedRaise, LearnedRaiseQuery } from '@agentdeck/contracts/core/economy';
 import type { LeadRole, LeadSection, TaskClass } from '@agentdeck/contracts/core/lead';
 import type { StepDef } from '@agentdeck/contracts/core/scenario';
+import { crossAdapterOf } from '../../conductor/next/lead-gate.ts';
+import { crossStepsOf } from '../../economy/cross-steps.ts';
 import { learnedRaiseOf, type LearnedTable } from '../../economy/learned/index.ts';
 import { resolveLeadSettings } from '../../economy/lead-settings/index.ts';
 import { reviewAuthorOf } from '../../economy/review-author.ts';
@@ -20,7 +22,8 @@ import type { StepRecord, TaskFoldState } from '../../journal/reduce/reduce.type
  * строками журнала задачи: роль куска (`unit.created.role`, иначе роль вида шага), строка роли
  * действующих настроек ведущего (только у задачи ведущего), прошлая неудачная попытка того же
  * шага в единице (эскалация с причиной и записью вывода проверки), автор для ревьюера, «понижение
- * уже падало», ключ проекта и класс задачи для обучения.
+ * уже падало», ключ проекта и класс задачи для обучения. Этап 12 (P185): второму ревью —
+ * CLI первого ревьюера как `avoidAdapter`, прочим шагам — плановый маршрут без его сессий.
  */
 
 export interface RoutingFactsDeps {
@@ -235,6 +238,30 @@ function classOf(state: TaskFoldState): TaskClass | null {
   return state.lead?.taskClass?.class ?? state.created?.lead?.class ?? null;
 }
 
+/**
+ * Плановый маршрут начатой задачи (P169) без сессий второго ревью: оно идёт на другом CLI нарочно,
+ * и правки после него остаются на маршруте работы, а не уходят за вторым ревьюером. Само второе
+ * ревью на следующем круге держится своего прошлого CLI. Ничего не меняется — поля нет, решает
+ * `startedOnOf` суда маршрута.
+ */
+function startedOnOf(
+  state: TaskFoldState,
+  lines: readonly JournalLine[],
+  step: { unitId: string | null; def: StepDef },
+): Pick<TierInput, 'startedOn'> {
+  const cross = crossStepsOf(lines);
+  if (cross.size === 0) return {};
+  const all = Object.values(state.sessions);
+  const mine = step.unitId ? all.filter((s) => state.steps[s.stepId]?.unitId === step.unitId) : [];
+  const pool = mine.length > 0 ? mine : all;
+  const keep = step.def.crossOf
+    ? pool.filter((s) => cross.has(s.stepId))
+    : pool.filter((s) => !cross.has(s.stepId));
+  const last = keep.at(-1);
+  if (!last || last === pool.at(-1)) return {};
+  return { startedOn: { adapter: last.adapter, route: last.route } };
+}
+
 export function routingFacts(
   state: TaskFoldState,
   lines: readonly JournalLine[],
@@ -246,8 +273,12 @@ export function routingFacts(
   const role = stepRoleOf(unitRoleOf(lines, step.unitId), step.def.kind);
   const escalation = escalationOf(state, lines, step, tiers);
   const author = step.def.kind === 'review' ? authorOf(state, step, tiers) : null;
+  // Второе ревью (P185): CLI первого ревьюера исключён — тот же факт, что у судьи формы.
+  const avoid = step.def.crossOf ? crossAdapterOf(state, step.unitId, step.def.crossOf) : null;
   const { learnedRaise } = deps;
   return {
+    ...startedOnOf(state, lines, step),
+    ...(avoid !== null ? { avoidAdapter: avoid } : {}),
     role,
     roleRow: roleRowOf(state, role, repoKey, deps),
     escalation,

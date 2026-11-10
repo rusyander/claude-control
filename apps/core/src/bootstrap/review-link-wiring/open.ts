@@ -4,7 +4,11 @@ import {
   type ReviewLinkBody,
   type ReviewLinkRefusal,
 } from '@agentdeck/contracts/core/review-link';
-import { openReviewTask, type SplitEnv } from '../../conductor/estimate/index.ts';
+import {
+  openReviewTask,
+  type ReviewTaskInput,
+  type SplitEnv,
+} from '../../conductor/estimate/index.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { GitOptions } from '../../platform/git/git.types.ts';
 import type { ForgeAccess } from '../publish-wiring/attempt.ts';
@@ -41,6 +45,8 @@ const same = (a: string, b: string): boolean =>
 export async function openReviewLink(
   body: ReviewLinkBody,
   deps: ReviewLinkOpenDeps,
+  // Этап 12: старт записи доски — факт `task.created.boardEntry` (запускатель доски).
+  extra: { boardEntry?: ReviewTaskInput['boardEntry'] } = {},
 ): Promise<ReviewLinkOpenOutcome> {
   const { url, repo, lang } = body.fields;
   const link = parseMrLink(url);
@@ -79,6 +85,7 @@ export async function openReviewLink(
       forge: link.forge,
       mr: { ...mr.value, title: `${mr.value.sourceBranch} → ${mr.value.targetBranch}` },
       ...(lang ? { lang } : {}),
+      ...(extra.boardEntry ? { boardEntry: extra.boardEntry } : {}),
     },
     deps.registry,
     deps.env,

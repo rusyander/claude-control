@@ -4,11 +4,18 @@ import {
   intakeSourceSchema,
   type IntakeSource,
 } from '@agentdeck/contracts/core/intake';
-import { fromAdf } from '../integrations/atlassian/adf.ts';
-import { call, jiraApi, type AtlassianAccess } from '../integrations/atlassian/client.ts';
+import { fromAdf } from '@agentdeck/trackers/adf';
+import {
+  browseUrl,
+  JIRA_SYSTEM,
+  linksOf as issueLinks,
+  readIssueRaw,
+} from '@agentdeck/trackers/jira';
+import type { AtlassianAccess } from '../integrations/atlassian/client.ts';
+import { viaTracker } from '../integrations/atlassian/tracker-port.ts';
 import { coded } from '../../lib/server-text/server-text.ts';
 import { invalidField, unreachable } from '../integrations/errors.ts';
-import type { RawIssueLink, RawTrackerIssue } from './tracker-snapshot.types.ts';
+import type { RawTrackerIssue } from './tracker-snapshot.types.ts';
 
 /**
  * Снимок задачи трекера для приёма ведущего (этап 11, P133, W3-16). Трекер читает панель, ядро
@@ -76,14 +83,11 @@ function linksOf(
   key: string,
   raw: unknown,
 ): { url: string; title?: string }[] {
-  const own = { url: `${access.baseUrl}/browse/${key}`, title: key };
-  const linked = (Array.isArray(raw) ? (raw as RawIssueLink[]) : []).flatMap((link) => {
-    const other = name(link.outwardIssue?.key) ?? name(link.inwardIssue?.key);
-    if (!other) return [];
-    const relation = name(link.outwardIssue ? link.type?.outward : link.type?.inward);
-    const title = (relation ? `${relation} ${other}` : other).slice(0, TITLE_MAX);
-    return [{ url: `${access.baseUrl}/browse/${other}`, title }];
-  });
+  const own = { url: browseUrl(access, key), title: key };
+  const linked = issueLinks(raw).map((link) => ({
+    url: browseUrl(access, link.key),
+    title: (link.relation ? `${link.relation} ${link.key}` : link.key).slice(0, TITLE_MAX),
+  }));
   return [own, ...linked].slice(0, LINKS_MAX);
 }
 
@@ -147,17 +151,16 @@ export async function trackerSnapshot(
         field: 'key',
       },
     );
-  const issue = await call<RawTrackerIssue>(access, {
-    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}?expand=names`,
-    system: 'Jira',
-  });
-  // Пустое тело `call` отдаёт как `null` (204 у части ручек Atlassian): у задачи это не ответ, а
+  const issue = (await viaTracker(access, (site, send) =>
+    readIssueRaw(site, send, key, 'expand=names'),
+  )) as RawTrackerIssue | null;
+  // Пустое тело клиент отдаёт как `null` (204 у части ручек Atlassian): у задачи это не ответ, а
   // отказ — назван, а не 500 «Cannot read properties of null».
   if (issue === null || typeof issue !== 'object')
     throw coded(
       unreachable(`Jira не вернула задачу ${key}: тело ответа пустое.`),
       'integration-issue-empty',
-      { system: 'Jira', key },
+      { system: JIRA_SYSTEM, key },
     );
   const issueKey = name(issue.key) ?? key;
   const title = name(text(issue.fields?.summary))?.slice(0, TITLE_MAX);

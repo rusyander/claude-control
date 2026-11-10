@@ -58,7 +58,14 @@ const body = (url: string, repo: string, cmdId = newId()) => ({
 });
 
 /** Шаг сдан и прошёл проверку — так его закрывает дирижёр; у ревью — заявление с замечаниями. */
-function done(task: LiveTask, unitId: string, defId: string, findings?: Finding[]): string {
+function done(
+  task: LiveTask,
+  unitId: string,
+  defId: string,
+  findings?: Finding[],
+  /** Шаг другого id того же вида (второе ревью `review-cross` — вид и брифинг шага `review`). */
+  stepDefId = defId,
+): string {
   const d = def(defId);
   const stepId = newId();
   task.append({
@@ -70,7 +77,7 @@ function done(task: LiveTask, unitId: string, defId: string, findings?: Finding[
       stepId,
       unitId,
       stepKind: d.kind,
-      stepDefId: defId,
+      stepDefId,
       round: 0,
       scenario: { id: 'review-link', version: 1 },
       budgetMs: 600_000,
@@ -302,6 +309,66 @@ describe('review MR by link (stage 10, F8)', { timeout: REAL_PUBLISH_TIMEOUT_MS 
     });
     expect(notesOf(w)).toHaveLength(1);
     expect(w.st.g(w.st.bare, 'rev-parse', `refs/heads/${w.branch}`)).toBe(headBefore);
+  });
+
+  it('the primary review and the cross review both reach the fix brief and the MR note, deduped; a review before the last fix does not', async () => {
+    const w = await world();
+    const wiring = wiringOf(w);
+    const { task, unitId, ctx } = await openedTask(w, wiring);
+    done(task, unitId, 'intake');
+    // Прошлый круг (оба ревью): его замечания правка уже закрыла — в итог не идут.
+    done(task, unitId, 'review', [{ file: 'old.ts', line: 9, severity: 'major', text: 'fixed' }]);
+    done(
+      task,
+      unitId,
+      'review',
+      [{ file: 'old-cross.ts', line: 4, severity: 'major', text: 'fixed too' }],
+      'review-cross',
+    );
+    done(task, unitId, 'fix');
+    done(task, unitId, 'review', [
+      { file: 'a.ts', line: 1, severity: 'major', text: 'primary only' },
+      { file: 'c.ts', line: 3, severity: 'minor', text: 'both saw it' },
+    ]);
+    // Второе ревью нового круга ещё не сдано: второе ревью прошлого круга в бриф не попадает.
+    expect((await wiring.hooks.preStep!(ctx('fix'))).sections[0]!.text).toBe(
+      [
+        'Review findings to fix (2):',
+        '1. `a.ts:1` [major] — primary only',
+        '2. `c.ts:3` [minor] — both saw it',
+      ].join('\n'),
+    );
+    done(
+      task,
+      unitId,
+      'review',
+      [
+        { file: 'b.ts', line: 2, severity: 'blocking', text: 'cross only' },
+        { file: 'c.ts', line: 3, severity: 'minor', text: 'both saw it' },
+      ],
+      'review-cross',
+    );
+    const fix = await wiring.hooks.preStep!(ctx('fix'));
+    expect(fix.sections[0]!.text).toBe(
+      [
+        'Review findings to fix (3):',
+        '1. `a.ts:1` [major] — primary only',
+        '2. `c.ts:3` [minor] — both saw it',
+        '3. `b.ts:2` [blocking] — cross only',
+      ].join('\n'),
+    );
+    answer(task, done(task, unitId, 'decide'), REVIEW_DECIDE_ANSWERS.ru.post);
+    expect(await wiring.hooks.onPublish!(ctx('publish'), null)).toEqual({
+      kind: 'published',
+      mrIid: w.mrIid,
+    });
+    const notes = notesOf(w);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toContain('**Замечания ревью (3)**');
+    expect(notes[0]).toContain('`a.ts:1` [major] — primary only');
+    expect(notes[0]).toContain('`b.ts:2` [blocking] — cross only');
+    expect(notes[0]).not.toContain('old.ts');
+    expect(notes[0]).not.toContain('old-cross.ts');
   });
 
   it('«Починить» + «Отправить»: no note, the step goes to the publisher (null); «И то и другое» + «Не отправлять» posts and publishes', async () => {

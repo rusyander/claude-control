@@ -47,11 +47,17 @@ export interface RoutingEnv {
   continuation?(
     session: ContinuationSession,
   ): { facts?: ContinuationFacts; transcriptPresent?: boolean } | undefined;
-  /** Остальное входа судьи `tier` (лестницы, выученное, реестр, «платный при отказе»). */
+  /** Остальное входа судьи `tier` (лестницы, выученное, реестр, «платный при отказе», модели маршрутов). */
   tier?: Partial<
     Pick<
       TierInput,
-      'ladders' | 'learnedRaise' | 'paidOnRefusal' | 'registry' | 'author' | 'lowerFailedHere'
+      | 'ladders'
+      | 'learnedRaise'
+      | 'paidOnRefusal'
+      | 'registry'
+      | 'author'
+      | 'lowerFailedHere'
+      | 'servedModels'
     >
   >;
   /**
@@ -97,6 +103,20 @@ function candidateOf(
     .sort((a, b) => b.startedSeq - a.startedSeq)[0];
 }
 
+/**
+ * Маршрут последней сессии задачи — плановый маршрут начатой задачи (P169, `tier-started.ts`).
+ * С `unitId` — сессия этой единицы, если она уже была; иначе последняя сессия задачи.
+ */
+function startedOnOf(
+  state: TaskFoldState,
+  unitId: string | null,
+): { startedOn?: { adapter: string; route: { kind: string; id: string } } } {
+  const all = Object.values(state.sessions);
+  const mine = unitId ? all.filter((s) => state.steps[s.stepId]?.unitId === unitId) : [];
+  const last = (mine.length > 0 ? mine : all).at(-1);
+  return last ? { startedOn: { adapter: last.adapter, route: last.route } } : {};
+}
+
 /** Чистая часть: оба решения по свёртке, без журнала. */
 export function decideRouting(
   state: TaskFoldState,
@@ -121,6 +141,9 @@ export function decideRouting(
     stepClass: stepClassOf(step.def.kind),
     ...(env.windows ? { windows: env.windows } : {}),
     ...(created?.paidOnRefusal === undefined ? {} : { paidOnRefusal: created.paidOnRefusal }),
+    // P169: у задачи уже шла сессия — окно её маршрут, модель и CLI не двигает, только клик.
+    started: Object.keys(state.sessions).length > 0,
+    ...startedOnOf(state, step.unitId),
     ...env.tier,
     ...env.step?.(state, step),
   });

@@ -58,6 +58,8 @@ export const CURSOR_CAPS: AdapterCaps = {
   channels: [],
   windowEvent: false,
   limitsChannel: null,
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 /** Канала адреса у Cursor нет: любой адрес отказан. */

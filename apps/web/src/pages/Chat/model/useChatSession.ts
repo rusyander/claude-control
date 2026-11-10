@@ -66,6 +66,8 @@ export interface ChatSession {
   /** Открыть разговор по ключу — когда на руках только id, а не сам чат. */
   openChatById: (id: string) => void;
   openProject: (project: ProjectInfo) => void;
+  /** Вкладка из адреса `?project=`: разговор того же адреса (`?id=`) остаётся открытым в ней. */
+  openAddressTab: (project: ProjectInfo) => void;
   openProjectPath: (path: string, name: string) => void;
   viewRun: (run: ViewTarget) => void;
   closeProjectTab: (id: string) => void;
@@ -318,6 +320,21 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     if (wasActive) enterProjectDraft();
   };
 
+  /**
+   * `?project=` вместе с `?id=` (переход «Открыть чат» задачи ядра: чат перехвата живёт в копии
+   * единицы, вкладка — её проект). Смена вкладки сбрасывала вид в черновик проекта и снимала id —
+   * разговор пропадал. Вкладка заранее помнит разговор адреса: эффект смены вкладки возвращает
+   * именно его, а уже открытая вкладка черновика не заводит.
+   */
+  const openAddressTab = (project: ProjectInfo): void => {
+    if (!urlId) {
+      openProject(project);
+      return;
+    }
+    workspace.rememberView(normalizeProjectPath(project.path), urlId);
+    ws.openProject(project.path, project.name);
+  };
+
   // Клик по агенту в пульте: показать его живой поток в главном чате. Если агент
   // в проекте — открываем таб (эффект смены таба подхватит pendingViewRef и
   // покажет прогон); если уже в этом табе — показываем сразу.
@@ -417,6 +434,7 @@ export function useChatSession({ chats }: ChatSessionInput): ChatSession {
     openChat,
     openChatById,
     openProject,
+    openAddressTab,
     openProjectPath,
     viewRun,
     closeProjectTab,

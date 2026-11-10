@@ -33,7 +33,7 @@ export function HelpTopicView({ topic }: HelpTopicViewProps) {
       <PageHeader
         title={t(`help.topics.${topic.id}.title`)}
         actions={
-          <Link to={topic.pagePath}>
+          <Link to={topic.pagePath} search={topic.pageSearch ?? {}}>
             <Button variant="secondary" leftIcon={<Icon name={topic.icon} size={24} />}>
               {t('help.common.openSection')}
             </Button>

@@ -24,6 +24,7 @@ import {
   type RunningChat,
 } from './commands.ts';
 import { newNonce, parseCallback, signCallback, verifyCallback } from './callback-data.ts';
+import { coreAskPressIntact, questionShown } from './core-ask-press.ts';
 import {
   CUSTOM_PROMPT_TEXT,
   cardOf,
@@ -31,8 +32,8 @@ import {
   sentItemOf,
   keyboardOf,
   messageText,
+  itemLink,
   OUTCOME,
-  panelLink,
   TOAST,
 } from './compose.ts';
 import type { AnswersStore } from './store.ts';
@@ -55,6 +56,11 @@ import {
 } from './replies.ts';
 import type { SentLog } from './sent-log.ts';
 import { sleep } from './sleep.ts';
+import { telegramApiBase } from '../telegram-api.ts';
+import type {
+  NoticeContext,
+  TelegramNoticesHooks,
+} from '../telegram-notices/telegram-notices.types.ts';
 import type { ReplyMarkup } from './telegram-answers.types.ts';
 import type {
   ApplyOutcome,
@@ -122,6 +128,11 @@ export interface AnswersServiceDeps {
   limits?: () => Promise<LimitShares | undefined>;
   /** Что бот писал и какие команды слал владелец — для /clear (`sent-log.ts`). */
   sentLog?: SentLog;
+  /**
+   * Уведомления о задачах ядра (этап 12, D29): нажатия `n:`, ответы на их подсказки, `/task` и
+   * незнакомые команды, строки `/status`, тихие часы. Нет — поведение до этапа 12.
+   */
+  notices?: TelegramNoticesHooks;
   /** Сколько собирать сообщения одного альбома с последнего пришедшего (мс). */
   albumWaitMs?: number;
   /**
@@ -406,11 +417,13 @@ export class TelegramAnswersService {
     if (dirty) this.deps.store.save();
 
     const afterMs = this.deps.store.settings.afterMinutes * 60_000;
-    const ready = items.filter(
+    const due = items.filter(
       (item) =>
         !this.deps.store.wasSent(item.key) &&
         (item.immediate || now - Date.parse(item.askedAt) >= afterMs),
     );
+    // Тихие часы (этап 12, P194): удержанное держит крючок уведомлений; нет крючка — всё сразу.
+    const ready = this.deps.notices ? this.deps.notices.hold(due, now) : due;
     if (ready.length === 0 || now < this.nextSendAt || now < this.quietUntil) return;
     const lastSentAt = this.deps.store.lastSentAt;
     if (lastSentAt && now - lastSentAt < (this.deps.coalesceMs ?? 60_000)) return;
@@ -543,6 +556,19 @@ export class TelegramAnswersService {
     return Boolean(owner) && String(chatId) === owner && String(fromId) === owner;
   }
 
+  /** Контекст крючка уведомлений: обновление-источник — отпечаток владельца для ядра. */
+  private noticeContext(token: string, chatId: number, fromId: number): NoticeContext {
+    return {
+      token,
+      origin: {
+        apiBase: telegramApiBase(),
+        botId: botIdOf(token) ?? '',
+        chatId: String(chatId),
+        fromId: String(fromId),
+      },
+    };
+  }
+
   /** Разобрать одно обновление. Открыт для тестов. */
   async handleUpdate(update: BotUpdate): Promise<void> {
     const token = this.token;
@@ -559,6 +585,11 @@ export class TelegramAnswersService {
     if (!this.isOwner(press.message?.chat.id, press.from.id)) {
       this.deps.log('telegram-answers: press from a non-owner ignored');
       return;
+    }
+    // Кнопка уведомления ядра (`n:`) — не ожидание ответов: её разбирает крючок уведомлений.
+    if (this.deps.notices && press.data?.startsWith('n:') && press.message) {
+      const ctx = this.noticeContext(token, press.message.chat.id, press.from.id);
+      if (await this.deps.notices.press(ctx, press)) return;
     }
     const toast = (text: string) => answerCallbackQuery(token, press.id, text);
     const parsed = parseCallback(press.data);
@@ -578,6 +609,11 @@ export class TelegramAnswersService {
     if (!action || !item || item.state !== 'open') {
       await toast(TOAST.answered);
       return;
+    }
+    // Вопрос ядра (этап 12, P189): подпись нажатой кнопки и вопрос, как их показал Telegram, —
+    // те же, что в файле ответов; иначе ни одной команды, свежая копия следующей сверкой.
+    if (!this.coreAskIntact(message, item, press)) {
+      return this.freshCopy(token, message, item, toast);
     }
     const clientId = `tg-${message.sid}-${parsed.action}`;
     switch (action.act) {
@@ -611,6 +647,34 @@ export class TelegramAnswersService {
       case 'expand':
         return this.expand(token, message, item, toast);
     }
+  }
+
+  /** Вопрос ядра: показанное Telegram совпало с тем, что бот показал бы сейчас (P189). */
+  private coreAskIntact(
+    message: SentMessage,
+    item: SentItem,
+    press: NonNullable<BotUpdate['callback_query']>,
+  ): boolean {
+    if (item.target.kind !== 'coreAsk') return true;
+    const sign = (n: number) => signCallback(this.deps.store.secret, message.sid, n, message.nonce);
+    const expected = keyboardOf(message, sign)
+      .flat()
+      .find((button) => button.callback_data === press.data)?.text;
+    return coreAskPressIntact(item.target, press, expected);
+  }
+
+  /** Ничего не отправлено: сообщение закрыто, следующая сверка пришлёт свежую копию вопроса. */
+  private async freshCopy(
+    token: string,
+    message: SentMessage,
+    item: SentItem,
+    toast: (text: string) => Promise<unknown>,
+  ): Promise<void> {
+    item.state = 'done';
+    item.outcome = OUTCOME.stale(this.now());
+    this.deps.store.forget(item.key);
+    await this.render(token, message);
+    await toast(TOAST.changed);
   }
 
   /** Вопрос из сводного сообщения — отдельным сообщением со всеми вариантами. */
@@ -749,6 +813,13 @@ export class TelegramAnswersService {
       await toast(TOAST.coreOnly);
       return;
     }
+    if (outcome.changed) return this.freshCopy(token, message, item, toast);
+    if (outcome.rebind) {
+      // Кнопки остаются: после новой привязки то же нажатие пройдёт (ключ повтора уже новый).
+      this.deps.log(`telegram-answers: core refused the chat owner: ${outcome.detail}`);
+      await toast(TOAST.rebind);
+      return;
+    }
     this.deps.log(`telegram-answers: answer refused: ${outcome.detail}`);
     await toast(TOAST.failed);
   }
@@ -776,6 +847,14 @@ export class TelegramAnswersService {
     if (command && command !== 'other') {
       this.remember(String(reply.chat.id), reply.message_id, 'owner');
       return this.command(token, command);
+    }
+    // `/task <текст>` и прочие незнакомые команды — крючку уведомлений; не взял — как прежде.
+    if (command === 'other' && this.deps.notices && reply.from) {
+      const ctx = this.noticeContext(token, reply.chat.id, reply.from.id);
+      if (await this.deps.notices.command(ctx, reply)) {
+        this.remember(String(reply.chat.id), reply.message_id, 'owner');
+        return;
+      }
     }
     const group = reply.media_group_id;
     if (group) {
@@ -805,6 +884,12 @@ export class TelegramAnswersService {
       await this.say(token, ownerId, HELP_TEXT);
       return;
     }
+    // Ответ на подсказку уведомления ядра («На доработку») — крючку уведомлений.
+    const first = messages[0];
+    if (this.deps.notices && first?.from) {
+      const ctx = this.noticeContext(token, first.chat.id, first.from.id);
+      if (await this.deps.notices.reply(ctx, messages, to)) return;
+    }
     // Вопрос ядра задач: ответ `answer` — суд `human-strict`, Telegram его не доказывает (ни числа
     // страницы панели, ни подписи ключом телефона). Не пересылаем — отказ и где ответить.
     const coreAsk = this.deps.sentLog?.find(ownerId, to, this.now())?.coreAsk;
@@ -819,6 +904,20 @@ export class TelegramAnswersService {
     if (question?.item.target.kind === 'outsideQuestion') {
       await this.say(token, ownerId, readOnlyLine(question.item.target.client));
       return;
+    }
+    // Вопрос ядра (P189): ответ на само сообщение вопроса — только если Telegram показал его тем же
+    // вопросом; «Свой ответ» уже прошёл ту же сверку при нажатии.
+    const quoted = messages.find(
+      (one) => one.reply_to_message?.message_id === to,
+    )?.reply_to_message;
+    if (
+      question?.item.target.kind === 'coreAsk' &&
+      question.message.messageId === to &&
+      !questionShown(question.item.target, quoted?.text)
+    ) {
+      return this.freshCopy(token, question.message, question.item, (line) =>
+        this.say(token, ownerId, line),
+      );
     }
     if (question) {
       return this.answerByReply(token, question, text, refs, wrongType, clientId);
@@ -984,7 +1083,10 @@ export class TelegramAnswersService {
       ),
       this.deps.limits?.().catch(() => undefined) ?? Promise.resolve(undefined),
     ]);
-    return statusText({ running, waiting, ...(limits ? { limits } : {}), now: this.now() });
+    const text = statusText({ running, waiting, ...(limits ? { limits } : {}), now: this.now() });
+    // Живые задачи ядра (этап 12, P193) — строками крючка уведомлений под сводкой панели.
+    const extra = (await this.deps.notices?.statusLines().catch(() => [])) ?? [];
+    return extra.length ? [text, ...extra].join('\n') : text;
   }
 
   /**
@@ -1048,7 +1150,7 @@ function retarget(item: SentItem, fresh: PendingAskItem): boolean {
 }
 
 function linksOf(message: SentMessage): string[] {
-  return message.items.map((item) => panelLink(item.openId));
+  return message.items.map(itemLink);
 }
 
 function errorText(error: unknown): string {

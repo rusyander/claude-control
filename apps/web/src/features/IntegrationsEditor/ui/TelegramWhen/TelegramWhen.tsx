@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
 import { Typography } from '@shared/ui/typography';
-import { minutesValid } from '../../model/telegramCard';
+import { minutesValid, quietValid } from '../../model/telegramCard';
 import type { TelegramWhenProps } from './TelegramWhen.types';
 import styles from './TelegramWhen.module.scss';
 
@@ -100,6 +100,59 @@ export function TelegramWhen({ draft, onChange }: TelegramWhenProps) {
           </Typography>
         </label>
       </div>
+      <Quiet draft={draft} onChange={onChange} />
     </Stack>
+  );
+}
+
+/**
+ * «Тихие часы» (этап 12): окно, в котором уведомления копятся и приходят одной сводкой в конце;
+ * блокирующие вопросы держатся, только если отмечено второе. Время — по часам машины панели.
+ */
+function Quiet({ draft, onChange }: TelegramWhenProps) {
+  const { t } = useTranslation();
+  const off = !draft.quietOn;
+  const invalid = !off && !quietValid(draft);
+  const time = (value: string, aria: string, patch: (v: string) => Partial<typeof draft>) => (
+    <input
+      className={`${styles.minutes} ${styles.time}`}
+      type="time"
+      value={value}
+      onChange={(event) => onChange(patch(event.target.value))}
+      disabled={off}
+      aria-label={aria}
+      aria-invalid={invalid}
+      title={invalid ? t('telegramCard.quiet.error') : undefined}
+    />
+  );
+  return (
+    <div className={styles.row} data-telegram-quiet={draft.quietOn ? 'on' : 'off'}>
+      <label className={styles.label}>
+        <input
+          type="checkbox"
+          checked={draft.quietOn}
+          onChange={(event) => onChange({ quietOn: event.target.checked })}
+        />
+        <Typography variant="body-sm" as="span">
+          {t('telegramCard.quiet.label')}
+        </Typography>
+      </label>
+      {time(draft.quietFrom, t('telegramCard.quiet.fromAria'), (quietFrom) => ({ quietFrom }))}
+      <Typography variant="body-sm" as="span">
+        {t('telegramCard.quiet.to')}
+      </Typography>
+      {time(draft.quietTo, t('telegramCard.quiet.toAria'), (quietTo) => ({ quietTo }))}
+      <label className={styles.label}>
+        <input
+          type="checkbox"
+          checked={draft.quietAsks}
+          disabled={off}
+          onChange={(event) => onChange({ quietAsks: event.target.checked })}
+        />
+        <Typography variant="body-sm" as="span" color={off ? 'subtle' : undefined}>
+          {t('telegramCard.quiet.asks')}
+        </Typography>
+      </label>
+    </div>
   );
 }

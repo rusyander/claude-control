@@ -29,6 +29,9 @@ import { questionCards } from '../../src/entities/inbox/questionCards';
 import { openDeferred, waitingDeferred } from '../../src/entities/inbox/deferred';
 import { useInboxDeferred } from '../../src/entities/inbox/deferredApi';
 import { DeferredSection } from '../../src/features/inbox/DeferredSection/DeferredSection';
+import { CoreWaitingSection } from '../../src/features/inbox/CoreWaiting/CoreWaitingSection';
+import { useCoreWaiting } from '../../src/features/inbox/CoreWaiting/useCoreWaiting';
+import type { CoreWaitingCard } from '../../src/features/inbox/CoreWaiting/coreWaiting.types';
 
 type HomeTab = 'chats' | 'questions';
 
@@ -63,6 +66,9 @@ export default function HomeScreen() {
   const deferredQuery = useInboxDeferred(configured);
   const deferred = useMemo(() => deferredQuery.data ?? [], [deferredQuery.data]);
   const deferredWaiting = waitingDeferred(deferred);
+  // Задачи ядра, которые держит блокирующий вопрос (этап 12, P176): те же «ждёт вас», что на
+  // доске панели и в push, — в значке вкладки и разделом наверху «Вопросов».
+  const coreWaiting = useCoreWaiting(configured);
   const running = groups.reduce((sum, group) => sum + group.running, 0);
   const projects = groups.filter((group) => !group.isSandbox).length;
 
@@ -119,7 +125,7 @@ export default function HomeScreen() {
               value: 'questions',
               label: t.home.tabQuestions,
               a11y: t.home.tabQuestionsA11y(pending),
-              badge: pending + deferredWaiting,
+              badge: pending + deferredWaiting + coreWaiting.length,
             },
           ]}
           value={tab}
@@ -203,28 +209,42 @@ export default function HomeScreen() {
         ) : null}
 
         {loaded && tab === 'questions' ? (
-          <QuestionsTab cards={cards} deferred={deferred} now={now} onOpen={open} />
+          <QuestionsTab
+            cards={cards}
+            deferred={deferred}
+            core={coreWaiting}
+            now={now}
+            onOpen={open}
+            onOpenCore={(id) => router.push({ pathname: '/core-task', params: { id } })}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/** Вкладка «Вопросы» — список D-n сверху, карточка на чат или пустое состояние. */
+/**
+ * Вкладка «Вопросы» — задачи ядра, ждущие вас, и список D-n сверху, карточка на чат или пустое
+ * состояние.
+ */
 function QuestionsTab({
   cards,
   deferred,
+  core,
   now,
   onOpen,
+  onOpenCore,
 }: {
   cards: readonly QuestionCardData[];
   deferred: readonly InboxDeferred[];
+  core: readonly CoreWaitingCard[];
   now: number;
   onOpen: (chat: InboxChat) => void;
+  onOpenCore: (taskId: string) => void;
 }) {
   const t = useT();
   const hasDeferred = openDeferred(deferred).length > 0;
-  if (cards.length === 0 && !hasDeferred) {
+  if (cards.length === 0 && !hasDeferred && core.length === 0) {
     return (
       <Empty
         title={t.home.noQuestions}
@@ -237,6 +257,7 @@ function QuestionsTab({
   }
   return (
     <>
+      <CoreWaitingSection cards={core} onOpen={onOpenCore} />
       <DeferredSection items={deferred} now={now} />
       {cards.map((card) => (
         <AskCard

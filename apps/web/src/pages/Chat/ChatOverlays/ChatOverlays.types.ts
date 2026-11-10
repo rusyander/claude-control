@@ -2,6 +2,7 @@ import type { Artifact } from '@agentdeck/contracts';
 import type { CascadeCeiling } from '@agentdeck/contracts/model-cascade';
 import type { ProjectInfo } from '@entities/Project';
 import type { ParallelChoice } from '@features/ParallelLaunch';
+import type { DiffNotesSend } from '@features/ProjectCode';
 
 /** Окна поверх чата: выбор папки, подтверждение удаления, код, тесты, запуск. */
 export type ProjectWindow = 'code' | 'tests' | 'environment';
@@ -26,6 +27,11 @@ export interface ChatOverlaysProps {
   projectPath?: string;
   /** Разговор нужен коду проекта: дифф показывает правки ИМЕННО этого чата. */
   activeChatId?: string;
+  /**
+   * Отправка этого разговора для заметок к строкам правок в окне кода: «Сейчас»
+   * — на ходу, «В очередь» — следующим ходом, агент свободен — обычной отправкой.
+   */
+  diffNotesSend?: DiffNotesSend;
   /**
    * Открытое окно проекта: код, тест-кейсы или «Окружение» (Compose проекта).
    * Одно поле, а не флаг на окно: модальных окон поверх чата открыто не больше одного.

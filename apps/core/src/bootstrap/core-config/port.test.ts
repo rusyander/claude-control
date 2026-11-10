@@ -204,6 +204,19 @@ describe('config widenings', () => {
     ]);
     expect(configWidenings({ cliPaths: { claude: '/opt/a/claude' } }, {})).toEqual([]);
   });
+
+  it('W2-D: a new Telegram task repo is named (a /task entry starts work there); a removed one is silent', () => {
+    const one = { path: '/r/app', baseRef: null };
+    expect(
+      configWidenings(
+        { telegram: { owner: null, repos: [one] } },
+        { telegram: { owner: null, repos: [one, { path: '/r/api', baseRef: 'main' }] } },
+      ),
+    ).toEqual([{ section: 'telegram', detail: 'task repo /r/api' }]);
+    expect(
+      configWidenings({ telegram: { owner: null, repos: [one] } }, { telegram: { owner: null } }),
+    ).toEqual([]);
+  });
 });
 
 describe('port wiring outside a stand', () => {

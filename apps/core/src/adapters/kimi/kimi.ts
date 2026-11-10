@@ -89,6 +89,8 @@ export const KIMI_CAPS: AdapterCaps = {
   channels: KIMI_CHANNELS,
   windowEvent: false,
   limitsChannel: null,
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 /** Канал Kimi — построитель фактов запуска (`@agentdeck/providers/kimi`), адрес с `/v1`. */

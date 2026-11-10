@@ -40,7 +40,8 @@ function statementsOf(input: RequirementsInput, id: string): Statement[] {
   const out: Statement[] = [];
   for (const row of input.claims) {
     const review = row.stepKind === 'review';
-    for (const claim of row.claim.requirements) {
+    // Второе ревью (P185) ничего не одобряет: его «покрыто» и подтверждения не в счёт, опровержения — в счёт.
+    for (const claim of row.cross ? [] : row.claim.requirements) {
       if (claim.id !== id) continue;
       out.push(
         claim.state === 'covered'
@@ -58,6 +59,7 @@ function statementsOf(input: RequirementsInput, id: string): Statement[] {
     if (!review) continue;
     for (const c of row.claim.confirmations ?? []) {
       if (c.target.kind === 'gate' || c.target.id !== id) continue;
+      if (row.cross && c.verdict === 'confirmed') continue;
       out.push({
         seq: row.seq,
         review: true,

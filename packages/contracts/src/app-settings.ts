@@ -109,6 +109,13 @@ export const telegramSettingsSchema = object({
   ]),
   // «Закончил» после долгой работы; не задано — порог по умолчанию (`integrations.ts`).
   doneAfterMinutes: number().int().min(0).max(1440).optional(),
+  // Тихие часы (этап 12, P194): уведомления и неблокирующие вопросы копятся до конца окна и
+  // уходят одной сводкой; блокирующий вопрос держится, только если `asks` включён. Нет — тишины нет.
+  quiet: object({
+    from: string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM'),
+    to: string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM'),
+    asks: boolean().default(false),
+  }).optional(),
 });
 
 export const tmsSystemSettingsSchema = object({

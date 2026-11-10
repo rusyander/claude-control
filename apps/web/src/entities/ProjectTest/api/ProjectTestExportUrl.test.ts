@@ -33,4 +33,20 @@ describe('project-tests: адреса отчётов файлом', () => {
     expect(md).toContain('/api/project-tests/release/export?');
     expect(md).toContain('release=1.4');
   });
+
+  // Язык экрана едет в ссылке: смена языка доходит до интерфейса раньше, чем PATCH
+  // настроек до сервера, и файл, выгруженный в этот миг, выходил на старом языке.
+  it('каждая ссылка файлом несёт язык экрана; без языка — параметра нет', () => {
+    const urls = [
+      runExportUrl('C:/work/app', 'run-1', 'md', 'en'),
+      runExportUrl('C:/work/app', 'run-1', 'csv', 'en'),
+      runExportUrl('C:/work/app', 'run-1', 'pdf', 'en'),
+      releaseExportUrl('C:/work/app', '1.4', 'md', 'en'),
+      releaseExportUrl('C:/work/app', '1.4', 'html', 'en'),
+      releaseExportUrl('C:/work/app', '1.4', 'pdf', 'en'),
+    ];
+    for (const url of urls)
+      expect(new URL(url, 'http://x').searchParams.get('lang'), url).toBe('en');
+    expect(releaseExportUrl('C:/work/app', '1.4', 'md')).not.toContain('lang=');
+  });
 });

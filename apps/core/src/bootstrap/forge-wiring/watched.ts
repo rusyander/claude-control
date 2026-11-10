@@ -8,6 +8,8 @@ import type { TaskRegistry, TaskSummary } from '../../conductor/tasks.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import { publicationOf } from '../../journal/reduce/publish.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
+import { boardStopOf } from '../../journal/reduce/fold-view.ts';
+import type { BoardStop } from '@agentdeck/contracts/core/board';
 import { pathKey } from '../../platform/paths.ts';
 import type { GitOptions } from '../../platform/git/git.types.ts';
 import type { WatchedMr } from '../../publisher/events/poll.ts';
@@ -50,12 +52,19 @@ interface TaskMrs {
   /** Заметки, прочитанные публикацией, по номеру MR. */
   read: { mrIid: number; notes: string[] }[];
   answers: boolean;
+  /** Этап 12 (P157): остановка задачи (`boardStopOf`); `null` — не с доски, решает репозиторий. */
+  stop: BoardStop | null;
 }
 
 export interface WatchedDeps {
   registry: TaskRegistry;
   git?: GitOptions;
   log?: (message: string) => void;
+  /**
+   * Этап 12 (P157): ключи путей репозиториев из `forgePoll` конфига — для MR без остановки с доски.
+   * Нет — каждый включённый ключ (`enabled`) считается настроенным, как до этапа 12.
+   */
+  configured?: () => ReadonlySet<string>;
 }
 
 /** Адрес без `user:password@` (https/ssh-URL); scp-вид `git@host:path` и путь — как есть. */
@@ -89,6 +98,7 @@ function readTaskMrs(dir: string, taskId: string, state: TaskFoldState): TaskMrs
     pollerEvents: [],
     read: [],
     answers: state.created?.scenario.id === ANSWER_REVIEWERS_PRESET,
+    stop: boardStopOf(state),
   };
   for (const line of readJournalLines(dir, taskId).lines) {
     if (line.kind === 'task.created') {
@@ -135,6 +145,21 @@ function readTaskMrs(dir: string, taskId: string, state: TaskFoldState): TaskMrs
   return out;
 }
 
+/**
+ * Исходный репозиторий и ссылка базы единицы с MR — тем же разбором, что у круга опроса: носитель
+ * доработки (этап 12, P162) читает сервер репозитория так же, как опрос.
+ */
+export function unitMrOf(
+  registry: TaskRegistry,
+  taskId: string,
+  state: TaskFoldState,
+  unitId: string,
+): { repo: string; ref: string; mrIid: number } | undefined {
+  const dir = registry.live(taskId)?.dir ?? join(registry.tasksDir, taskId);
+  const unit = readTaskMrs(dir, taskId, state).units.find((u) => u.unitId === unitId);
+  return unit ? { repo: unit.repo, ref: unit.ref, mrIid: unit.mrIid } : undefined;
+}
+
 interface Carrier {
   summary: TaskSummary;
   unit: UnitMr;
@@ -168,8 +193,34 @@ export function createWatched(deps: WatchedDeps) {
     }
   }
 
+  /**
+   * Этап 12 (P157): остановка MR решает, смотреть ли его — по первой задаче MR (той, что его
+   * открыла; носители ответов несут её `boardEntry`): «до MR» — никогда, даже в репозитории из
+   * `forgePoll`; «до конца» — всегда, даже вне его; без остановки — как настроен репозиторий.
+   */
+  function stopAllows(first: Carrier): boolean {
+    const stop = first.mrs.stop;
+    if (stop === 'mr') return false;
+    if (stop === 'end') return true;
+    return deps.configured ? deps.configured().has(pathKey(first.unit.repo)) : true;
+  }
+
+  /**
+   * Репозитории MR с остановкой «до конца»: опрос включается для них и вне `forgePoll`
+   * (`forgePollOf`). Тот же разбор журналов, что у круга, — память законченных общая.
+   */
+  function stopRepos(): string[] {
+    const out = new Map<string, string>();
+    for (const s of deps.registry.list()) {
+      const mrs = mrsOf(s);
+      if (mrs?.stop !== 'end') continue;
+      for (const unit of mrs.units) out.set(pathKey(unit.repo), unit.repo);
+    }
+    return [...out.values()];
+  }
+
   /** `enabled` — ключи путей включённых репозиториев: адрес пуша читается только для них. */
-  return async function watched(enabled?: ReadonlySet<string>): Promise<WatchedMr[]> {
+  async function watched(enabled?: ReadonlySet<string>): Promise<WatchedMr[]> {
     const byMr = new Map<string, Carrier[]>();
     const halfMade: HalfMade[] = [];
     // id — uuidv7, `list()` отсортирован по ним: порядок списка — порядок создания задач.
@@ -198,6 +249,7 @@ export function createWatched(deps: WatchedDeps) {
     };
     for (const carriers of byMr.values()) {
       const first = carriers[0]!;
+      if (!stopAllows(first)) continue;
       const server = await serverOf(first.unit.repo, first.unit.ref);
       if (!('value' in server)) {
         deps.log?.(`forge poller: ${first.unit.repo}: ${server.unknown}`);
@@ -231,6 +283,7 @@ export function createWatched(deps: WatchedDeps) {
         remote: server.value.remote,
         url,
         mrIid: iid,
+        mrUrl: first.unit.mrUrl,
         seen: [...new Set(seen)],
         ...(Number.isFinite(publishedAt) ? { publishedAt } : {}),
         ...(handled.length > 0 ? { handled: [...new Set(handled)] } : {}),
@@ -238,5 +291,7 @@ export function createWatched(deps: WatchedDeps) {
       });
     }
     return out;
-  };
+  }
+
+  return Object.assign(watched, { stopRepos });
 }

@@ -170,3 +170,14 @@ export function pathListDelimiter(os: OsKind = currentOs()): string {
 export function joinPath(os: OsKind, ...parts: string[]): string {
   return api(os).join(...parts);
 }
+
+/**
+ * Корень проекта закреплённого репозитория: вершина git + подпапка, которую назвал человек
+ * (`task.created.repos[].subPath`). Нет подпапки — проект в вершине или журнал старше поля.
+ */
+export function projectRootOf(
+  repo: { path: string; subPath?: string | undefined },
+  os: OsKind = currentOs(),
+): string {
+  return repo.subPath ? joinPath(os, repo.path, ...repo.subPath.split('/')) : repo.path;
+}

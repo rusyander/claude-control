@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { agentRuns } from '@shared/lib/agent-runs';
 import { toast } from '@shared/lib/toast';
+import { ChatLimitCard, panelResend, useLimitClears } from '@features/ChatLimitCard';
 import { ChatMessages } from '@features/ChatMessages';
 import { ChatEmptyState } from '../ChatEmptyState/ChatEmptyState';
 import { answerChild } from '../lib/answerChild';
@@ -15,6 +16,7 @@ import type { ChatThreadProps } from './ChatThread.types';
 export function ChatThread({
   messages,
   conversationId,
+  liveConversationId,
   stream,
   modelName,
   isLoading,
@@ -27,6 +29,7 @@ export function ChatThread({
   runStartedAt,
   localRun,
   chatId,
+  coreTaskId,
   permissions,
   queued,
   onCancelQueued,
@@ -51,6 +54,13 @@ export function ChatThread({
   mediaRevision,
 }: ChatThreadProps) {
   const { t } = useTranslation();
+  // Ответ после сброса окна пришёл в историю (его шлёт ядро) — ошибка лимита прогона снимается.
+  useLimitClears(
+    stream,
+    messages,
+    coreTaskId,
+    chatId ? () => agentRuns.dismissError(chatId) : undefined,
+  );
 
   // Есть ли о чём говорить. Пустой разговор — это не только пустая история:
   // ход мог уже идти, ответ печататься или закончиться ошибкой, и подсказки
@@ -136,11 +146,21 @@ export function ChatThread({
             toast.error(t('chat.answerRefusedForChild', { title, message })),
         })
       }
-      onRetry={chatId ? () => agentRuns.retry(chatId) : undefined}
-      onContinue={chatId ? onContinue : undefined}
+      // Лимит держит ход — повтор ведёт ядро (P171): повтор панели дал бы второй ход того же слова.
+      onRetry={panelResend(stream, chatId ? () => agentRuns.retry(chatId) : undefined)}
+      onContinue={panelResend(stream, chatId ? onContinue : undefined)}
       onDismissError={chatId ? () => agentRuns.dismissError(chatId) : undefined}
       onCompact={chatId ? onCompact : undefined}
       onFreshSession={chatId ? onFreshSession : undefined}
+      errorAside={
+        <ChatLimitCard
+          // Новый лимит — новая карточка: «Ждать сброса» прошлого не сворачивает этот.
+          key={stream.error ?? ''}
+          stream={stream}
+          {...(coreTaskId ? { coreTaskId } : {})}
+          {...(liveConversationId ? { conversationId: liveConversationId } : {})}
+        />
+      }
       onRefresh={onRefresh}
       onKeepSession={chatId ? () => void agentRuns.keepSession(chatId) : undefined}
       costUnit={costUnit}

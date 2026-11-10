@@ -133,7 +133,8 @@ export function registerRemoteRoutes(
    * выясняется только через реальный прогон, то есть слишком поздно.
    */
   app.post('/api/remote/test', async () => {
-    notify({ kind: 'done', chatId: 'test', projectPath: undefined });
+    // `test` — звонит при любом виде: обычный «готово» в push больше не уходит (этап 12, P175).
+    notify({ kind: 'done', chatId: 'test', projectPath: undefined, test: true });
     return { ok: true, devices: ctx.store.getPushDevices().length };
   });
 }

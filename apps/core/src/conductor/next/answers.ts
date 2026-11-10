@@ -37,6 +37,22 @@ export const CONDUCTOR_ANSWERS = {
     },
     en: { recheck: 'Check again', done: 'Treat as done', notDone: 'Treat as not done' },
   },
+  /**
+   * Точка 4 потерянного входа CLI (этап 12, P170, `conductor/human/login-ask.ts`): войти заново и
+   * продолжить или остановить шаг; варианты перевода `model:`/`cli:` идут за ними.
+   */
+  login: {
+    ru: { relogin: 'Я вошёл заново — продолжить', stop: 'Остановить шаг' },
+    en: { relogin: 'I logged in again — continue', stop: 'Stop the step' },
+  },
+  /**
+   * Пункт 9 комментария назад в тикет (этап 12, P166, `bootstrap/panel-trackers.ts`): разрешить
+   * одну строку со ссылкой на MR или не писать. Отпускает запись только ответ панели или телефона.
+   */
+  trackerWrite: {
+    ru: { approve: 'Разрешить комментарий', decline: 'Не писать' },
+    en: { approve: 'Allow the comment', decline: 'Do not write' },
+  },
 } as const;
 
 export type AnswerFamily = keyof typeof CONDUCTOR_ANSWERS;
@@ -73,6 +89,27 @@ export function answerKey<F extends AnswerFamily>(
   return undefined;
 }
 
+/** Переводы строки, на которых прежний разбор `/^(model|cli):(.+)$/` отказывал. */
+const LINE_BREAKS = ['\n', '\r', '\u2028', '\u2029'];
+
+/**
+ * Ответ-переключение: `model:<id>` — правка модели задачи, `cli:<id>` — правка её CLI. Другой
+ * текст, пустое значение или значение с переводом строки — `null`. Без регулярного выражения:
+ * модули решений текст регулярками не разбирают (P32, `decision-regex.test.ts`).
+ */
+export function switchAnswerOf(
+  answer: string | undefined,
+): { field: 'model' | 'adapter'; value: string } | null {
+  if (answer === undefined) return null;
+  const colon = answer.indexOf(':');
+  if (colon < 0) return null;
+  const head = answer.slice(0, colon);
+  const value = answer.slice(colon + 1);
+  if (head !== 'model' && head !== 'cli') return null;
+  if (!value || LINE_BREAKS.some((mark) => value.includes(mark))) return null;
+  return { field: head === 'cli' ? 'adapter' : 'model', value };
+}
+
 const RU_QUOTE = (t: string): string => `«${t}»`;
 const EN_QUOTE = (t: string): string => `“${t}”`;
 
@@ -99,8 +136,17 @@ export const CONDUCTOR_QUESTIONS = {
       ? `Step ${EN_QUOTE(title)} ran over its token budget (${spent} of ${limit}). Extend it?`
       : `Шаг ${RU_QUOTE(title)} вышел за бюджет токенов (${spent} из ${limit}). Продлить?`;
   },
-  exhausted: (lang: AskLang, routeId: string, step: AskStep): string => {
+  exhausted: (lang: AskLang, routeId: string, step: AskStep, offers = 0): string => {
     const title = stepTitleIn(step, lang);
+    // Начатая задача (P169): другие годные маршруты есть, но уйти на них можно только кликом.
+    if (offers > 0)
+      return lang === 'en'
+        ? `Route ${routeId} has used up its paid budget. Step ${EN_QUOTE(title)} of a started task ` +
+            'stays on it until you choose: top up and clear the mark with the clear-exhausted ' +
+            'command, move the task to another model or CLI below, or stop the step.'
+        : `Маршрут ${routeId} исчерпал оплаченный бюджет. Шаг ${RU_QUOTE(title)} начатой задачи ` +
+            'ждёт его, пока вы не выберете: пополнить счёт и снять отметку командой ' +
+            'clear-exhausted, перевести задачу на другую модель или CLI ниже, или остановить шаг.';
     return lang === 'en'
       ? `Route ${routeId} has used up its paid budget, and step ${EN_QUOTE(title)} has no other ` +
           'allowed route. Top up the account and clear the mark with the clear-exhausted command, ' +
@@ -108,6 +154,24 @@ export const CONDUCTOR_QUESTIONS = {
       : `Маршрут ${routeId} исчерпал оплаченный бюджет, другого разрешённого маршрута у шага ` +
           `${RU_QUOTE(title)} нет. Пополните счёт и снимите отметку командой clear-exhausted, или ` +
           'остановите шаг.';
+  },
+  /**
+   * Точка 4 (P170): CLI маршрута потерял вход посреди шага — перечитанное состояние входа
+   * «нет». Что модель успела сделать до отказа, неизвестно; сам шаг маршрут не меняет.
+   */
+  login: (lang: AskLang, routeId: string, step: AskStep, offers = 0): string => {
+    const title = stepTitleIn(step, lang);
+    const move =
+      offers > 0
+        ? lang === 'en'
+          ? ', move the task to another model or CLI below'
+          : ', перевести задачу на другую модель или CLI ниже'
+        : '';
+    return lang === 'en'
+      ? `The CLI of route ${routeId} lost its login during step ${EN_QUOTE(title)}. Log in again ` +
+          `in that CLI and continue${move}, or stop the step.`
+      : `CLI маршрута ${routeId} потерял вход во время шага ${RU_QUOTE(title)}. Войдите в этот CLI ` +
+          `заново и продолжите${move}, или остановите шаг.`;
   },
   /** Точка 4: сверка не узнала исход действия к сроку своего класса чтения. */
   reconcile: (lang: AskLang, kind: string, target: string, reason: string): string =>

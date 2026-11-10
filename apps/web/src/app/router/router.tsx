@@ -3,14 +3,26 @@ import {
   createRoute,
   createRouter,
   lazyRouteComponent,
+  redirect,
 } from '@tanstack/react-router';
 import { MainLayout } from '@app/layouts/MainLayout/MainLayout';
 import { OverviewPage } from '@pages/Overview/OverviewPage/OverviewPage';
 import { ChatSection } from '@pages/Chat/ChatSection/ChatSection';
+import { coreBoardSearch, groupsBoardTarget } from '@pages/CoreTask/model/boardSearch';
 import { i18n, loadHelp, toLanguage } from '@shared/config/i18n';
 import { gated } from './gated';
 import { validateSearch } from './validateSearch';
 import { redirectCoreChat } from './coreChatRedirect';
+
+/** Адрес раздела `/core`: общие ключи панели плюс ключи доски (`view`, `lane`, `group`). */
+function coreSearch(search: Record<string, unknown>) {
+  return { ...validateSearch(search), ...coreBoardSearch(search) };
+}
+
+/** `beforeLoad` прежнего `/groups`: страницы больше нет, только переход на полосы групп доски. */
+function redirectGroups(): never {
+  throw redirect({ ...groupsBoardTarget(), replace: true } as never);
+}
 import { NotFoundPage } from './NotFoundPage/NotFoundPage';
 import { RouteErrorPage } from './RouteErrorPage/RouteErrorPage';
 import { RoutePending } from './RoutePending/RoutePending';
@@ -22,10 +34,6 @@ import { RoutePending } from './RoutePending/RoutePending';
  * целиком ради любого раздела — с телефона по Tailscale это секунды.
  */
 const SearchPage = lazyRouteComponent(() => import('@pages/Search/SearchPage'), 'SearchPage');
-const GroupsPage = lazyRouteComponent(
-  () => import('@pages/Groups/GroupsPage/GroupsPage'),
-  'GroupsPage',
-);
 const HistoryPage = lazyRouteComponent(
   () => import('@pages/History/HistoryPage/HistoryPage'),
   'HistoryPage',
@@ -132,7 +140,8 @@ const routes = [
   // Панель-level разделы — без гейта: видны и работают при любом провайдере.
   { path: '/', component: OverviewPage },
   { path: '/search', component: SearchPage },
-  { path: '/groups', component: GroupsPage },
+  // Страница групп свёрнута в доску ядра (этап 12, D13): прежний адрес ведёт на полосы групп.
+  { path: '/groups', beforeLoad: redirectGroups },
   { path: '/history', component: HistoryPage },
   { path: '/settings', component: SettingsPage },
   { path: '/dlp', component: DlpPage },
@@ -142,7 +151,8 @@ const routes = [
   { path: '/compare', component: ProviderComparePage },
   { path: '/portability', component: PortabilityPage },
   // Ядро задач — свой процесс; панель только показывает его через прокладку `/api/core/*`.
-  { path: '/core', component: CoreTasksPage },
+  // Доска и список одного раздела: свой разбор адреса дописывает `view`, `lane`, `group`.
+  { path: '/core', component: CoreTasksPage, validateSearch: coreSearch },
   { path: '/core/launch', component: CoreLaunchPage },
   { path: '/core/scenarios', component: CoreScenariosPage },
   // Чат через ядро свёрнут в `/chat` (W3-17a): старый адрес только переводит туда.

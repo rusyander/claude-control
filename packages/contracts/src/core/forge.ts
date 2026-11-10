@@ -224,3 +224,51 @@ export interface ForgePort {
     mrIids: number[];
   }): Promise<Fact<ForgeActivity[]>>;
 }
+
+/** Задача форжа, назначенная мне (входящие, D16): ключ `<путь проекта>#<iid>`. */
+export interface ForgeIssue {
+  iid: number;
+  project: string;
+  title: string;
+  url: string;
+  labels: string[];
+  /** sha256 значимых полей — изменился, запись входящих помечается. */
+  digest: string;
+  /** Этап 12 (D26): описание текстом — из него входящие берут названные пути. */
+  description?: string;
+  /** Эпик задачи (`<группа>&<номер>`), если форж его отдаёт. */
+  epic?: string;
+  /** Связанные задачи (`<путь проекта>#<iid>`), подсказка «связано с …». */
+  links?: string[];
+}
+
+/** MR для входящих: на моё ревью или мой с нерешёнными нитями. Состояние — из `ForgePort.mr`. */
+export interface ForgeInboxMr {
+  iid: number;
+  project: string;
+  title: string;
+  url: string;
+  labels: string[];
+  digest: string;
+  /** Нерешённых нитей (для своего MR); для MR на ревью — 0. */
+  openThreads: number;
+}
+
+/**
+ * Чтения входящих с правами учётки человека (D16, fold m2): по всему сайту, не по одному проекту,
+ * поэтому отдельно от `ForgePort` (тот — про один проект задачи). Каждое чтение — факт: «не умеет»
+ * у форжа без такого API (GitHub — «не поддерживается»), «неизвестно» записей не трогает.
+ */
+export interface ForgeInbox {
+  readonly kind: ForgeKind;
+  /**
+   * Задачи с КАЖДОЙ из меток; `assignedToMe: false` — чьи угодно (нужна хотя бы одна метка, иначе
+   * читать нечего), нет поля или `true` — только назначенные на учётку.
+   */
+  assignedIssues(q: {
+    labels: string[];
+    assignedToMe?: boolean;
+  }): Promise<Fact<ForgeIssue[]> | ForgeUnsupported>;
+  reviewRequests(): Promise<Fact<ForgeInboxMr[]> | ForgeUnsupported>;
+  ownMrsWithOpenThreads(): Promise<Fact<ForgeInboxMr[]> | ForgeUnsupported>;
+}

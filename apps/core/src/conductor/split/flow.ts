@@ -99,6 +99,29 @@ export async function runSplitPoint(
 }
 
 /**
+ * Сценарий без точки деления (этап 12, проход по стенду `browser-walk`: один шаг `walk`): оценке
+ * негде кончиться, и `estimating` ждало бы вечно. Соло предлагает ядро сразу после единицы 0;
+ * проверка и решение — те же строки журнала, принято — политика запуска. Есть точка — `null`.
+ */
+export async function runSoloWithoutSplitPoint(
+  task: LiveTask,
+  scenario: { id: string; steps: readonly StepDef[] },
+  env: SplitEnv,
+): Promise<SplitPointResult | null> {
+  if (task.state.task !== 'estimating') return null;
+  if (scenario.steps.some((def) => isSplitPoint(scenario.steps, def))) return null;
+  const outcome = proposeSplit(
+    task,
+    soloOf(task),
+    { by: 'core', stepId: null },
+    { deliverable: deliverableOf(scenario.id, null) },
+    env,
+  );
+  if (outcome.decision.verdict !== 'accepted') return { outcome, after: null };
+  return { outcome, after: await afterAccept(task, outcome, env) };
+}
+
+/**
  * Задача ведущего (этап 11) — одно правило на деление и крючки ведущего (`conductor-wiring/lead.ts`):
  * профиль ведения в `task.created.lead` или сценарий ведущего — `lead`, `tracker-ticket` со второй
  * версии (первая заморожена без ведения). Сценарий — текущий `scenario.ref`: свёртка ставит его

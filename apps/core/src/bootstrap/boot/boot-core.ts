@@ -47,6 +47,9 @@ import { createContextWiring } from '../economy-wiring/context.ts';
 import { createEconomyWiring } from '../economy-wiring/index.ts';
 import { learnedPortOf } from '../economy-wiring/learned-port.ts';
 import { createPollWiring } from '../forge-wiring/poll-wiring.ts';
+import { createBoardWiring } from '../board-wiring.ts';
+import { createTakeoverWiring } from '../takeover-wiring.ts';
+import { createInboxWiring } from '../inbox-wiring.ts';
 import { createAgentsWiring } from '../agents-wiring/index.ts';
 import { createAllocatorWiring } from '../allocator-wiring/index.ts';
 import { createObserverWiring } from '../observer-wiring/index.ts';
@@ -55,6 +58,7 @@ import { createRouteWindows } from '../route-windows.ts';
 import { createSessionRuntime, type SessionRuntime } from '../session-runtime.ts';
 import type { LearnedTable } from '../../economy/learned/index.ts';
 import { createSessionKeyBook } from '../session-keys.ts';
+import { createWalkPort, type WalkPort } from '../../adapters/browser/index.ts';
 import { buildVerifierWiring } from '../verifier-wiring/index.ts';
 import type { BootedCore, BootOptions } from './boot.types.ts';
 import { openCoreLog, routeJournalOf } from './core-log.ts';
@@ -70,6 +74,8 @@ import { openFilesLimit } from '../../platform/limits.ts';
 import { startDlpProxyWiring, type DlpProxyWiring } from '../dlp-proxy-wiring.ts';
 import { readPanelListenerSettings } from '../panel-profiles.ts';
 import { forgeHostsOfPanel, forgeOfPanel } from '../panel-forge.ts';
+import { commentBackOf } from '../panel-trackers.ts';
+import { createCommentRelease } from '../publish-wiring/comment-release.ts';
 import {
   panelGatewayPort,
   startUserGatewayWiring,
@@ -203,6 +209,10 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
   cells.sessions = sessions;
   const me = { build, pid: process.pid, pidStart: self.value.start, bootId };
   const startedAt = Date.now();
+  const commentRelease = createCommentRelease({
+    commentBack: commentBackOf({ coreHome: layout.root, panelAppData: panel.appData, note }),
+    note,
+  });
   const registry = createTaskRegistry(
     layout.tasks,
     {
@@ -215,8 +225,14 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       // Отвергнутая писателем строка — сигнал `journal-rejected` наблюдателя (этап 8, F11).
       onRejected: (taskId, rejection) => observer.rejected(taskId, rejection),
     },
-    // Каждая задача, ставшая живой (открыта на загрузке, создана, открыта заново), — под наблюдателем.
-    { onLive: (task) => observer.attach(task) },
+    // Каждая задача, ставшая живой (открыта на загрузке, создана, открыта заново), — под наблюдателем
+    // и под отпусканием комментария назад в тикет (ответ пункта 9, W2-D).
+    {
+      onLive: (task) => {
+        observer.attach(task);
+        commentRelease.attach(task);
+      },
+    },
   );
   registryCell.current = registry;
   // История агентов (этап 11): свёртка журнала задач для `/v1/*agents*`; маска — та же, что у журнала.
@@ -269,6 +285,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
   // Шлюз человека (этап 10): настройку держит ядро, сам шлюз живёт на хосте звеньев.
   let userGateway: UserGatewayWiring | undefined;
   let dlpProxy: DlpProxyWiring | undefined;
+  // Браузер шага `walk` (этап 12): Chromium стартует первым действием модели, уходит с ядром.
+  let walk: WalkPort | undefined;
   try {
     note('routes', { ids: routes.list().map((route) => route.id) });
     const token = ensureTokenFile(layout.token);
@@ -336,11 +354,53 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       pin: loopPin ?? (() => processPin()),
       keys: sessionKeys,
       windowOf: (routeId, model) => routeWindows.windowOf(routeId, model),
+      servedModels: (routeId) => routeWindows.modelsOf(routeId),
     });
     learnedCell = economy.learned;
     // Дописать оборванную запись настройки и подписаться на дрейф — до API и до первого читателя.
     configWiring = createConfigPort({ layout, note });
     const configPort = configWiring.port;
+    // Этап 12: доска задач (Z1) и перехват с доработкой (Z4) — до API, их порты нужны ему и командам.
+    const board = createBoardWiring({
+      registry,
+      layout,
+      note,
+      split: () => splitEnv,
+      reviewLink: () => reviewLink,
+      config: configPort,
+      economy,
+      windows,
+      allocator,
+      now: Date.now,
+      // Z7: «ответить ревьюерам» из входящих — форж каталога панели, решённого здесь (не по умолчанию).
+      answerForgeFor: (url) => {
+        const port = forgeOfPanel(panel.appData)(url).port;
+        return port.kind === 'generic' ? null : port;
+      },
+      // W2-D (B10b): обход конца MR — тот же форж каталога панели; без него «Влит»/«Закрыта» не пишутся.
+      forgeFor: (url) => forgeOfPanel(panel.appData)(url).port,
+    });
+    const takeover = createTakeoverWiring({
+      registry,
+      layout,
+      note,
+      split: () => splitEnv,
+      config: configPort,
+      board: () => board.commands(),
+      now: Date.now,
+    });
+    // Этап 12 (Z6/Z7): входящие — после доски: записи кладутся только через её хранилище.
+    // Свои MR, которые ведёт опрос форжа (W2-D), — ячейка: опрос собирается ниже, до старта входящих.
+    const forgeWatched: { urls?: () => Promise<ReadonlySet<string>> } = {};
+    const inbox = createInboxWiring({
+      layout,
+      note,
+      config: configPort,
+      board: () => board.port(),
+      watchedMrs: () => forgeWatched.urls?.() ?? Promise.resolve(new Set<string>()),
+      panelAppData: panel.appData,
+      now: Date.now,
+    });
     // `agentdeck state`: ручка API и снимок запуска собираются над одной библиотекой сценариев.
     const stateDeps = { scenarioOf: libraryScenarioOf(layout.scenarios) };
     const verifier = buildVerifierWiring({
@@ -350,6 +410,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       windows,
       known: economy.known,
     });
+    // Доступы стенда — из хранилища панели; подставленное значение уходит в маску сессии (P178).
+    walk = createWalkPort({ panelAppData: panel.appData, keys: sessionKeys, known: economy.known });
     // Удержание своей модели панелью (этап 10, зона C): прошлое удержание возвращается до API —
     // слот карты занят его живым сервером раньше, чем задача ядра попросит свою модель.
     const localHold = createLocalHold({
@@ -419,6 +481,11 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       agents: () => agents.port(),
       allocator: () => allocator.port(),
       // Этап 11 (P140): сброс ключа обучения — в кэш выученного, затем перечитать его.
+      board: () => board.port(),
+      boardCommands: () => board.commands(),
+      inbox: () => inbox.port(),
+      takeover: () => takeover.takeover(),
+      rework: () => takeover.rework(),
       learned: () =>
         learnedPortOf({
           tasksDir: layout.tasks,
@@ -444,6 +511,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       verifier,
       split: () => splitEnv,
       known: economy.known,
+      walk,
       // Команды человека над маршрутами: `set-route` судит набор по реестру этой загрузки,
       // `clear-exhausted` идёт к тому же хосту звеньев, что и дорога сессии.
       routes: routePortsNow,
@@ -513,6 +581,8 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       cliVersion,
       sessionState: launchSnapshot(stateDeps),
       ...(options.resourceReaders ? { readers: options.resourceReaders } : {}),
+      // Страница прохода закрывается концом своей сессии и концом задачи (этап 12, P177).
+      ...(walk ? { walkPages: walk.driver } : {}),
     });
     roadCell = road;
     // Замер базы на старте сеанса (G9): пробы в фоне снимаются и дожидаются вместе с дирижёром.
@@ -550,8 +620,12 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       forgeFor: (url) => forgeOfPanel(panel.appData)(url).port,
       ...options.forgePoll,
     });
+    forgeWatched.urls = () => forgePoll.watchedMrUrls();
     stopConductor = async () => {
-      // Первым и с ожиданием: идущий круг опроса ещё может открыть задачу через дирижёра.
+      // Первым и с ожиданием: идущий круг опроса или старт доски ещё может открыть задачу.
+      await inbox.stop();
+      await board.stop();
+      await takeover.stop();
       await forgePoll.stop();
       splitEnv = undefined;
       publisher = undefined;
@@ -585,6 +659,9 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
     // Исполнитель — после строки в procs.json: мост MCP сессии находит ядро по ней.
     conductor.start();
     forgePoll.start();
+    takeover.start();
+    board.start();
+    inbox.start();
 
     const stopBackups = startBackups(registry, layout, note);
     const { clock, stop: stopClock } = startClockJumps(registry, bootId, note);
@@ -611,6 +688,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
       windows,
       economy: economy.run,
       measureBase,
+      walk,
       running: () => conductor.running(),
       async stop() {
         if (stopped) return;
@@ -627,6 +705,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
             () => localFront?.stop(),
             () => userGateway?.stop(),
             () => dlpProxy?.stop(),
+            () => walk?.close(),
             () => supervisor.close(),
             async () => {
               // Чистая остановка — серверы маршрутов уходят вместе с ядром; при крахе сюда не
@@ -664,6 +743,7 @@ export async function bootCore(options: BootOptions = {}): Promise<BootedCore> {
         () => localFront?.stop(),
         () => userGateway?.stop(),
         () => dlpProxy?.stop(),
+        () => walk?.close(),
         () => supervisor.close(),
         () => shutdownRoutes(routes, note),
         () => observer.stop(),

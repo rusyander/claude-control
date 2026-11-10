@@ -1,0 +1,35 @@
+// Связанные карточки в окне записи: отделены чертой, как прочие разделы окна.
+.section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+// Строка — чекбокс с названием и причинами; вся строка — подпись чекбокса (крупная цель клика).
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.item input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

@@ -11,7 +11,12 @@ import { applied, reject } from './outcome.ts';
  */
 export const applyGrant: ApplyCommand = async (task, command) => {
   const f = command.fields as { project: string; globs: string[]; ops: ('edit' | 'exec-db')[] };
-  const repos = task.state.created?.repos.map((r) => r.repoKey) ?? [];
+  // Проект — и ключ единицы: задача в папке без git репозиториев не имеет, а её единица идёт под
+  // запасным ключом (`perform.ts` `createUnit`), и судья права сверяет грант именно с ним.
+  const units = Object.values(task.state.units).map((u) => u.repoKey);
+  const repos = [
+    ...new Set([...(task.state.created?.repos.map((r) => r.repoKey) ?? []), ...units]),
+  ];
   if (!repos.includes(f.project)) {
     return reject(
       task,

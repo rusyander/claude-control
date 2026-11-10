@@ -1,5 +1,7 @@
 export { ProjectCodeModal } from './ui/ProjectCodeModal/ProjectCodeModal';
 export type { ProjectCodeModalProps } from './ui/ProjectCodeModal/ProjectCodeModal.types';
+// Дорога отправки заметок к правкам: её собирает страница чата (N1).
+export type { DiffNotesSend } from './model/sendNotes.types';
 
 // Тот же редактор файла — для страницы проектов: инструкции проекта правятся
 // им же, с подсветкой Markdown, сворачиванием разделов, поиском и Ctrl+S.

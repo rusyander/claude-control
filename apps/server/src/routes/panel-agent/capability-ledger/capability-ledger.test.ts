@@ -58,10 +58,20 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   // выгрузка журнала агентов задачи — файл человеку, как выгрузка разговора.
   'POST /api/core/learned/reset': 'human:rights',
   'GET /api/core/tasks/:id/agents/export': 'human:download',
+  // Этап 12 (новая строка): ход на доске ставит задачу в очередь или в работу — человек.
+  'POST /api/core/board/move': 'human:rights',
+  'POST /api/core/board/entries': 'human:rights',
+  // Этап 12 (новая строка): записи во «Входящие» из поиска — человек.
+  'POST /api/core/inbox': 'human:rights',
   // Решение владельца 30.09: перезапуск dev-сервера обрывает живые ходы.
   'POST /api/dev-restart': 'human:dev-restart',
   // Решение владельца 30.09: проверка поломкой правит код в копии и тратит время.
   'POST /api/project-tests/mutation': 'human:code-write',
+  // Этап 12, R3–R4 (новые строки): записанный спек панель потом исполняет сама; проход по
+  // стенду и «Прогнать все» с задачей на расхождение тратят модель.
+  'POST /api/project-tests/recorded': 'human:code-write',
+  'POST /api/project-tests/recorded/walk': 'human:paid',
+  'POST /api/project-tests/recorded/replay': 'human:paid',
   // Решение владельца 13.10: обновление панели — кнопка человека; оно перематывает код
   // самой панели и ведёт к перезапуску сервера.
   'POST /api/panel-update': 'human:code-write',
@@ -126,6 +136,7 @@ const PINNED_HUMAN: Readonly<Record<string, RouteClass>> = {
   'GET /api/integrations/telegram/answers': 'human:secret',
   'PUT /api/integrations/telegram/answers': 'human:secret',
   'POST /api/integrations/telegram/answers/restart': 'human:secret',
+  'GET /api/integrations/telegram/answers/core-binding': 'human:secret',
   // Подключение по /start (решение владельца 25.10.2026: только человек).
   'GET /api/integrations/telegram/connect': 'human:secret',
   'POST /api/integrations/telegram/connect': 'human:secret',

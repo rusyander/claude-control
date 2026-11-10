@@ -75,11 +75,12 @@ export function CommandPalette({ isOpen, onOpenChange }: CommandPaletteProps) {
   const navOptions = useMemo<PaletteOption[]>(() => {
     const ranked = rankByFuzzy(reachable, query, (item) => t(item.label));
     return ranked.slice(0, NAV_LIMIT).map(({ item }) => ({
-      id: `nav:${item.path}`,
+      // `key`, а не путь: пункт-ярлык «Группы» делит путь `/core` с «Задачами ядра».
+      id: `nav:${item.key}`,
       icon: item.icon,
       title: t(item.label),
       subtitle: item.path,
-      run: () => go(item.path),
+      run: () => go(item.path, item.search),
     }));
     // t и navigate стабильны между рендерами; пересобираем на смену запроса/набора.
     // eslint-disable-next-line react-hooks/exhaustive-deps

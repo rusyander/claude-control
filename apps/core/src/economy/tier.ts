@@ -5,11 +5,13 @@ import {
   PLANNING_KINDS,
   defaultRoleOf,
   effortRank,
+  ceilingOn,
   modelRank,
   topEffort,
 } from './tier-ladder.ts';
 import { isOverride, overrideFor, type Picked } from './tier-override.ts';
 import { applyEscalation, applyPromotion, settleApplied } from './tier-raise.ts';
+import { costRank, modelMatches, startedHold } from './tier-started.ts';
 import type {
   AllowedRoute,
   PickSource,
@@ -31,15 +33,11 @@ import { routeWait } from './window/index.ts';
  * платного (P117): окно, отказавшее входу CLI, не уводит шаг на ключ API без «платного при
  * отказе» этой задачи. Маршрут, который окно держит или исчерпало, не выбирается; остальные
  * годные маршруты названы как кандидаты подмены (P110). Правка `set-model`/`set-cli`
- * проверяется этой же функцией.
+ * проверяется этой же функцией. Начатая задача (P169) из-за окна маршрут не меняет: плановый
+ * ждёт, годные только предлагаются (`tier-started.ts`).
  */
 
-/** Шаблон модели набора: «*» — любая последовательность; без звезды — ровно это имя. */
-export function modelMatches(pattern: string, model: string): boolean {
-  if (!pattern.includes('*')) return pattern === model;
-  const parts = pattern.split('*').map((p) => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(`^${parts.join('.*')}$`).test(model);
-}
+export { modelMatches };
 
 const sameRoute = (a: AllowedRoute, b: AllowedRoute): boolean =>
   a.adapter === b.adapter &&
@@ -52,17 +50,20 @@ export { overrideFor };
 const label = (r: AllowedRoute): string =>
   `${r.adapter}/${r.route.kind}:${r.route.id}/${r.modelPattern}`;
 
-/** Маршруты шага внутри набора задачи; шаг без списка берёт весь набор. */
-function candidatesOf(input: TierInput): { candidates: AllowedRoute[]; dropped: AllowedRoute[] } {
+/**
+ * Маршруты шага внутри набора задачи; шаг без списка берёт весь набор. Тот же отбор читает судья
+ * формы (`next/lead-gate.ts`): второе ревью без другого переходника в наборе пропускается.
+ */
+export function candidatesOf(input: Pick<TierInput, 'stepModel' | 'allowed'>): {
+  candidates: AllowedRoute[];
+  dropped: AllowedRoute[];
+} {
   const routes = input.stepModel.routes;
   if (!routes) return { candidates: [...input.allowed], dropped: [] };
   const candidates = routes.filter((r) => input.allowed.some((a) => sameRoute(a, r)));
   const dropped = routes.filter((r) => !input.allowed.some((a) => sameRoute(a, r)));
   return { candidates, dropped };
 }
-
-/** Собственный вход CLI и локальные маршруты раньше платного ключа API (11 §Policy, P117). */
-const costRank = (r: AllowedRoute): number => (r.route.kind === 'api-key' ? 1 : 0);
 
 /**
  * Маршруты, на которых шаг этого класса ждёт окно (P122): судит `routeWait` зоны окна — отказ,
@@ -224,7 +225,13 @@ export function decideTier(input: TierInput): TierDecision {
   const reasons = dropped.map((r) => `step route ${label(r)} is outside the task's allowed set`);
   const unregistered = listed.filter((r) => !registered(input, r));
   for (const r of unregistered) reasons.push(`route ${label(r)} is not in the route registry`);
-  const candidates = listed.filter((r) => registered(input, r));
+  const avoid = input.avoidAdapter;
+  const avoided = listed.filter((r) => registered(input, r) && r.adapter === avoid);
+  for (const r of avoided)
+    reasons.push(
+      `route ${label(r)} avoided: avoidAdapter ${avoid} is the first reviewer's, the cross review runs on another adapter`,
+    );
+  const candidates = listed.filter((r) => registered(input, r) && r.adapter !== avoid);
   const skipped = windowSkips(input, candidates);
   for (const s of skipped) reasons.push(`route ${label(s.route)} skipped: window ${s.verdict}`);
   // P117: окно отказало входу CLI — ключ API того же переходника только при «платном при отказе».
@@ -249,18 +256,57 @@ export function decideTier(input: TierInput): TierDecision {
       : modelOverride;
   const effort = overrideFor(input.overrides, 'effort', ids);
   const failed: string[] = [];
-  if (candidates.length === 0) failed.push('no allowed route for this step');
+  if (candidates.length === 0)
+    failed.push(
+      avoided.length > 0
+        ? `no allowed route on an adapter other than avoidAdapter ${avoid} for this step`
+        : 'no allowed route for this step',
+    );
   else if (usable.length === 0) failed.push('every allowed route of this step is held or blocked');
   const byAdapter = usable.filter((r) => adapter.value === null || r.adapter === adapter.value);
   if (usable.length > 0 && byAdapter.length === 0)
-    failed.push(`adapter ${adapter.value} (${adapter.source}) is not in the allowed set`);
+    failed.push(
+      adapter.value === avoid
+        ? `adapter ${adapter.value} (${adapter.source}) is avoidAdapter: the cross review never runs on the first reviewer's adapter`
+        : `adapter ${adapter.value} (${adapter.source}) is not in the allowed set`,
+    );
   const ranked = [...byAdapter].sort((a, b) => costRank(a) - costRank(b));
-  const fits = ranked
-    .map((route) => ({ route, pick: modelOn(route, model, input.ceiling) }))
+  // Потолок задачи — по лестнице переходника маршрута: чужая ступень не уходит в его CLI.
+  const ceilings = new Map<string, ReturnType<typeof ceilingOn>>();
+  const ceilingOf = (adapterId: string) => {
+    let got = ceilings.get(adapterId);
+    if (!got) ceilings.set(adapterId, (got = ceilingOn(input.ladders, adapterId, input.ceiling)));
+    return got.ceiling;
+  };
+  let fits = ranked
+    .map((route) => ({ route, pick: modelOn(route, model, ceilingOf(route.adapter)) }))
     .filter((x) => x.pick !== null);
+  // P169: у начатой задачи окно маршрут не двигает — плановый (выбор без окон) ждёт.
+  const pool = candidates.filter((r) => adapter.value === null || r.adapter === adapter.value);
+  const hold = startedHold(
+    input,
+    pool,
+    usable,
+    skipped,
+    (r) => modelOn(r, model, ceilingOf(r.adapter)) !== null,
+  );
+  if (hold?.kind === 'keep' && fits[0] && fits[0].route !== hold.route)
+    reasons.push(
+      `route ${label(hold.route)} kept: a started task stays on the route of its session (P169)`,
+    );
+  if (hold?.kind === 'paid')
+    reasons.push(`route ${label(hold.route)} taken: paid on refusal is on for this task (P117)`);
+  if (hold?.kind === 'paid' || hold?.kind === 'keep') {
+    fits = [
+      ...fits.filter((f) => f.route === hold.route),
+      ...fits.filter((f) => f.route !== hold.route),
+    ];
+  }
   // Модель судится и тогда, когда переходник уже отказан: человек видит оба препятствия разом.
   const modelPool = byAdapter.length > 0 ? byAdapter : usable;
-  const modelFits = modelPool.some((route) => modelOn(route, model, input.ceiling) !== null);
+  const modelFits = modelPool.some(
+    (route) => modelOn(route, model, ceilingOf(route.adapter)) !== null,
+  );
   if (modelPool.length > 0 && (byAdapter.length > 0 ? fits.length === 0 : !modelFits))
     failed.push(
       model.value === null
@@ -274,9 +320,15 @@ export function decideTier(input: TierInput): TierDecision {
     skipped: skipped.length,
     paidBlocked: paidBlocked.length,
     alternatives: alternatives.length,
+    // Число есть только у шага с исключённым переходником: по нему факты шага узнают второе ревью.
+    ...(avoid === undefined ? {} : { avoided: avoided.length }),
   };
   const chosen = fits[0];
-  const refuse = (why: string[]): TierDecision => ({
+  const started = input.started === true;
+  const refuse = (
+    why: string[],
+    extra: { alternatives?: AllowedRoute[]; waits?: TierSkip; offers?: string[] } = {},
+  ): TierDecision => ({
     ok: false,
     reasons: [...why, ...reasons],
     dropped: [...dropped, ...unregistered],
@@ -284,8 +336,27 @@ export function decideTier(input: TierInput): TierDecision {
     alternatives,
     numbers: counts,
     basis,
+    started,
+    ...extra,
   });
+  if (hold?.kind === 'wait') {
+    const verdict = hold.skip ? `window ${hold.skip.verdict}` : 'held';
+    return refuse(
+      [
+        `route ${label(hold.planned)} ${verdict}: a started task waits for it and never switches route, model or CLI without a click (P169)`,
+      ],
+      {
+        // Шаг ждёт плановый маршрут: все годные — только предложения человеку.
+        alternatives: fits.map((f) => f.route),
+        ...(hold.skip ? { waits: hold.skip } : {}),
+        offers: hold.offers,
+      },
+    );
+  }
   if (failed.length > 0 || !chosen) return refuse(failed);
+  const sized: TierInput = { ...input, ceiling: ceilingOf(chosen.route.adapter) };
+  const ceilingWhy = ceilings.get(chosen.route.adapter)?.reason;
+  if (ceilingWhy) reasons.push(ceilingWhy);
   const first = chosen.pick as { model: string | null; source: PickSource };
   let effortSource: PickSource = 'cli-default';
   if (effort.source) effortSource = effort.source;
@@ -320,15 +391,16 @@ export function decideTier(input: TierInput): TierDecision {
   if (row) reasons.push(`role ${role ?? 'none'}: ${row.source} row ${level}`);
   // Эскалация шагает от ступени прошлой попытки — уровень её уже решил.
   if (!input.escalation) applyLevel(input, level, pick, reasons);
-  const promotion = applyPromotion(input, pick, learnedKey, reasons, modelMatches);
+  // Подъём (обучение, эскалация) упирается в потолок задачи на лестнице выбранного переходника.
+  const promotion = applyPromotion(sized, pick, learnedKey, reasons, modelMatches);
   const preEscalation = { model: pick.model, effort: pick.effort };
-  const escalation = applyEscalation(input, pick, reasons, modelMatches);
+  const escalation = applyEscalation(sized, pick, reasons, modelMatches);
   // Источник «эскалация» — только когда она сдвинула выбор: у потолка или вне шаблона выбор тот
   // же, и его по-прежнему назвала строка роли или сценарий.
   const escalated =
     escalation !== null &&
     (pick.model !== preEscalation.model || pick.effort !== preEscalation.effort);
-  if (promotion || escalation) settleApplied(input, pick, baseModel);
+  if (promotion || escalation) settleApplied(sized, pick, baseModel);
   const floor = reviewerFloor(input, pick, reasons);
   if (floor !== null) return refuse([floor]);
   clampEffort(input, pick, reasons);
@@ -370,6 +442,7 @@ export function decideTier(input: TierInput): TierDecision {
     dropped: [...dropped, ...unregistered],
     skipped,
     alternatives,
+    started,
     reasons,
     numbers: {
       ...counts,

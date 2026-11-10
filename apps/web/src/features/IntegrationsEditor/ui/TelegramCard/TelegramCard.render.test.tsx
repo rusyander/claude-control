@@ -22,6 +22,10 @@ const draft = {
   doneAfterMinutes: '5',
   broken: true,
   budget: false,
+  quietOn: false,
+  quietFrom: '23:00',
+  quietTo: '08:00',
+  quietAsks: false,
 };
 
 function props(over: Partial<TelegramCardViewProps> = {}): TelegramCardViewProps {
@@ -104,6 +108,19 @@ describe('карточка Telegram', () => {
     expect(html).toContain('ошибка: у бота стоит вебхук');
     expect(html).toMatch(/value="3"[^>]*disabled|disabled[^>]*value="3"/);
     expect(render({ health: { tone: 'off' } })).toContain('выключен');
+  });
+
+  it('тихие часы: выключены — поля времени гаснут; включены с одинаковыми краями — поле помечено ошибкой', () => {
+    const off = render();
+    expect(off).toContain('data-telegram-quiet="off"');
+    expect(off).toContain('Тихие часы');
+    expect(off).toMatch(/type="time"[^>]*disabled/);
+    const bad = render({ draft: { ...draft, quietOn: true, quietTo: '23:00' } });
+    expect(bad).toContain('data-telegram-quiet="on"');
+    expect(bad).toMatch(/type="time"[^>]*aria-invalid="true"/);
+    expect(bad).not.toMatch(/type="time"[^>]*disabled/);
+    const good = render({ draft: { ...draft, quietOn: true } });
+    expect(good).not.toContain('aria-invalid="true"');
   });
 
   it('половина не записалась — сказано, какая', () => {

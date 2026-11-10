@@ -114,6 +114,18 @@ describe('claude session hooks: every hook the CLI runs for the session (R2)', (
     expect(claudeInventory(h.pin, h.cwd, true, { ran: 'on' }).hash).not.toBe(before.hash);
   });
 
+  // s12: хуки профиля чата панели едут `--settings` ядра — опись называет их своим ключом.
+  it('panel profile hooks (carry.hooks) are in the session inventory under panel:, origin carry', () => {
+    const h = home();
+    const got = claudeSessionHooks(h.pin, h.cwd, true, {
+      ran: 'observe',
+      carry: { hooks: hookFile('mcp__.*__jira_search', 'node board.mjs').hooks },
+    });
+    const panel = got.hooks.filter((x) => x.key.startsWith('panel:'));
+    expect(keys(panel)).toEqual(['panel:PreToolUse.0.0']);
+    expect(panel[0]).toMatchObject({ origin: 'carry', command: 'node board.mjs' });
+  });
+
   it('the hook reader names a kit hook by its command, written or with the plugin root expanded', () => {
     const h = home();
     const spec = {

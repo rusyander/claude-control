@@ -30,6 +30,21 @@ const until = async (probe) => {
   return false;
 };
 const LANGUAGE_BUTTON = { ru: 'Русский', en: 'English' };
+/**
+ * Ответ следующего PATCH настроек. Правку судят ворота «только человек» (таблица TCP и процессов),
+ * первая на стенде идёт около 3 с: файл читается и F5 делается только после ответа, иначе
+ * перезагрузка рвёт ещё не принятую правку.
+ */
+const nextSave = (page, key) =>
+  page
+    .waitForResponse(
+      (r) =>
+        r.url().includes('/api/settings') &&
+        r.request().method() === 'PATCH' &&
+        (r.request().postData() ?? '').includes(`"${key}"`),
+      { timeout: 30_000 },
+    )
+    .catch(() => null);
 const COMBOS = [
   ['dark', 'ru'],
   ['dark', 'en'],
@@ -63,6 +78,7 @@ await runOnStand({ label: 'settings-theme-language' }, async (stand, check) => {
       });
       const colorBefore = await background();
       const themeBefore = await theme();
+      const themeSaved = themeBefore === wantTheme ? null : nextSave(page, 'theme');
       await page
         .getByRole('button', { name: THEME_LABEL[language][wantTheme], exact: true })
         .click();
@@ -79,6 +95,7 @@ await runOnStand({ label: 'settings-theme-language' }, async (stand, check) => {
           `${colorBefore} → ${await background()}`,
         );
       }
+      const languageSaved = language === wantLanguage ? null : nextSave(page, 'language');
       await page.getByRole('button', { name: LANGUAGE_BUTTON[wantLanguage], exact: true }).click();
       await until(async () => (await navHas(wantLanguage)) > 0);
       language = wantLanguage;
@@ -91,6 +108,18 @@ await runOnStand({ label: 'settings-theme-language' }, async (stand, check) => {
         `${tag}: всё без перезагрузки`,
         await page.evaluate(() => window.__sameDocument === true),
       );
+      for (const [what, pending] of [
+        ['тема', themeSaved],
+        ['язык', languageSaved],
+      ]) {
+        if (!pending) continue;
+        const reply = await pending;
+        check(
+          `${tag}: правка «${what}» принята (PATCH 200)`,
+          reply?.status() === 200,
+          String(reply?.status()),
+        );
+      }
       const saved = stored();
       check(
         `${tag}: в state.json тема и язык`,

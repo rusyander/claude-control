@@ -3,7 +3,7 @@ import type {
   ProjectTestSecretRef,
   ProjectTestSecretStatus,
 } from '@agentdeck/contracts';
-import { normalizeProjectPath } from '../../../lib/app-store/projects.ts';
+import { environmentSecretsKey } from '@agentdeck/keys/environment-keys';
 import {
   MAX_KEY_LENGTH,
   clearStoredKey,
@@ -50,10 +50,8 @@ const NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const RESERVED = ['PATH', 'PATHEXT', 'HOME', 'USERPROFILE', 'NODE_OPTIONS', 'SHELL', 'TEMP', 'TMP'];
 const RESERVED_PREFIXES = ['CLAUDE_', 'ANTHROPIC_', 'AWS_', brandEnvName(''), legacyEnvName('')];
 
-/** Ключ окружения в общем хранилище секретов панели. */
-export function environmentSecretsKey(root: string, environmentId: string): string {
-  return `env:${normalizeProjectPath(root)}:${environmentId}`;
-}
+// Ключ окружения в общем хранилище секретов — один на панель и ядро (проход по стенду читает его).
+export { environmentSecretsKey };
 
 /** Имя переменной годится под доступ стенда — или отказ с причиной. */
 export function assertSecretName(name: string): string {

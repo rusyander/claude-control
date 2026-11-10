@@ -35,7 +35,8 @@ import { ACP_PROFILES, type AcpProfile } from './__fixtures__/profiles/acp.ts';
  */
 
 type BoolCap = {
-  [K in keyof AdapterCaps]: AdapterCaps[K] extends boolean ? K : never;
+  // `-?`: необязательная возможность (`loginLost`, этап 12) не даёт ключу `undefined`.
+  [K in keyof AdapterCaps]-?: Exclude<AdapterCaps[K], undefined> extends boolean ? K : never;
 }[keyof AdapterCaps];
 
 const A = '11111111-1111-4111-8111-111111111111';

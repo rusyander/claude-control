@@ -1,5 +1,5 @@
 import type { RunInputRecord } from '@agentdeck/contracts/run-input';
-import type { LocalLayerCarry } from '@agentdeck/contracts/core/session-carry';
+import type { LocalLayerCarry, SessionHooks } from '@agentdeck/contracts/core/session-carry';
 import {
   BRIEF_OUTPUT_ENV,
   TESTS_CLI_ENV,
@@ -129,11 +129,10 @@ export interface RunOptions {
    */
   profileNote?: string;
   /**
-   * Настройки поверх личных для группы разделения (1.3): `skillOverrides`,
-   * `enabledPlugins`. Едут тем же файлом `--settings`, что и исключения
-   * `CLAUDE.md`: второй флаг `--settings` заменил бы первый.
+   * Настройки профиля чата поверх личных: хуки (список задач трекера без описаний, 5.2). В сеанс
+   * ядра едут полем `session.hooks` — его `--settings` единственный (s12, `core-run/session-carry.ts`).
    */
-  platformSettings?: Record<string, unknown>;
+  platformSettings?: { hooks?: SessionHooks };
   /**
    * Локальный слой проекта (`domains/local-layer`) на этот старт: уезжает в ядро полем
    * `session.localLayer`, а источники настроек без `project` — в `platformArgs`. Реестр ставит

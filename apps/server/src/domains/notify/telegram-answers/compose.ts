@@ -39,6 +39,8 @@ import { bold, code, escapeHtml, expandable, htmlToPlain } from './html.ts';
 /** Предел сообщения Telegram — 4096; считаем вместе с тегами, с запасом. */
 export const MESSAGE_LIMIT = 3900;
 const QUESTION_LIMIT = 300;
+/** Вопрос ядра, часть вариантов которого Telegram не выбирает (D29): где выбрать остальные. */
+const PANEL_ONLY_LINE = '🔒 Остальные варианты — в панели или с телефона';
 /** Имя сессии в первой строке — чтобы строка помещалась в уведомление телефона. */
 export const SESSION_LIMIT = 40;
 /** Команда-суть второй строкой; длиннее — целиком в цитате. */
@@ -114,10 +116,34 @@ export function panelLink(openId: string, port = process.env.WEB_PORT ?? '8888')
   return openId ? `${base}?id=${encodeURIComponent(openId)}` : base;
 }
 
-/** Строка-ссылка «Открыть чат →» — текстом: кнопкой Telegram такой адрес не принимает. */
+/** Ссылка панели на задачу ядра с открытым вопросом (`/core?id=…&ask=…`, раздел задач ядра). */
+export function coreTaskLink(
+  taskId: string,
+  askId: string | null,
+  port = process.env.WEB_PORT ?? '8888',
+): string {
+  const ask = askId ? `&ask=${encodeURIComponent(askId)}` : '';
+  return `http://${PANEL_LINK_HOST}:${port}/core?id=${encodeURIComponent(taskId)}${ask}`;
+}
+
+/**
+ * Куда ведёт ожидание сообщения: вопрос ядра — на его задачу (та же ссылка, что у текстового
+ * запасного пути `core-ask-delivery`), прочее — на чат панели.
+ */
+export function itemLink(item: Pick<SentItem, 'target' | 'openId'>): string {
+  return item.target.kind === 'coreAsk'
+    ? coreTaskLink(item.target.taskId, item.target.askId)
+    : panelLink(item.openId);
+}
+
+/**
+ * Строка-ссылка «Открыть чат →» («Открыть задачу →» для задачи ядра) — текстом: кнопкой Telegram
+ * такой адрес не принимает.
+ */
 export function linkLine(url: string): string {
   const href = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-  return `<a href="${href}">Открыть чат →</a>`;
+  const label = /^https?:\/\/[^/]+\/core\?/.test(url) ? 'Открыть задачу →' : 'Открыть чат →';
+  return `<a href="${href}">${label}</a>`;
 }
 
 /** Хвост сообщения: пустая строка и ссылка — последней, прямо над кнопками. */
@@ -195,7 +221,10 @@ export function cardOf(item: PendingAskItem): ItemCard {
   if (kind === 'outsideQuestion') {
     return { kind: 'question', ...base, readOnly: readOnlyLine(item.target.client) };
   }
-  if (kind === 'question' || kind === 'relayQuestion') return { kind: 'question', ...base };
+  // Вопрос ядра задач (этап 12, D29) — карточка вопроса: варианты ядра кнопками.
+  if (kind === 'question' || kind === 'relayQuestion' || kind === 'coreAsk') {
+    return { kind: 'question', ...base };
+  }
   const essence = essenceOf(item);
   const title = essence.text;
   const details = item.launch ? launchCode(item) : item.summary;
@@ -248,6 +277,7 @@ function questionBlock(item: SentItem, card: ItemCard, options: RenderOptions): 
     });
   }
   if (card.readOnly) lines.push('', escapeHtml(card.readOnly));
+  else if (item.target.kind === 'coreAsk' && item.target.panelOnly) lines.push('', PANEL_ONLY_LINE);
   else if (question?.multiSelect && options.index === undefined) {
     lines.push('Можно выбрать несколько, затем «Готово».');
   }
@@ -416,7 +446,7 @@ export function keyboardOf(message: SentMessage, sign: (n: number) => string): I
     const kind = item.target.kind;
     // Только для чтения: ни вариантов, ни «Ответить» — отвечают там, где сессия.
     if (kind === 'outsideQuestion') return;
-    if (kind !== 'question' && kind !== 'relayQuestion') {
+    if (kind !== 'question' && kind !== 'relayQuestion' && kind !== 'coreAsk') {
       rows.push([
         button(index, '✅ Разрешить', { act: 'allow' }),
         button(index, '⛔ Запретить', { act: 'deny' }),
@@ -445,9 +475,11 @@ export function keyboardOf(message: SentMessage, sign: (n: number) => string): I
           : button(index, label, { act: 'pick', option: at, step }),
       ]);
     });
-    const last = [button(index, '✍️ Свой ответ', { act: 'custom', step })];
+    // Свой текст вопросу ядра — только там, где его примет суд области ядра (D29, B3).
+    const custom = item.target.kind !== 'coreAsk' || item.target.freeText;
+    const last = custom ? [button(index, '✍️ Свой ответ', { act: 'custom', step })] : [];
     if (question.multiSelect) last.unshift(button(index, '✅ Готово', { act: 'done', step }));
-    rows.push(last);
+    if (last.length > 0) rows.push(last);
   });
   return rows;
 }
@@ -473,6 +505,11 @@ export const TOAST = {
   pickFirst: 'Сначала выберите хотя бы один вариант',
   next: 'Принято — следующий вопрос',
   coreOnly: 'Ответ ядру — в панели или с телефона',
+  /** Ядро не признало этот чат владельцем: привязка снята или файл ответов сменил владельца. */
+  rebind:
+    'Ядро не узнало этот чат — включите «Отвечать ядру из Telegram» заново в панели (Интеграции → Telegram)',
+  /** Подпись кнопки или вопрос не совпали с показанным или живым вопросом — ничего не отправлено. */
+  changed: 'Вопрос изменился — ничего не отправлено, свежая копия ниже',
 } as const;
 
 /** Просьба написать свой ответ — коротко: вопрос уже стоит выше в чате. */

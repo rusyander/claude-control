@@ -1,6 +1,7 @@
 import type { ForgePort } from '@agentdeck/contracts/core/forge';
 import type { FastifyInstance } from 'fastify';
 import type { AdapterRegistry } from '../../adapters/index.ts';
+import type { WalkPort } from '../../adapters/browser/index.ts';
 import type { AskBridgeBook } from '../../conductor/ask/index.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { ActionFactReaders } from '../../conductor/reconcile.ts';
@@ -50,6 +51,8 @@ export interface BootedCore {
   economy: RunEconomy;
   /** Замер базы на старте сеанса (G9) — тот, что дирижёр зовёт после `started`; `stop` ядра его снимает. */
   measureBase: BaseStart;
+  /** Браузер шага `walk` этого ядра (этап 12): страницы сессий, доступы стенда, маска. */
+  walk: WalkPort;
   /** Задачи, которые сейчас ведёт исполнитель ядра (`runTask`). */
   running(): string[];
   stop(): Promise<void>;

@@ -13,6 +13,7 @@ import type {
   LocalLimits,
   SessionSpec,
 } from '../adapter.types.ts';
+import { runOnce } from '../launcher/index.ts';
 import { isRemoteMcp } from '../mcp-carry.ts';
 import { claudeMcpSource } from './mcp-source.ts';
 import { claudeEconomy } from './economy.ts';
@@ -91,6 +92,47 @@ export function classifyClaudeError(text: string): 'fresh-required' | null {
   return MISSING_CONVERSATION.test(text) ? 'fresh-required' : null;
 }
 
+/**
+ * Потерянный вход (этап 12, P170): Claude Code кончает ход ошибкой, последняя строка которой
+ * зовёт войти заново — «Not logged in · Please run /login» (записано на CLI 2.1.310 без входа,
+ * `__fixtures__/login-lost.stream.jsonl`), «OAuth token has expired · Please run /login», «API
+ * Error: 401 … · Please run /login». Отказ ключа API («Invalid API key · Fix external API key»)
+ * — не вход: чинится ключ, не `/login`. Только подозрение: решает перечитанный вход.
+ */
+const LOGIN_LOST = /(?:^|\n)[^\n]*·\s*Please run \/login\s*$/;
+
+export function classifyClaudeLogin(text: string): boolean {
+  return LOGIN_LOST.test(text.trimEnd());
+}
+
+/**
+ * Задокументированное чтение входа: `claude auth status --json` → `loggedIn` (код выхода 1 —
+ * входа нет). Ни токен, ни хранилище ядро не читает. Сбой, тайм-аут, чужой вывод — `unknown`.
+ */
+export async function readClaudeLoginState(
+  command: string,
+  env: Record<string, string>,
+  cwd: string,
+  run: typeof runOnce = runOnce,
+): Promise<'up' | 'absent' | 'unknown'> {
+  try {
+    const got = await run(command, ['auth', 'status', '--json'], env, cwd, 15_000);
+    return loginStateOf(got.stdout);
+  } catch {
+    return 'unknown';
+  }
+}
+
+/** Вывод `claude auth status --json` → вход; не JSON или без булева `loggedIn` — `unknown`. */
+export function loginStateOf(stdout: string): 'up' | 'absent' | 'unknown' {
+  try {
+    const loggedIn = (JSON.parse(stdout) as { loggedIn?: unknown }).loggedIn;
+    return loggedIn === true ? 'up' : loggedIn === false ? 'absent' : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}
+
 /** Имя разговора CLI: буквы, цифры, `_ . : -`, не с `-` впереди. */
 const RESUME_ID = /^[A-Za-z0-9][\w.:-]*$/;
 
@@ -127,6 +169,8 @@ export const CLAUDE_CAPS: AdapterCaps = {
   // Окно подписки — строка потока по факту запуска (`rate_limit_event`), разбор — `window.ts`.
   windowEvent: claudeRunFacts.windowEvent !== undefined,
   limitsChannel: 'env',
+  // Этап 12 (P170): текст «Please run /login» в ошибке хода + `claude auth status` (перечитать).
+  loginLost: true,
 };
 
 /** Учётки и переключатели облака самого Claude Code, которых нет в фактах каналов. */
@@ -316,7 +360,9 @@ export function planClaude(
     // `disableAllHooks: true` человека в `on` снял бы и хук ядра (проба K2): наш `--settings`
     // старше, значение ядра — «хуки включены» (F-08).
     disableAllHooks: false,
-    hooks: mergeHooks(layered.hooks, local.hooks, coreHooks),
+    // Хуки профиля чата панели (s12, `carry.hooks`: список задач трекера без описаний) — после
+    // слоя, перед хуком ядра: судья права остаётся последним и решает сам.
+    hooks: mergeHooks(layered.hooks, local.hooks, (carry?.hooks ?? {}) as HookTable, coreHooks),
     ...(mdExcludes.length > 0 ? { claudeMdExcludes: mdExcludes } : {}),
   };
   const files: Record<string, string> = {
@@ -485,12 +531,14 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       // Перенос слоя панели (G6): `--setting-sources a,b`, `--plugin-dir` на каждый, `--tools`.
       // Промпт контура (s10 G13 p7) — `--system-prompt-file`, как у прежнего исполнителя панели.
       // Локальный слой проекта (s10 G14 p6) — источники без `project`, плагин, `--settings`, бриф.
+      // Хуки профиля чата панели (s12) — в `--settings` ядра перед хуком ядра.
       sessionCarry: {
         settingSources: true,
         plugins: true,
         builtinTools: true,
         systemPrompt: true,
         localLayer: true,
+        hooks: true,
       },
       echo: true,
       bindEndpoint: bindClaudeEndpoint,
@@ -501,6 +549,9 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): SdkAdap
       plan: planClaude,
       mapPermission: mapClaudePermission,
       classifyError: classifyClaudeError,
+      loginLost: classifyClaudeLogin,
+      loginState: (command) =>
+        readClaudeLoginState(command, process.env as Record<string, string>, process.cwd()),
       readWindow: readClaudeWindow,
       outcome: CLAUDE_OUTCOME,
       // Субагенты и фон из строк задач потока (этап 11, P148): переходник объявляет backgroundFacts.

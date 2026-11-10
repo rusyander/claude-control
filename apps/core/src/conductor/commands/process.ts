@@ -4,9 +4,12 @@ import type { MaskFn } from '../../journal/journal.types.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import type { TaskFoldState } from '../../journal/reduce/reduce.types.ts';
 import { decideAuthority, type CommandProof } from '../../policy/authority/authority.ts';
+import { channelOfProof } from '../human/channel.ts';
+import { readHumanLedger } from '../human/ledger.ts';
 import type { CommandEnv, CommandResult } from './commands.types.ts';
 import { APPLY } from './apply.ts';
 import { reject } from './outcome.ts';
+import { judgeTelegramScope } from './telegram-scope.ts';
 
 /**
  * Приём команды человека (01 §Commands, F23 F26). Порядок — часть свойства:
@@ -124,7 +127,7 @@ async function processOne(
     proof = await gatherProof();
     task.append({
       kind: 'command.received',
-      actor: proof.signature === 'valid' ? 'human:device' : 'human:panel',
+      actor: channelOfProof(proof).actor,
       cmdId,
       data: {
         kind: command.kind,
@@ -152,6 +155,11 @@ async function processOne(
       });
     }
     return reject(task, cmdId, authority.code, authority.reason);
+  }
+  // Пир Telegram (этап 12, D29): вид прошёл список — поле судит книга вопросов задачи (B3).
+  if (channelOfProof(proof).channel === 'telegram') {
+    const scope = judgeTelegramScope(command, readHumanLedger(task).asks);
+    if (!scope.ok) return reject(task, cmdId, 'telegram-binding', scope.reason);
   }
 
   if (command.expectSeq !== undefined && command.expectSeq !== seqBefore) {

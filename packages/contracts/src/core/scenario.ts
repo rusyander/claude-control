@@ -32,6 +32,11 @@ export const STEP_KINDS = [
    * кончается только командой `end-chat` или отменой задачи — конец хода не повод напоминать.
    */
   'chat',
+  /**
+   * Проход по стенду (этап 12, D23): сессия водит браузер только инструментами ядра, каждое
+   * действие — строка `browse.step`; копию не правит.
+   */
+  'walk',
 ] as const;
 export type StepKind = (typeof STEP_KINDS)[number];
 /**
@@ -78,6 +83,13 @@ export const TASK_CLASSES = ['S', 'M', 'L', 'XL'] as const;
 export type TaskClass = (typeof TASK_CLASSES)[number];
 
 /**
+ * Профили ведущего (этап 11) — здесь по той же причине, что классы: шаг ограничивается профилем
+ * (`onlyProfile`, этап 12 D25), а `lead.ts` читает этот модуль и отдаёт список дальше.
+ */
+export const LEAD_PROFILES = ['economy', 'balanced', 'max-quality'] as const;
+export type LeadProfile = (typeof LEAD_PROFILES)[number];
+
+/**
  * Уровень модели нового шага по виду (канон пресетов): план — выше, механика ядра — ниже,
  * остальное — потолок. Один на ядро и панель: редактор сценария ставит шагу тот же уровень, что
  * дали бы пресеты, а расхождение копий меняло бы цену шага молча.
@@ -98,6 +110,8 @@ export const STEP_TIER_OF: Readonly<Record<StepKind, ModelTier>> = {
   'ask-human': 'lower-if-mechanical',
   custom: 'ceiling',
   chat: 'ceiling',
+  // Проход судит, похоже ли поведение страницы на ожидаемое, — это работа, а не механика.
+  walk: 'ceiling',
 };
 export type OverBudget = (typeof OVER_BUDGET)[number];
 export const WIDTH_ORDER = {
@@ -182,6 +196,16 @@ export const stepDefSchema = z.strictObject({
    * (`skip-step`). Нет поля — шаг для всех классов; пустой список — ошибка автора, а не «никогда».
    */
   onlyFor: z.array(z.enum(TASK_CLASSES)).min(1).max(TASK_CLASSES.length).optional(),
+  /**
+   * Этап 12 (D25, P185): шаг идёт только под этими профилями ведущего; под прочими — пропуск
+   * (`skip-step`) с причиной. Нет поля — под любым профилем.
+   */
+  onlyProfile: z.array(z.enum(LEAD_PROFILES)).min(1).max(LEAD_PROFILES.length).optional(),
+  /**
+   * Этап 12 (D25): второе ревью шага `crossOf` — маршрут выбирается в обход адаптера его сессии
+   * (`avoidAdapter`); другого адаптера в наборе нет — шаг пропускается с причиной в отчёте.
+   */
+  crossOf: stepDefId.optional(),
 });
 export type StepDef = z.infer<typeof stepDefSchema>;
 
@@ -227,6 +251,11 @@ export const PRESET_IDS = [
    * трекера.
    */
   'lead',
+  /**
+   * Проход по стенду (этап 12, D23–D24): один шаг `walk` без хвоста доставки — копию не правит,
+   * итог — строки `browse.step` (из них панель собирает спек) и отчёт о найденном.
+   */
+  'browser-walk',
 ] as const;
 export type PresetId = (typeof PRESET_IDS)[number];
 
@@ -247,6 +276,13 @@ export function scenarioProblems(s: Scenario): string[] {
       out.push(`${st.id}: ask recommendation is not one of options`);
     if (st.within && st.kind !== 'work') out.push(`${st.id}: within needs kind work`);
     if (st.regression && st.kind !== 'work') out.push(`${st.id}: regression needs kind work`);
+    if (st.crossOf !== undefined) {
+      // Второе ревью судит то же, что первое, — оба шага ревью, и не сам себя.
+      if (st.kind !== 'review') out.push(`${st.id}: crossOf needs kind review`);
+      const of = byId.get(st.crossOf);
+      if (!of || of.kind !== 'review' || of.id === st.id)
+        out.push(`${st.id}: crossOf must name another review step`);
+    }
   }
   const onPath = new Set<string>();
   const ancestors = new Map<string, Set<string>>();
@@ -269,6 +305,9 @@ export function scenarioProblems(s: Scenario): string[] {
   };
   for (const st of s.steps) {
     const anc = visit(st.id);
+    // Адаптер первого ревью известен, только когда оно уже прошло: второе идёт после него.
+    if (st.crossOf !== undefined && byId.has(st.crossOf) && !anc.has(st.crossOf))
+      out.push(`${st.id}: crossOf step ${st.crossOf} must run before it`);
     if (st.kind === 'publish' || st.kind === 'answer-reviewers') {
       const gated = [...anc].some((a) => byId.get(a)?.kind === 'final-gate');
       if (!gated) out.push(`${st.id}: ${st.kind} without a final-gate before it`);

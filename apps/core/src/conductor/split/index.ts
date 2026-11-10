@@ -19,6 +19,7 @@ export {
   deliverableOf,
   isLedTask,
   isSplitPoint,
+  runSoloWithoutSplitPoint,
   runSplitPoint,
   type SplitPointResult,
 } from './flow.ts';

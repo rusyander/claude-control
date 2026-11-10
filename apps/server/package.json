@@ -20,6 +20,7 @@
     "@agentdeck/pricing": "workspace:*",
     "@agentdeck/providers": "workspace:*",
     "@agentdeck/sieves": "workspace:*",
+    "@agentdeck/trackers": "workspace:*",
     "@fastify/cors": "^11.3.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^5.0.0",
@@ -32,6 +33,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@agentdeck/stub-tracker": "workspace:*",
     "@types/node": "^26.1.1",
     "@types/pg": "8.23.1",
     "@types/pg-cursor": "2.7.2",

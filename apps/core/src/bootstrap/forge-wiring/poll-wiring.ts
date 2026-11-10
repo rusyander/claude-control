@@ -1,11 +1,13 @@
 import { join } from 'node:path';
 import type { ForgePort } from '@agentdeck/contracts/core/forge';
 import { openAnswerTask, type SplitEnv } from '../../conductor/estimate/index.ts';
+import { mrUrlKey } from '../../conductor/inbox/poller.ts';
 import type { TaskRegistry } from '../../conductor/tasks.ts';
 import type { CopyGitOptions } from '../../platform/copy-git.ts';
+import { pathKey } from '../../platform/paths.ts';
 import type { AnswerTaskRequest } from '../../publisher/events/poll.ts';
 import type { Note } from '../boot/boot.types.ts';
-import { forgePollOf } from './poll-config.ts';
+import { forgePollKeys, forgePollOf } from './poll-config.ts';
 import { createForgePoller } from './poller.ts';
 import { createWatched } from './watched.ts';
 
@@ -47,6 +49,8 @@ export function createPollWiring(deps: PollWiringDeps) {
     registry: deps.registry,
     ...(deps.git ? { git: deps.git } : {}),
     log,
+    // Этап 12 (P157): MR без остановки с доски — только в настроенных репозиториях.
+    configured: () => forgePollKeys(deps.layout.config),
   });
   async function request(req: AnswerTaskRequest): Promise<void> {
     const env = deps.split();
@@ -60,8 +64,24 @@ export function createPollWiring(deps: PollWiringDeps) {
       events: req.events.length,
     });
   }
-  return createForgePoller({
-    enabled: () => forgePollOf(deps.layout.config),
+  const enabled = () => forgePollOf(deps.layout.config, () => watched.stopRepos());
+  /**
+   * Этап 12 (W2-D, решение родителя): веб-адреса MR, которые ведёт ЭТОТ опрос, — тем же набором,
+   * что у круга (включённые репозитории, остановка с доски). Входящие пропускают «мой MR» из него:
+   * второй задачи ответов по одному MR не будет.
+   */
+  async function watchedMrUrls(): Promise<ReadonlySet<string>> {
+    const on = enabled();
+    if (on.repos.length === 0) return new Set();
+    const keys = new Set(on.repos.map((r) => pathKey(r)));
+    const out = new Set<string>();
+    for (const mr of await watched(keys)) {
+      if (mr.mrUrl && keys.has(pathKey(mr.repo))) out.add(mrUrlKey(mr.mrUrl));
+    }
+    return out;
+  }
+  const poller = createForgePoller({
+    enabled,
     watched,
     request,
     stateFile: join(deps.layout.root, FORGE_POLL_STATE),
@@ -70,4 +90,5 @@ export function createPollWiring(deps: PollWiringDeps) {
     ...(deps.intervalMs === undefined ? {} : { intervalMs: deps.intervalMs }),
     ...(deps.now ? { now: deps.now } : {}),
   });
+  return Object.assign(poller, { watchedMrUrls });
 }

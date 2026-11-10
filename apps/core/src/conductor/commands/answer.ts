@@ -46,6 +46,22 @@ export const applyAnswer: ApplyCommand = async (task, command, env) => {
       `answer is none of the options: ${ask.options.join(' | ')}`,
     );
   }
+  // Перевод начатой задачи (P169) — только вариантом, который точка 7 (или 4 потерянного входа,
+  // P170) предложила: ответ `cli:`/`model:` вне вариантов двигал бы маршрут, которого человеку не
+  // предлагали.
+  if (
+    open &&
+    (ask.dedupe?.startsWith('exhausted:') === true || ask.dedupe?.startsWith('login:') === true) &&
+    /^(model|cli):/.test(answer) &&
+    !ask.options.includes(answer)
+  ) {
+    return reject(
+      task,
+      command.cmdId,
+      'unknown-option',
+      `answer is none of the options: ${ask.options.join(' | ')}`,
+    );
+  }
   // Истёкший: машина вопроса знает поздний ответ (`expired` → тот же); снятый — нет, там только
   // сам ответ (переход был бы аномалией свёртки).
   if (open || ask.state === 'expired') {

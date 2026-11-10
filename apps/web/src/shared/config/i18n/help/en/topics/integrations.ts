@@ -54,22 +54,23 @@ export const integrationsEn: typeof integrationsRu = {
     cardsWhat: 'What it gives',
     cardJira: 'Jira',
     cardJiraText:
-      'Issue search, defects for failed cases, comments, issues without cases in the coverage matrix.',
+      'Issue search, defects for failed cases, comments, issues without cases in the coverage matrix; an inbox source of the core board.',
     cardConfluence: 'Confluence',
     cardConfluenceText:
       "Searching and reading requirement pages, publishing a run report as a page. Its own URL and key, not Jira's.",
     cardGitlab: 'GitLab',
     cardGitlabText:
-      'Without glab installed: a defect, a comment, linking an MR to a run. An own installation — by its URL.',
+      'Without glab installed: a defect, a comment, linking an MR to a run; issues and MRs as an inbox source of the core board. An own installation — by its URL.',
     cardGithub: 'GitHub',
     cardGithubText:
-      'Without gh installed: a defect, a comment, linking a pull request to a run. With both forges connected the right one is picked by the link or by the project origin.',
+      'Without gh installed: a defect, a comment, linking a pull request to a run. With both forges connected the right one is picked by the link or by the project origin. GitHub is never an inbox source of the core board.',
     cardTelegram: 'Telegram',
     cardTelegramText:
       'A message when a task is closed or the agent waits for a decision, a run fails, ' +
       'asks for permission, asks a question, or a test fails; none for intermediate ' +
       'stops. Connected in two steps: the bot token and /start in the chat with the bot. ' +
-      'The switch turns everything off; sending never delays the work itself.',
+      'The switch turns everything off; sending never delays the work itself. With the task ' +
+      'core — questions with buttons, task notices, /task and quiet hours.',
     cardWebhook: 'Webhook',
     cardWebhookText:
       'The same events at an address of your own: one POST with JSON. It covers Slack, ' +
@@ -321,13 +322,12 @@ export const integrationsEn: typeof integrationsRu = {
         'as text, and the bot answers “✉️ Отправлено в «чат»”. A reply to an open question ' +
         'answers it, to a closed one it is a normal message to the chat; a reply to a ' +
         'question without buttons sends nothing — the bot reminds you where to answer. A ' +
-        'task-core question (“Ядро ждёт ответа”) arrives without buttons, and a reply to it is ' +
-        'not passed to the core: the bot refuses with a link to the task, because such a question ' +
-        'takes an answer only in the panel or from the phone, where it is signed with the device key. The ' +
-        'same holds for a permission question in a chat the core runs (the «Core question» card in the ' +
-        'window): in Telegram it arrives only as that notice, with no Allow or Deny. A press on a button ' +
-        'of an older message about such a question collapses it into “🔒 Ответ ядру — в панели или с ' +
-        'телефона · …” and decides nothing: the question waits for an answer in the window. A ' +
+        'task-core question, while «Answer the core from Telegram» is off, arrives as the text ' +
+        '“Ядро ждёт ответа” without buttons, and a reply to it is not passed to the core: the bot ' +
+        'refuses with a link to the task — the panel or the phone takes the answer, signed with ' +
+        'the device key. A press on a button of an older message about such a question collapses ' +
+        'it into “🔒 Ответ ядру — в панели или с телефона · …” and decides nothing. With the ' +
+        'switch on, core questions arrive with buttons — see «Telegram and the task core». A ' +
         'VS Code or terminal session gets the message through the hook, never as a new ' +
         'panel run. Photos and image ' +
         'files (and PDF) up to 20 MB together go with the text as attachments; an album ' +
@@ -347,13 +347,88 @@ export const integrationsEn: typeof integrationsRu = {
         'conversations are running (“📁 project · session” with secrets masked, and minutes), how ' +
         'many wait for you and the subscription load (“session 13% · week 62%” when known); ' +
         '/waiting — send everything that waits for an answer now, without waiting for the ' +
-        'set minutes (the new message first, then the old one loses its buttons); /clear — ' +
+        'set minutes (the new message first, then the old one loses its buttons); /task text — ' +
+        'put a task into the core board «Inbox» (details in «Telegram and the task core»); with ' +
+        'the core alive /status adds the line “🧠 Задачи ядра: N” and up to six tasks with their ' +
+        'stage; /clear — ' +
         'remove everything the bot wrote and your commands younger than 48 hours, except ' +
         'what waits for an answer (the “🧹 Убрал N” reply vanishes after 30 seconds; older ' +
         'than 48 hours — chat menu → Clear history); /help — the command list. The bot gets ' +
         'its command menu by itself when polling starts; messages not from you go ' +
         'unnoticed. The “Открыть чат →” link points to 127.0.0.1 — it opens on this ' +
         'computer; the server knows no panel address for the phone.',
+
+      coreTitle: 'Telegram and the task core',
+      coreCaption:
+        'The answers bot also talks to the task core: core questions come with buttons, a ' +
+        'finished task, an opened MR, a failure and a window wait come as notices, a new task ' +
+        'goes in with /task. One switch on the Telegram card turns it on.',
+      coreBinding: 'Answer the core from Telegram',
+      coreBindingText:
+        'The switch shows once the answers bot is connected. On, it records this chat’s ' +
+        'fingerprint with the core: “The core knows this chat: task questions come with ' +
+        'buttons”. Off — questions arrive as text with a link to the panel. With the core not ' +
+        'running the card says the binding cannot be checked. From Telegram you can answer a ' +
+        'question, allow one asked call, cancel or rework a task, switch the model or CLI, send ' +
+        'an entry to «Inbox». Granting a permission wider than the question, changing a route or ' +
+        'the settings, taking a task over, publishing, allowing a ticket write — only in the ' +
+        'panel or from the phone: your Telegram account is reachable from this same machine, the ' +
+        'phone key is not. If the core no longer knows the chat (the binding was removed), a ' +
+        'press answers “Ядро не узнало этот чат — включите «Отвечать ядру из Telegram» заново”.',
+      coreAsks: 'A core question with buttons',
+      coreAsksText:
+        'The question arrives at once, without the «When to call» delay, one message per ' +
+        'question. The buttons are only the options the core accepts from Telegram; when any is ' +
+        'hidden, the line “🔒 Остальные варианты — в панели или с телефона” says so. A model ' +
+        'question takes your own text — reply to the message; the «✍️ Свой ответ» button shows only ' +
+        'where the core accepts free text. If the question changed meanwhile — ' +
+        '“Вопрос изменился — ничего не отправлено, свежая копия ниже”. Answered in the panel — the ' +
+        'message collapses into “Отвечено в панели”, withdrawn — into “Уже не актуально”.',
+      coreNotices: 'Task notices',
+      coreNoticesText:
+        'Four kinds: done, MR opened, failed and waiting for a window. What leaves is the task ' +
+        'name and one line of essence with secrets masked — no code, paths or prompt; the link to ' +
+        'the task in the panel is text. A live task carries “🔁 На доработку” (the bot asks you to ' +
+        'reply to a prompt with what to rework) and “⏹ Стоп”; a finished one has no stop. “🔀 ' +
+        'Открыть MR” — only for an https address not on this computer. The window card offers to ' +
+        'move the task to another CLI or model with a button. A core refusal shows as a line ' +
+        'under the message.',
+      coreTask: 'A task from Telegram — /task',
+      coreTaskText:
+        '“/task fix login” puts an entry into the board «Inbox» with the Telegram source. The ' +
+        '«Repositories for Telegram tasks» field on the card holds one repository per line, at ' +
+        'most eight, a path and optionally “ @ branch”. With repositories set the entry carries ' +
+        'them and the message has “▶️ В работу”: a start from Telegram by the same road as from ' +
+        'the board. Empty — no button, the entry waits for a repository on the board. A start ' +
+        'refusal comes as a Russian line (no repository, no longer in «Inbox») with a link to the ' +
+        'board.',
+      coreQuiet: 'Quiet hours',
+      coreQuietText:
+        'The «Quiet hours» row holds a start and an end. In between, notices pile up and arrive ' +
+        'as one digest at the end: “🌙 Пока было тихо (N):”, a line per event. Questions the ' +
+        'agent is blocked on are held only with «hold questions … too» ticked; a core question ' +
+        'with its own default action is always held by quiet hours. Quiet hours cover the ' +
+        'panel’s run notices too, and what is held survives a panel restart: if the window ended ' +
+        'while the panel was down, the digest arrives soon after it starts.',
+
+      inboxTitle: 'Tracker and forge as a core inbox source',
+      inboxCaption:
+        'The Jira and GitLab cards let the task core read tickets for the board «Inbox» (help ' +
+        '«Task core» → «Inbox from the tracker»). The core takes the address from the card and ' +
+        'the key from the same store; it writes nowhere except one line into a ticket with your ' +
+        'approval.',
+      inboxReads: 'What is read',
+      inboxReadsText:
+        'Jira — tickets by labels, assigned to you or by your own JQL. GitLab — issues by labels ' +
+        'or assigned to you, MRs where you are a reviewer, and your MRs with open threads. GitHub ' +
+        'is never an inbox source. The tracker itself judges the query; it never goes through a ' +
+        'model.',
+      inboxFails: 'When the tracker does not answer',
+      inboxFailsText:
+        'A list longer than 500 entries counts as not read: the search shows «The source did not ' +
+        'answer», and the poll leaves board entries as they were — none is removed. A 429 with a ' +
+        'Retry-After makes that source wait that long; the other sources keep being polled. No ' +
+        'access — «check the tracker account in Integrations».',
     },
 
     notTitle: 'What this tab is not',
@@ -363,7 +438,9 @@ export const integrationsEn: typeof integrationsRu = {
     notSync: 'Not a sync',
     notSyncText:
       'The panel pulls nothing in the background and keeps no copy of your issues. A ' +
-      'request goes out when the screen that shows it is open, or a button is pressed.',
+      'request goes out when the screen that shows it is open, or a button is pressed. Only ' +
+      'the task core polls the tracker in the background — and only the inbox sources you set ' +
+      'up on the board.',
     notAuto: 'Not auto-publishing',
     notAutoText:
       'From the panel a defect, a report or a comment leaves only on a click. An agent ' +
@@ -394,7 +471,9 @@ export const integrationsEn: typeof integrationsRu = {
       'gets the kind of access, never the key itself. It also takes the address of every ' +
       'enabled GitLab or GitHub card: your MCP server that talks to that site (or to the cloud) ' +
       'only reads in a core task — only the core publishes. The address is read on every step, ' +
-      'so a card edit takes effect without a restart',
+      'so a card edit takes effect without a restart. For the board «Inbox» the core reads the ' +
+      'Jira and GitLab address and key the same way; into a ticket it writes one line with the ' +
+      'MR link, and only on your approval from the panel or the phone',
     storageHealth: 'Check verdicts',
     storageHealthValue: 'agentdeck/state.json → integrationHealth (state, reason, account)',
     storageLinks: 'Project links',
@@ -411,7 +490,8 @@ export const integrationsEn: typeof integrationsRu = {
     canForget: 'Forget the key: token erased, card switched off, address and other fields kept',
     cantSso: 'Sign in via SSO or a password: integrations work by token only',
     cantDelete: 'Delete or close anything in an external system',
-    cantBackground: 'Poll external systems in the background with no screen open',
+    cantBackground:
+      'Poll external systems in the background with no screen open — only the task core does that, for the inbox sources set up',
     cantSendBody: 'Send out a prompt, an agent reply or file paths',
     cantAddBot: 'Add the bot to your Telegram chat for you',
 
@@ -479,10 +559,20 @@ export const integrationsEn: typeof integrationsRu = {
       '05-telegram-answers':
         'Telegram connected: whether it works, “You: name”, three “When to call” groups and one Save',
     },
+    'telegram-core': {
+      '01-binding':
+        'The Telegram card: «Answer the core from Telegram» on, the core knows this chat',
+      '02-repos':
+        'The «Repositories for Telegram tasks» field: path and branch, a /task entry starts with «В работу»',
+      '03-quiet':
+        'The «Quiet hours» row: 22:00 to 08:00, questions the agent is blocked on are not held',
+    },
   },
 
   diagrams: {
     'who-calls-whom':
       'The tab’s three directions: the panel fetches context, hands results over on a button, and pushes events outward',
+    'telegram-core':
+      'Telegram and the task core: chat binding, questions with buttons, notices with rework and stop, /task into «Inbox», quiet hours and the digest',
   },
 };

@@ -5,7 +5,7 @@ import {
   type ExportFormat,
 } from '../../../domains/project-tests/export-cases/export-cases.ts';
 import {
-  exportLanguage,
+  askedLanguage,
   exportRun,
   type RunExportFormat,
 } from '../../../domains/project-tests/export-run/export-run.ts';
@@ -115,7 +115,7 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, ctx: Serv
    * Отдельный маршрут от выгрузки кейсов: там срез набора «как он выглядит
    * сейчас», здесь событие «вот что было в этот раз».
    */
-  app.get<{ Querystring: { path?: string; id?: string; format?: string } }>(
+  app.get<{ Querystring: { path?: string; id?: string; format?: string; lang?: string } }>(
     '/api/project-tests/run/export',
     (request, reply) => {
       const root = requireRoot(request.query.path, reply);
@@ -138,8 +138,10 @@ export function registerProjectTestsImportRoutes(app: FastifyInstance, ctx: Serv
           .send({ message: 'Не указан прогон.', messageCode: 'run-unspecified' });
 
       return guard(reply, () => {
-        // Отчёт уходит наружу на языке интерфейса того, кто его выгружает.
-        const file = exportRun(root, id, format, exportLanguage(ctx.store.getSettings().language));
+        // Отчёт уходит наружу на языке интерфейса того, кто его выгружает: ссылка несёт
+        // язык экрана, настройка — только когда его не назвали (`askedLanguage`).
+        const lang = askedLanguage(request.query.lang, ctx.store.getSettings().language);
+        const file = exportRun(root, id, format, lang);
         return reply
           .header('Content-Disposition', `attachment; filename="${file.filename}"`)
           .type(file.contentType)

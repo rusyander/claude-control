@@ -9,6 +9,7 @@ import type { ProjectCodeEditorProps } from './ProjectCodeEditor.types';
 import styles from './ProjectCodeEditor.module.scss';
 import { LOADED } from './ProjectCodeEditor.constants';
 import { labelExtension } from '../../lib/labelExtension';
+import { notesGutter } from '../DiffNotes/notesGutter';
 
 export function ProjectCodeEditor({
   path,
@@ -21,6 +22,7 @@ export function ProjectCodeEditor({
   onSave,
   ariaLabel,
   autoFocus = false,
+  notes,
 }: ProjectCodeEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
@@ -28,11 +30,23 @@ export function ProjectCodeEditor({
   const merge = useRef(new Compartment()).current;
   const writable = useRef(new Compartment()).current;
   const label = useRef(new Compartment()).current;
+  const notesSlot = useRef(new Compartment()).current;
 
   // Колбэки читаются из ref: иначе каждый ререндер родителя пересобирал бы
   // состояние редактора — вместе с курсором и историей отмен.
-  const handlers = useRef({ onChange, onSave });
-  handlers.current = { onChange, onSave };
+  const handlers = useRef({ onChange, onSave, notes, path });
+  handlers.current = { onChange, onSave, notes, path };
+
+  // Поле заметок есть только там, где заметки есть кому отправить (окно кода
+  // из чата); у редактора инструкций проекта его нет.
+  const notesExtension = notes
+    ? notesGutter({
+        lines: notes.lines,
+        label: notes.label,
+        onPick: (anchor) =>
+          handlers.current.notes?.onPick({ ...anchor, path: handlers.current.path }),
+      })
+    : [];
 
   const mergeExtension =
     showDiff && baseline !== undefined
@@ -63,6 +77,7 @@ export function ProjectCodeEditor({
           merge.of([]),
           writable.of([]),
           label.of(labelExtension(ariaLabel)),
+          notesSlot.of([]),
           EditorView.lineWrapping,
           // Приоритет выше стандартного набора: иначе Ctrl+S перехватил бы
           // браузер и предложил сохранить страницу.
@@ -138,6 +153,28 @@ export function ProjectCodeEditor({
     view.current?.dispatch({ effects: label.reconfigure(labelExtension(ariaLabel)) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ariaLabel]);
+
+  // Метки заметок перерисовываются по набору помеченных строк, а не по каждому
+  // ререндеру: перенастройка отсека не трогает текст, курсор и историю отмен.
+  useEffect(() => {
+    view.current?.dispatch({ effects: notesSlot.reconfigure(notesExtension) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes?.lines, notes?.label, Boolean(notes)]);
+
+  // Строка курсора — для кнопки «Заметка» над редактором.
+  useEffect(() => {
+    if (!notes) return undefined;
+    const slot = notes.cursor;
+    slot.current = () => {
+      const instance = view.current;
+      if (!instance) return undefined;
+      const line = instance.state.doc.lineAt(instance.state.selection.main.head);
+      return { line: line.number, text: line.text };
+    };
+    return () => {
+      slot.current = null;
+    };
+  }, [notes]);
 
   // Грамматика приезжает отдельным куском и может опоздать: пока её нет, файл
   // читается как обычный текст. Ответ на устаревший путь отбрасываем — иначе

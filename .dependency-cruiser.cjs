@@ -358,6 +358,31 @@ module.exports = {
       from: { path: '^packages/sieves/' },
       to: { path: '^packages/', pathNot: '^packages/(sieves|contracts|dlp)/' },
     },
+    // Трекеры и их заглушка (этап 12, D15, P165) — общие для панели и входящих ядра.
+    {
+      name: 'tracker-packages-apart-from-apps',
+      comment:
+        'Клиент трекера читают и панель, и входящие ядра, заглушку — тесты ядра и голый node; ' +
+        'импорт из приложения сделал бы пакет частью одного из них, а токен — чужим знанием.',
+      severity: 'error',
+      from: { path: '^packages/(trackers|stub-tracker)/' },
+      to: { path: '^apps/' },
+    },
+    // Порт команд Telegram (этап 12, D29, P190): ставит заголовки канала владельца, поэтому до
+    // него дотягивается только цикл getUpdates бота — ни одна HTTP-ручка панели.
+    {
+      name: 'telegram-command-port-only-from-bot',
+      comment:
+        'Порт команд Telegram доказывает ядру владельца бота заголовками канала. Импорт из ручки ' +
+        'или другого домена дал бы запросу браузера путь к этим заголовкам (P190).',
+      severity: 'error',
+      from: {
+        path: '^apps/',
+        pathNot:
+          '^apps/server/src/domains/notify/(telegram-answers|telegram-notices)/|\\.test\\.ts$',
+      },
+      to: { path: '^apps/server/src/domains/notify/telegram-core/command-port\\.ts$' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

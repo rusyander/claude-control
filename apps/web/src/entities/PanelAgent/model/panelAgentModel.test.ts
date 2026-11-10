@@ -183,13 +183,16 @@ describe('pageNavigation', () => {
     expect(pageNavigation({ route: '/dlp' })).toEqual({ to: '/dlp', search: {} });
   });
 
-  it('группа: ?show= велит странице выбрать вкладку по области группы', () => {
-    expect(pageNavigation({ route: '/groups', focus: 'g-1' })).toEqual({
-      to: '/groups',
-      search: { show: 'g-1' },
-      anchor: 'g-1',
+  it('группа: страница групп свёрнута в доску — полосы групп ядра, якорь — полоса группы (D13)', () => {
+    expect(pageNavigation({ route: '/groups', focus: 'group-g1' })).toEqual({
+      to: '/core',
+      search: { view: 'board', lane: 'group' },
+      anchor: 'group-g1',
     });
-    expect(pageNavigation({ route: '/groups' })).toEqual({ to: '/groups', search: {} });
+    expect(pageNavigation({ route: '/groups' })).toEqual({
+      to: '/core',
+      search: { view: 'board', lane: 'group' },
+    });
   });
 });
 
@@ -213,6 +216,8 @@ describe('pageContext', () => {
     expect(sectionLabelKey('/')).toBe('nav.overview');
     expect(sectionLabelKey('/chat/123')).toBe('nav.chat');
     expect(sectionLabelKey('/nowhere')).toBeUndefined();
+    // Ярлык «Группы» тоже ведёт на `/core`, но подпись страницы — её собственный пункт.
+    expect(sectionLabelKey('/core')).toBe('nav.coreTasks');
   });
 
   it('адрес с запросом, пустые поля не уходят', () => {

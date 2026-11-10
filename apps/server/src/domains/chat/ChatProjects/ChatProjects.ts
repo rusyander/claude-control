@@ -82,13 +82,17 @@ export function isNonProject(path: string): boolean {
  * `extra` — сводки разговоров не-Claude CLI из ядра (этап 11, волна 3): транскрипта у них нет,
  * а список проектов телефона строится только отсюда — без них разговор qwen/opencode с телефона
  * не открыть. Сводка с id, который уже есть в транскриптах, не дублируется.
+ *
+ * `hidden` — id транскриптов, которые не разговоры человека (сеансы шагов задач ядра): проект
+ * из одних таких не появляется вовсе.
  */
 export function listProjects(
   projectsDir: string,
   extra: readonly ChatSummary[] = [],
+  hidden: ReadonlySet<string> = new Set(),
 ): ProjectInfo[] {
   const byPath = new Map<string, ProjectInfo>();
-  const own = readChats(projectsDir);
+  const own = readChats(projectsDir).filter((chat) => !hidden.has(chat.id));
   const chats =
     extra.length === 0
       ? own

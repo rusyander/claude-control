@@ -30,7 +30,6 @@ export const overviewSchema = object({
     failed: number(),
   }).nullable(),
   permissions: object({ allow: number(), ask: number(), deny: number() }).nullable(),
-  groups: object({ total: number() }),
 });
 
 export type Overview = Infer<typeof overviewSchema>;

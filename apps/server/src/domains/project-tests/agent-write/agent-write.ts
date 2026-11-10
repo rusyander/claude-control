@@ -40,8 +40,13 @@ export type AgentCaseWrite =
     }
   | { kind: 'draft'; runId: string; caseId: string };
 
-/** Поля результата прогона — их пишет `record`, а не правка описания. */
-const RUN_OWNED = ['status', 'statusId', 'note', 'muted', 'muteReason', 'archived'] as const;
+/**
+ * Поля результата прогона — их пишет `record`, а не правка описания. `archived` сюда не входит:
+ * это жизнь кейса, а не итог прогона, — кейс на убранный файл агент уводит в архив сам (W1-D
+ * 08.11: `case` тихо выбрасывал флаг, кейсы архивировали руками в JSON). Кейс человека и в
+ * архив уходит только его приёмкой — правка там всё равно черновик.
+ */
+const RUN_OWNED = ['status', 'statusId', 'note', 'muted', 'muteReason'] as const;
 
 /** Атрибут кейса с id, под которым агент просил его завести. */
 const AGENT_ID = 'agent-id';

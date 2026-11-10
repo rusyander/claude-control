@@ -1,3 +1,4 @@
+import { CORE_GROUP_LANES_SEARCH, CORE_TASKS_ROUTE } from '@shared/config/routes';
 import type { HelpTopic } from './topics.types';
 import { OverviewTopic } from '../topics/OverviewTopic/OverviewTopic';
 import { SearchTopic } from '../topics/SearchTopic/SearchTopic';
@@ -108,7 +109,14 @@ export const HELP_GROUPS: HelpGroup[] = [
   {
     labelKey: 'nav.sectionApp',
     topics: [
-      { id: 'groups', icon: 'groups', pagePath: '/groups', Content: GroupsTopic },
+      // Страница групп свёрнута в доску ядра (D13): раздел ведёт прямо на её полосы групп.
+      {
+        id: 'groups',
+        icon: 'groups',
+        pagePath: CORE_TASKS_ROUTE,
+        pageSearch: CORE_GROUP_LANES_SEARCH,
+        Content: GroupsTopic,
+      },
       { id: 'history', icon: 'history', pagePath: '/history', Content: HistoryTopic },
       { id: 'compare', icon: 'swap', pagePath: '/compare', Content: CompareTopic },
       // Порядок тот же, что в боковом меню: паспорт среды стоит между

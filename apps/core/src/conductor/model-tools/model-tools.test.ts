@@ -285,7 +285,8 @@ describe('model tools', () => {
     expect(noDone).toEqual(['chat']);
     // Решение 28.10: разбор задачи, план и деление только читают — как ревью и отчёт.
     const readOnly = SESSION_STEP_KINDS.filter((k) => toolPlanFor(k)?.builtins === 'read-only');
-    expect(readOnly).toEqual(['intake', 'plan', 'research', 'split', 'review', 'report']);
+    // Этап 12: проход по стенду (`walk`) тоже только читает — копию он не меняет.
+    expect(readOnly).toEqual(['intake', 'plan', 'research', 'split', 'review', 'report', 'walk']);
     const { task, b } = await stepOf('research');
     const reply = handleModelTool(task, b, 'check', { checkId: 'unit' }, toolDeps());
     expect(reply).toMatchObject({ ok: false, code: TOOL_NOT_IN_PLAN });

@@ -8,6 +8,7 @@ import type { HumanPointPolicy } from '../../policy/human-point/human-point.type
 import type { PendingPermits } from '../../policy/permit/pending.ts';
 import type { PermitCodec, PermitContext } from '../../policy/permit/permit.types.ts';
 import type { UnitDiffDeps } from './unit-diff.ts';
+import type { WalkPort } from '../../adapters/browser/browser.types.ts';
 
 /** Сессия, которой ядро выдало токен, — по журналу задачи (03: токен сессии = её шаг). */
 export interface SessionBinding {
@@ -58,6 +59,11 @@ export interface ModelToolDeps {
    * отказывает «не подключено»; `unknown` — копию или базу не назвать, тело не читается.
    */
   unitDiff?(task: LiveTask, b: SessionBinding): Fact<UnitDiffDeps>;
+  /**
+   * Браузер, доступы стенда и маска сессии шага `walk` (этап 12, P177/P178). Нет — инструменты
+   * браузера отвечают `not-wired`; жест вне умений (`browse_gesture`) пишется пробелом и без него.
+   */
+  walk?: WalkPort;
 }
 
 /** Что нужно ответу на вопрос о праве одной сессии: её переходник, кодек и факты копии. */

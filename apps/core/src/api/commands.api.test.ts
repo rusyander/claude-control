@@ -61,6 +61,10 @@ const VALID_FIELDS: Record<CommandKind, unknown> = {
     allowedRoutes: [{ adapter: 'a-1', route: { kind: 'stub', id: 's-1' }, modelPattern: '*' }],
   },
   'clear-exhausted': { routeId: 's-1' },
+  'take-over': {},
+  'hand-back': { note: 'n' },
+  'set-stop': { stop: 'mr' },
+  rework: { text: 't' },
 };
 
 describe('POST /v1/commands', () => {

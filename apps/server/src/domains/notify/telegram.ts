@@ -12,6 +12,10 @@ import { classifyTurnEnd } from './turn-end/turn-end.ts';
 import type { TurnEnd } from './turn-end/turn-end.types.ts';
 import { escapeHtml } from './telegram-answers/html.ts';
 import type { ChatRoute } from './telegram-answers/telegram-answers.types.ts';
+import { DIVIDER } from './telegram-answers/compose.ts';
+import { digestParts } from './telegram-notices/compose.ts';
+import { quietAt } from './telegram-notices/quiet.ts';
+import type { HeldLine } from './telegram-notices/telegram-notices.types.ts';
 import { parseForeignChatKey } from '@agentdeck/contracts/foreign-chat-key';
 
 /**
@@ -70,6 +74,28 @@ export interface BudgetNotice {
  */
 export interface TelegramAnswersCover {
   covers: () => boolean;
+  /**
+   * Строка потока ядра (пересылка рантайма) → уведомления о задачах ядра в маршрутах ответов
+   * (этап 12, P191). Маршруты ставят его, когда собрали уведомления; не стоит — строка пропадает.
+   */
+  coreLine?: (
+    task: { taskId: string; title: string | null },
+    event: { event: string | null },
+  ) => void;
+  /**
+   * Вопросы ядра идут кнопками бота ответов (этап 12, D29, P188): маршруты ставят его, пересылка
+   * тогда не шлёт их текстом. Не стоит — текст со ссылкой, как прежде.
+   */
+  coreButtons?: () => boolean;
+}
+
+/**
+ * Удержанное тихими часами (этап 12, P194): общий с уведомлениями ядра файл
+ * `telegram-notices.json` (`noticesStoreAt`) — строки переживают перезапуск панели.
+ */
+export interface TelegramHeldLines {
+  heldLines(): HeldLine[];
+  setHeldLines(lines: readonly HeldLine[]): void;
 }
 
 export type TelegramNotice = RunNotice | TestFailedNotice | BudgetNotice;
@@ -117,6 +143,12 @@ export interface TelegramDeps {
   settleMs?: number;
   /** Отложенный запуск — подменяется в тестах. */
   schedule?: (run: () => void, ms: number) => void;
+  /**
+   * Тихие часы (`settings.quiet`): готовое к отправке, кроме прав и вопросов (они блокируют
+   * агента и ждут только при `quiet.asks`), ложится сюда и уходит одной сводкой в конце окна.
+   * Не задано — тишины у этого уведомителя нет.
+   */
+  held?: TelegramHeldLines;
 }
 
 /** Пауза перед судом о конце хода прогона панели: продолжения стартуют за секунды. */
@@ -248,11 +280,13 @@ export async function telegramMe(token: string): Promise<string> {
  */
 export function createTelegramNotifier(deps: TelegramDeps): (notice: TelegramNotice) => void {
   const cards = new Map<string, string>();
+  const quiet = createQuietHold(deps);
   const deliver = (notice: TelegramNotice, turn?: TurnEnd): void => {
     const settings = deps.settings();
     if (!settings.enabled || !settings.chatId) return;
     const token = deps.token();
     if (!token) return;
+    if (quiet.hold(settings, notice, turn)) return;
     void send(deps, token, settings.chatId, notice, turn).catch((error: unknown) => {
       // Нет сети, лёг сервис, бот выкинут из чата — уведомление просто не дошло.
       // Состояние панели от этого не меняется, и падать тут не с чего.
@@ -321,6 +355,79 @@ function judgeTurn(
     if (cards.size > CARDS_MAX) cards.delete(cards.keys().next().value as string);
   }
   return turn;
+}
+
+/** Повтор сводки, которую Telegram не принял: через минуту, не раньше. */
+const FLUSH_RETRY_MS = 60_000;
+
+/**
+ * Тихие часы уведомителя прогонов (этап 12, P194). Внутри окна готовый текст ложится в общий
+ * файл удержанного (`held`) и не уходит; права и вопросы блокируют агента — держатся, только
+ * если `quiet.asks`. В конце окна (таймер) и при старте панели (удержанное до перезапуска)
+ * — одна сводка на чат, разрезанная по пределу сообщения; ушедшая часть снимается сразу.
+ */
+function createQuietHold(deps: TelegramDeps) {
+  const now = (): number => (deps.now ?? Date.now)();
+  let armed = false;
+  const arm = (ms: number): void => {
+    if (armed) return;
+    armed = true;
+    (deps.schedule ?? later)(
+      () => {
+        armed = false;
+        void flush().catch((error: unknown) => (deps.onError ?? warnSendFailed)(error));
+      },
+      Math.max(ms, 1_000),
+    );
+  };
+  const flush = async (): Promise<void> => {
+    const held = deps.held;
+    const lines = held?.heldLines() ?? [];
+    if (!held || lines.length === 0) return;
+    const window = quietAt(deps.settings().quiet, now());
+    if (window.inside) {
+      arm((window.endsAt ?? now()) - now() + 1_000);
+      return;
+    }
+    const token = deps.token();
+    if (!token) return;
+    for (const chatId of [...new Set(lines.map((line) => line.chatId))]) {
+      const own = held.heldLines().filter((line) => line.chatId === chatId);
+      for (const part of digestParts(own.map((line) => `${DIVIDER}\n${line.text}`))) {
+        const result = await deliverTelegram(token, chatId, part.text, deps.delivery);
+        if (!result.ok) {
+          arm(FLUSH_RETRY_MS);
+          throw new Error(safeDetail(result.error));
+        }
+        const gone = new Set(own.splice(0, part.count));
+        held.setHeldLines(held.heldLines().filter((line) => !gone.has(line)));
+      }
+    }
+  };
+  // Удержанное до перезапуска: окно кончилось, пока панель лежала, — сводка вскоре после старта.
+  if (deps.held?.heldLines().length) arm(1_000);
+  return {
+    hold(settings: TelegramSettings, notice: TelegramNotice, turn?: TurnEnd): boolean {
+      if (!deps.held) return false;
+      const window = quietAt(settings.quiet, now());
+      if (!window.inside) return false;
+      const asks = notice.kind === 'permission' || notice.kind === 'question';
+      if (asks && !settings.quiet?.asks) return false;
+      deps.held.setHeldLines([
+        ...deps.held.heldLines(),
+        { chatId: settings.chatId, text: noticeText(deps, notice, turn), at: now() },
+      ]);
+      arm((window.endsAt ?? now()) - now() + 1_000);
+      return true;
+    },
+  };
+}
+
+/** Текст уведомления, как ушёл бы сам, — для строки сводки тишины. */
+function noticeText(deps: TelegramDeps, notice: TelegramNotice, turn?: TurnEnd): string {
+  const panelChat = 'chatId' in notice ? notice.chatId : undefined;
+  const openId = panelChat ? (deps.openIdOf?.(panelChat) ?? panelChat) : undefined;
+  return telegramText(notice, titleSafe(deps, notice), openId, viaOf(deps, notice, openId), turn);
 }
 
 /**

@@ -79,6 +79,38 @@ export function IntegrationsGuideSections({ tr }: SectionProps) {
           <GuideStep title={g('notifyCommands')} text={g('notifyCommandsText')} />
         </GuideSteps>
       </HelpSection>
+
+      {/* Ядро задач в Telegram (этап 12): кадры — `tools/help-shots/core-inbox.mjs`. */}
+      <HelpSection title={g('coreTitle')} caption={g('coreCaption')}>
+        <HelpDiagram topic="integrations" name="telegram-core" />
+        <GuideSteps>
+          <GuideStep title={g('coreBinding')} text={g('coreBindingText')}>
+            <HelpShot
+              topic="integrations"
+              scenario="telegram-core"
+              frame="01-binding"
+              side="panel"
+            />
+          </GuideStep>
+          <GuideStep title={g('coreAsks')} text={g('coreAsksText')} />
+          <GuideStep title={g('coreNotices')} text={g('coreNoticesText')} />
+          <GuideStep title={g('coreTask')} text={g('coreTaskText')}>
+            <HelpShot topic="integrations" scenario="telegram-core" frame="02-repos" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('coreQuiet')} text={g('coreQuietText')}>
+            <HelpShot topic="integrations" scenario="telegram-core" frame="03-quiet" side="panel" />
+          </GuideStep>
+        </GuideSteps>
+      </HelpSection>
+
+      <HelpSection title={g('inboxTitle')} caption={g('inboxCaption')}>
+        <GuideSteps>
+          <GuideStep title={g('inboxReads')} text={g('inboxReadsText')}>
+            <HelpShot topic="core" scenario="inbox" frame="02-sources" side="panel" />
+          </GuideStep>
+          <GuideStep title={g('inboxFails')} text={g('inboxFailsText')} />
+        </GuideSteps>
+      </HelpSection>
     </>
   );
 }

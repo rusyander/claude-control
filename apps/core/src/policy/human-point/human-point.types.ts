@@ -8,7 +8,7 @@ export type HumanPointItem = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
  * Пункты, которые источник ядра называет прямо (G15): судья права (3 адрес сервиса, 5 грант),
  * сверка outbox (4), круги (6), бюджет (7), шаг сценария (8), запуск (10).
  */
-export type NamedPoint = 3 | 4 | 5 | 6 | 7 | 8 | 10;
+export type NamedPoint = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export interface HumanPointInput {
   /**

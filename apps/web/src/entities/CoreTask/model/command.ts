@@ -1,4 +1,5 @@
-import type { CommandEnvelope, CommandKind } from '@agentdeck/contracts/core/commands';
+import type { CommandDraft } from '@agentdeck/contracts/core/ask-commands';
+import type { CommandEnvelope } from '@agentdeck/contracts/core/commands';
 
 /**
  * UUIDv7 (RFC 9562): 48 бит времени в мс, версия 7, вариант 10, остальное — случай. Ядро
@@ -31,20 +32,8 @@ export function pageLoadId(): string {
   return pageLoad;
 }
 
-export interface CommandDraft {
-  kind: CommandKind;
-  taskId: string;
-  fields: CommandEnvelope['fields'];
-  /** Номер строки, на которую смотрел человек: ядро откажет, если задача ушла дальше. */
-  expectSeq?: number;
-  /** Подпись устройства (телефон), если команда строгая и пир не подтверждён. */
-  signature?: string;
-  /**
-   * Ключ повтора, который держит вызывающий: повтор с тем же `cmdId` ядро не исполняет второй раз,
-   * а отдаёт сохранённый исход (P47). Нет — новый ключ на каждую отправку.
-   */
-  cmdId?: string;
-}
+// Черновик команды — общий с ботом Telegram (этап 12, P188): одна форма на все карточки вопроса.
+export type { CommandDraft } from '@agentdeck/contracts/core/ask-commands';
 
 /** Конверт команды с числом страницы, которое только что выдало ядро. */
 export function commandEnvelope(

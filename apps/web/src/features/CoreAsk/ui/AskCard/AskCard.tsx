@@ -8,8 +8,13 @@ import { Stack } from '@shared/ui/stack';
 import { TextField } from '@shared/ui/text-field';
 import { Toggle } from '@shared/ui/toggle';
 import { Typography } from '@shared/ui/typography';
-import { commandsFor, globsOf } from '../../model/askCommands';
-import type { AskChoice, GrantOp } from '../../model/askCommands.types';
+import {
+  commandsFor,
+  globsOf,
+  switchOf,
+  type AskChoice,
+  type GrantOp,
+} from '@agentdeck/contracts/core/ask-commands';
 import { useAskSubmit } from '../../model/useAskSubmit';
 import type { AskCardProps } from './AskCard.types';
 
@@ -20,12 +25,18 @@ const LAUNCH_LABEL: Record<string, string> = {
   'edit-split': 'coreTimeline.ask.editSplit',
 };
 
-/** Источники, чей вопрос ядро пишет на языке задачи (запуск, точки 6 и 7 дирижёра, сверка). */
+/**
+ * Источники, чей вопрос ядро пишет на языке задачи (запуск, точки 6 и 7 дирижёра, сверка, приём,
+ * потерянный вход CLI, запись в тикет пункта 9).
+ */
 const TASK_LANG_SOURCES: ReadonlySet<string> = new Set([
   'launch',
   'round-cap',
   'budget',
   'reconcile',
+  'intake',
+  'login',
+  'tracker-write',
 ]);
 
 /**
@@ -83,7 +94,14 @@ export function AskCard({ taskId, ask, state }: AskCardProps) {
         <Stack direction="row" gap="var(--spacing-xs)" wrap>
           {ask.options.map((option) => {
             const launchKey = ask.source === 'launch' ? LAUNCH_LABEL[option] : undefined;
-            const label = launchKey ? t(launchKey) : option;
+            const move = switchOf(option);
+            let label = launchKey ? t(launchKey) : option;
+            // Вариант перевода начатой задачи (P169): ядро пишет `model:<id>` / `cli:<id>`.
+            if (move)
+              label =
+                move.kind === 'cli'
+                  ? t('limitCard.option.cli', { cli: move.value })
+                  : t('limitCard.option.model', { model: move.value });
             if (option === 'grant') {
               return (
                 <Button

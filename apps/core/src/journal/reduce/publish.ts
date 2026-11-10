@@ -89,6 +89,14 @@ export function reducePublish(
       }
       return prev ? state : withUnit(state, d.unitId, { mr: { ...d, seq } });
     }
+    case 'publish.mr-state': {
+      // Этап 12: конец MR без его личности в журнале — противоречие (чей MR слит?).
+      const d = data(line, 'publish.mr-state');
+      if (!publicationOf(state, d.unitId).mr) {
+        return anomaly(`unit ${d.unitId} MR ${d.state} before publish.mr`);
+      }
+      return withUnit(state, d.unitId, { mrState: { ...d, seq } });
+    }
     case 'publish.read': {
       const d = data(line, 'publish.read');
       if (publicationOf(state, d.unitId).read) {

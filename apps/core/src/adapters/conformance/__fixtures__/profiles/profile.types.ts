@@ -25,6 +25,8 @@ export interface Profile {
     denyOverPermit?: string;
     /** Ход со строкой окна подписки (`windowEvent`). */
     window?: string;
+    /** Ход, кончившийся ошибкой CLI «войдите заново» (`loginLost`, этап 12 P170). */
+    loginLost?: string;
   };
   /** Файл сеанса с правилами запрета (относительно каталога сеанса). */
   settings: string;

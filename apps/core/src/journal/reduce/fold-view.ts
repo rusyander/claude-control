@@ -1,3 +1,4 @@
+import type { BoardStop } from '@agentdeck/contracts/core/board';
 import type { JournalDataV1 } from '@agentdeck/contracts/core/journal';
 import type { TaskFoldState, UsageTotals } from './reduce.types.ts';
 import { ZERO_USAGE } from './stage5.ts';
@@ -37,6 +38,22 @@ export function allowedRoutesOf(
   state: TaskFoldState,
 ): JournalDataV1['task.created']['allowedRoutes'] {
   return state.routesSet?.allowedRoutes ?? state.created?.allowedRoutes ?? [];
+}
+
+/**
+ * Этап 12 (P157): где задача остановится — последний `task.stop` поверх записи доски
+ * `task.created.boardEntry`. `null` — задача не с доски и остановку не меняли: поведение — по
+ * настройке репозитория.
+ */
+export function boardStopOf(state: TaskFoldState): BoardStop | null {
+  return state.stop?.stop ?? state.created?.boardEntry?.stop ?? null;
+}
+
+/** Этап 12: открытый перехват единицы человеком; `null` — перехвата нет. */
+export function openTakeoverOf(
+  state: TaskFoldState,
+): { unitId: string; copy: string; seq: number; chatTaskId?: string } | null {
+  return state.takeover ?? null;
 }
 
 /** Секции вводной, уже отданные сессии: id → sha256 (дельта шлёт только изменённые). */

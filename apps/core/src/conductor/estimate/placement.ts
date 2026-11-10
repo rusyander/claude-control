@@ -3,7 +3,7 @@ import type { EstimateFields } from '@agentdeck/contracts/core/estimate';
 import type { SendImage } from '@agentdeck/contracts/core/ask';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { LiveTask } from '../../journal/resume.ts';
-import { longForm } from '../../platform/paths.ts';
+import { longForm, projectRootOf } from '../../platform/paths.ts';
 import { listDir, readBytesSync } from '../../platform/safe-io/files.ts';
 import { pathsFoldCase } from '../../platform/user-dirs.ts';
 
@@ -114,12 +114,13 @@ export function inPlaceRootOf(task: LiveTask, unitId: string): string | undefine
   if (created.scenario.id !== CHAT_PRESET) return undefined;
   const cmdId = created.origin?.cmdId;
   if (!cmdId) return undefined;
-  // Папка без git (G12 p7): корень — сама папка, репозитория у задачи нет.
+  // Папка без git (G12 p7): корень — сама папка, репозитория у задачи нет. Проект в подпапке
+  // репозитория — корень и есть подпапка: грант назван на неё, сравнение с вершиной его не находило,
+  // и чат молча уходил в копию всего репозитория.
   const repoKey = task.state.units[unitId]?.repoKey;
-  const root =
-    created.folder ??
-    (created.repos.find((r) => r.repoKey === repoKey) ?? (repoKey ? undefined : created.repos[0]))
-      ?.path;
+  const repo =
+    created.repos.find((r) => r.repoKey === repoKey) ?? (repoKey ? undefined : created.repos[0]);
+  const root = created.folder ?? (repo ? projectRootOf(repo) : undefined);
   if (!root) return undefined;
   const granted = readJournalLines(task.dir, task.taskId).lines.some((line) => {
     if (line.kind !== 'grant.given' || line.cmdId !== cmdId) return false;

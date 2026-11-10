@@ -1,0 +1,306 @@
+{
+  "topic": "core",
+  "scenario": "board",
+  "frames": [
+    {
+      "id": "01-board",
+      "side": "panel",
+      "file": "01-board.png",
+      "masked": 0,
+      "width": 1628,
+      "height": 397,
+      "shotAt": "2026-11-08T17:00:08.825Z",
+      "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b Входящие 1 Разобрать журнал сборки вручную Очередь 1 Обновить справку раздела чат Разбор 1 Добавить тест парсера 1 вопрос группа 00a11a Работа 2 Свести стили таблицы ведёт человек Починить парсер заказов единиц: 1 из 3 группа 00a11a Ревью 1 Убрать дубли в настройках группа 00b22b Проверка 1 Описать итог релиза группа 00b22b Готово к MR 0 Пусто MR открыт 1 Кнопка экспорта в CSV Влит / закрыт 0 Пусто Ждёт вас 2 Выбрать формат отчёта ждёт вас 1 вопрос Перевести письма на шаблоны ждёт вас route claude-login refused by its window; waits for the reset Показать закрытые (1)",
+      "seal": {
+        "png": "07c1bf9b59889655",
+        "text": "832e17266e78e151"
+      },
+      "en": {
+        "file": "01-board.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 404,
+        "shotAt": "2026-11-08T17:00:58.667Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Waiting for you · 2 By group Group 00a11a Group 00b22b Inbox 1 Triage the build log manual Queue 1 Update the section help chat Triage 1 Add a parser test 1 question group 00a11a Work 2 Unify the table styles driven by a human Fix the order parser units: 1 of 3 group 00a11a Review 1 Drop duplicate settings group 00b22b Check 1 Write the release summary group 00b22b Ready for MR 0 Empty MR open 1 CSV export button Merged / closed 0 Empty Waiting for you 2 Pick the report format waiting for you 1 question Move emails to templates waiting for you route claude-login refused by its window; waits for the reset Show closed (1)",
+        "seal": {
+          "png": "9a1b6631ea54a09d",
+          "text": "8e512e327fd5449a"
+        }
+      },
+      "dark": {
+        "file": "01-board.dark.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 397,
+        "shotAt": "2026-11-08T17:01:39.951Z",
+        "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b Входящие 1 Разобрать журнал сборки вручную Очередь 1 Обновить справку раздела чат Разбор 1 Добавить тест парсера 1 вопрос группа 00a11a Работа 2 Свести стили таблицы ведёт человек Починить парсер заказов единиц: 1 из 3 группа 00a11a Ревью 1 Убрать дубли в настройках группа 00b22b Проверка 1 Описать итог релиза группа 00b22b Готово к MR 0 Пусто MR открыт 1 Кнопка экспорта в CSV Влит / закрыт 0 Пусто Ждёт вас 2 Выбрать формат отчёта ждёт вас 1 вопрос Перевести письма на шаблоны ждёт вас route claude-login refused by its window; waits for the reset Показать закрытые (1)",
+        "seal": {
+          "png": "b0a972473311ebe7",
+          "text": "832e17266e78e151"
+        }
+      },
+      "darkEn": {
+        "file": "01-board.dark.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 404,
+        "shotAt": "2026-11-08T17:02:21.281Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Waiting for you · 2 By group Group 00a11a Group 00b22b Inbox 1 Triage the build log manual Queue 1 Update the section help chat Triage 1 Add a parser test 1 question group 00a11a Work 2 Unify the table styles driven by a human Fix the order parser units: 1 of 3 group 00a11a Review 1 Drop duplicate settings group 00b22b Check 1 Write the release summary group 00b22b Ready for MR 0 Empty MR open 1 CSV export button Merged / closed 0 Empty Waiting for you 2 Pick the report format waiting for you 1 question Move emails to templates waiting for you route claude-login refused by its window; waits for the reset Show closed (1)",
+        "seal": {
+          "png": "fdb93ae9854503b9",
+          "text": "8e512e327fd5449a"
+        }
+      }
+    },
+    {
+      "id": "02-entry-window",
+      "side": "panel",
+      "file": "02-entry-window.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-08T17:00:10.423Z",
+      "text": "Разобрать журнал сборки Входящие Стадия Входящие Состояние во входящих Остановка до плана Класс и профиль нет данных Источник вручную Разобрать журнал сборки Запуск с доски Ход по единицам нет данных Агенты нет данных Расход нет данных Оценка до запуска нет данных MR нет данных Сценарий feature Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Ходы карточки В очередь Отклонить",
+      "seal": {
+        "png": "69d1332d0dc299b7",
+        "text": "09ea1319e5edcbdb"
+      },
+      "en": {
+        "file": "02-entry-window.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:00.219Z",
+        "text": "Triage the build log Inbox Stage Inbox State in the inbox Stop at the plan Class and profile no data Source manual Triage the build log Launch from the board Progress by unit no data Agents no data Spend no data Estimate before launch no data MR no data Scenario feature Created Nov 8, 2026, 02:00 PM Started no data Card moves To queue Reject",
+        "seal": {
+          "png": "0094e12cebc267a0",
+          "text": "6ec695867f740c92"
+        }
+      },
+      "dark": {
+        "file": "02-entry-window.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:41.516Z",
+        "text": "Разобрать журнал сборки Входящие Стадия Входящие Состояние во входящих Остановка до плана Класс и профиль нет данных Источник вручную Разобрать журнал сборки Запуск с доски Ход по единицам нет данных Агенты нет данных Расход нет данных Оценка до запуска нет данных MR нет данных Сценарий feature Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Ходы карточки В очередь Отклонить",
+        "seal": {
+          "png": "8f889cd3a5092393",
+          "text": "09ea1319e5edcbdb"
+        }
+      },
+      "darkEn": {
+        "file": "02-entry-window.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:02:22.848Z",
+        "text": "Triage the build log Inbox Stage Inbox State in the inbox Stop at the plan Class and profile no data Source manual Triage the build log Launch from the board Progress by unit no data Agents no data Spend no data Estimate before launch no data MR no data Scenario feature Created Nov 8, 2026, 02:00 PM Started no data Card moves To queue Reject",
+        "seal": {
+          "png": "62837da32324e4e2",
+          "text": "6ec695867f740c92"
+        }
+      }
+    },
+    {
+      "id": "03-task-window",
+      "side": "panel",
+      "file": "03-task-window.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-08T17:00:15.807Z",
+      "text": "Починить парсер заказов Работа Открыть полностью Стадия Работа Состояние идёт Остановка до MR Класс и профиль L · balanced Источник нет данных Запуск нет данных Ход по единицам единиц: 1 из 3 Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена 8 нояб. 2026 г., 14:01 Ручное вмешательство Ядро встанет на ближайшей безопасной точке, слот освободится. Вы работаете в копии задачи — сами или в чате, которому дана правка только этой копии. Взять вручную Что доработать Сообщение получит текущий шаг на ближайшей границе хода. На доработку Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+      "seal": {
+        "png": "f042e653696ccad1",
+        "text": "e045b3302e9535ee"
+      },
+      "en": {
+        "file": "03-task-window.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:02.151Z",
+        "text": "Fix the order parser Work Open in full Stage Work State running Stop at the MR Class and profile L · balanced Source no data Launch no data Progress by unit units: 1 of 3 Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started Nov 8, 2026, 02:01 PM Manual intervention The core pauses at the nearest safe point and frees the slot. You work in the task copy — by hand or in a chat allowed to edit only that copy. Take over What to rework The current step receives the message at the next turn boundary. Send for rework Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "4a27cbc0774ce1f9",
+          "text": "86970a294bd8a84a"
+        }
+      },
+      "dark": {
+        "file": "03-task-window.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:43.450Z",
+        "text": "Починить парсер заказов Работа Открыть полностью Стадия Работа Состояние идёт Остановка до MR Класс и профиль L · balanced Источник нет данных Запуск нет данных Ход по единицам единиц: 1 из 3 Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена 8 нояб. 2026 г., 14:01 Ручное вмешательство Ядро встанет на ближайшей безопасной точке, слот освободится. Вы работаете в копии задачи — сами или в чате, которому дана правка только этой копии. Взять вручную Что доработать Сообщение получит текущий шаг на ближайшей границе хода. На доработку Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+        "seal": {
+          "png": "ca2b269b04a804e1",
+          "text": "e045b3302e9535ee"
+        }
+      },
+      "darkEn": {
+        "file": "03-task-window.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:02:24.767Z",
+        "text": "Fix the order parser Work Open in full Stage Work State running Stop at the MR Class and profile L · balanced Source no data Launch no data Progress by unit units: 1 of 3 Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started Nov 8, 2026, 02:01 PM Manual intervention The core pauses at the nearest safe point and frees the slot. You work in the task copy — by hand or in a chat allowed to edit only that copy. Take over What to rework The current step receives the message at the next turn boundary. Send for rework Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "57a9b90434207d9e",
+          "text": "86970a294bd8a84a"
+        }
+      }
+    },
+    {
+      "id": "04-takeover-open",
+      "side": "panel",
+      "file": "04-takeover-open.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-08T17:00:21.156Z",
+      "text": "Свести стили таблицы Работа Открыть полностью Стадия Работа Состояние на паузе Остановка до MR Класс и профиль нет данных Источник нет данных Запуск нет данных Ход по единицам Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Ручное вмешательство Перехват открыт: задачу ведёте вы. Копия: copies/7f3a/unit-1 Открыть чат Что сделано (уйдёт следующему шагу) Чат перехвата закроется первым, затем ядро продолжит с прерванного шага. Вернуть ядру Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+      "seal": {
+        "png": "5f9a75af4c4590c7",
+        "text": "435c85a3c56be285"
+      },
+      "en": {
+        "file": "04-takeover-open.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:04.086Z",
+        "text": "Unify the table styles Work Open in full Stage Work State paused Stop at the MR Class and profile no data Source no data Launch no data Progress by unit Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started no data Manual intervention Takeover is open: you are driving the task. Copy: copies/7f3a/unit-1 Open chat What was done (goes to the next step) The takeover chat closes first, then the core resumes the interrupted step. Hand back to the core Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "243498a1f882f018",
+          "text": "adde7cf39dfc57b7"
+        }
+      },
+      "dark": {
+        "file": "04-takeover-open.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:45.388Z",
+        "text": "Свести стили таблицы Работа Открыть полностью Стадия Работа Состояние на паузе Остановка до MR Класс и профиль нет данных Источник нет данных Запуск нет данных Ход по единицам Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Ручное вмешательство Перехват открыт: задачу ведёте вы. Копия: copies/7f3a/unit-1 Открыть чат Что сделано (уйдёт следующему шагу) Чат перехвата закроется первым, затем ядро продолжит с прерванного шага. Вернуть ядру Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+        "seal": {
+          "png": "9ccbf7e261d361de",
+          "text": "435c85a3c56be285"
+        }
+      },
+      "darkEn": {
+        "file": "04-takeover-open.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:02:26.686Z",
+        "text": "Unify the table styles Work Open in full Stage Work State paused Stop at the MR Class and profile no data Source no data Launch no data Progress by unit Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started no data Manual intervention Takeover is open: you are driving the task. Copy: copies/7f3a/unit-1 Open chat What was done (goes to the next step) The takeover chat closes first, then the core resumes the interrupted step. Hand back to the core Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "482c4d89b1e4b5d0",
+          "text": "adde7cf39dfc57b7"
+        }
+      }
+    },
+    {
+      "id": "05-window-card",
+      "side": "panel",
+      "file": "05-window-card.png",
+      "masked": 0,
+      "width": 912,
+      "height": 752,
+      "shotAt": "2026-11-08T17:00:23.074Z",
+      "text": "Перевести письма на шаблоны Ждёт вас ждёт вас Открыть полностью Стадия Ждёт вас Состояние ждёт окна лимита Остановка до MR Класс и профиль нет данных Источник нет данных Запуск нет данных Ход по единицам Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Почему стоит route claude-login refused by its window; waits for the reset Лимит маршрут отказал по лимиту Задача ждёт окно маршрута claude-login. Окно откроется: 8 нояб. 2026 г., 19:30. Задача продолжит сама, тем же маршрутом. Сама задача маршрут не сменит. Перевести её можно кликом: Перенести в codex Другая модель: claude-sonnet-4-5 Ручное вмешательство Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+      "seal": {
+        "png": "1a734c58cc9600f1",
+        "text": "9fe4ac189799ce2c"
+      },
+      "en": {
+        "file": "05-window-card.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:06.005Z",
+        "text": "Move emails to templates Waiting for you waiting for you Open in full Stage Waiting for you State waiting for the limit window Stop at the MR Class and profile no data Source no data Launch no data Progress by unit Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started no data Why it stands route claude-login refused by its window; waits for the reset Limit route refused on a limit The task waits for the window of route claude-login. The window opens at Nov 8, 2026, 07:30 PM. The task continues by itself on the same route. The task never changes its route by itself. You can move it with a click: Move to codex Other model: claude-sonnet-4-5 Manual intervention Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "0f672cf31e0ec9c2",
+          "text": "b4287ba91036b1a5"
+        }
+      },
+      "dark": {
+        "file": "05-window-card.dark.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:01:47.290Z",
+        "text": "Перевести письма на шаблоны Ждёт вас ждёт вас Открыть полностью Стадия Ждёт вас Состояние ждёт окна лимита Остановка до MR Класс и профиль нет данных Источник нет данных Запуск нет данных Ход по единицам Единица 1: implement — running Агенты сейчас 0 · всего 0 Расход 54.2k токенов · ходов: 9 Оценка до запуска нет данных MR нет данных Сценарий нет данных Создана 8 нояб. 2026 г., 14:00 Запущена нет данных Почему стоит route claude-login refused by its window; waits for the reset Лимит маршрут отказал по лимиту Задача ждёт окно маршрута claude-login. Окно откроется: 8 нояб. 2026 г., 19:30. Задача продолжит сама, тем же маршрутом. Сама задача маршрут не сменит. Перевести её можно кликом: Перенести в codex Другая модель: claude-sonnet-4-5 Ручное вмешательство Где остановиться До плана До MR До конца После MR точку остановки не сменить. Ходы карточки Ходов у карточки сейчас нет: стадию двигает ядро по журналу задачи.",
+        "seal": {
+          "png": "00d18cefa8b32979",
+          "text": "9fe4ac189799ce2c"
+        }
+      },
+      "darkEn": {
+        "file": "05-window-card.dark.en.png",
+        "masked": 0,
+        "width": 912,
+        "height": 752,
+        "shotAt": "2026-11-08T17:02:28.602Z",
+        "text": "Move emails to templates Waiting for you waiting for you Open in full Stage Waiting for you State waiting for the limit window Stop at the MR Class and profile no data Source no data Launch no data Progress by unit Unit 1: implement — running Agents now 0 · total 0 Spend 54.2k tokens · turns: 9 Estimate before launch no data MR no data Scenario no data Created Nov 8, 2026, 02:00 PM Started no data Why it stands route claude-login refused by its window; waits for the reset Limit route refused on a limit The task waits for the window of route claude-login. The window opens at Nov 8, 2026, 07:30 PM. The task continues by itself on the same route. The task never changes its route by itself. You can move it with a click: Move to codex Other model: claude-sonnet-4-5 Manual intervention Where to stop At the plan At the MR To the end The stop point cannot change after the MR. Card moves No moves for this card now: the core moves the stage by the task journal.",
+        "seal": {
+          "png": "918b7cde487f10c9",
+          "text": "b4287ba91036b1a5"
+        }
+      }
+    },
+    {
+      "id": "06-defaults",
+      "side": "panel",
+      "file": "06-defaults.png",
+      "masked": 0,
+      "width": 1628,
+      "height": 142,
+      "shotAt": "2026-11-08T17:00:25.918Z",
+      "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Умолчания Раздел «board» настройки ядра не принят — действуют умолчания: board.inWork: expected 1 | 2 | 4 | 6 Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b",
+      "seal": {
+        "png": "5659f50cb7825dc4",
+        "text": "36a641c314e4cf4f"
+      },
+      "en": {
+        "file": "06-defaults.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 142,
+        "shotAt": "2026-11-08T17:01:08.894Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Defaults The core config «board» section was rejected — defaults apply: board.inWork: expected 1 | 2 | 4 | 6 Waiting for you · 2 By group Group 00a11a Group 00b22b",
+        "seal": {
+          "png": "d32419d754752eef",
+          "text": "f7e0e03264c8e835"
+        }
+      },
+      "dark": {
+        "file": "06-defaults.dark.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 142,
+        "shotAt": "2026-11-08T17:01:50.111Z",
+        "text": "В работе: 2 из 2 Стартов сегодня: 4 из 10 Остановка по умолчанию: до MR Умолчания Раздел «board» настройки ядра не принят — действуют умолчания: board.inWork: expected 1 | 2 | 4 | 6 Ждёт вас · 2 По группам Группа 00a11a Группа 00b22b",
+        "seal": {
+          "png": "22e6895a7b6e3187",
+          "text": "36a641c314e4cf4f"
+        }
+      },
+      "darkEn": {
+        "file": "06-defaults.dark.en.png",
+        "masked": 0,
+        "width": 1628,
+        "height": 142,
+        "shotAt": "2026-11-08T17:02:31.375Z",
+        "text": "In work: 2 of 2 Started today: 4 of 10 Default stop: at the MR Defaults The core config «board» section was rejected — defaults apply: board.inWork: expected 1 | 2 | 4 | 6 Waiting for you · 2 By group Group 00a11a Group 00b22b",
+        "seal": {
+          "png": "cf741b582d48e143",
+          "text": "f7e0e03264c8e835"
+        }
+      }
+    }
+  ]
+}

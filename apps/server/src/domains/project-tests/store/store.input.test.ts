@@ -80,6 +80,35 @@ describe('upsertCase: строгий вход панели', () => {
     expect(readGroups(root)[0]?.cases[0]?.duration).toBeUndefined();
   });
 
+  // layout-024: свой предел прогона кейса — для долгого живого обхода.
+  it('свой предел прогона: (0; 60] минут, негодный — отказ; правка без него его не стирает', () => {
+    const auto = (timeoutMinutes?: number) =>
+      ({ status: 'automated', file: 'tools/qa/slow.mjs', timeoutMinutes }) as const;
+    const before = file();
+    for (const bad of [-1, 61, Number.NaN]) {
+      expect(() => save({ automation: auto(bad) })).toThrow(/Предел прогона/);
+    }
+    expect(file()).toBe(before);
+
+    save({ automation: auto(25) });
+    expect(readGroups(root)[0]?.cases[0]?.automation?.timeoutMinutes).toBe(25);
+    // Форма панели шлёт привязку без предела — он остаётся.
+    save({ title: 'Вход по паролю', automation: auto() });
+    expect(readGroups(root)[0]?.cases[0]?.automation?.timeoutMinutes).toBe(25);
+    save({ automation: auto(0) });
+    expect(readGroups(root)[0]?.cases[0]?.automation?.timeoutMinutes).toBeUndefined();
+
+    // Файл агента с негодным пределом читается, предел просто не действует.
+    const path = join(root, '.agent', 'tests', 'gui.tests.json');
+    const stored = JSON.parse(file()) as { cases: Array<Record<string, unknown>> };
+    stored.cases[0]!.automation = { ...auto(), timeoutMinutes: 500 };
+    writeFileSync(path, JSON.stringify(stored, null, 2));
+    expect(readGroups(root)[0]?.cases[0]?.automation).toEqual({
+      status: 'automated',
+      file: 'tools/qa/slow.mjs',
+    });
+  });
+
   // Ревью 26.09: файл агента или CSV несут «REQ-12» и длительность 2000 —
   // чтение их принимает, форма шлёт ссылки обратно при ЛЮБОЙ правке, и правка
   // заголовка отказывала за ссылку, которую человек не трогал.

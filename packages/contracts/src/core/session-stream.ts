@@ -25,8 +25,9 @@ export const SESSION_STREAM_KINDS = [
 export type SessionStreamKind = (typeof SESSION_STREAM_KINDS)[number];
 
 /**
- * Статус окна в словаре Claude Code (`rate_limit_info.status`): на эти строки смотрят повтор после
- * лимита (`run-retry`), исход цепочки и лента панели — другое имя они бы не узнали.
+ * Статус окна в словаре Claude Code (`rate_limit_info.status`): на эти строки смотрят исход
+ * цепочки, карточка лимита чата и лента панели — другое имя они бы не узнали. Повтор после лимита
+ * ведёт ядро (этап 12, P171), не панель.
  */
 export const SESSION_WINDOW_STATUSES = ['allowed', 'allowed_warning', 'rejected'] as const;
 

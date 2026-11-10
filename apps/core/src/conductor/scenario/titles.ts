@@ -33,6 +33,7 @@ export const PRESET_TITLES: Record<PresetId, TitlePair> = {
   ask: { ru: 'Вопрос модели', en: 'Model question' },
   'review-link': { ru: 'Ревью MR по ссылке', en: 'MR review by link' },
   lead: { ru: 'Ведущий', en: 'Lead' },
+  'browser-walk': { ru: 'Проход по стенду', en: 'Stand walk' },
 };
 
 /**
@@ -45,6 +46,8 @@ export const STEP_TITLES: Record<string, TitlePair> = {
   plan: { ru: 'План', en: 'Plan' },
   work: { ru: 'Работа', en: 'Work' },
   review: { ru: 'Ревью', en: 'Review' },
+  'review-cross': { ru: 'Второе ревью', en: 'Cross review' },
+  walk: { ru: 'Проход по стенду', en: 'Stand walk' },
   fix: { ru: 'Правки по ревью', en: 'Review fixes' },
   'final-gate': { ru: 'Финальная проверка', en: 'Final check' },
   'integration-gate': { ru: 'Проверка интеграции', en: 'Integration check' },

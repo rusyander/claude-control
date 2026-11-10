@@ -79,13 +79,54 @@ export function createControl(state, repo) {
     return out;
   }
 
+  const idsOf = (names) => (names ?? []).map((name) => state.user(name).id);
+  const issueOf = (project, iid) => {
+    const issue = state.issues.find((i) => i.projectId === project.id && i.iid === Number(iid));
+    if (!issue) throw new TypeError(`stub-forge: no issue #${iid}`);
+    return issue;
+  };
+
+  /** Действия входящих ядра: задачи форжа, их связи, ревьюеры и закрытие MR. */
+  function actInbox(author, project, action) {
+    switch (action.type) {
+      case 'issue-open':
+        return state.createIssue(project.id, author, {
+          ...action,
+          assigneeIds: idsOf(action.assignees),
+        });
+      case 'issue-update':
+        return state.updateIssue(issueOf(project, action.iid), action);
+      case 'issue-link':
+        return state.linkIssues(
+          issueOf(project, action.iid),
+          issueOf(projectOf(action.targetProject ?? action.project), action.targetIid),
+        );
+      case 'mr-reviewers': {
+        const mr = mrOf(project, action.mrIid);
+        mr.reviewerIds = idsOf(action.reviewers);
+        return mr;
+      }
+      case 'mr-close': {
+        const mr = mrOf(project, action.mrIid);
+        mr.state = 'closed';
+        mr.updatedAt = state.now();
+        return mr;
+      }
+      default:
+        return undefined;
+    }
+  }
+
   function act(as, action) {
     const author = state.user(as).id;
     const project = projectOf(action.project);
+    const inbox = actInbox(author, project, action);
+    if (inbox !== undefined) return inbox;
     switch (action.type) {
       case 'mr-open':
         return state.createMr(project.id, author, {
           ...action,
+          reviewerIds: idsOf(action.reviewers),
           headSha: action.headSha ?? headOf(action.sourceBranch),
         });
       case 'mr-update':
@@ -140,6 +181,8 @@ export function createControl(state, repo) {
         discussions: state.discussions,
         pipelines: state.pipelines,
         events: state.events,
+        issues: state.issues,
+        issueLinks: state.issueLinks,
       }),
     );
   }

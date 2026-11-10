@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@shared/ui/modal';
 import { ConfirmDialog } from '@shared/ui/confirm-dialog';
@@ -24,6 +24,10 @@ import type { CodeTab } from '../../lib/previewMode.types';
 import { defaultTab } from '../../lib/defaultTab';
 import { bodyKind } from '../../lib/bodyKind';
 import { placeholderKey } from '../../lib/placeholderKey';
+import { useDiffNotes } from '../../model/useDiffNotes';
+import { DiffNotesTray } from '../DiffNotes/DiffNotesTray/DiffNotesTray';
+import type { EditorNotes } from '../DiffNotes/notesGutter.types';
+import type { NoteAnchor } from '../../lib/diffNotes.types';
 
 /**
  * Окно кода проекта: слева файлы, справа один открытый файл с подсветкой,
@@ -38,11 +42,39 @@ export function ProjectCodeModal({
   onOpenChange,
   projectPath,
   chatId,
+  notesSend,
 }: ProjectCodeModalProps) {
   const { t } = useTranslation();
   const code = useProjectCode(projectPath, chatId, isOpen);
   const tree = useTreeWidth(isOpen);
   const file = code.shown;
+
+  // Заметки к строкам правок (N1): поле «+» у строк, лоток под редактором.
+  const notes = useDiffNotes(chatId, notesSend);
+  const cursor = useRef<EditorNotes['cursor']['current']>(null);
+  const pick = useRef(notes.pick);
+  pick.current = notes.pick;
+  const notedLines = useMemo(
+    () => (file ? notes.linesOf(file.path) : new Set<number>()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notes.notes, file?.path],
+  );
+  const editorNotes = useMemo<EditorNotes | undefined>(
+    () =>
+      notes.isEnabled
+        ? {
+            lines: notedLines,
+            label: t('diffNotes.gutterLabel'),
+            onPick: (anchor: NoteAnchor) => pick.current(anchor),
+            cursor,
+          }
+        : undefined,
+    [notes.isEnabled, notedLines, t],
+  );
+  const noteAtCursor = (): void => {
+    const at = cursor.current?.();
+    if (at && file) notes.pick({ ...at, path: file.path });
+  };
 
   // Вкладка выбирается человеком, но существует не у всякого файла: у картинки
   // нет исходника, у кода — показа. Поэтому выбор держится отдельно, а что
@@ -182,6 +214,19 @@ export function ProjectCodeModal({
                 нечего — тумблер и «Сохранить» там не выключены, а отсутствуют:
                 выключенная кнопка обещает работу, которой у файла нет.
               */}
+              {editorNotes && isEditorShown && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  leftIcon={<Icon name="plus" size={16} />}
+                  title={t('diffNotes.addAtCursorHint')}
+                  data-testid="diff-note-add"
+                  onClick={noteAtCursor}
+                >
+                  {t('diffNotes.addAtCursor')}
+                </Button>
+              )}
+
               {canEditText(file) && (
                 <>
                   <Stack as="label" direction="row" align="center" gap="var(--spacing-2xs)">
@@ -222,6 +267,7 @@ export function ProjectCodeModal({
                 showDiff={code.showDiff}
                 onChange={code.changeDraft}
                 onSave={code.saveDraft}
+                notes={editorNotes}
               />
             )}
 
@@ -243,6 +289,8 @@ export function ProjectCodeModal({
               </div>
             )}
           </div>
+
+          {notes.isEnabled && <DiffNotesTray state={notes} />}
 
           <ProjectCodeStatus file={code.isSwitching ? undefined : file} />
         </section>

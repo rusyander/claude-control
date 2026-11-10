@@ -23,7 +23,8 @@ import {
  * набора (`agent-prompt-guard`): «кандидатов по matcher нет».
  *
  * Ключи: файлы настроек — `<событие>.<группа>.<хук>` (тот же ключ у записи `observe`), плагин —
- * `<имя плагина>:<событие>.<группа>.<хук>`, хуки локального слоя — `local-layer:…`.
+ * `<имя плагина>:<событие>.<группа>.<хук>`, хуки локального слоя — `local-layer:…`, хуки профиля
+ * чата панели (`carry.hooks`, s12) — `panel:…`.
  */
 
 /** Откуда хук: файлы настроек человека, плагин, перенос сеанса (`--settings` ядра). */
@@ -49,6 +50,8 @@ const REGISTRY_VERSION = 2;
 const LOCAL_SETTINGS = 'settings.local.json';
 const LOCAL_LAYER_KEY = 'local-layer';
 const LOCAL_LAYER_SOURCE = 'session carry: localLayer.hooks';
+const PANEL_HOOKS_KEY = 'panel';
+const PANEL_HOOKS_SOURCE = 'session carry: hooks';
 const ALL_SOURCES: readonly SettingSource[] = ['user', 'project', 'local'];
 const BOM = new RegExp(`^${String.fromCharCode(0xfeff)}`);
 
@@ -224,6 +227,12 @@ export function claudeSessionHooks(
   const local = session.carry?.localLayer;
   if (local?.hooks) {
     for (const hook of keyed(local.hooks as HookTable, LOCAL_LAYER_SOURCE, LOCAL_LAYER_KEY))
+      out.hooks.push({ ...hook, origin: 'carry' });
+  }
+  // Хуки профиля чата панели (s12) — тем же `--settings` ядра, в любом режиме, где сеанс их несёт.
+  const panel = session.carry?.hooks;
+  if (panel) {
+    for (const hook of keyed(panel as HookTable, PANEL_HOOKS_SOURCE, PANEL_HOOKS_KEY))
       out.hooks.push({ ...hook, origin: 'carry' });
   }
   const seen = new Set<string>();

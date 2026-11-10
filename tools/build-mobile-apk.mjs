@@ -49,6 +49,14 @@
  * Запуск: `pnpm mobile:apk`. Нужны JDK 17 и Android SDK — те же, что для
  * `pnpm mobile`.
  *
+ * ## Push: файл Firebase попадает в нативный проект сам
+ *
+ * `AGENTDECK_GOOGLE_SERVICES` (путь к `google-services.json`) читает `app.config.js`, но в Gradle
+ * файл приезжает только через `expo prebuild`. Сборка сама запускает
+ * `npx expo prebuild --platform android`, когда переменная задана, а в `android/app` файла нет
+ * или он другой (`ensureGoogleServices`); тот же файл — prebuild не нужен. Идентификатор EAS
+ * (`AGENTDECK_EAS_PROJECT_ID`) prebuild не нужен: он едет в манифест приложения при сборке.
+ *
  * После успешной сборки промежуточные файлы удаляются сами
  * (`clean-mobile-build.mjs`), на Windows — вместе с короткой копией: иначе они
  * копятся десятками гигабайт внутри `node_modules`. Нужна быстрая пересборка
@@ -64,8 +72,8 @@ import {
   rmSync,
   statSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   buildDirsOf,
   formatGb,
@@ -83,6 +91,78 @@ const isWindows = process.platform === 'win32';
 /** Промежуточные файлы обычно не нужны; `--keep-build` бережёт время пересборки. */
 const KEEP_BUILD = process.argv.includes('--keep-build');
 
+/** Путь к `google-services.json` проекта Firebase — его же читает `app.config.js`. */
+export const GOOGLE_SERVICES_ENV = 'AGENTDECK_GOOGLE_SERVICES';
+
+/**
+ * Нужен ли `expo prebuild` ради файла Firebase. Путь из переменной — от `apps/mobile`, как его
+ * понимает Expo (`android.googleServicesFile`). `absent` / `differs` — запускать; `same` и
+ * `no-google-services` — нет; `source-missing` — переменная указывает в пустоту, сборка без
+ * FCM молча дала бы APK без push, поэтому это отказ.
+ *
+ * @param {NodeJS.ProcessEnv} env
+ * @param {string} mobileDir
+ * @returns {{ run: boolean, reason: 'no-google-services' | 'source-missing' | 'absent' | 'differs' | 'same', source?: string }}
+ */
+export function prebuildNeed(env, mobileDir) {
+  const raw = (env[GOOGLE_SERVICES_ENV] ?? '').trim();
+  if (!raw) return { run: false, reason: 'no-google-services' };
+  const source = resolve(mobileDir, raw);
+  if (!existsSync(source)) return { run: false, reason: 'source-missing', source };
+  const placed = join(mobileDir, 'android', 'app', 'google-services.json');
+  if (!existsSync(placed)) return { run: true, reason: 'absent', source };
+  if (readFileSync(placed).equals(readFileSync(source))) {
+    return { run: false, reason: 'same', source };
+  }
+  return { run: true, reason: 'differs', source };
+}
+
+/**
+ * Довести файл Firebase до нативного проекта: при надобности — `npx expo prebuild --platform
+ * android` в `apps/mobile`, затем проверка, что файл в `android/app` тот самый. `false` — сборку
+ * не начинать (файла нет, prebuild упал или не положил файл). Запуск процесса подаётся снаружи —
+ * тест судит решение без настоящего Expo.
+ *
+ * @param {{ env?: NodeJS.ProcessEnv, mobileDir: string, spawn?: typeof spawnSync, log?: (line: string) => void, platform?: NodeJS.Platform }} options
+ * @returns {boolean}
+ */
+export function ensureGoogleServices({
+  env = process.env,
+  mobileDir,
+  spawn = spawnSync,
+  log = console.log,
+  platform = process.platform,
+}) {
+  const need = prebuildNeed(env, mobileDir);
+  if (need.reason === 'source-missing') {
+    log(
+      `${GOOGLE_SERVICES_ENV} указывает на ${need.source}, а файла там нет — push в сборке не заработает.`,
+    );
+    return false;
+  }
+  if (!need.run) return true;
+  log(
+    need.reason === 'absent'
+      ? 'Файла Firebase в android/app нет — expo prebuild --platform android…'
+      : 'Файл Firebase в android/app другой — expo prebuild --platform android…',
+  );
+  const result = spawn('npx', ['expo', 'prebuild', '--platform', 'android'], {
+    cwd: mobileDir,
+    stdio: 'inherit',
+    shell: platform === 'win32',
+    env: { ...env },
+  });
+  if (result.status !== 0) {
+    log('expo prebuild не отработал.');
+    return false;
+  }
+  if (prebuildNeed(env, mobileDir).run) {
+    log('expo prebuild отработал, но файл Firebase в android/app так и не тот.');
+    return false;
+  }
+  return true;
+}
+
 /**
  * Адрес панели, который попадёт в сборку как значение по умолчанию: экран
  * сопряжения покажет его заполненным, и APK можно отдать другому человеку, не
@@ -95,11 +175,6 @@ const urlFile = join(appsDir, 'mobile', '.panel-url');
 const defaultUrl = (
   process.env.MOBILE_DEFAULT_URL ?? (existsSync(urlFile) ? readFileSync(urlFile, 'utf8') : '')
 ).trim();
-
-if (!existsSync(join(androidDir, isWindows ? 'gradlew.bat' : 'gradlew'))) {
-  console.error('Нет каталога android/ — сначала выполните expo prebuild в apps/mobile.');
-  process.exit(1);
-}
 
 /** Запустить gradle в каталоге `cwd`; на Windows gradlew — это .bat. */
 function gradle(cwd, tasks) {
@@ -154,103 +229,116 @@ function mirrorMobile(from, to) {
   return result.status !== null && result.status < 8;
 }
 
-// Старый файл убирается ДО сборки: сорвись она — в корне не останется вчерашней
-// сборки, которую легко принять за сегодняшнюю.
-if (existsSync(target)) {
-  rmSync(target);
-  console.log(`Убран прежний ${outputName}`);
-}
+function main() {
+  // Файл Firebase — до всего остального: prebuild может и создать android/ с нуля.
+  if (!ensureGoogleServices({ mobileDir: join(appsDir, 'mobile') })) process.exit(1);
 
-console.log(
-  defaultUrl
-    ? `Адрес панели в сборке: ${defaultUrl} (токен НЕ вшивается)`
-    : 'Адрес панели в сборке не задан — поле останется пустым (MOBILE_DEFAULT_URL или apps/mobile/.panel-url)',
-);
-console.log('Собираю релизный APK — первый раз это минут десять…');
-let built;
-/** Где Gradle собирал: на Windows — короткая копия, иначе сам проект. */
-let buildAndroid = androidDir;
-
-if (isWindows) {
-  // Короткая копия, codegen с её настоящего пути, затем подстановка диска (шапка файла).
-  const copy = shortCopyDir();
-  buildAndroid = join(copy, 'mobile', 'android');
-  console.log(`Копирую apps/mobile в ${copy} — короткий путь для нативной сборки…`);
-  try {
-    mkdirSync(copy, { recursive: true });
-  } catch (error) {
-    console.error(
-      `Не удалось создать ${copy} (${error.code}) — задайте AGENTDECK_APK_DIR: короткий путь, куда можно писать.`,
-    );
-    process.exit(1);
-  }
-  if (!mirrorMobile(join(appsDir, 'mobile'), join(copy, 'mobile'))) {
-    console.error('\nКопия apps/mobile не сделалась (robocopy).');
+  if (!existsSync(join(androidDir, isWindows ? 'gradlew.bat' : 'gradlew'))) {
+    console.error('Нет каталога android/ — сначала выполните expo prebuild в apps/mobile.');
     process.exit(1);
   }
 
-  console.log('Сначала codegen с настоящего пути…');
-  if (
-    !gradle(buildAndroid, [
-      'generateCodegenSchemaFromJavaScript',
-      'generateCodegenArtifactsFromSchema',
-    ])
-  ) {
-    console.error('\nCodegen не отработал.');
+  // Старый файл убирается ДО сборки: сорвись она — в корне не останется вчерашней
+  // сборки, которую легко принять за сегодняшнюю.
+  if (existsSync(target)) {
+    rmSync(target);
+    console.log(`Убран прежний ${outputName}`);
+  }
+
+  console.log(
+    defaultUrl
+      ? `Адрес панели в сборке: ${defaultUrl} (токен НЕ вшивается)`
+      : 'Адрес панели в сборке не задан — поле останется пустым (MOBILE_DEFAULT_URL или apps/mobile/.panel-url)',
+  );
+  console.log('Собираю релизный APK — первый раз это минут десять…');
+  let built;
+  /** Где Gradle собирал: на Windows — короткая копия, иначе сам проект. */
+  let buildAndroid = androidDir;
+
+  if (isWindows) {
+    // Короткая копия, codegen с её настоящего пути, затем подстановка диска (шапка файла).
+    const copy = shortCopyDir();
+    buildAndroid = join(copy, 'mobile', 'android');
+    console.log(`Копирую apps/mobile в ${copy} — короткий путь для нативной сборки…`);
+    try {
+      mkdirSync(copy, { recursive: true });
+    } catch (error) {
+      console.error(
+        `Не удалось создать ${copy} (${error.code}) — задайте AGENTDECK_APK_DIR: короткий путь, куда можно писать.`,
+      );
+      process.exit(1);
+    }
+    if (!mirrorMobile(join(appsDir, 'mobile'), join(copy, 'mobile'))) {
+      console.error('\nКопия apps/mobile не сделалась (robocopy).');
+      process.exit(1);
+    }
+
+    console.log('Сначала codegen с настоящего пути…');
+    if (
+      !gradle(buildAndroid, [
+        'generateCodegenSchemaFromJavaScript',
+        'generateCodegenArtifactsFromSchema',
+      ])
+    ) {
+      console.error('\nCodegen не отработал.');
+      process.exit(1);
+    }
+
+    releaseStaleDrives(copy);
+    const letter = freeDriveLetter();
+    if (!letter) {
+      console.error('Нет свободной буквы диска для короткого пути — освободите Y:, X: или W:.');
+      process.exit(1);
+    }
+    subst([`${letter}:`, copy]);
+    try {
+      built = assemble(`${letter}:\\mobile\\android`);
+    } finally {
+      subst([`${letter}:`, '/D']);
+    }
+  } else {
+    built = assemble(androidDir);
+  }
+
+  if (!built) {
+    console.error('\nGradle не собрал APK.');
     process.exit(1);
   }
 
-  releaseStaleDrives(copy);
-  const letter = freeDriveLetter();
-  if (!letter) {
-    console.error('Нет свободной буквы диска для короткого пути — освободите Y:, X: или W:.');
+  // Выходных файлов может быть несколько (разные ABI) — берём самый свежий.
+  const outDir = join(buildAndroid, 'app', 'build', 'outputs', 'apk', 'release');
+  const apk = readdirSync(outDir)
+    .filter((name) => name.endsWith('.apk'))
+    .map((name) => ({ name, time: statSync(join(outDir, name)).mtimeMs }))
+    .sort((left, right) => right.time - left.time)[0];
+
+  if (!apk) {
+    console.error(`Gradle отработал, но APK в ${outDir} не нашёлся.`);
     process.exit(1);
   }
-  subst([`${letter}:`, copy]);
-  try {
-    built = assemble(`${letter}:\\mobile\\android`);
-  } finally {
-    subst([`${letter}:`, '/D']);
+
+  copyFileSync(join(outDir, apk.name), target);
+  const size = (statSync(target).size / 1024 / 1024).toFixed(1);
+  console.log(`\nГотово: ${outputName} (${size} МБ) в корне репозитория.`);
+  console.log('Установка: adb install -r agentdeck.apk — или скиньте файл на телефон.');
+
+  // Уборка за собой. Промежуточные файлы нативной сборки — десяток гигабайт,
+  // которые не нужны ни APK, ни репозиторию (см. clean-mobile-build.mjs). APK уже
+  // скопирован, так что терять нечего; демона Gradle сначала гасим, иначе он
+  // держит часть файлов открытыми и удаление будет неполным.
+  if (KEEP_BUILD) {
+    console.log('\nПромежуточные файлы сборки оставлены (--keep-build).');
+  } else {
+    console.log('\nУбираю промежуточные файлы сборки…');
+    gradle(androidDir, ['--stop']);
+    const { count, bytes, locked } = sweepMobileBuild();
+    console.log(`Освобождено ${formatGb(bytes)} в ${count} каталогах.`);
+    // APK уже лежит в корне: недоубранный каталог — повод сказать, а не провалить сборку.
+    const note = lockedNote(locked);
+    if (note) console.log(note);
+    console.log('Следующая сборка будет полной — это плата за то, что диск не пухнет.');
   }
-} else {
-  built = assemble(androidDir);
 }
 
-if (!built) {
-  console.error('\nGradle не собрал APK.');
-  process.exit(1);
-}
-
-// Выходных файлов может быть несколько (разные ABI) — берём самый свежий.
-const outDir = join(buildAndroid, 'app', 'build', 'outputs', 'apk', 'release');
-const apk = readdirSync(outDir)
-  .filter((name) => name.endsWith('.apk'))
-  .map((name) => ({ name, time: statSync(join(outDir, name)).mtimeMs }))
-  .sort((left, right) => right.time - left.time)[0];
-
-if (!apk) {
-  console.error(`Gradle отработал, но APK в ${outDir} не нашёлся.`);
-  process.exit(1);
-}
-
-copyFileSync(join(outDir, apk.name), target);
-const size = (statSync(target).size / 1024 / 1024).toFixed(1);
-console.log(`\nГотово: ${outputName} (${size} МБ) в корне репозитория.`);
-console.log('Установка: adb install -r agentdeck.apk — или скиньте файл на телефон.');
-
-// Уборка за собой. Промежуточные файлы нативной сборки — десяток гигабайт,
-// которые не нужны ни APK, ни репозиторию (см. clean-mobile-build.mjs). APK уже
-// скопирован, так что терять нечего; демона Gradle сначала гасим, иначе он
-// держит часть файлов открытыми и удаление будет неполным.
-if (KEEP_BUILD) {
-  console.log('\nПромежуточные файлы сборки оставлены (--keep-build).');
-} else {
-  console.log('\nУбираю промежуточные файлы сборки…');
-  gradle(androidDir, ['--stop']);
-  const { count, bytes, locked } = sweepMobileBuild();
-  console.log(`Освобождено ${formatGb(bytes)} в ${count} каталогах.`);
-  // APK уже лежит в корне: недоубранный каталог — повод сказать, а не провалить сборку.
-  const note = lockedNote(locked);
-  if (note) console.log(note);
-  console.log('Следующая сборка будет полной — это плата за то, что диск не пухнет.');
-}
+// Запуск командой — сборка; импорт (тест решения о prebuild) — только функции.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();

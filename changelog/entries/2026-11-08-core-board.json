@@ -1,0 +1,497 @@
+{
+  "title": {
+    "ru": "Доска задач ядра: очередь с пределами, входящие из трекера, Telegram для задач ядра, ручное вмешательство, ожидание окна лимита без смены маршрута, группы полосами, заметки к строкам правок, связанные карточки, записанные сценарии стенда и окно сайта в чате",
+    "en": "Core task board: a queue with limits, an inbox from the tracker, Telegram for core tasks, manual intervention, waiting for a limit window without a route change, groups as lanes, notes on changed lines, related cards, recorded stand scenarios and a site window in chat"
+  },
+  "summary": {
+    "ru": "Раздел «Задачи ядра» открывается доской: задачи идут колонками от «Входящих» до MR, голову очереди ядро запускает само в пределах доски, а карточку можно взять вручную и вернуть ядру. Во «Входящие» записи приходят из Jira и GitLab, из Telegram и из красного прогона «Тестов»; вопросы ядра приходят в Telegram кнопками. Упёршаяся в лимит подписки задача или разговор ждут сброса тем же маршрутом и переводятся только кликом. Группы стали полосами той же доски, к правкам в окне кода пишутся заметки у строк. Связанные тикеты «Входящих» объединяются в одну задачу по клику, ядро проходит стенд проекта в браузере и записывает проход сценарием, который дальше гоняется без модели, а сайт проекта открывается рядом с чатом с выбором элемента мышью.",
+    "en": "The «Core tasks» section opens on a board: tasks move in columns from «Inbox» to the MR, the core starts the queue head by itself within the board limits, and a card can be taken over and handed back to the core. Entries reach «Inbox» from Jira and GitLab, from Telegram and from a red «Tests» run; core questions arrive in Telegram with buttons. A task or conversation that hits the subscription limit waits for the reset on the same route and moves only by a click. Groups became lanes of the same board, and changes in the code window take notes at their lines. Related «Inbox» tickets merge into one task by a click, the core walks the project stand in a browser and records the walk as a scenario that then runs without a model, and the project site opens beside the chat with element picking by mouse."
+  },
+  "items": [
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Доска задач ядра — вид раздела «Задачи ядра» по умолчанию («Список» остался переключателем): колонки «Входящие», «Очередь», «Разбор», «Работа», «Ревью», «Проверка», «Готово к MR», «MR открыт», «Влит / закрыт» и «Ждёт вас». Голову очереди ядро запускает само, пока задач в работе меньше предела (1, 2, 4 или 6), доска не на паузе и не исчерпан суточный предел стартов; пределы и остановка по умолчанию задаются разделом board настройки ядра, непринятый раздел показан плашкой «Умолчания» с причиной. Неудавшийся старт возвращает запись во «Входящие» с причиной, не тратя места.",
+        "en": "The core task board is the default view of the «Core tasks» section («List» stays as a switch): columns «Inbox», «Queue», «Triage», «Work», «Review», «Check», «Ready for MR», «MR open», «Merged / closed» and «Waiting for you». The core starts the queue head by itself while fewer tasks are in work than the limit (1, 2, 4 or 6), the board is not paused and the daily start limit is not used up; the limits and the default stop come from the board section of the core config, and a rejected section shows a «Defaults» strip with the reason. A failed start returns the entry to «Inbox» with the reason, spending no slot."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      },
+      "images": ["board.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Окно карточки: стадия, состояние, источник, ход по единицам, агенты, расход, MR и «Почему стоит». До запуска у записи есть ходы «В очередь», «Отклонить», «Выше» и «Вернуть»; у идущей задачи — «Где остановиться» (до плана, до MR, до конца; после MR не меняется). На экране запуска появилась кнопка «В очередь»: задача ложится на доску и стартует, когда освободится место.",
+        "en": "The card window: stage, state, source, progress by unit, agents, spend, MR and «Why it stands». Before launch an entry has the moves «To queue», «Reject», «Up» and «Restore»; a running task has «Where to stop» (at the plan, at the MR, to the end; fixed after the MR). The launch screen gained a «To queue» button: the task goes onto the board and starts when a slot frees up."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Ручное вмешательство: «Взять вручную» ставит задачу на ближайшей безопасной точке и освобождает место, работа идёт в копии задачи — руками или в чате, которому дана правка только этой копии; «Вернуть ядру» передаёт заметку «Что сделано» следующему шагу и продолжает с прерванного шага. «На доработку» отправляет текст текущему шагу, а после открытого MR — открывает задачу ответов по нему.",
+        "en": "Manual intervention: «Take over» pauses the task at the nearest safe point and frees the slot, and the work happens in the task copy — by hand or in a chat allowed to edit only that copy; «Hand back to the core» passes the «What was done» note to the next step and resumes the interrupted step. «Send for rework» sends text to the current step, and once the MR is open, starts a review-answer task on it."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      },
+      "images": ["takeover.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Входящие из трекера: ядро само опрашивает Jira и GitLab и кладёт новые тикеты во «Входящие» доски, по записи на тикет. Строка над доской показывает источники и сбои опроса; окно «Источники» задаёт метки, «Только назначенные на меня», свой JQL, репозитории и «Сам в очередь», «Найти в трекере» ищет запросом мимо модели и кладёт отмеченное одной кнопкой. У записи из тикета выбирается сценарий запуска, а комментарий со ссылкой на MR назад в тикет уходит только после разрешения в панели или с телефона. Влитый или закрытый MR переезжает в «Влит / закрыт» сам, примерно за 30 секунд.",
+        "en": "Inbox from the tracker: the core polls Jira and GitLab by itself and puts new tickets into the board «Inbox», one entry per ticket. A row above the board shows the sources and polling failures; the «Sources» window sets labels, «Only assigned to me», a custom JQL, repositories and «Queue by itself», and «Find in the tracker» searches with a query that never passes through a model and adds the picked tickets with one button. An entry from a ticket gets a launch scenario, and a comment with the MR link goes back into the ticket only after it is allowed in the panel or from the phone. A merged or closed MR moves to «Merged / closed» by itself in about 30 seconds."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      },
+      "images": ["inbox-search.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Telegram и ядро задач: переключатель «Отвечать ядру из Telegram» на карточке Telegram. Включённый — вопросы ядра приходят кнопками, только с теми вариантами, которые ядро примет из Telegram; остальные остаются панели и телефону. Уведомления о готовой задаче, открытом MR, падении и ожидании окна несут кнопки «На доработку», «Стоп» и перевод на другой CLI или модель. «/task текст» записывает задачу во «Входящие», с заданными репозиториями её можно запустить кнопкой «В работу». Тихие часы копят уведомления и присылают одну сводку в конце окна.",
+        "en": "Telegram and the task core: the «Answer the core from Telegram» switch on the Telegram card. Switched on, core questions arrive with buttons, only with the options the core accepts from Telegram; the rest stay with the panel and the phone. Notices about a finished task, an opened MR, a failure and a window wait carry the bot's «На доработку» and «Стоп» buttons and a move to another CLI or model. «/task text» puts a task into «Inbox», and with repositories set it starts from the bot's «В работу» button. Quiet hours collect notices and send one digest when the window ends."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      },
+      "images": ["telegram-core.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Проваленный кейс в развёрнутом прогоне «Тестов» отправляется на доску ядра кнопкой «На доску»: запись ложится во «Входящие» с источником «тесты», шагом и причиной провала.",
+        "en": "A failed case in an expanded «Tests» run goes to the core board with the «To the board» button: the entry lands in «Inbox» with the «tests» source, the step and the failure reason."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      },
+      "images": ["tests-to-board.png"]
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отказ ядра сменить сценарий записи показывается на языке панели, исходный текст ядра — во всплывающей подсказке; раньше под выбором стояла английская строка ядра.",
+        "en": "The core's refusal to change an entry's scenario now reads in the panel language, with the core's original text in a tooltip; before, the core's English line stood under the picker."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "«Сохранить репозитории» в карточке Telegram больше не затирает правку настройки ядра, сделанную в другой вкладке: ядро отклоняет устаревшую запись, под кнопкой — причина и «Перечитать настройку». Раньше сохранение молча стирало чужой репозиторий.",
+        "en": "«Save repositories» on the Telegram card no longer overwrites a core settings edit made in another tab: the core refuses the stale write, and the reason with «Reload the config» appears under the button. Before, the save silently erased the other repository."
+      },
+      "area": {
+        "ru": "Интеграции",
+        "en": "Integrations"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Окно лимита подписки больше не меняет маршрут само. Задача ждёт сброса тем же маршрутом в колонке «Ждёт вас» с блоком «Лимит»: когда окно откроется и кнопки перевода на другой CLI или модель из набора задачи. В чате под отклонённым ходом стоит карточка «Лимит подписки»: после сброса последнее сообщение уходит ещё раз, один раз и само, а «Перенести в …» переключает CLI и переносит разговор — повторная отправка прежнему CLI тогда отменяется. В шапке чата появилась кнопка «Доска» с числом карточек, ждущих человека.",
+        "en": "A subscription limit window no longer changes the route by itself. A task waits for the reset on the same route in «Waiting for you» with a «Limit» block: when the window opens and buttons to move to another CLI or model from the task's set. In chat a «Subscription limit» card sits under the refused turn: after the reset the last message goes out again, once and by itself, and «Move to …» switches the CLI and carries the conversation — the resend to the former CLI is then cancelled. The chat header gained a «Board» button with the number of cards waiting for a human."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["chat-limit-card.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Новые вопросы ядра: CLI маршрута потерял вход посреди шага — «Я вошёл заново — продолжить» или «Остановить шаг»; маршрут исчерпал оплаченный бюджет — пополнить счёт, перевести начатую задачу кликом или остановить шаг. Потерю входа пока распознаёт адаптер Claude.",
+        "en": "New core questions: the route's CLI lost its login mid-step — «I logged in again — continue» or «Stop the step»; the route used up its paid budget — top up, move a started task with a click, or stop the step. Only the Claude adapter recognises a lost login so far."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Группы задач ядра стали полосами доски: адрес /groups и пункт «Группы» открывают доску с фильтром «По группам», число у пункта меню и на плитке «Обзора» считает открытые полосы. Группа из нескольких пунктов ложится в очередь одной записью. Прежние запуски групп видны под «Закрытыми» только для чтения, а «Путь» прежней группы переводится в сценарий ядра кнопкой «Импорт пунктов».",
+        "en": "Core task groups became board lanes: the /groups address and the «Groups» entry open the board with the «By group» filter, and the number at the menu entry and on the «Overview» tile counts the open lanes. A group of several items enters the queue as one entry. Former group runs show under «Closed», read only, and a former group's Path turns into a core scenario with the «Import items» button."
+      },
+      "area": {
+        "ru": "Группы",
+        "en": "Groups"
+      },
+      "images": ["group-lanes.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Заметки к строкам правок в окне «Код проекта»: «+» у номера строки или кнопка «Заметка» открывают поле, заметки копятся в лотке под редактором и уходят одним сообщением с «путь:строка» — «Сейчас» словом посреди хода или «В очередь» со следующим ходом. Лоток свой у каждого разговора и очищается только после принятия сообщения.",
+        "en": "Notes on changed lines in the «Project code» window: «+» by the line number or the «Note» button opens a field, notes collect in a tray under the editor and go out as one message with «path:line» — «Now» as a word mid-turn or «Queue» with the next turn. Each conversation has its own tray, and it empties only once the message is accepted."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["diff-notes.png"]
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Сеансы, которые ядро открывает под шаги задачи, больше не попадают в список чатов строками «## task … ## step»: их место — дерево агентов задачи. Чат через ядро и чат перехвата остаются в списке.",
+        "en": "Sessions the core opens for task steps no longer appear in the chat list as «## task … ## step» rows: they belong in the task's agent tree. A chat through the core and a takeover chat stay in the list."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Уведомление при открытом модальном окне показывается внутри окна, вверху по центру, а не в углу страницы поверх кнопок окна: оно больше не закрывает «Сохранить» или «Сейчас» и доступно с клавиатуры и экранному диктору. Наведение указателя на уведомление по-прежнему задерживает его, но уход указателя снова запускает отсчёт.",
+        "en": "A notification shown while a modal is open now sits inside the modal, top centre, instead of the page corner over the modal's buttons: it no longer covers «Save» or «Now» and is reachable by keyboard and screen reader. Hovering still holds it, and moving the pointer away restarts the countdown."
+      },
+      "area": {
+        "ru": "Интерфейс",
+        "en": "Interface"
+      }
+    },
+    {
+      "kind": "improved",
+      "text": {
+        "ru": "Кейс «Тестов» может нести свой предел времени (до 60 минут): tests-cli run ставит его вместо общего для файла кейса и называет такие кейсы; флаг --case-timeout в команде сильнее. Черновик агента не уводит кейс человека в архив и не возвращает из него — tests-cli говорит об этом вслух.",
+        "en": "A «Tests» case can carry its own time limit (up to 60 minutes): tests-cli run uses it instead of the common one for the case's file and names such cases; the --case-timeout flag in the command wins. An agent draft does not archive a human's case or bring it back — tests-cli says so out loud."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Записанные сценарии стенда — вкладка «Сценарии» в «Тестах»: «Записать сценарий» принимает описание словами («войти под demo и увидеть приветствие») и окружение, ядро один раз проходит стенд в браузере, а проход ложится кейсом и спеком Playwright без модели и без времени. Дальше «Прогнать все» гоняет сценарии обычным прогоном и встаёт на первом упавшем шаге; модель зовётся снова только на расхождении, решение «Дефект продукта» или «Сценарий устарел» — за человеком, второе перезаписывает тот же кейс из нового прохода. Проход стартует сам после оценки и не теряется при закрытии окна или перезагрузке страницы; строка сценария несёт полоску последних двадцати прогонов и итог «прошли N из M».",
+        "en": "Recorded stand scenarios — the «Scenarios» tab in «Tests»: «Record a scenario» takes a description in words («log in as demo and see the greeting») and an environment, the core walks the stand once in a browser, and the walk becomes a case and a Playwright spec with no model and no timestamps. From then on «Replay all» runs the scenarios as a normal run and stops at the first failed step; the model is called again only on a mismatch, and the call «Product defect» or «Scenario is stale» is the human's — the latter rewrites the same case from a new walk. The walk starts by itself after the estimate and survives closing the window or reloading the page; a scenario row carries a strip of the last twenty runs and the total «N of M passed»."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      },
+      "images": ["recorded-walk.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Проход ходит только по стендам проекта и по петле (localhost, 127.*): открытие чужого адреса, перенаправление сервера или ссылка страницы останавливаются до того, как запрос уйдёт, страница сбрасывается, в проходе встаёт пробел. Сама панель страницей прохода не бывает никогда, ссылки в новое окно ничего не делают. Доступ стенда модель называет только по имени, значение подставляет ядро и только на странице того стенда, к которому доступ привязан; записанный сценарий держит то же правило, а значение, повторённое в тексте ошибки шага, замазано. Отказы прохода приходят модели кодом и причиной.",
+        "en": "A walk moves only across the project's stands and loopback (localhost, 127.*): opening a foreign address, a server redirect or a page link stops before the request leaves, the page resets and the walk records a gap. The panel itself is never a walk page, and links into a new window do nothing. The model names a stand credential only by name; the core fills in the value and only on the page of the stand the credential belongs to. A recorded scenario keeps the same rule, and a value echoed in a step's error text is masked. Walk refusals reach the model as a code and a reason."
+      },
+      "area": {
+        "ru": "Тесты",
+        "en": "Tests"
+      }
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Окно сайта в чате: когда dev-сервер проекта запущен из панели, над лентой появляется полоса «Сайт: <проект>», и сайт открывается справа от чата через прокси панели — только тот сервер, который запустила панель. «Выбрать элемент» обводит элемент под мышью, щелчок кладёт его чипом в поле ввода, и при отправке агент получает описание: адрес, уникальный селектор, тег, текст, место на странице и разметку не больше 4 КБ; секреты в нём замазаны. Остановленный или перезапущенный сервер закрывает окно сам, полоса открывает новый запуск.",
+        "en": "A site window in chat: when the project's dev server is started from the panel, a «Site: <project>» strip appears above the feed and the site opens to the right of the chat through the panel's proxy — only the server the panel started. «Pick an element» outlines the element under the mouse, a click puts it as a chip into the input, and on send the agent gets a description: address, unique selector, tag, text, place on the page and markup up to 4 KB, with secrets masked. A stopped or restarted server closes the window by itself, and the strip opens the new run."
+      },
+      "area": {
+        "ru": "Чат",
+        "en": "Chat"
+      },
+      "images": ["site-pick.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Связанные карточки: запись «Входящих» из трекера несёт значок «связано: N», когда по фактам тикетов есть такие же записи — общий эпик или родитель, связь задач, путь, названный в обоих тикетах; общая метка, автор и похожий заголовок связью не считаются. В окне записи раздел «Связанные карточки» показывает причины словами, «Объединить в эту (N)» складывает отмеченные записи в одну задачу со всеми тикетами (эта запись и ещё до 15). Само ядро записи не объединяет.",
+        "en": "Related cards: a tracker «Inbox» entry carries a «related: N» badge when ticket facts point to similar entries — a shared epic or parent, an issue link, a path named in both tickets; a shared label, author or similar title does not count. In the entry window the «Related cards» section gives the reasons in words, and «Merge into this card (N)» folds the ticked entries into one task with all the tickets (this entry plus up to 15). The core never merges entries by itself."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      },
+      "images": ["related-merge.png"]
+    },
+    {
+      "kind": "added",
+      "text": {
+        "ru": "Второе ревью на другом CLI в профиле «Максимум качества»: после первого ревью единицу смотрит ревьюер на другом разрешённом CLI. Одобрить он не может — считаются только его находки, а его согласие не снимает находку первого ревьюера. Нет другого разрешённого CLI, CLI закреплён или первое ревью прошло без сеанса — второго ревью нет, и причина стоит в разделе «Не проверено» итогового отчёта.",
+        "en": "A second review on another CLI in the «Maximum quality» profile: after the first review, a reviewer on another allowed CLI looks at the unit. It cannot approve — only its findings count, and its agreement never clears a finding of the first reviewer. With no other allowed CLI, a pinned CLI or a first review that ran without a session there is no second review, and the reason stands in the «Not verified» section of the final report."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "changed",
+      "text": {
+        "ru": "Пуш на телефон приходит только на то, что ждёт ответа — блокирующий вопрос задачи ядра или запрос права, по одному на вопрос и после перезапуска панели тоже; о завершении и ошибках пуш больше не приходит. Во вкладке «Вопросы» приложения первым стоит блок «Ждут вас задачи ядра: N» — задачи, которые без ответа дальше не пойдут; задачи чатов в него не входят, число на значке вкладки их считает один раз.",
+        "en": "A phone push now comes only for what waits for an answer — a blocking core task question or a permission request, one per question, also after a panel restart; completion and errors no longer send a push. The app's «Questions» tab opens with a «Core tasks waiting for you: N» block — tasks that will not move without an answer; chat tasks are not in it, and the tab badge counts them once."
+      },
+      "area": {
+        "ru": "Телефон",
+        "en": "Phone"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Отказ ядра объединить карточки или сделать ход карточки показывается одной строкой по-русски в окне записи, с ключом тикета, а исходный текст ядра — в подсказке; раньше отказ объединения стоял английской строкой ядра и повторялся общим всплывающим уведомлением, а отказ хода был общей строкой без причины.",
+        "en": "The core's refusal to merge cards or to make a card move now reads as one line in the panel language in the entry window, with the ticket key, and the core's original text sits in a tooltip; before, the merge refusal stood as the core's English line repeated by a generic pop-up notification, and a move refusal was a generic line without the reason."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Проект в подпапке git-репозитория: чат на месте работает в этой подпапке, а не в копии всего репозитория, CLI задачи в копии стартует в той же подпапке, проход по стенду берёт окружения и доступы подпапки.",
+        "en": "A project in a git repository subfolder: an in-place chat works in that subfolder rather than in a copy of the whole repository, a task's CLI in a copy starts in the same subfolder, and a stand walk takes the subfolder's environments and credentials."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Хуки профиля чата панели снова доходят до хода через ядро — прежде они терялись молча; прочие настройки профиля, которых ядро не переносит, отказываются по имени.",
+        "en": "Panel chat profile hooks reach a turn through the core again — before, they were lost silently; other profile settings the core does not carry are refused by name."
+      },
+      "area": {
+        "ru": "Набор",
+        "en": "Kit"
+      }
+    },
+    {
+      "kind": "docs",
+      "text": {
+        "ru": "Справка «Задачи ядра», «Группы» и «Чат» описывает доску, очередь, ручное вмешательство, окно лимита, полосы групп и заметки к строкам, «Задачи ядра» — ещё и входящие из трекера, связанные карточки и второе ревью на другом CLI, «Интеграции» — Telegram для задач ядра, «Тесты» — отправку красного кейса на доску, записанные сценарии, границы прохода и его отказы, «Чат» — окно сайта и выбор элемента, «Телефон» — блок «Ждут вас задачи ядра»; со снимками обеих тем и схемами. «Обзор», «Права», «Набор», «Перенос среды» и «Агент панели» поправлены под новое поведение.",
+        "en": "The «Core tasks», «Groups» and «Chat» help describes the board, the queue, manual intervention, the limit window, group lanes and line notes; «Core tasks» also covers the inbox from the tracker, related cards and the second review on another CLI, «Integrations» covers Telegram for core tasks, «Tests» covers sending a red case to the board, recorded scenarios, the walk's bounds and refusals, «Chat» covers the site window and element picking, and «Phone» covers the «Core tasks waiting for you» block — with shots of both themes and diagrams. «Overview», «Permissions», «Kit», «Environment transfer» and «Panel agent» were updated to the new behaviour."
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Задание на фичу и на исправление ошибки получает текст запроса, а не только заголовок: шаги разбора и работы видят, что именно просили.",
+        "en": "A feature or bugfix task brief carries the request text, not only the title: the triage and work steps see what exactly was asked."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Ход, отклонённый из устаревшего окна карточки (запись тем временем изменили на другой странице), показывается в окне с причиной; окно остаётся на той же карточке. Прежде окно закрывалось, и отказ не был виден.",
+        "en": "A move refused from a stale card window (the entry was changed on another page meanwhile) is shown in the window with the reason, and the window stays on the same card. Before, the window closed and the refusal was never seen."
+      },
+      "area": {
+        "ru": "Задачи ядра",
+        "en": "Core tasks"
+      }
+    },
+    {
+      "kind": "fixed",
+      "text": {
+        "ru": "Правка настроек, после которой страницу сразу перезагрузили, больше не теряется: запрос доходит до панели и после перезагрузки, а правка, ещё не отправленная, спрашивает подтверждение перед уходом со страницы.",
+        "en": "A settings change followed by an immediate page reload is no longer lost: the request reaches the panel after the reload too, and a change not yet sent asks for confirmation before leaving the page."
+      },
+      "area": {
+        "ru": "Настройки",
+        "en": "Settings"
+      }
+    }
+  ],
+  "images": [
+    {
+      "file": "toast-over-modal-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: уведомление в углу страницы закрывает кнопки модального окна",
+        "en": "Before: the notification in the page corner covers the modal's buttons"
+      }
+    },
+    {
+      "file": "toast-over-modal-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: уведомление внутри окна вверху, «Отмена» и «Сохранить» открыты",
+        "en": "After: the notification inside the modal at the top, «Cancel» and «Save» are clear"
+      }
+    },
+    {
+      "file": "preset-refusal-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: отказ сменить сценарий — английской строкой ядра",
+        "en": "Before: the scenario refusal as the core's English line"
+      }
+    },
+    {
+      "file": "preset-refusal-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: тот же отказ на языке панели",
+        "en": "After: the same refusal in the panel language"
+      }
+    },
+    {
+      "file": "telegram-repos-stale-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: настройку уже изменили в другой вкладке, а «Сохранить репозитории» прошло молча",
+        "en": "Before: the settings were already changed in another tab, yet «Save repositories» went through silently"
+      }
+    },
+    {
+      "file": "telegram-repos-stale-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: ядро не приняло устаревшую запись — причина и «Перечитать настройку»",
+        "en": "After: the core refused the stale write — the reason and «Reload the config»"
+      }
+    },
+    {
+      "file": "inbox-search.png",
+      "role": "shot",
+      "caption": {
+        "ru": "«Найти в трекере»: два тикета из трёх отмечены, «Во входящие (2)»",
+        "en": "«Find in the tracker»: two tickets of three picked, «To the inbox (2)»"
+      }
+    },
+    {
+      "file": "telegram-core.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Карточка Telegram: «Отвечать ядру из Telegram» и репозитории для задач из Telegram",
+        "en": "The Telegram card: «Answer the core from Telegram» and the repositories for Telegram tasks"
+      }
+    },
+    {
+      "file": "tests-to-board.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Развёрнутый прогон «Тестов»: у проваленного кейса — «На доску»",
+        "en": "An expanded «Tests» run: the failed case has «To the board»"
+      }
+    },
+    {
+      "file": "board.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Доска задач ядра: пределы, колонки от «Входящих» до «Ждёт вас», карточки двух групп",
+        "en": "The core task board: limits, columns from «Inbox» to «Waiting for you», cards of two groups"
+      }
+    },
+    {
+      "file": "takeover.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Перехват открыт: копия задачи, «Открыть чат», «Что сделано» и «Вернуть ядру»",
+        "en": "Takeover open: the task copy, «Open chat», «What was done» and «Hand back to the core»"
+      }
+    },
+    {
+      "file": "chat-limit-card.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Карточка «Лимит подписки» в чате: время сброса, «Ждать сброса» и переводы",
+        "en": "The «Subscription limit» card in chat: the reset time, «Wait for reset» and the moves"
+      }
+    },
+    {
+      "file": "group-lanes.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Полосы групп на доске: две группы по две задачи, те же колонки",
+        "en": "Group lanes on the board: two groups of two tasks each, the same columns"
+      }
+    },
+    {
+      "file": "diff-notes.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Заметки к строкам правок: точки у строк, лоток с «путь:строка», «Сейчас» и «В очередь»",
+        "en": "Notes on changed lines: dots at the lines, the tray with «path:line», «Now» and «Queue»"
+      }
+    },
+    {
+      "file": "related-refusal-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: отказ объединить — английской строкой ядра с внутренним номером записи",
+        "en": "Before: the merge refusal as the core's English line with an internal entry id"
+      }
+    },
+    {
+      "file": "related-refusal-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: тот же отказ по-русски, с ключом тикета",
+        "en": "After: the same refusal in the panel language, with the ticket key"
+      }
+    },
+    {
+      "file": "related-merge.png",
+      "role": "shot",
+      "caption": {
+        "ru": "«Связанные карточки» в окне записи: причина словами, «Объединить в эту (1)»",
+        "en": "«Related cards» in the entry window: the reason in words, «Merge into this card (1)»"
+      }
+    },
+    {
+      "file": "recorded-walk.png",
+      "role": "shot",
+      "caption": {
+        "ru": "«Записать сценарий»: проход кончился, имя и группа сценария, «Записать в кейс и спек»",
+        "en": "«Record a scenario»: the walk is over, the scenario name and group, «Record into a case and a spec»"
+      }
+    },
+    {
+      "file": "site-pick.png",
+      "role": "shot",
+      "caption": {
+        "ru": "Выбранный на сайте элемент — чипом над полем ввода чата",
+        "en": "An element picked on the site — as a chip above the chat input"
+      }
+    },
+    {
+      "file": "stale-window-refusal-before.png",
+      "role": "before",
+      "caption": {
+        "ru": "Было: после отказа хода окно карточки закрылось, причина не видна",
+        "en": "Before: after the refused move the card window closed, the reason is not visible"
+      }
+    },
+    {
+      "file": "stale-window-refusal-after.png",
+      "role": "after",
+      "caption": {
+        "ru": "Стало: окно осталось на карточке и показывает, почему ход не принят",
+        "en": "After: the window stays on the card and shows why the move was refused"
+      }
+    }
+  ]
+}

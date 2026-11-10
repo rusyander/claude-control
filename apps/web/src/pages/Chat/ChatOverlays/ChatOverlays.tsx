@@ -31,6 +31,7 @@ export function ChatOverlays({
   isProjectContext,
   projectPath,
   activeChatId,
+  diffNotesSend,
   projectWindow,
   onProjectWindowChange,
   onAskAgent,
@@ -71,7 +72,9 @@ export function ChatOverlays({
       />
 
       {/* Код проекта. Разговор передаём, чтобы дифф показывал правки ИМЕННО
-          этого чата; в песочнице кнопки нет — окно живёт только у проекта. */}
+          этого чата; в песочнице кнопки нет — окно живёт только у проекта.
+          Отправка чата — для заметок к строкам правок: они уходят агенту этого
+          же разговора одним сообщением. */}
       {isProjectContext && projectPath && codeMounted && (
         <Suspense fallback={null}>
           <ProjectCodeModal
@@ -79,6 +82,7 @@ export function ChatOverlays({
             onOpenChange={toggle('code')}
             projectPath={projectPath}
             chatId={activeChatId}
+            notesSend={diffNotesSend}
           />
         </Suspense>
       )}

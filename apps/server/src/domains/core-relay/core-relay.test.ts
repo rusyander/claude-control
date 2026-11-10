@@ -18,10 +18,16 @@ const OTHER = '019a0000-0000-7000-8000-000000000002';
 const ASK = '019a0000-0000-7000-8000-0000000000a1';
 const ASK_ANSWERED = '019a0000-0000-7000-8000-0000000000a2';
 
+/** Строка журнала; у `human.asked` поле `defaultAction` обязательно — по умолчанию вопрос блокирует. */
 const line = (seq: number, kind: string, data: Record<string, unknown> = {}): CoreSseEvent => ({
   id: String(seq),
   event: kind,
-  data: JSON.stringify({ seq, kind, taskId: TASK, data }),
+  data: JSON.stringify({
+    seq,
+    kind,
+    taskId: TASK,
+    data: kind === 'human.asked' ? { defaultAction: null, ...data } : data,
+  }),
 });
 
 interface FakeCore extends CoreRelayCore {
@@ -96,6 +102,7 @@ describe('core relay: one notice per open ask, cursor survives a panel restart',
           deepLink: `http://127.0.0.1:8888/core?id=${TASK}&ask=${ASK}`,
         },
         question: 'Делить задачу?',
+        waits: true,
       },
     ]);
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toEqual({
@@ -175,7 +182,7 @@ describe('core relay: one notice per open ask, cursor survives a panel restart',
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toEqual({
       cursors: { [TASK]: '2' },
       delivered: [],
-      pending: [{ taskId: TASK, askId: ASK, question: 'Делить?' }],
+      pending: [{ taskId: TASK, askId: ASK, question: 'Делить?', waits: true }],
     });
     // Канал появился — следующий круг той же пересылки сообщает ровно раз.
     channel = true;
@@ -305,6 +312,96 @@ describe('core relay: one notice per open ask, cursor survives a panel restart',
     await down.tick();
     await down.stop();
     expect(logs).toEqual(['core-relay: core unavailable: procs.json: ENOENT']);
+  });
+});
+
+describe('core relay: blocking vs non-blocking ask (stage 12, P175)', () => {
+  const OPEN_2 = '019a0000-0000-7000-8000-0000000000a3';
+
+  it('waits = askWaits(defaultAction) reaches deliver and pending; readiness is asked per ask; a pre-12 pending entry counts as blocking', async () => {
+    const journal = [
+      line(1, 'human.asked', { askId: ASK, question: 'Ждёт', defaultAction: null }),
+      line(2, 'human.asked', { askId: OPEN_2, question: 'Идёт дальше', defaultAction: 'skip' }),
+    ];
+    const statePath = join(dir, 'core-relay.json');
+    // Канал есть только для блокирующего (push без Telegram): неблокирующий ждёт в pending.
+    const asked: boolean[] = [];
+    const sent: RelayAsk[] = [];
+    const make = () =>
+      createCoreRelay({
+        core: fakeCore({ [TASK]: journal }, [{ taskId: TASK, live: true, title: 't' }], {
+          [ASK]: 'open',
+          [OPEN_2]: 'open',
+        }),
+        statePath,
+        ready: (waits) => {
+          asked.push(waits);
+          return waits;
+        },
+        deliver: async (ask) => sent.push(ask) > 0,
+        link: () => '',
+        log: () => undefined,
+      });
+    await settle(make());
+    expect(sent.map((ask) => [ask.notice.askId, ask.waits])).toEqual([[ASK, true]]);
+    expect(asked).toEqual([true, false]);
+    expect(JSON.parse(readFileSync(statePath, 'utf8')).pending).toEqual([
+      { taskId: TASK, askId: OPEN_2, question: 'Идёт дальше', waits: false },
+    ]);
+
+    // Неблокирующий в начале очереди не держит блокирующий за ним (раньше — `break`).
+    sent.length = 0;
+    writeFileSync(
+      statePath,
+      JSON.stringify({
+        cursors: { [TASK]: '2' },
+        delivered: [],
+        pending: [
+          { taskId: TASK, askId: OPEN_2, question: 'Идёт дальше', waits: false },
+          // Запись до этапа 12 — без поля: push тогда шёл о каждом вопросе, значит блокирует.
+          { taskId: TASK, askId: ASK, question: 'Ждёт' },
+        ],
+      }),
+    );
+    await settle(make());
+    expect(sent.map((ask) => [ask.notice.askId, ask.waits])).toEqual([[ASK, true]]);
+    expect(JSON.parse(readFileSync(statePath, 'utf8'))).toMatchObject({
+      delivered: [ASK],
+      pending: [{ askId: OPEN_2, waits: false }],
+    });
+  });
+});
+
+describe('core relay onLine seam (stage 12, D29)', () => {
+  it('every journal line reaches onLine in order; a throwing hook is logged and the ask is still relayed', async () => {
+    const journal = [
+      line(1, 'task.created'),
+      line(2, 'human.asked', { askId: ASK, question: 'Делить задачу?' }),
+      line(3, 'task.finished'),
+    ];
+    const core = fakeCore(
+      { [TASK]: journal },
+      [{ taskId: TASK, live: true, title: 'Починить вход' }],
+      { [ASK]: 'open' },
+    );
+    const seen: string[] = [];
+    const sent: RelayAsk[] = [];
+    const logs: string[] = [];
+    const relay = createCoreRelay({
+      core,
+      statePath: join(dir, 'core-relay.json'),
+      deliver: async (ask) => sent.push(ask) > 0,
+      link: () => '',
+      log: (text) => logs.push(text),
+      onLine: (task, event) => {
+        seen.push(`${task.taskId === TASK ? 'T' : '?'}:${event.id}:${event.event}`);
+        if (event.event === 'human.asked') throw new Error('boom');
+      },
+    });
+    await settle(relay);
+    expect(seen).toEqual(['T:1:task.created', 'T:2:human.asked', 'T:3:task.finished']);
+    expect(sent.map((ask) => ask.notice.askId)).toEqual([ASK]);
+    expect(logs).toEqual([`core-relay: onLine ${TASK}: boom`]);
   });
 });
 

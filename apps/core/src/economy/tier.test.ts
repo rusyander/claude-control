@@ -121,6 +121,45 @@ describe('G7 decideTier', () => {
     });
   });
 
+  it('a task ceiling from another adapter ladder never reaches this CLI: no own rungs → ignored, own rungs → mapped by rank', () => {
+    const CODEX_ANY: AllowedRoute = {
+      adapter: 'codex',
+      route: { kind: 'cli-login', id: 'cli-login-codex' },
+      modelPattern: '*',
+    };
+    const OTHER_ANY: AllowedRoute = {
+      adapter: 'other',
+      route: { kind: 'cli-login', id: 'cli-login-other' },
+      modelPattern: '*',
+    };
+    const ladders = {
+      claude: LADDER,
+      codex: { models: [], efforts: ['low', 'medium', 'high'] },
+      other: { models: ['o-small', 'o-big'], efforts: [] },
+    };
+    const codex = decideTier(input({ allowed: [CODEX_ANY], ceiling: 'claude-opus', ladders }));
+    expect(codex).toMatchObject({ ok: true, adapter: 'codex', model: null });
+    expect(codex.ok && codex.sources.model).toBe('cli-default');
+    expect(codex.reasons).toContain(
+      'task ceiling claude-opus is a claude rung and codex has no model ladder: ignored on codex, the CLI default model runs',
+    );
+    const mapped = (ceiling: string) =>
+      decideTier(input({ allowed: [OTHER_ANY], ceiling, ladders }));
+    expect(mapped('claude-opus')).toMatchObject({ model: 'o-big', sources: { model: 'ceiling' } });
+    expect(mapped('claude-sonnet')).toMatchObject({ model: 'o-small' });
+    expect(mapped('claude-opus').reasons).toContain(
+      'task ceiling claude-opus is a claude rung (3/3): on other it maps by rank to o-big',
+    );
+    // Своя ступень и имя вне любой лестницы (модель, названная человеком) — как прежде.
+    expect(
+      decideTier(input({ allowed: [LOGIN_ANY], ceiling: 'claude-opus', ladders })),
+    ).toMatchObject({ adapter: 'claude', model: 'claude-opus' });
+    expect(decideTier(input({ allowed: [CODEX_ANY], ceiling: 'gpt-5.5', ladders }))).toMatchObject({
+      adapter: 'codex',
+      model: 'gpt-5.5',
+    });
+  });
+
   it('step > unit > task; the latest line of a level wins; a null line clears only its own level', () => {
     const task = row('task', 'model', 'claude-haiku-5');
     const unit = row('unit', 'model', 'claude-sonnet-5');

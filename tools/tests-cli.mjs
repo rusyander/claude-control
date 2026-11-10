@@ -180,9 +180,16 @@ go.sum entry при go.sum вне git, go.mod/тулчейн), записыва�
                     (tests-cli tree --out … до ворот) засчитывается без прогона
   --case-timeout <мин>  для run: предел на кейс (по умолчанию 10 мин, иначе
                     AGENTDECK_TESTS_CASE_TIMEOUT); прогон ждёт не дольше предела × число
-                    файлов кейсов; у своей команды с timeoutMinutes — его, если флаг не назван. Дольше —
+                    файлов кейсов; у кейса с automation.timeoutMinutes (до 60) — его предел вместо
+                    общего; у своей команды с timeoutMinutes — его, если флаг не назван. Дольше —
                     дерево процессов прогона снимается, кейсы ложатся в историю проваленными
                     с причиной «предел времени», код 124
+  --env <id>        для run: окружение стенда из .agent/tests/environments.json — его адрес
+                    (E2E_BASE_URL) и доступы из хранилища панели уходят переменными в процесс
+                    прогона; прогон пишется в историю с этим окружением. Записанные проходы
+                    (*.recorded.mjs) идут запускателем junit-run над проектом
+  --max-failures <n>  для run: после n проваленных тестов остальные файлы не запускаются
+                    («не запускался»); повтор записанных проходов встаёт на первом расхождении
   --fail-on <s>     для lint: ронять сборку с этой серьёзности (error | warning | info)
   --budget <мин>    для plan: сколько минут отведено (у «дыма» по умолчанию 30)
   --release <веха>  для plan release: чью веху собирать
@@ -501,6 +508,12 @@ async function saveCase(project, options) {
     console.log(
       `Кейс ${result.caseId} написан человеком и не переписан: правка ушла черновиком ${result.runId} — её примет человек в разделе «Тесты».`,
     );
+    // Приёмка черновика архив не переносит (поле жизни кейса человека): сказать, а не потерять молча.
+    if (typeof input.archived === 'boolean') {
+      console.log(
+        `Архив кейса человека черновик не меняет: ${input.archived ? 'увести в архив' : 'вернуть из архива'} ${group}:${result.caseId} может только человек в разделе «Тесты».`,
+      );
+    }
     return;
   }
   if (result.requested) {
@@ -1112,7 +1125,8 @@ async function runTests(project, options) {
   // потом npm test.
   const plan = options.cmd
     ? commandPlan(options.cmd, files, project)
-    : ((await e2ePlan(project, files)) ??
+    : (recordedPlan(project, files) ??
+      (await e2ePlan(project, files)) ??
       (await vitestPlan(project, files)) ??
       (await mixedPlan(project, files, !options.group && !picked)) ??
       (await automationPlan(project, files, !options.group && !picked)) ??
@@ -1134,6 +1148,19 @@ async function runTests(project, options) {
   const pickedList = automated.map((entry) => `${entry.group}:${entry.item.id}`).join(',');
   if ((picked || options.group) && pickedList.length < 30_000)
     plan.env = { ...plan.env, AGENTDECK_TEST_CASES: pickedList };
+  // Окружение стенда (`--env`): адрес и доступы — переменными процесса прогона, как у кнопки панели.
+  if (options.env) plan.env = { ...plan.env, ...(await standRunEnv(project, options.env)) };
+  // Лежащий стенд у записанного прохода — «не засчитано», а не расхождение на первом шаге.
+  if (plan.recorded && plan.env.E2E_BASE_URL && !plan.env.JUNIT_RUN_HEALTH)
+    plan.env = { ...plan.env, JUNIT_RUN_HEALTH: plan.env.E2E_BASE_URL };
+  if (options['max-failures'] !== undefined) {
+    const limit = numberOption(options['max-failures'], '--max-failures', 'целое больше нуля');
+    if (!Number.isInteger(limit) || limit < 1)
+      throw new Error(
+        `--max-failures ждёт целое больше нуля, а пришло «${options['max-failures']}».`,
+      );
+    plan.env = { ...plan.env, JUNIT_RUN_MAX_FAILURES: String(options['max-failures']) };
+  }
   await narrowToBranchRed(project, plan, automated);
 
   console.log(`Кейсов с автотестом: ${automated.length}, файлов: ${files.length}`);
@@ -1142,7 +1169,7 @@ async function runTests(project, options) {
   if (plan.listed) console.log(`Файлов прогона: ${plan.listed} — списком в AGENTDECK_TEST_FILES`);
   let cap;
   try {
-    cap = runCap(options, files.length, plan.timeout);
+    cap = runCap(options, files.length, plan.timeout, ownCaseLimits(automated));
   } catch (error) {
     dropTemp(plan.temp);
     throw error;
@@ -1322,6 +1349,7 @@ async function runTests(project, options) {
     ...(content !== undefined ? { content } : { file: toProjectRelative(project, file) }),
     origin: plan.origin,
     scope: `tests-cli run: ${plan.line}`,
+    ...(options.env ? { environmentId: options.env } : {}),
     exitCode: status ?? exitCode,
     // Прогон части (--group, --case) — результаты на кейсы этих групп: одинаковый
     // ключ набора двух пакетов на весь проект двусмыслен, и его результат терялся.
@@ -1457,7 +1485,24 @@ const DRAIN_MS = 2_000;
 /** Сколько ждать выхода после SIGTERM дерева по пределу, прежде чем SIGKILL корня. */
 const KILL_GRACE_MS = 5_000;
 
-function runCap(options, fileCount, planTimeout) {
+/**
+ * Свои пределы кейсов прогона (`automation.timeoutMinutes`) по файлам: кейсы одного файла идут
+ * одним прогоном, и файлу нужен самый долгий из их пределов. Негодное значение до сюда не
+ * доходит — чтение кейсов отбрасывает его (store, потолок в контрактах).
+ */
+function ownCaseLimits(automated) {
+  const byFile = new Map();
+  for (const { group, item } of automated) {
+    const minutes = item.automation.timeoutMinutes;
+    if (!minutes) continue;
+    const prior = byFile.get(item.automation.file);
+    const ids = [...(prior?.ids ?? []), `${group}:${item.id}`];
+    byFile.set(item.automation.file, { minutes: Math.max(prior?.minutes ?? 0, minutes), ids });
+  }
+  return byFile;
+}
+
+function runCap(options, fileCount, planTimeout, caseLimits = new Map()) {
   const flag = options['case-timeout'];
   const env = process.env[CASE_TIMEOUT_ENV]?.trim();
   const raw = flag ?? (env || undefined);
@@ -1468,16 +1513,27 @@ function runCap(options, fileCount, planTimeout) {
     throw new Error(`${source} ждёт минуты числом больше нуля, а пришло «${raw}».`);
   }
   const perCase = Math.round(minutes * 60_000);
-  const total = perCase * Math.max(1, fileCount);
-  const own = planTimeout && flag === undefined;
-  const wanted = own ? planTimeout : total;
+  const files = Math.max(1, fileCount);
+  // Свой предел кейса сильнее общего (по умолчанию и переменной окружения), `--case-timeout`,
+  // названный в самой команде, — сильнее него: человек сказал это сейчас.
+  const own = flag === undefined ? [...caseLimits.values()] : [];
+  const ownMs = own.reduce((sum, limit) => sum + Math.round(limit.minutes * 60_000), 0);
+  const total = perCase * Math.max(0, files - own.length) + ownMs;
+  const plan = planTimeout && flag === undefined;
+  const wanted = plan ? planTimeout : total;
   const ms = Math.min(wanted, TIMER_MAX_MS);
   const fmt = (value) => `${Math.round((value / 60_000) * 100) / 100} мин`;
   const clamped = ms < wanted ? `; таймер дольше ${fmt(TIMER_MAX_MS)} не умеет` : '';
-  const shown = own
-    ? `${fmt(ms)} (timeoutMinutes своей команды${clamped})`
-    : `${fmt(perCase)} на кейс × ${Math.max(1, fileCount)} = ${fmt(ms)} (${source}${clamped})`;
-  return { ms, perCase, shown };
+  const named = own
+    .map((limit) => `${limit.ids.join(', ')} — ${fmt(limit.minutes * 60_000)}`)
+    .join('; ');
+  let shown = `${fmt(perCase)} на кейс × ${files} = ${fmt(ms)} (${source}${clamped})`;
+  if (plan) shown = `${fmt(ms)} (timeoutMinutes своей команды${clamped})`;
+  else if (own.length > 0)
+    shown =
+      `${fmt(ms)}: свой предел кейса ${named}; остальным ${fmt(perCase)} × ` +
+      `${files - own.length} (${source}${clamped})`;
+  return { ms, shown };
 }
 
 /**
@@ -1886,6 +1942,61 @@ async function e2ePlan(project, files) {
  */
 const STAND_COMMAND =
   /https?:\/\/|\blocalhost\b|127\.0\.0\.1|--health\b|\bplaywright\b|\bcypress\b/i;
+
+/** Окончание записанного прохода панели — то же, что у `recorded/codegen.ts` и `junit-run.mjs`. */
+const RECORDED_SUFFIX = '.recorded.mjs';
+
+/**
+ * Только записанные проходы панели (`*.recorded.mjs`, R4): они идут запускателем этого репозитория
+ * над проектом, а не командой проекта — спек самостоятелен (библиотека playwright, код выхода), и
+ * своей команды, которая его знает, у чужого проекта нет. Смешанный набор сюда не попадает: его
+ * ведёт команда проекта, как раньше.
+ */
+function recordedPlan(project, files) {
+  if (files.length === 0 || !files.every((file) => file.endsWith(RECORDED_SUFFIX)))
+    return undefined;
+  const temp = mkdtempSync(join(tmpdir(), 'cc-tests-run-'));
+  const report = join(temp, 'junit.xml');
+  const runner = join(REPO, 'tools', 'qa', 'junit-run.mjs');
+  return {
+    line: `node ${shellQuote(runner)} --project ${shellQuote(project)} ${files.map(shellQuote).join(' ')}`,
+    cwd: project,
+    env: { AGENTDECK_JUNIT_REPORT: report },
+    results: ['junit', report],
+    ownReport: report,
+    temp,
+    origin: 'e2e',
+    // Проход идёт по стенду: память прогонов его не повторяет — стенд меняется без правки файлов.
+    stand: true,
+    recorded: true,
+  };
+}
+
+/**
+ * Переменные окружения стенда для `run --env <id>`: адрес (`E2E_BASE_URL` и родня) и доступы из
+ * хранилища панели. Значения — только в процесс прогона: в вывод идут имена недостающих, не
+ * значения. Каталог данных панели — `AGENTDECK_TESTS_APP_DATA` (проверки ведут его во временную
+ * папку), иначе тот же, что у сервера.
+ */
+async function standRunEnv(project, environmentId) {
+  const { readEnvironments } = await domain('library');
+  const environment = readEnvironments(project).find((item) => item.id === environmentId);
+  if (!environment) {
+    throw new Error(`Окружения «${environmentId}» нет в .agent/tests/environments.json.`);
+  }
+  const { runSecrets } = await domain('env-secrets');
+  const { standEnv } = await domain('e2e-run');
+  const appData =
+    process.env.AGENTDECK_TESTS_APP_DATA ||
+    join(process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'), BRAND_SLUG);
+  const { values, missing } = runSecrets(appData, project, environment);
+  if (missing.length)
+    console.log(
+      `Окружение ${environmentId}: нет значений доступов ${missing.map((ref) => ref.name).join(', ')} — ` +
+        'шаги с ними лягут «не проверено». Значения заводятся в панели: «Тесты» → «Окружения».',
+    );
+  return { ...values, ...standEnv(environment) };
+}
 
 async function automationPlan(project, files, whole) {
   const { readAutomation, automationCommand, clearReport, collectReport, reportTail } =

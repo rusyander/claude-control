@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PushDevice } from '@agentdeck/contracts';
 import type { RelayNotice } from '@agentdeck/contracts/core/relay';
+import { createPushOnce } from '../remote-notify.ts';
 import { createCoreAskDelivery } from './core-ask-delivery.ts';
 import { coreTaskLink } from './core-notice.ts';
 import type { CorePushMessage } from './core-notice.ts';
@@ -65,7 +66,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function delivery(over: { events?: string[]; pushEnabled?: boolean; cover?: boolean } = {}) {
+function delivery(
+  over: { events?: string[]; pushEnabled?: boolean; cover?: boolean; buttons?: boolean } = {},
+) {
   const sentLog = new SentLog();
   const pushed: CorePushMessage[][] = [];
   const channels = createCoreAskDelivery({
@@ -81,7 +84,9 @@ function delivery(over: { events?: string[]; pushEnabled?: boolean; cover?: bool
     devices: () => [device],
     machineId: () => 'machine-0001',
     push: async (messages) => void pushed.push(messages),
+    pushOnce: createPushOnce(),
     log: () => undefined,
+    ...(over.buttons !== undefined ? { buttons: () => over.buttons! } : {}),
   });
   return { deliver: channels.deliver, ready: channels.ready, sentLog, pushed };
 }
@@ -91,7 +96,7 @@ describe('core ask → push and Telegram, never an answer', () => {
     const bot = fakeBot();
     vi.stubGlobal('fetch', bot.fetchStub);
     const { deliver, sentLog, pushed } = delivery();
-    expect(await deliver(notice(), 'Делить задачу на две?')).toBe(true);
+    expect(await deliver(notice(), 'Делить задачу на две?', true)).toBe(true);
 
     const sends = bot.calls.filter((call) => call.method === 'sendMessage');
     expect(sends).toHaveLength(1);
@@ -119,14 +124,14 @@ describe('core ask → push and Telegram, never an answer', () => {
     const bot = fakeBot();
     vi.stubGlobal('fetch', bot.fetchStub);
     const { deliver, ready, pushed } = delivery({ events: ['runError'], pushEnabled: false });
-    expect(ready()).toBe(false);
-    expect(await deliver(notice(), 'q')).toBe(false);
+    expect(ready(true)).toBe(false);
+    expect(await deliver(notice(), 'q', true)).toBe(false);
     expect(bot.calls).toEqual([]);
     expect(pushed).toEqual([]);
     // Ответы из Telegram включены — вопрос туда идёт и без события.
     const covered = delivery({ events: ['runError'], cover: true });
-    expect(covered.ready()).toBe(true);
-    expect(await covered.deliver(notice(), 'q')).toBe(true);
+    expect(covered.ready(true)).toBe(true);
+    expect(await covered.deliver(notice(), 'q', true)).toBe(true);
     expect(bot.calls.filter((call) => call.method === 'sendMessage')).toHaveLength(1);
   });
 
@@ -139,15 +144,15 @@ describe('core ask → push and Telegram, never an answer', () => {
       ),
     );
     const { deliver, ready } = delivery({ pushEnabled: false });
-    expect(ready()).toBe(true);
-    expect(await deliver(notice(), 'q')).toBe(false);
+    expect(ready(true)).toBe(true);
+    expect(await deliver(notice(), 'q', true)).toBe(false);
   });
 
   it('reply to the core-ask message → refusal naming panel and phone with the link; nothing reaches the core or a chat', async () => {
     const bot = fakeBot();
     vi.stubGlobal('fetch', bot.fetchStub);
     const { deliver, sentLog } = delivery();
-    await deliver(notice(), 'Делить?');
+    await deliver(notice(), 'Делить?', true);
     const store = new AnswersStore();
     store.setSettings({ enabled: true, afterMinutes: 0, ownerId: String(OWNER) });
     const apply = vi.fn(async () => ({ ok: true as const }));
@@ -186,5 +191,36 @@ describe('core ask → push and Telegram, never an answer', () => {
     expect(text).toContain(`/core?id=${TASK}&amp;ask=${ASK}`);
     expect(apply).not.toHaveBeenCalled();
     expect(sendToChat).not.toHaveBeenCalled();
+  });
+
+  it('buttons cover the ask (D29) → no text message, push still goes, delivered; without buttons the text goes', async () => {
+    const bot = fakeBot();
+    vi.stubGlobal('fetch', bot.fetchStub);
+    const covered = delivery({ cover: true, buttons: true });
+    expect(await covered.deliver(notice(), 'Делить задачу на две?', true)).toBe(true);
+    expect(bot.calls.filter((call) => call.method === 'sendMessage')).toHaveLength(0);
+    expect(covered.pushed).toHaveLength(1);
+    // Кнопок нет (ядро не узнаёт чат) — прежний текст со ссылкой.
+    const plain = delivery({ cover: true, buttons: false });
+    expect(await plain.deliver(notice(), 'q', true)).toBe(true);
+    expect(bot.calls.filter((call) => call.method === 'sendMessage')).toHaveLength(1);
+    // Итога задачи в пересылке больше нет (этап 12, m3): другого вида уведомления не бывает.
+    expect(covered.pushed).toHaveLength(1);
+  });
+
+  it('a non-blocking core ask (P175) → Telegram still told, no push; push alone is not a channel for it', async () => {
+    const bot = fakeBot();
+    vi.stubGlobal('fetch', bot.fetchStub);
+    const { deliver, ready, pushed } = delivery();
+    expect(ready(false)).toBe(true);
+    expect(await deliver(notice(), 'Продолжаю с умолчанием', false)).toBe(true);
+    expect(bot.calls.filter((call) => call.method === 'sendMessage')).toHaveLength(1);
+    expect(pushed).toEqual([]);
+    // Telegram выключен: у неблокирующего вопроса канала нет вовсе — пересылка его не держит.
+    const pushOnly = delivery({ events: ['runError'] });
+    expect(pushOnly.ready(false)).toBe(false);
+    expect(pushOnly.ready(true)).toBe(true);
+    expect(await pushOnly.deliver(notice(), 'q', false)).toBe(false);
+    expect(pushOnly.pushed).toEqual([]);
   });
 });

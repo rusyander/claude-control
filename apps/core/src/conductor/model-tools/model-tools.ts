@@ -1,8 +1,10 @@
 import {
+  isBrowserToolName,
   parseModelCall,
   toolPlanFor,
   type AskHumanCall,
   type BlockerCall,
+  type BrowserToolName,
   type ModelToolName,
   type ModelToolReply,
   MODEL_TOOL_NAMES,
@@ -13,6 +15,7 @@ import { raiseHumanPoint } from '../human/raise.ts';
 import type { ModelToolDeps, SessionBinding } from './model-tools.types.ts';
 import { stepDone } from './step-done.ts';
 import { unitDiff } from './unit-diff.ts';
+import { handleWalkTool } from './walk-tools.ts';
 
 /**
  * Сервер `agentdeck` со стороны ядра (03 §Model tools): один вход на шесть инструментов. Набор
@@ -197,7 +200,8 @@ export function handleModelTool(
 export function handleModelTool(
   task: LiveTask,
   b: SessionBinding,
-  name: Exclude<ModelToolName, 'step_done' | 'unit_diff'>,
+  // Инструменты браузера отвечают обещанием (страница), синхронного ответа у них нет.
+  name: Exclude<ModelToolName, 'step_done' | 'unit_diff' | BrowserToolName>,
   input: unknown,
   deps: ModelToolDeps & { check?: undefined },
 ): ModelToolReply;
@@ -219,8 +223,10 @@ export function handleModelTool(
   if (name === 'step_done')
     return refused ? Promise.resolve(refused) : stepDone(task, b, input, deps);
   if (refused) return refused;
+  // Инструменты браузера (только шаг `walk`, этап 12) — свой вход.
+  if (isBrowserToolName(name)) return handleWalkTool(task, b, name, input, deps);
   // Мимо плана сюда доходит только имя инструмента модели, и `step_done` уже ушёл выше.
-  switch (name as Exclude<ModelToolName, 'step_done'>) {
+  switch (name as Exclude<ModelToolName, 'step_done' | BrowserToolName>) {
     case 'check': {
       const parsed = parseModelCall('check', input);
       if (!parsed.ok) return invalid(parsed.issues);

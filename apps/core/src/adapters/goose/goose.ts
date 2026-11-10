@@ -127,6 +127,8 @@ export const GOOSE_CAPS: AdapterCaps = {
   channels: GOOSE_CHANNELS,
   windowEvent: false,
   limitsChannel: null,
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 /** Канал Goose — построитель фактов запуска (`@agentdeck/providers/goose`), адрес с `/v1`. */

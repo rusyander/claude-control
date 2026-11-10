@@ -1,3 +1,13 @@
+import type { SessionHooks } from '@agentdeck/contracts/core/session-carry';
+
+/**
+ * Настройки профиля поверх личных. Только хуки: прогон идёт через ядро, и ядро несёт их полем
+ * `session.hooks` в свой `--settings` (s12). Иных ключей у ядра нет — перенос отказал бы по имени.
+ */
+export interface ProfileSettings {
+  hooks?: SessionHooks;
+}
+
 /** Что реестр прогонов кладёт в запуск: флаги, переменные, серверы, строка, настройки. */
 export interface GroupRunProfile {
   /** `--strict-mcp-config`: всё, что не приехало своим `--mcp-config`, снято. */
@@ -8,6 +18,6 @@ export interface GroupRunProfile {
   mcp?: { ids: string[]; config: unknown };
   /** Строка к системному промпту: что подключено, что снято и как попросить. */
   note: string;
-  /** Настройки поверх личных (`--settings`): хуки и прочее. Пусто — ничего не тронуто. */
-  settings: Record<string, unknown>;
+  /** Настройки поверх личных: хуки. Пусто — ничего не тронуто. */
+  settings: ProfileSettings;
 }

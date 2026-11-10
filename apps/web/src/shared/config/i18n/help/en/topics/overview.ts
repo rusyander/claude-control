@@ -49,8 +49,8 @@ export const overviewEn: typeof overviewRu = {
       'only visible on disk: a hook whose script is missing is marked broken, and a ' +
       'script no hook refers to is marked unbound. MCP server health is NOT probed on ' +
       'open: the result of the last connection check is taken from the panel’s own ' +
-      'file. Groups come from there too, while the number of backups and the changes ' +
-      'summary come from the backup directory. A watcher follows the files: an edit ' +
+      'file. The number of backups and the changes summary come from the backup ' +
+      'directory, and the groups count from the core task board. A watcher follows the files: an edit ' +
       'made by hand outside the panel recounts the numbers by itself, without F5.',
 
     sourceTitle: 'Where the configuration directory comes from',
@@ -255,8 +255,10 @@ export const overviewEn: typeof overviewRu = {
       'exist, otherwise the sum would not match the caption.',
     tileGroups: 'Groups',
     tileGroupsText:
-      'How many setting bundles exist. While there are none the caption says so plainly — ' +
-      'the tile does not look broken.',
+      'How many core task groups are in progress — open group lanes on the board; the ' +
+      '“Groups” menu entry shows the same number. With none the caption says “no groups in ' +
+      'progress”, and when the core does not answer, “core not responding” — the tile does not ' +
+      'look broken. A click opens the board in group lanes.',
     tileBackups: 'Backups',
     tileBackupsText:
       'How many copies lie in the panel’s directory and when the latest was taken. It ' +

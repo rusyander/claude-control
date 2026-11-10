@@ -16,6 +16,17 @@ import {
   planCarry,
   type CarrySourceChat,
 } from '../../domains/portability/carry-context/carry-context.ts';
+import {
+  cancelCarriedResends,
+  type CarryCancelDeps,
+} from '../../domains/chat/core-run/carry-cancel.ts';
+import {
+  coreChatBookPath,
+  createCoreChatBook,
+} from '../../domains/chat/core-run/core-chat-book.ts';
+import { createCoreChatPort } from '../../domains/chat/core-run/core-chat-port.ts';
+import { createCoreCaller } from '../../domains/core-ask/core-ask.ts';
+import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 import { continuationStarter } from '../chat/handoff-routes.ts';
 import { projectsDir } from '../chat/paths.ts';
 
@@ -43,6 +54,8 @@ export interface PortabilityCarryDeps {
   runs: ChatRunRegistry;
   chains: HandoffChains;
   session: ChatSession;
+  /** Книга и ручки чата ядра (R6); нет — книга на диске панели и ядро этого дома. */
+  coreChat?: CarryCancelDeps;
 }
 
 export function registerPortabilityCarryRoutes(
@@ -52,6 +65,12 @@ export function registerPortabilityCarryRoutes(
 ): void {
   const selfBaseUrl = `http://127.0.0.1:${process.env.PORT ?? 5178}`;
   const appData = (): string => ctx.location.paths.appData;
+  let coreChat = deps.coreChat;
+  const coreChatDeps = (): CarryCancelDeps =>
+    (coreChat ??= {
+      book: createCoreChatBook(coreChatBookPath(appData())),
+      port: createCoreChatPort(createCoreCaller(() => coreHomeOf())),
+    });
 
   /**
    * Разговоры, которые панель вправе предложить к переносу.
@@ -173,6 +192,13 @@ export function registerPortabilityCarryRoutes(
           );
         },
       });
+
+      // Перенос — выбор человека, где разговор продолжится: задача прежнего разговора, ждущая
+      // сброса окна, отменяется, чтобы после сброса не слать то же слово прежнему CLI (R6).
+      const carried = outcomes.filter((o) => o.carried).map((o) => o.key);
+      if (carried.length > 0) {
+        await cancelCarriedResends(carried, target.id, coreChatDeps());
+      }
 
       return { target: target.id, outcomes };
     },

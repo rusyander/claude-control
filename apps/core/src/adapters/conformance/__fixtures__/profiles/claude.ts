@@ -31,6 +31,7 @@ export const CLAUDE_PROFILE: Profile = {
     wake: 'bg-permit-allow',
     denyOverPermit: 'deny-permit-allow',
     window: 'window',
+    loginLost: 'login-lost',
   },
   settings: 'claude/settings.json',
   brief: (argv) => readFileSync(after(argv, '--append-system-prompt-file')!, 'utf8'),

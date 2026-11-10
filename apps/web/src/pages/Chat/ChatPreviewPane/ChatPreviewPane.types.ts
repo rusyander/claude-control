@@ -1,8 +1,14 @@
 import type { Artifact, MediaDeck, MediaImage } from '@agentdeck/contracts';
 import type { AgentPaneTarget } from '@entities/AgentTree';
+import type { SitePreviewProps } from '@features/SitePreview';
 
 export interface ChatPreviewPaneProps {
   chatId: string;
+  /**
+   * Окно сайта проекта (этап 12, D20). Открывают его последним нажатием, и оно закрывает
+   * остальное в столбце, как и они закрывают его, — поэтому, пока оно есть, показано только оно.
+   */
+  site?: SitePreviewProps | undefined;
   /** Файл из папки разговора. Пусто — столбец занят картинкой панели. */
   artifact?: Artifact;
   /**

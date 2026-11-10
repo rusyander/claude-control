@@ -20,6 +20,7 @@ import { collectOutgoing } from '../../publisher/collect/outgoing.ts';
 import { ensureMr } from '../../publisher/mr/mr.ts';
 import { pushUnit } from '../../publisher/push/push.ts';
 import type { OutboxPort } from '../../publisher/push/push.types.ts';
+import type { TrackerCommentPort } from '../../publisher/tracker-comment.ts';
 import { backoffMs, nextBackoffAttempt } from '../../publisher/queue/queue.ts';
 import { refusalUnmet, type ReadyJudge } from '../../publisher/ready/ready.ts';
 import type { PublishReadyInput, ReadyNext } from '../../publisher/ready/ready.types.ts';
@@ -50,6 +51,8 @@ export interface AttemptDeps {
   forgeFor(url: string): ForgeAccess | null;
   judge: ReadyJudge;
   outbox(task: LiveTask, s: StepCtx): OutboxPort;
+  /** Комментарий назад в тикет при открытии MR (Z7, P166); нет — не пишется никогда. */
+  commentBack?(task: LiveTask, outbox: OutboxPort): TrackerCommentPort;
 }
 
 const why = (f: Fact<unknown>): string => ('unknown' in f ? f.unknown : 'absent');
@@ -207,8 +210,9 @@ async function readyInput(
       coverage: { policy: 'warn', gaps: [] },
       sieves: scanOutgoing(outgoing.value),
       texts,
+      // Вопрос пункта 9 о комментарии назад в тикет (W2-D) — о записи ВНЕ MR: публикацию он не держит.
       openHumanPoints: Object.values(task.state.asks)
-        .filter((a) => a.state === 'open')
+        .filter((a) => a.state === 'open' && a.source !== 'tracker-write')
         .map((a) => a.point),
     },
   };
@@ -246,7 +250,13 @@ async function publishAllowed(
     .map(([actionId, a]) => ({ actionId, startedAt: a.startedAt }))
     .sort((a, b) => a.startedAt - b.startedAt)[0];
   const mr = await ensureMr(
-    { forge, forgeKind: forge.kind, outbox, self },
+    {
+      forge,
+      forgeKind: forge.kind,
+      outbox,
+      self,
+      ...(deps.commentBack ? { commentBack: deps.commentBack(task, outbox) } : {}),
+    },
     {
       unitId,
       url: view.url,

@@ -52,7 +52,8 @@ const PNG_1PX =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
 type BoolCap = {
-  [K in keyof AdapterCaps]: AdapterCaps[K] extends boolean ? K : never;
+  // `-?`: необязательная возможность (`loginLost`, этап 12) не даёт ключу `undefined`.
+  [K in keyof AdapterCaps]-?: Exclude<AdapterCaps[K], undefined> extends boolean ? K : never;
 }[keyof AdapterCaps];
 
 interface Stand {
@@ -519,6 +520,29 @@ const CASES: Case[] = [
     },
   },
   {
+    name: 'loginLost: the recorded «log in again» turn ends in error and the adapter names it; a normal turn does not',
+    needs: ['loginLost'],
+    when: (p) => p.fixtures.loginLost !== undefined,
+    async run(p) {
+      if (!p.fixtures.loginLost)
+        throw new Error('run without a loginLost fixture: `when` must skip it');
+      const r = await run(p, fx(p, p.fixtures.loginLost));
+      await r.adapter.send(r.handle, 'hello', A);
+      const end = await r.tap.until(ended);
+      expect(end).toMatchObject({ isError: true });
+      const text = end.type === 'turn.ended' ? (end.text ?? '') : '';
+      expect(r.adapter.loginLost?.(text)).toBe(true);
+      await r.adapter.stop(r.handle, 'soft');
+      const ok = await run(p, fx(p, p.fixtures.basic));
+      await ok.adapter.send(ok.handle, 'hello one', A);
+      const fine = await ok.tap.until(ended);
+      expect(ok.adapter.loginLost?.(fine.type === 'turn.ended' ? (fine.text ?? '') : '')).toBe(
+        false,
+      );
+      await ok.adapter.stop(ok.handle, 'soft');
+    },
+  },
+  {
     name: 'skills off reach the CLI as its own switch; skills on leave the CLI as is',
     needs: ['skillControl'],
     async run(p) {
@@ -638,6 +662,7 @@ describe('adapter conformance — P121 every declared cap has a case', () => {
     'subagents',
     'skillControl',
     'windowEvent',
+    'loginLost',
   ];
 
   it('the registry holds every profiled adapter, and every boolean cap is listed here', () => {

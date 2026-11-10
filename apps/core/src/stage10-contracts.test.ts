@@ -64,12 +64,15 @@ describe('stage-10 contracts', () => {
     expect(coreSupervisorStateSchema.safeParse({ ...up, extra: 1 }).success).toBe(false);
   });
 
-  it('relay notice: a question or the final report, with a panel link; no answer field', () => {
+  it('relay notice: a question only (report-final removed, s12 m3), with a panel link; no answer field', () => {
     const ask = { taskId: ID, askId: ID, kind: 'ask', title: 'дальше?', deepLink: '/core/tasks/x' };
     expect(relayNoticeSchema.safeParse(ask).success).toBe(true);
+    // Итог задачи телефону не сообщается: пуш — только о том, что ждёт человека.
     expect(relayNoticeSchema.safeParse({ ...ask, askId: null, kind: 'report-final' }).success).toBe(
-      true,
+      false,
     );
+    expect(relayNoticeSchema.safeParse({ ...ask, kind: 'report-final' }).success).toBe(false);
+    expect(relayNoticeSchema.safeParse({ ...ask, askId: null }).success).toBe(false);
     expect(relayNoticeSchema.safeParse({ ...ask, answer: 'да' }).success).toBe(false);
     expect(relayNoticeSchema.safeParse({ ...ask, taskId: 'task-1' }).success).toBe(false);
   });

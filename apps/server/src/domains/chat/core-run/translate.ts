@@ -36,7 +36,8 @@ const SAMPLE_WINDOWS = { five_hour: 'fiveHour', seven_day: 'sevenDay' } as const
 /**
  * Окно подписки сеанса ядра → событие `limit` ленты, как его строил прежний исполнитель из
  * `rate_limit_event` (`chat-events.ts`): сброс в секундах, имя окна, статус и замер загрузки
- * окон — реестр по нему ставит повтор после лимита и пишет долю лимита у чата (`limit-journal`).
+ * окон — реестр пишет по нему долю лимита у чата (`limit-journal`), лента — карточку лимита.
+ * Повтор после лимита ведёт ядро (этап 12, P171): панель слово не переотправляет.
  */
 function limitOf(raw: SessionStreamEvent['data'], now: number): Translated {
   const parsed = sessionWindowDataSchema.safeParse(raw);

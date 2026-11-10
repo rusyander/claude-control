@@ -51,12 +51,12 @@ const SETS = [
   {
     source: 'docs/diagrams/tests-guide/tests-guide.drawio',
     topic: 'tests',
-    pages: ['where-cases-live', 'what-turns-red'],
+    pages: ['where-cases-live', 'what-turns-red', 'recorded-replay'],
   },
   {
     source: 'docs/diagrams/chat-guide/chat-guide.drawio',
     topic: 'chat',
-    pages: ['message-path', 'deferred-asks'],
+    pages: ['message-path', 'deferred-asks', 'diff-notes', 'site-pick'],
   },
   {
     source: 'docs/diagrams/rules-guide/rules-guide.drawio',
@@ -156,7 +156,7 @@ const SETS = [
   {
     source: 'docs/diagrams/integrations-guide/integrations-guide.drawio',
     topic: 'integrations',
-    pages: ['who-calls-whom'],
+    pages: ['who-calls-whom', 'telegram-core'],
   },
   {
     source: 'docs/diagrams/dlp-guide/dlp-guide.drawio',
@@ -186,7 +186,17 @@ const SETS = [
   {
     source: 'docs/diagrams/core-guide/core-guide.drawio',
     topic: 'core',
-    pages: ['panel-to-core', 'launch-to-steps', 'lead-pipeline'],
+    pages: [
+      'panel-to-core',
+      'launch-to-steps',
+      'lead-pipeline',
+      'board-flow',
+      'takeover-loop',
+      'limit-window',
+      'group-lanes',
+      'inbox-flow',
+      'related-merge',
+    ],
   },
 ];
 

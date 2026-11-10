@@ -12,6 +12,7 @@ import { UPLOAD_ACCEPT_ATTRIBUTE } from '@agentdeck/contracts/uploads';
 import { carriesFiles, filesOf } from '@shared/lib/attach';
 import { hasRejections, planAttach } from '../../lib/attachments';
 import { ChatModeMenu } from '../ChatModeMenu/ChatModeMenu';
+import { ComposerChips } from '../ComposerChips/ComposerChips';
 import type { AttachedFile, ChatComposerProps } from './ChatComposer.types';
 import styles from './ChatComposer.module.scss';
 import { toAttachedFile } from '../../lib/toAttachedFile';
@@ -269,6 +270,9 @@ export function ChatComposer({
             ))}
           </Stack>
         )}
+
+        {/* Выбранные в окне сайта элементы: их описание уйдёт агенту вместе с текстом. */}
+        {!isMedia && <ComposerChips />}
 
         {/* Правка готовой колоды: что именно правится — на виду. «Поправь третий
             слайд» без названия колоды легко отправить не в ту, а отмена стоит

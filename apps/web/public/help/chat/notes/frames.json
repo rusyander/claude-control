@@ -1,0 +1,56 @@
+{
+  "topic": "chat",
+  "scenario": "notes",
+  "frames": [
+    {
+      "id": "01-notes",
+      "side": "panel",
+      "file": "01-notes.png",
+      "masked": 0,
+      "width": 1500,
+      "height": 984,
+      "shotAt": "2026-11-08T17:00:55.255Z",
+      "text": "Код проекта C:/work/orders-panel Изменённые (5) Все файлы ветка feature/orders-export · Изменено файлов: 5 · +128 −31 строк В ЭТОМ РАЗГОВОРЕ src/ parse.ts +2 −2 В РАБОЧЕМ ДЕРЕВЕ src/pages/Orders/ OrdersPage.tsx M src/pages/Orders/ export.ts A src/shared/api/ client.ts M notes.txt ? src/parse.ts Заметка Правки агента Сохранить 1 2 3 4 5 6 ⌄ + ● ● + + + export function parseOrder(line: string) { const parts = line.split(','); return { id: parts[0], total: parts[1] }; const parts = line.split(';'); const total = Number(parts[1]); return { id: parts[0], total }; } src/parse.ts:2 Разделитель берём из настройки, не литералом. src/parse.ts:3 Пустая строка — ошибка с номером. Заметок: 2 Агент свободен: заметки уйдут одним сообщением. Очистить В очередь Сейчас +2 −2",
+      "seal": {
+        "png": "92969b07a8d36e22",
+        "text": "4107ad8add478cb0"
+      },
+      "en": {
+        "file": "01-notes.en.png",
+        "masked": 0,
+        "width": 1500,
+        "height": 984,
+        "shotAt": "2026-11-08T17:01:36.410Z",
+        "text": "Project code C:/work/orders-panel Changed (5) All files branch feature/orders-export · Changed files: 5 · +128 −31 lines IN THIS CONVERSATION src/ parse.ts +2 −2 IN THE WORKING TREE src/pages/Orders/ OrdersPage.tsx M src/pages/Orders/ export.ts A src/shared/api/ client.ts M notes.txt ? src/parse.ts Note Agent edits Save 1 2 3 4 5 6 ⌄ + ● ● + + + export function parseOrder(line: string) { const parts = line.split(','); return { id: parts[0], total: parts[1] }; const parts = line.split(';'); const total = Number(parts[1]); return { id: parts[0], total }; } src/parse.ts:2 Take the separator from the settings, not a literal. src/parse.ts:3 An empty line is an error with its number. Notes: 2 The agent is idle: the notes go as one message. Clear Queue Now +2 −2",
+        "seal": {
+          "png": "9539ebc267d3492a",
+          "text": "28e0e65230265f0e"
+        }
+      },
+      "dark": {
+        "file": "01-notes.dark.png",
+        "masked": 0,
+        "width": 1500,
+        "height": 984,
+        "shotAt": "2026-11-08T17:02:17.987Z",
+        "text": "Код проекта C:/work/orders-panel Изменённые (5) Все файлы ветка feature/orders-export · Изменено файлов: 5 · +128 −31 строк В ЭТОМ РАЗГОВОРЕ src/ parse.ts +2 −2 В РАБОЧЕМ ДЕРЕВЕ src/pages/Orders/ OrdersPage.tsx M src/pages/Orders/ export.ts A src/shared/api/ client.ts M notes.txt ? src/parse.ts Заметка Правки агента Сохранить 1 2 3 4 5 6 ⌄ + ● ● + + + export function parseOrder(line: string) { const parts = line.split(','); return { id: parts[0], total: parts[1] }; const parts = line.split(';'); const total = Number(parts[1]); return { id: parts[0], total }; } src/parse.ts:2 Разделитель берём из настройки, не литералом. src/parse.ts:3 Пустая строка — ошибка с номером. Заметок: 2 Агент свободен: заметки уйдут одним сообщением. Очистить В очередь Сейчас +2 −2",
+        "seal": {
+          "png": "a3d528aae8822f21",
+          "text": "4107ad8add478cb0"
+        }
+      },
+      "darkEn": {
+        "file": "01-notes.dark.en.png",
+        "masked": 0,
+        "width": 1500,
+        "height": 984,
+        "shotAt": "2026-11-08T17:02:59.271Z",
+        "text": "Project code C:/work/orders-panel Changed (5) All files branch feature/orders-export · Changed files: 5 · +128 −31 lines IN THIS CONVERSATION src/ parse.ts +2 −2 IN THE WORKING TREE src/pages/Orders/ OrdersPage.tsx M src/pages/Orders/ export.ts A src/shared/api/ client.ts M notes.txt ? src/parse.ts Note Agent edits Save 1 2 3 4 5 6 ⌄ + ● ● + + + export function parseOrder(line: string) { const parts = line.split(','); return { id: parts[0], total: parts[1] }; const parts = line.split(';'); const total = Number(parts[1]); return { id: parts[0], total }; } src/parse.ts:2 Take the separator from the settings, not a literal. src/parse.ts:3 An empty line is an error with its number. Notes: 2 The agent is idle: the notes go as one message. Clear Queue Now +2 −2",
+        "seal": {
+          "png": "96fb2b98028ec949",
+          "text": "28e0e65230265f0e"
+        }
+      }
+    }
+  ]
+}

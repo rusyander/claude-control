@@ -67,6 +67,7 @@ export function ChatMessages({
   onDismissError,
   onCompact,
   onFreshSession,
+  errorAside,
   onRefresh,
   onKeepSession,
   costUnit,
@@ -384,6 +385,7 @@ export function ChatMessages({
         onCompact={onCompact}
         onFreshSession={onFreshSession}
       />
+      {errorAside}
 
       <div ref={feed.bottomRef} />
     </div>

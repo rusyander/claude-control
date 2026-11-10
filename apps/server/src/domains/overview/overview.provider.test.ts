@@ -85,4 +85,11 @@ describe('buildOverview по активному провайдеру', () => {
     expect(overview.skills?.total).toBe(2);
     expect(overview.permissions?.allow).toBe(4);
   });
+
+  // «Группы» в меню и на плитке считают открытые дорожки групп ядра (useCoreGroupLaneCount);
+  // прежний счёт наборов настроек читателей не имеет и в ответ не попадает ни под каким CLI.
+  it.each(['claude', 'qwen'])('%s: счёта групп в обзоре нет', (provider) => {
+    const overview = buildOverview(detectClaudeLocation().paths, storeWith(provider));
+    expect(Object.keys(overview)).not.toContain('groups');
+  });
 });

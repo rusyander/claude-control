@@ -5,7 +5,9 @@ import {
   SESSION_APPEND_MAX,
   SESSION_SYSTEM_PROMPT_MAX,
   SETTING_SOURCES,
+  sessionHooksSchema,
   type LocalLayerCarry,
+  type SessionHooks,
   type SettingSource,
 } from '@agentdeck/contracts/core/session-carry';
 import { claudeRunFacts } from '@agentdeck/providers/claude';
@@ -184,9 +186,38 @@ export function carriedEnvOf(
 }
 
 /**
+ * Настройки профиля чата (`RunOptions.platformSettings`) → поле `session.hooks` (s12). Прежний
+ * исполнитель клал их своим `--settings`; у ядра `--settings` один — его, и из настроек профиля
+ * оно несёт только хуки. Иной ключ — отказ хода по имени, а не тихая потеря (доктрина выше).
+ */
+export function hooksOfSettings(
+  settings: Readonly<Record<string, unknown>> | undefined,
+): { ok: true; hooks?: SessionHooks } | { ok: false; reason: string } {
+  const foreign = Object.keys(settings ?? {}).filter((key) => key !== 'hooks');
+  if (foreign.length > 0) {
+    return {
+      ok: false,
+      reason: `panel profile settings ${foreign.join(', ')} have no core session field — the core carries only hooks`,
+    };
+  }
+  if (settings?.hooks === undefined) return { ok: true };
+  const parsed = sessionHooksSchema.safeParse(settings.hooks);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    return {
+      ok: false,
+      reason:
+        `panel profile hooks do not fit the core session: ${issue?.path.join('.') ?? ''} ${issue?.message ?? ''}`.trim(),
+    };
+  }
+  return Object.keys(parsed.data).length > 0 ? { ok: true, hooks: parsed.data } : { ok: true };
+}
+
+/**
  * Из частей — поля сеанса и значения; пустые части не создают полей. `systemPrompt` — промпт
  * контура (`PlatformRunRoute.systemPrompt`): прежний исполнитель клал его `--system-prompt-file`
- * ВМЕСТО промпта CLI, ядро получает его тем же смыслом полем `session.systemPrompt`.
+ * ВМЕСТО промпта CLI, ядро получает его тем же смыслом полем `session.systemPrompt`. `settings` —
+ * настройки профиля чата (`hooksOfSettings`).
  */
 export function buildCarry(input: {
   append: string;
@@ -194,6 +225,7 @@ export function buildCarry(input: {
   env: Record<string, string>;
   systemPrompt?: string;
   localLayer?: LocalLayerCarry;
+  settings?: Readonly<Record<string, unknown>>;
 }): CarryOutcome {
   if (input.append.length > SESSION_APPEND_MAX) {
     return {
@@ -222,11 +254,14 @@ export function buildCarry(input: {
     };
   }
   const localLayer = layer?.success && Object.keys(layer.data).length > 0 ? layer.data : undefined;
+  const profile = hooksOfSettings(input.settings);
+  if (!profile.ok) return profile;
   const { plugins, ...narrowing } = args.parsed;
   const names = Object.keys(input.env);
   const session: CoreSession = {
     ...(systemPrompt ? { systemPrompt } : {}),
     ...(localLayer ? { localLayer } : {}),
+    ...(profile.hooks ? { hooks: profile.hooks } : {}),
     ...(input.append ? { append: input.append } : {}),
     ...(plugins.length > 0 ? { plugins } : {}),
     ...narrowing,
@@ -267,5 +302,7 @@ export function carryOfRunOptions(options: RunOptions): CarryOutcome {
     env: carriedEnvOf(options.platformEnv),
     ...(options.platformSystemPrompt ? { systemPrompt: options.platformSystemPrompt } : {}),
     ...(options.localLayer ? { localLayer: options.localLayer } : {}),
+    // Хуки профиля чата (список задач трекера без описаний) — полем `session.hooks` (s12).
+    ...(options.platformSettings ? { settings: options.platformSettings } : {}),
   });
 }

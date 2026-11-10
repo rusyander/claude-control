@@ -104,15 +104,22 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
     else ended(o.stepId, line.sessionId, o);
   });
 
-  const events = (stepId: string, to: () => SessionEvents | undefined) => {
+  const events = (stepId: string, to: () => SessionEvents | undefined, adapter: CliAdapter) => {
     // Инструмент считается по запросу и результату: конец хода с открытым — не безопасная точка.
     const tools = new Set<string>();
     return (event: AdapterEvent): void => {
       deps.onEvent?.(stepId, event);
       const on = to();
       if (!on) return;
-      if (event.type === 'turn.ended') on.turnEnded();
-      else if (event.type === 'tool.requested' && !tools.has(event.toolUseId)) {
+      if (event.type === 'turn.ended') {
+        // Этап 12 (P170): ошибка хода с текстом CLI «войдите заново» — до конца хода, решит
+        // перечитанный вход (`conductor/human/login-ask.ts`). Любая ошибка хода — тоже до конца
+        // хода: слово человека без ответа чат повторит новой сессии (этап 12, L3).
+        if (event.isError) on.turnError?.(event.text ?? '');
+        if (event.isError && event.text && adapter.loginLost?.(event.text) === true)
+          on.loginLost?.(event.text);
+        on.turnEnded();
+      } else if (event.type === 'tool.requested' && !tools.has(event.toolUseId)) {
         tools.add(event.toolUseId);
         on.tool(1);
       } else if (event.type === 'tool.result' && tools.delete(event.toolUseId)) on.tool(-1);
@@ -184,7 +191,7 @@ export function roadSessionPort(deps: RoadPortDeps): SessionPort & {
         cwd: start.cwd,
         resumed: resumed !== undefined,
         ...(resumed?.replayed === undefined ? {} : { replayed: resumed.replayed }),
-        onEvent: events(s.stepId, () => target.on),
+        onEvent: events(s.stepId, () => target.on, adapter),
       });
       const entry: Open = Object.assign(target, { handle, adapter, road, stepId: s.stepId });
       void road.done.then(() => ended(s.stepId, sessionId, entry));

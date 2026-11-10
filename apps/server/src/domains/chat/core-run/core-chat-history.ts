@@ -20,7 +20,9 @@ import {
   coreChatHistoryEntry,
   type CoreChatHistoryEntry,
 } from './core-chat-book.ts';
+import { adoptTakeoverChat } from './core-chat-adopt.ts';
 import type { CoreChatPort } from './core-run.types.ts';
+import type { CoreStepSessions } from './core-step-sessions.ts';
 
 /**
  * История разговора не-Claude CLI (этап 11, волна 3): лента, список чатов и отпечаток для опроса —
@@ -289,12 +291,21 @@ export interface CoreChatHistory {
   ): Promise<ChatMessagesPage | undefined>;
   /** Отпечаток для опроса `/version`: `mtimeMs` — стена последнего хода, `size` — байты вывода. */
   version(id: string): Promise<{ mtimeMs: number; size: number } | undefined>;
+  /** Разговор задачи ядра; чат перехвата, которого книга не знает, — усыновить (`core-chat-adopt`). */
+  adopt(taskId: string): Promise<string | undefined>;
+  /**
+   * Id сеансов, что ядро открыло под шаги задачи (не `chat`): их транскрипты — не разговоры
+   * человека, списки чатов их не показывают (`core-step-sessions.ts`).
+   */
+  stepSessions(): Promise<ReadonlySet<string>>;
 }
 
 export function createCoreChatHistory(
   port: HistoryPort,
   /** Файл книги — спросом: каталог данных панели меняется вместе с выбором папки конфигурации. */
   bookFile: () => string,
+  /** Нет — списки ничего не прячут (тесты ленты, панель без ядра). */
+  steps?: CoreStepSessions,
 ): CoreChatHistory {
   /** Свёртки задач: кончившаяся задача на том же числе журнала читается из памяти. */
   const folds = new Map<string, TaskFold>();
@@ -356,6 +367,8 @@ export function createCoreChatHistory(
   }
 
   return {
+    adopt: (taskId) => adoptTakeoverChat(port, bookFile(), taskId),
+    stepSessions: () => steps?.ids() ?? Promise.resolve(new Set<string>()),
     async summaries() {
       const out: ChatSummary[] = [];
       for (const entry of coreChatHistoryEntries(bookFile())) {

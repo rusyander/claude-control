@@ -21,6 +21,7 @@ import type { LiveTask } from '../../journal/resume.ts';
 import { readJournalLines } from '../../journal/read-lines.ts';
 import type { SessionRoad } from '../session-road.ts';
 import { createEndCloser, OPEN_SESSION } from './close-ended.ts';
+import { cliLoginRouteId } from '../../routes/cli-login/cli-login.ts';
 import type { LoopOptions } from './conductor-wiring.types.ts';
 import { roadSessionPort, type ResumedSession, type RoadPortDeps } from './loop.ts';
 import { journaledSessionDir, processPin, stepStart } from './session-start.ts';
@@ -312,6 +313,12 @@ export function startLoops(deps: LoopsDeps): Loops {
       ...(deps.allocator ? { allocator: deps.allocator } : {}),
       ...(deps.xl ? { xl: deps.xl } : {}),
       ...(options.upkeepEveryMs === undefined ? {} : { upkeepEveryMs: options.upkeepEveryMs }),
+      // Этап 12 (P170): вход маршрута «свой вход CLI» перечитывает переходник его CLI; маршрут с
+      // адресом или переходник без чтения — `unknown` (обычный путь сбоя хода).
+      loginState: async (adapterId, routeId) => {
+        const read = deps.adapters.get(adapterId)?.loginState;
+        return read && routeId === cliLoginRouteId(adapterId) ? read() : 'unknown';
+      },
     });
     deps.note('loop.started', { taskId: task.taskId, resumed: resumed.size });
     return { task, run, release: () => port.release() };

@@ -5,7 +5,9 @@ import { SkeletonTiles } from '@shared/ui/skeleton';
 import { PageHeader } from '@shared/ui/page-header';
 import { apiClient } from '@shared/api/client';
 import { queryKeys } from '@shared/api/query-keys';
+import { CORE_GROUP_LANES_SEARCH, CORE_TASKS_ROUTE } from '@shared/config/routes';
 import { useLocation, useOverview } from '@entities/AppConfig';
+import { useCoreGroupLaneCount } from '@entities/CoreTask';
 import { activeProvider, useProviders } from '@entities/Provider';
 import { LocationCard } from '../LocationCard/LocationCard';
 import { StatTile } from '../StatTile/StatTile';
@@ -20,6 +22,12 @@ export function OverviewPage() {
   const { data: location } = useLocation();
   const { data: overview, isLoading } = useOverview();
   const { data: providers } = useProviders();
+  // «Группы» ведут в полосы групп доски ядра — число оттуда же; ответа нет — «—».
+  const { count: groupLanes, failed: groupsFailed } = useCoreGroupLaneCount();
+  const groupsHint = (count: number | undefined): string | undefined => {
+    if (count === undefined) return groupsFailed ? t('overview.groupsUnknown') : undefined;
+    return count > 0 ? t('overview.groupsHint', { count }) : t('overview.groupsEmpty');
+  };
   // Чей конфиг посчитан — говорит сам обзор; пока его нет, подпись по выбранному провайдеру.
   const providerName = overview?.provider.name ?? activeProvider(providers)?.name ?? 'Claude Code';
   const isClaude = (overview?.provider.id ?? 'claude') === 'claude';
@@ -178,13 +186,10 @@ export function OverviewPage() {
           <StatTile
             icon="groups"
             label={t('nav.groups')}
-            value={overview.groups.total}
-            hint={
-              overview.groups.total > 0
-                ? t('overview.groupsHint', { count: overview.groups.total })
-                : t('overview.groupsEmpty')
-            }
-            to="/groups"
+            value={groupLanes ?? '—'}
+            hint={groupsHint(groupLanes)}
+            to={CORE_TASKS_ROUTE}
+            search={{ ...CORE_GROUP_LANES_SEARCH }}
           />
           <StatTile
             icon="file"

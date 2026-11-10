@@ -498,6 +498,26 @@
       "document": "apps/web/src/pages/Help/topics/ChatTopic/ChatTopic.tsx",
       "sources": [
         {
+          "path": "apps/server/src/domains/site-preview/proxy.ts",
+          "why": "«Окно сайта»: прокси на 127.0.0.1 только над запуском панели, скрипт выбора в страницу, чужие адреса не открывает",
+          "sha": "1a7989b66adec84d"
+        },
+        {
+          "path": "apps/server/src/domains/site-preview/hub.ts",
+          "why": "«Окно сайта»: одноразовый ключ окна, закрытие при остановке dev-сервера, маскировка секретов и предел 4 КБ разметки",
+          "sha": "804a887b04adb5da"
+        },
+        {
+          "path": "apps/web/src/features/SitePreview/ui/SitePreview/SitePreview.tsx",
+          "why": "«Окно сайта»: кнопки «Выбрать элемент», «Обновить страницу», «Открыть в браузере», «Закрыть», Escape",
+          "sha": "953cf40aa50b38d1"
+        },
+        {
+          "path": "apps/web/src/pages/Chat/ChatPage/useSitePick.ts",
+          "why": "«Окно сайта»: полоса над лентой, чип в поле ввода, окно картинки/презентации/агента закрывает окно сайта",
+          "sha": "2f782683550e7ae7"
+        },
+        {
           "path": "apps/server/src/domains/chat/tests-gate/tests-gate.ts",
           "why": "Доставка группы: какие кейсы держат «доставлено», красное не из-за ветки — заметка в MR, а не остановка",
           "sha": "50965e8a83a7f6c4"
@@ -505,7 +525,7 @@
         {
           "path": "apps/server/src/domains/chat/core-run/core-run.ts",
           "why": "«Путь одного сообщения»: ход чата задачей ядра — сообщение шагу или оценка chat, set-cli, запуск; отказы по имени; вопрос права карточкой, ответ ядру шлёт окно",
-          "sha": "80bacd0370e20136"
+          "sha": "236fd55e58789761"
         },
         {
           "path": "apps/web/src/pages/Chat/lib/corePermit.ts",
@@ -593,9 +613,9 @@
           "sha": "8d575049f9acedf7"
         },
         {
-          "path": "apps/web/src/features/CoreAsk/model/askCommands.ts",
+          "path": "packages/contracts/src/core/ask-commands.ts",
           "why": "«Правки в чате другого CLI»: просьба за пределами корня — карточка вопроса ядра: выдать право (проект, пути, действия) или отказать",
-          "sha": "73ea59ea154fe26f"
+          "sha": "388137d5544db44b"
         },
         {
           "path": "apps/web/src/features/ChatList/lib/rows.ts",
@@ -740,7 +760,7 @@
         {
           "path": "apps/core/src/policy/human-point/human-point.ts",
           "why": "«Что задача решает сама»: закрытый список действий, которые ждут человека, своя доставка без человека, остальное — развилка в отчёт",
-          "sha": "0e4b6331e5875977"
+          "sha": "c5c887829023a3a0"
         },
         {
           "path": "apps/core/src/bootstrap/session-road/economy.ts",
@@ -750,7 +770,7 @@
         {
           "path": "packages/contracts/src/core/config.ts",
           "why": "«Экономия шагов»: умолчания рычагов (CORE_ECONOMY_DEFAULTS) и границы раздела economy",
-          "sha": "f4030f594c8517a3"
+          "sha": "af1d95e6fcf3fd8f"
         },
         {
           "path": "apps/core/src/observer/catalog.ts",
@@ -805,20 +825,65 @@
         {
           "path": "apps/server/src/domains/chat/core-run/core-chat-book.ts",
           "why": "«Один чат для всех CLI»: разговор → задача ядра; после перезапуска панели ход идёт живому шагу, а не новой задаче",
-          "sha": "c4fa17695ac39fe5"
+          "sha": "ed5cb28cef3d4248"
         },
         {
           "path": "apps/server/src/domains/chat/core-run/core-chat-history.ts",
           "why": "«Один чат для всех CLI»: лента и список разговоров другого CLI — из видов сеансов ядра, не из транскрипта CLI",
-          "sha": "cd47972de2dd55a5"
+          "sha": "f7fa95eaeef8c945"
         },
         {
           "path": "apps/server/src/domains/chat/core-foreign/foreign-carry.ts",
           "why": "«Правки в чате другого CLI»: сеанс другого CLI получает строку о «Тестах» и набор панели для этого CLI",
           "sha": "4fd25b51cdaccef3"
+        },
+        {
+          "path": "apps/web/src/features/ChatLimitCard/ui/ChatLimitCard/ChatLimitCard.tsx",
+          "why": "«Лимит подписки: ждать или перевести»: карточка, «Ждать сброса», переводы, повтор сообщения один раз",
+          "sha": "c00502cccfb8a0dd"
+        },
+        {
+          "path": "apps/web/src/features/ChatLimitCard/model/chatLimit.ts",
+          "why": "«Лимит подписки»: когда карточка стоит, какие переводы предлагаются и когда уходит",
+          "sha": "26e1cf5f55c46c00"
+        },
+        {
+          "path": "apps/web/src/features/ChatLimitCard/model/useCarryTo.ts",
+          "why": "«Перевести, не дожидаясь»: смена CLI и перенос разговора",
+          "sha": "09c47b778715dfd1"
+        },
+        {
+          "path": "apps/web/src/pages/Chat/ChatHeader/CoreBoardButton/CoreBoardButton.tsx",
+          "why": "«Кнопка «Доска» в шапке»: число ждущих карточек всей доски",
+          "sha": "abb89d0d5be4f929"
+        },
+        {
+          "path": "apps/web/src/features/ProjectCode/model/useDiffNotes.ts",
+          "why": "«Заметки к строкам правок»: лоток на разговор, очистка только после принятия",
+          "sha": "03fe19d601d88cc7"
+        },
+        {
+          "path": "apps/web/src/features/ProjectCode/model/sendNotes.ts",
+          "why": "«Сейчас» или «В очередь»: слово на ходу, следующий ход, обычная отправка",
+          "sha": "3d7a779ccb153e7f"
+        },
+        {
+          "path": "apps/web/src/features/ProjectCode/lib/notesMessage.ts",
+          "why": "«Заметки»: одно сообщение с блоками «путь:строка»",
+          "sha": "dbbb449c354f8c2c"
+        },
+        {
+          "path": "apps/server/src/domains/chat/core-run/core-step-sessions.ts",
+          "why": "«Что перешло в ядро задач» → «Разделить»: сеансы шагов задач ядра в список чатов не попадают, чат через ядро и чат перехвата остаются",
+          "sha": "0960c61c91addb5c"
+        },
+        {
+          "path": "apps/web/src/features/SitePreview/model/useSitePreview.ts",
+          "why": "«Окно сайта»: окно закрывается само при остановке или перезапуске цели, полоса «Сайт:» открывает новый запуск",
+          "sha": "e73a53d293371da0"
         }
       ],
-      "confirmedAt": "2026-11-07T13:15:04.437Z"
+      "confirmedAt": "2026-11-09T18:51:18.290Z"
     },
     {
       "topic": "tests",
@@ -842,7 +907,7 @@
         {
           "path": "apps/web/src/pages/Tests/TestsRunsTab/TestsRunsTab.tsx",
           "why": "«Прогоны агента»: ссылка «Открыть задачу ядра» у прогона через ядро",
-          "sha": "2d6ede2127f5ca90"
+          "sha": "4828772b67a8b46f"
         },
         {
           "path": "apps/server/src/domains/project-tests/impact/impact.ts",
@@ -997,7 +1062,7 @@
         {
           "path": "tools/tests-cli.mjs",
           "why": "«Без панели»: sync и run, --case/--group, --memo/--fresh, предел времени прогона, код 124, снятие при синхронной блокировке",
-          "sha": "f986be2c081d8ce9"
+          "sha": "b86c5d37d60c22f8"
         },
         {
           "path": "tools/tests-cli-parts.mjs",
@@ -1027,7 +1092,7 @@
         {
           "path": "apps/server/src/domains/project-tests/export-run/export-run.ts",
           "why": "«Прогон лёг в историю»: подпись записи в заголовке MD/HTML/PDF и столбец CSV «Запись»",
-          "sha": "afe85abfa81c925f"
+          "sha": "87186eea29db8d44"
         },
         {
           "path": "apps/server/src/domains/project-tests/mutation/mutation.ts",
@@ -1078,9 +1143,64 @@
           "path": "apps/server/src/domains/project-tests/red-verdict/red-verdict.ts",
           "why": "Проверка конца хода: исполненный красный не снимается записью «прошёл» словом",
           "sha": "8c3dbfdb5307309b"
+        },
+        {
+          "path": "apps/web/src/pages/Tests/TestsToBoard/TestsToBoard.tsx",
+          "why": "«Красный кейс — на доску ядра»:кнопка «На доску» у проваленного кейса и запись во «Входящие»",
+          "sha": "ad93633c8c463c27"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/recorded/record.ts",
+          "why": "«Сценарии» → «Записать сценарий»: удавшиеся шаги прохода в кейс и спек, пробелы — «не проверено», кейс человека не перезаписывается",
+          "sha": "33cb22e7b6ff4cfb"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/recorded/codegen.ts",
+          "why": "«Сценарии», «Чего запись не делает»: спек без времени и без секретов, снимки экрана не воспроизводятся",
+          "sha": "e655a8782939c555"
+        },
+        {
+          "path": "apps/server/src/domains/project-tests/recorded/replay.ts",
+          "why": "«Прогнать все»: без модели, встаёт на первом упавшем шаге, проход открывается только на расхождении",
+          "sha": "f3a3baceacb6c063"
+        },
+        {
+          "path": "apps/web/src/pages/Tests/TestsRecordedTab/RecordedMismatchCard.tsx",
+          "why": "«Первое расхождение»: «Дефект продукта» против «Сценарий устарел», «Перезаписать из прохода» после конца прохода",
+          "sha": "060eb4f38a265040"
+        },
+        {
+          "path": "apps/web/src/pages/Tests/TestsRecordedTab/RecordedCaseRow.tsx",
+          "why": "«Список сценариев»: полоска прогонов, «не проверено», ссылка на задачу записи",
+          "sha": "aee428b7d3119a98"
+        },
+        {
+          "path": "apps/core/src/adapters/browser/stand-origins.ts",
+          "why": "«Где ходит проход»: только стенды проекта и петля, порты панели — никогда, уход со стенда — origin-not-allowed",
+          "sha": "134cf79742e11cf3"
+        },
+        {
+          "path": "apps/core/src/adapters/browser/stand-secrets.ts",
+          "why": "«Доступ стенда в проходе», «Отказы прохода»: доступ только на своём стенде, коды secret-*",
+          "sha": "7891fc8f30a8b6ff"
+        },
+        {
+          "path": "apps/core/src/adapters/browser/no-browser.ts",
+          "why": "«Отказы прохода»: no-browser и команда установки Chromium",
+          "sha": "1a10affd41d9eb78"
+        },
+        {
+          "path": "apps/web/src/pages/Tests/TestsRecordedTab/RecordWalkModal.tsx",
+          "why": "«1. Записать сценарий»: проход стартует сам, переживает закрытие окна, «Новый проход»",
+          "sha": "303679f80255b18d"
+        },
+        {
+          "path": "apps/web/src/pages/Tests/TestsRecordedTab/recordedApi.ts",
+          "why": "«1. Записать сценарий»: проход хранится до закрытия вкладки и после перезагрузки",
+          "sha": "f877b5991f04c2ec"
         }
       ],
-      "confirmedAt": "2026-11-04T12:11:55.028Z"
+      "confirmedAt": "2026-11-09T18:51:18.417Z"
     },
     {
       "topic": "rules",
@@ -1276,7 +1396,7 @@
           "sha": "e9f3fb111b31ee12"
         }
       ],
-      "confirmedAt": "2026-11-03T11:53:05.341Z"
+      "confirmedAt": "2026-11-08T16:16:33.293Z"
     },
     {
       "topic": "mcp",
@@ -1607,12 +1727,12 @@
     {
       "topic": "overview",
       "document": "apps/web/src/pages/Help/topics/OverviewTopic/OverviewTopic.tsx",
-      "confirmedAt": "2026-10-08T12:34:14.600Z",
+      "confirmedAt": "2026-11-08T16:12:55.793Z",
       "sources": [
         {
           "path": "apps/server/src/domains/overview/overview.ts",
           "why": "«Что считают плитки»: счётчики собираются теми же читалками, что и разделы; «действует» и «сломано» — отдельные числа",
-          "sha": "a185c339d57d5be1"
+          "sha": "ee3203bfaa8722f1"
         },
         {
           "path": "apps/server/src/domains/overview-provider.ts",
@@ -1959,7 +2079,7 @@
     {
       "topic": "providers",
       "document": "apps/web/src/pages/Help/topics/ProvidersTopic/ProvidersTopic.tsx",
-      "confirmedAt": "2026-11-07T09:21:52.028Z",
+      "confirmedAt": "2026-11-08T16:14:40.316Z",
       "sources": [
         {
           "path": "apps/server/src/providers/registry.ts",
@@ -1989,12 +2109,12 @@
         {
           "path": "apps/core/src/adapters/gemini/gemini.ts",
           "why": "«Чат и помощник»: Gemini CLI продолжает разговор (caps.resume, session/load ACP)",
-          "sha": "320e4fbd76149900"
+          "sha": "2e80ca2f1947847a"
         },
         {
           "path": "apps/core/src/adapters/opencode/opencode.ts",
           "why": "«Чат и помощник»: у OpenCode продолжения нет (caps.resume false)",
-          "sha": "8247115ea0623e62"
+          "sha": "017c684f238f7b52"
         },
         {
           "path": "apps/core/src/adapters/gateless.ts",
@@ -2043,7 +2163,7 @@
     {
       "topic": "integrations",
       "document": "apps/web/src/pages/Help/topics/IntegrationsTopic/IntegrationsTopic.tsx",
-      "confirmedAt": "2026-11-03T15:54:05.518Z",
+      "confirmedAt": "2026-11-09T18:51:18.633Z",
       "sources": [
         {
           "path": "apps/server/src/domains/integrations/store/store.ts",
@@ -2083,7 +2203,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/service.ts",
           "why": "«Ответы из Telegram»: кто может ответить, однократные кнопки, устаревшее нажатие, ответы reply в чат, две минуты тишины после старта и сна",
-          "sha": "08ea1a16758b8543"
+          "sha": "8abb263e61bea3ba"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-text.ts",
@@ -2103,7 +2223,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram.ts",
           "why": "«Задача закрыта или агент ждёт решения»: 20 секунд до суда о прогоне панели, повтор вопроса не идёт, одна карточка на ход",
-          "sha": "4f637483481f2a35"
+          "sha": "b5a786b208979896"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-delivery.ts",
@@ -2118,7 +2238,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/commands.ts",
           "why": "«Команды бота»: /status (имена под маской), /waiting, /clear, /help",
-          "sha": "1450a434110744f8"
+          "sha": "6f024e8372d646e0"
         },
         {
           "path": "apps/web/src/features/IntegrationsEditor/ui/TelegramConnect/TelegramConnect.tsx",
@@ -2138,7 +2258,7 @@
         {
           "path": "apps/web/src/features/IntegrationsEditor/model/telegramCard.ts",
           "why": "«Когда звать»: группы над событиями, кнопки ответа всегда под «ждёт тебя», что значит ошибка",
-          "sha": "d58da998d48753bc"
+          "sha": "d1396f5e16313348"
         },
         {
           "path": "apps/web/src/features/IntegrationsEditor/ui/TelegramAdvanced/TelegramAdvanced.tsx",
@@ -2148,7 +2268,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/compose.ts",
           "why": "«Сообщение»: «вид · суть», хэштег и чат, цитата, ссылка, сворачивание отвеченного в строку итога",
-          "sha": "0ec14ad55f1535f4"
+          "sha": "ad36448bf2de093b"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-answers/collect.ts",
@@ -2158,7 +2278,7 @@
         {
           "path": "apps/server/src/domains/notify/telegram-answers/apply.ts",
           "why": "«Ответы из Telegram»: нажатие на старое сообщение о вопросе ядра — названный отказ «🔒 Ответ ядру — в панели или с телефона»",
-          "sha": "14b0cbad4fd36483"
+          "sha": "941d4fcc5d137e37"
         },
         {
           "path": "apps/server/src/domains/notify/telegram-answers/cleanup.ts",
@@ -2178,7 +2298,27 @@
         {
           "path": "apps/server/src/domains/notify/core-notice.ts",
           "why": "«Ответы из Telegram»: вопрос ядра задач без кнопок, reply на него — отказ со ссылкой, ответ только в панели или с телефона",
-          "sha": "a027a14520ca6805"
+          "sha": "aa9bed1491500ef4"
+        },
+        {
+          "path": "apps/web/src/features/IntegrationsEditor/ui/TelegramCoreBinding/TelegramCoreBinding.tsx",
+          "why": "«Telegram и ядро задач»: переключатель «Отвечать ядру из Telegram», поле репозиториев /task",
+          "sha": "a318db479111ab37"
+        },
+        {
+          "path": "apps/server/src/domains/notify/telegram-notices/compose.ts",
+          "why": "«Уведомления о задачах»: четыре вида, кнопки «На доработку», «Стоп», «Открыть MR», перевод окна",
+          "sha": "043ed83ea5477544"
+        },
+        {
+          "path": "apps/server/src/domains/notify/telegram-notices/quiet.ts",
+          "why": "«Тихие часы»: что держится, сводка в конце окна",
+          "sha": "30fcd3c237c2a5df"
+        },
+        {
+          "path": "apps/server/src/domains/notify/telegram-notices/launch.ts",
+          "why": "«Задача из Telegram — /task»: запись во «Входящие», «В работу» и отказы старта",
+          "sha": "5741b572ac99daf6"
         }
       ]
     },
@@ -2363,7 +2503,7 @@
         {
           "path": "apps/server/src/domains/panel-agent/help-topics/help-topics.ts",
           "why": "«Как агент связывает разделы»: строки links* и карта разделов уходят агенту в промпт дословно; «Спросить, как сделать» — поиск по справке",
-          "sha": "fb83f1a55fe6fe5b"
+          "sha": "e1b4b89b045d69a8"
         },
         {
           "path": "apps/server/src/domains/panel-agent/data-mask/data-mask.ts",
@@ -2483,7 +2623,7 @@
         {
           "path": "apps/server/src/routes/panel-agent/actions-panel/actions-panel.ts",
           "why": "«Что агент умеет»: обзор, поиск, аналитика, сравнение — чтение",
-          "sha": "626b935105c3f544"
+          "sha": "8e8be2fa6edfb8f2"
         },
         {
           "path": "apps/server/src/routes/panel-agent/help-routes.ts",
@@ -2601,7 +2741,7 @@
           "sha": "7c771e51441ebc81"
         }
       ],
-      "confirmedAt": "2026-11-07T09:21:37.751Z"
+      "confirmedAt": "2026-11-10T11:09:07.804Z"
     },
     {
       "topic": "portability",
@@ -2645,50 +2785,15 @@
         {
           "path": "apps/server/src/routes/portability-carry-routes/portability-carry-routes.ts",
           "why": "Кто попадает в список кандидатов, у кого заводится разговор и куда ложится заметка",
-          "sha": "88e8c42c6b992f03"
+          "sha": "516bcfdcb4c2447e"
         }
       ],
-      "confirmedAt": "2026-11-07T09:21:45.184Z"
+      "confirmedAt": "2026-11-08T16:14:07.394Z"
     },
     {
       "topic": "groups",
       "document": "apps/web/src/pages/Help/topics/GroupsTopic/GroupsTopic.tsx",
       "sources": [
-        {
-          "path": "apps/web/src/pages/Groups/GroupsPage/GroupsPage.tsx",
-          "why": "«Что изменилось», кадр 02: задачи ядра сверху, прежние группы блоком с вкладками ниже",
-          "sha": "6e3eef6c94d3f300"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/GroupTile/GroupTile.tsx",
-          "why": "«Прежние группы — только чтение»: что на карточке и когда у неё есть «В ядро»",
-          "sha": "30d3708459e50ed2"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/model/tileStepTitles.ts",
-          "why": "карточка: первые три шага «Пути» и число остальных",
-          "sha": "1c693f5104353bad"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/CoreGroupsSection/CoreGroupsSection.tsx",
-          "why": "кадр 01: строка задачи ядра, «Новая задача», «Открыть ленту»",
-          "sha": "8cc5f4afd4394103"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/CoreImportDialog/CoreImportDialog.tsx",
-          "why": "кадр 03: шаги перевода, отказ с названными шагами, сохранить нельзя при проблемах",
-          "sha": "ef64989a13045aca"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/model/coreImport.ts",
-          "why": "«В ядро»: какой запуск открывается после сохранения сценария, язык названий шагов",
-          "sha": "ea008163701cad04"
-        },
-        {
-          "path": "apps/web/src/pages/Groups/LegacyRuns/LegacyRuns.tsx",
-          "why": "кадр 01: прежние запуски — состояние, дата, группы плана",
-          "sha": "2c151ba193d6a224"
-        },
         {
           "path": "apps/server/src/domains/groups/legacy-runs/legacy-runs.ts",
           "why": "«Прежние запуски видны»: какие состояния бывают у прежнего запуска",
@@ -2707,20 +2812,55 @@
         {
           "path": "apps/core/src/conductor/intake/group.ts",
           "why": "«Что изменилось»: группа пунктов — по задаче на пункт, общий groupId, каждая тем же путём оценки",
-          "sha": "99b0443149ff9b71"
+          "sha": "58f4da420dcda1ac"
         },
         {
           "path": "apps/web/src/features/CoreLaunch/model/groupLaunch.ts",
           "why": "«Что изменилось»: кнопка запуска группы запускает все её задачи",
           "sha": "d784ae11b7291963"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/CoreBoard.tsx",
+          "why": "«Группы на доске»: полосы групп, фильтр «По группам», чипы групп, адрес /groups",
+          "sha": "1adf427a8d0ba341"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/BoardClosed.tsx",
+          "why": "«Закрытые»: закрытые задачи и прежние запуски групп",
+          "sha": "485e1290c6e18c23"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/BoardImport.tsx",
+          "why": "«Импорт пунктов»: кнопка в шапке доски",
+          "sha": "9cd11075cfe50104"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreImportDialog/CoreImportDialog.tsx",
+          "why": "«Импорт пунктов»: выбор группы, шаги сценария, «Сохранить и открыть запуск»",
+          "sha": "490f94b1f6427382"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/LegacyRuns/LegacyRuns.tsx",
+          "why": "«Прежние запуски групп»: только чтение, недоведённый запуск остановлен",
+          "sha": "1fa07b6ab642bb84"
+        },
+        {
+          "path": "apps/web/src/entities/CoreTask/model/board.ts",
+          "why": "«Группы на доске»: полоса группы и её счётчик",
+          "sha": "d50072a5b80144d4"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/model/coreImport.ts",
+          "why": "«Импорт пунктов»: список прежних групп с «Путём» и сохранение сценария",
+          "sha": "ea008163701cad04"
         }
       ],
-      "confirmedAt": "2026-11-07T09:21:37.866Z"
+      "confirmedAt": "2026-11-10T07:03:42.371Z"
     },
     {
       "topic": "phone",
       "document": "apps/web/src/pages/Help/topics/PhoneTopic/PhoneTopic.tsx",
-      "confirmedAt": "2026-11-07T09:21:38.189Z",
+      "confirmedAt": "2026-11-09T18:51:18.854Z",
       "sources": [
         {
           "path": "apps/server/src/lib/access-gate/access-gate.ts",
@@ -2740,12 +2880,12 @@
         {
           "path": "apps/server/src/routes/remote-routes.ts",
           "why": "Карточка «Удалённый доступ»: включение, код спаривания, смена токена, устройства",
-          "sha": "89bf7ce8d8025100"
+          "sha": "d91d091063559312"
         },
         {
           "path": "apps/server/src/domains/remote-notify.ts",
           "why": "«Уведомления»: что уходит в Expo — вид события, имя папки и номер машины, ничего больше",
-          "sha": "027f71fe73b7efcd"
+          "sha": "7d70f70062bc9e11"
         },
         {
           "path": "apps/server/src/domains/chat/chat-inbox/chat-inbox.ts",
@@ -2815,7 +2955,7 @@
         {
           "path": "apps/mobile/app/(tabs)/index.tsx",
           "why": "Кадр «Главная, панель молчит»: крутилка только от жеста, не от фонового опроса",
-          "sha": "269f1b220ac14fe4"
+          "sha": "84ffa8141ff50c7a"
         },
         {
           "path": "apps/mobile/app/(tabs)/settings.tsx",
@@ -2901,6 +3041,11 @@
           "path": "apps/mobile/src/features/signing/SigningCard/SigningCard.tsx",
           "why": "«Подпись решений», шаги 1 и 3: «Привязать этот телефон», отпечаток под карточкой, подтверждение включения со списком отпечатков и путём файла, включение и выключение только здесь",
           "sha": "b35095f77fe8d456"
+        },
+        {
+          "path": "apps/mobile/src/features/inbox/CoreWaiting/coreWaiting.ts",
+          "why": "«Вопросы»: блок «Ждут вас задачи ядра» — только блокирующие вопросы, задачи чатов не входят, счёт значка",
+          "sha": "4d0fbc6b7d9ab2be"
         }
       ]
     },
@@ -3029,7 +3174,7 @@
     {
       "topic": "kit",
       "document": "apps/web/src/pages/Help/topics/KitTopic/KitTopic.tsx",
-      "confirmedAt": "2026-11-07T09:21:38.059Z",
+      "confirmedAt": "2026-11-09T18:51:18.739Z",
       "sources": [
         {
           "path": "apps/server/src/domains/kit/service.ts",
@@ -3049,17 +3194,17 @@
         {
           "path": "apps/server/src/bootstrap/runtime/runtime.ts",
           "why": "«Не собралось — прогон не запускается»: отказ при сбое сборки набора",
-          "sha": "b13347005fee7daf"
+          "sha": "42f4891fb7dd3f2b"
         },
         {
           "path": "apps/core/src/adapters/claude/plugin-carry.ts",
           "why": "«Как набор доезжает до хода через ядро»: плагин набора в проекте без отметки доверия, отказы — хуки сужены шагом, MCP в каталоге, каталога нет",
-          "sha": "103987a11a31c2d3"
+          "sha": "3eacfcc83a38d1b7"
         },
         {
           "path": "apps/server/src/domains/chat/core-run/session-carry.ts",
           "why": "«Как набор доезжает до хода через ядро»: какие поля сеанса и переменные набора панель передаёт ядру",
-          "sha": "fd1ea80cf98a3248"
+          "sha": "cf20049e086e90cc"
         },
         {
           "path": "apps/server/src/domains/core-ask/helper-carry.ts",
@@ -3131,7 +3276,7 @@
     {
       "topic": "core",
       "document": "apps/web/src/pages/Help/topics/CoreTopic/CoreTopic.tsx",
-      "confirmedAt": "2026-11-07T09:21:37.632Z",
+      "confirmedAt": "2026-11-10T11:09:08.069Z",
       "sources": [
         {
           "path": "apps/web/src/pages/CoreTask/CoreTaskPage/CoreTaskPage.tsx",
@@ -3141,7 +3286,7 @@
         {
           "path": "apps/web/src/features/CoreLaunch/model/launchDraft.ts",
           "why": "«Экран запуска»: поля формы, «Ждать CI» выключено по умолчанию, что уходит в оценку",
-          "sha": "f0a5f678bb0b744e"
+          "sha": "9ec6d249d134aeed"
         },
         {
           "path": "apps/web/src/features/CoreLaunch/model/mcpPicks.ts",
@@ -3156,12 +3301,12 @@
         {
           "path": "apps/core/src/adapters/gemini/gemini.ts",
           "why": "«Серверы MCP для шагов»: Gemini CLI — серверы не доезжают (папка без доверия), потеря поимённо",
-          "sha": "320e4fbd76149900"
+          "sha": "2e80ca2f1947847a"
         },
         {
           "path": "apps/core/src/adapters/cursor/cursor.ts",
           "why": "«Серверы MCP для шагов»: Cursor — серверы не доезжают (CURSOR_MCP_UNPROVEN), потеря поимённо",
-          "sha": "fc8ad9111b84d144"
+          "sha": "b481a5c1695ba838"
         },
         {
           "path": "apps/web/src/features/CoreLaunch/model/reviewLinkDraft.ts",
@@ -3201,7 +3346,7 @@
         {
           "path": "apps/server/src/domains/core-relay/core-relay.ts",
           "why": "«Ответы на вопросы ядра»: открытый вопрос уходит уведомлением на телефон и в Telegram, ответ — панель или подпись телефона",
-          "sha": "c9d194ec6c4108d6"
+          "sha": "56bf8d31f8988cf1"
         },
         {
           "path": "apps/web/src/entities/CoreTask/ui/CoreHopsNotice/CoreHopsNotice.tsx",
@@ -3211,7 +3356,7 @@
         {
           "path": "apps/core/src/conductor/next/answers.ts",
           "why": "«Шаг исчерпал круги»: вопрос и варианты на языке панели запуска, как и вопросы срока и бюджета",
-          "sha": "fcf5012d49b35687"
+          "sha": "e2a97323d9c1d445"
         },
         {
           "path": "apps/web/src/features/CoreLaunch/model/launchSource.ts",
@@ -3252,6 +3397,116 @@
           "path": "apps/core/src/economy/tier-raise.ts",
           "why": "«Эскалация после неудачи»: подъём ступени после провала и по выученному, не выше потолка автоматики",
           "sha": "389d79fdab51a0af"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/BoardColumns.tsx",
+          "why": "«Доска задач» → «Колонки и пределы»: колонки слева направо и «Ждёт вас»",
+          "sha": "b18a1a5901b0c337"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/BoardToolbar.tsx",
+          "why": "«Колонки и пределы»: «В работе», «Стартов сегодня», «Остановка по умолчанию», фильтры, плашка «Умолчания»",
+          "sha": "011c4baeaf0ed0c0"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/BoardCardTile.tsx",
+          "why": "«Колонки и пределы»: что видно на карточке — источник, вопросы, единицы, группа, «ведёт человек»",
+          "sha": "87f2251ac2ac4d5e"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreTaskCardModal/CoreTaskCardModal.tsx",
+          "why": "«Окно идущей задачи»: факты, вмешательство, точка остановки",
+          "sha": "50b4ff7aa436bb42"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreTaskCardModal/CardMoves.tsx",
+          "why": "«Запись во «Входящих»»: ходы карточки до запуска",
+          "sha": "d33d90a57e8d75da"
+        },
+        {
+          "path": "apps/web/src/entities/CoreTask/model/board.ts",
+          "why": "«Доска задач»: какие ходы разрешены и в какой колонке карточка",
+          "sha": "d50072a5b80144d4"
+        },
+        {
+          "path": "apps/core/src/conductor/board/launch.ts",
+          "why": "«Старт из очереди» и «Пределы»: голова очереди, окно маршрута головы, отказ старта во «Входящие»",
+          "sha": "1e484e112f8ee0a6"
+        },
+        {
+          "path": "apps/core/src/conductor/board/gates.ts",
+          "why": "«Пределы — раздел board»: когда доска стартует",
+          "sha": "f1af96eb3cf018ce"
+        },
+        {
+          "path": "apps/web/src/features/CoreLaunch/ui/LaunchForm/QueueRow.tsx",
+          "why": "«В очередь вместо запуска сейчас»: кнопка, «Где остановиться», итог и повтор",
+          "sha": "149efad7581a8551"
+        },
+        {
+          "path": "apps/web/src/features/CoreTakeover/ui/CoreTakeoverAction/CoreTakeoverAction.tsx",
+          "why": "«Взять вручную и вернуть ядру»: перехват, возврат, доработка, точка остановки",
+          "sha": "f32bf89099204f18"
+        },
+        {
+          "path": "apps/web/src/features/CoreTakeover/model/takeoverActions.ts",
+          "why": "«Взять вручную»: когда какое действие доступно",
+          "sha": "572a2c2ac2c7c09c"
+        },
+        {
+          "path": "apps/web/src/features/CoreWindowOffer/ui/CoreWindowOffer/CoreWindowOffer.tsx",
+          "why": "«Задача ждёт окна лимита»: блок «Лимит», переводы кликом",
+          "sha": "3af1fbcb26ba9da2"
+        },
+        {
+          "path": "packages/contracts/src/core/window-offer.ts",
+          "why": "«Задача ждёт окна лимита»: вердикт окна и предложения",
+          "sha": "b8d4a72811ac87e3"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/Inbox/BoardInbox.tsx",
+          "why": "«Строка над доской»: строка входящих —источники, «Найти в трекере», сбои опроса",
+          "sha": "6e7e429f0d598a56"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/InboxSources/inboxSources.lib.ts",
+          "why": "«Источники»: поля источника (метки, назначенные, JQL, репозитории, «Сам в очередь») и проверка перед сохранением",
+          "sha": "8c31002b04bb47a9"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/InboxSearch/InboxSearch.tsx",
+          "why": "«Найти в трекере»: запрос мимо модели, отметки, «Во входящие (N)»",
+          "sha": "349f0725a3abd41f"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/Inbox/EntryPreset.tsx",
+          "why": "«Сценарий записи»: выбор «Сценарий» до старта и отказ ядра под ним",
+          "sha": "85c4b48c3e7d2486"
+        },
+        {
+          "path": "apps/core/src/conductor/inbox/related.ts",
+          "why": "«Связанные карточки»: какие факты тикетов — связь (эпик/родитель, связь задач, путь), метки и автор — нет; ядро само не объединяет",
+          "sha": "4038cd58779a47a8"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/Related/RelatedMerge.tsx",
+          "why": "«Связанные карточки»: раздел окна записи, отметки по умолчанию, «Объединить в эту (N)», запертые отметки сверх 15 с подписью, отказ строкой",
+          "sha": "e7dfb7918f628eb3"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreBoard/Related/relatedMerge.lib.ts",
+          "why": "«Связанные карточки»: предел отметок 15 и отказ ядра → строка словаря, проза ядра — в подсказке, без общего тоста",
+          "sha": "b975ea61b075ebbb"
+        },
+        {
+          "path": "apps/web/src/pages/CoreTask/CoreTaskCardModal/cardMoves.lib.ts",
+          "why": "«Запись во «Входящих»»: отказ хода карточки → строка по-русски, проза ядра — в подсказке",
+          "sha": "3ede97479530927a"
+        },
+        {
+          "path": "apps/core/src/conductor/next/lead-gate.ts",
+          "why": "«Второе ревью на другом CLI»: когда второе ревью пропускается (нет другого CLI, контур, закреплённый CLI, ревью без сеанса)",
+          "sha": "32bf0bff9e28a2be"
         }
       ]
     },

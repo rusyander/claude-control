@@ -341,6 +341,8 @@ describe('TelegramAnswersService: команды владельца и меню'
     expect((menus[1]!.body.commands as { command: string }[]).map((c) => c.command)).toEqual([
       'status',
       'waiting',
+      // Этап 12 (P193): `/task` — запись во «Входящие» доски ядра.
+      'task',
       'clear',
       'help',
     ]);

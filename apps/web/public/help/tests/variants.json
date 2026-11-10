@@ -89,6 +89,28 @@
         "height": 900
       }
     },
+    "board/01-to-board": {
+      "light-ru": {
+        "file": "01-to-board.png",
+        "width": 1308,
+        "height": 441
+      },
+      "light-en": {
+        "file": "01-to-board.en.png",
+        "width": 1308,
+        "height": 441
+      },
+      "dark-ru": {
+        "file": "01-to-board.dark.png",
+        "width": 1308,
+        "height": 441
+      },
+      "dark-en": {
+        "file": "01-to-board.dark.en.png",
+        "width": 1308,
+        "height": 441
+      }
+    },
     "e2e/01-missing": {
       "light-ru": {
         "file": "01-missing.png",
@@ -461,6 +483,94 @@
         "file": "08-runs-import.dark.en.png",
         "width": 1440,
         "height": 900
+      }
+    },
+    "recorded/01-list": {
+      "light-ru": {
+        "file": "01-list.png",
+        "width": 1308,
+        "height": 437
+      },
+      "light-en": {
+        "file": "01-list.en.png",
+        "width": 1308,
+        "height": 437
+      },
+      "dark-ru": {
+        "file": "01-list.dark.png",
+        "width": 1308,
+        "height": 437
+      },
+      "dark-en": {
+        "file": "01-list.dark.en.png",
+        "width": 1308,
+        "height": 437
+      }
+    },
+    "recorded/02-record": {
+      "light-ru": {
+        "file": "02-record.png",
+        "width": 652,
+        "height": 592
+      },
+      "light-en": {
+        "file": "02-record.en.png",
+        "width": 652,
+        "height": 592
+      },
+      "dark-ru": {
+        "file": "02-record.dark.png",
+        "width": 652,
+        "height": 592
+      },
+      "dark-en": {
+        "file": "02-record.dark.en.png",
+        "width": 652,
+        "height": 592
+      }
+    },
+    "recorded/03-mismatch": {
+      "light-ru": {
+        "file": "03-mismatch.png",
+        "width": 1308,
+        "height": 630
+      },
+      "light-en": {
+        "file": "03-mismatch.en.png",
+        "width": 1308,
+        "height": 630
+      },
+      "dark-ru": {
+        "file": "03-mismatch.dark.png",
+        "width": 1308,
+        "height": 630
+      },
+      "dark-en": {
+        "file": "03-mismatch.dark.en.png",
+        "width": 1308,
+        "height": 630
+      }
+    },
+    "recorded/04-rerecord": {
+      "light-ru": {
+        "file": "04-rerecord.png",
+        "width": 1272,
+        "height": 207
+      },
+      "light-en": {
+        "file": "04-rerecord.en.png",
+        "width": 1272,
+        "height": 207
+      },
+      "dark-ru": {
+        "file": "04-rerecord.dark.png",
+        "width": 1272,
+        "height": 207
+      },
+      "dark-en": {
+        "file": "04-rerecord.dark.en.png",
+        "width": 1272,
+        "height": 207
       }
     },
     "workspace/01-empty": {

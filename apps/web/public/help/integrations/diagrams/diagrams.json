@@ -7,9 +7,18 @@
       "file": "who-calls-whom.png",
       "page": 1,
       "source": "27b21d6c686223b4",
-      "width": 1507,
-      "height": 968,
-      "exportedAt": "2026-09-17T14:15:36.263Z"
+      "width": 1491,
+      "height": 952,
+      "exportedAt": "2026-11-09T11:22:54.495Z"
+    },
+    {
+      "name": "telegram-core",
+      "file": "telegram-core.png",
+      "page": 2,
+      "source": "0b7b5c6fdb296052",
+      "width": 1631,
+      "height": 792,
+      "exportedAt": "2026-11-09T11:22:57.677Z"
     }
   ]
 }

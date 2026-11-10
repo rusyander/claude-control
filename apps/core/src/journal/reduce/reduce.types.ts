@@ -5,6 +5,7 @@ import type {
   RequirementVerdict,
   STEP_END_BASES,
 } from '@agentdeck/contracts/core/journal';
+import type { BoardStop } from '@agentdeck/contracts/core/board';
 import type { ScenarioRef, TaskClass } from '@agentdeck/contracts/core/scenario';
 import type {
   AskState,
@@ -40,7 +41,9 @@ import type {
 // 12: этап 11 (ведущий): принятая карточка приёма и класс задачи (`lead`).
 // 13: этап 11: утверждение деления человеком после `accepted` / `edited` — `approved`, не аномалия
 //     (снимок v12 держит такое деление в `accepted`).
-export const REDUCER_VERSION = 13;
+// 14: этап 12 (доска): действие по умолчанию вопроса (`AskRecord.defaultAction`, «ждёт вас»),
+//     остановка задачи, перехват и возврат, потеря входа маршрута, конец MR единицы.
+export const REDUCER_VERSION = 14;
 
 /**
  * Состояния задачи, в которых идёт работа (паузы, ожидание человека и окна не считаются). Здесь,
@@ -149,6 +152,8 @@ export interface AskRecord {
   /** Ответ пришёл после истечения или отзыва вопроса (P71): хранится и показан. */
   lateAnswer: boolean;
   answer?: string;
+  /** Этап 12 (P153): из `human.asked`; `null` — вопрос блокирует, задача «ждёт вас». */
+  defaultAction: string | null;
 }
 
 export interface SessionRecord {
@@ -222,6 +227,18 @@ export interface TaskFoldState extends TaskFoldStage4, TaskFoldStage5, TaskFoldP
     card: { by: 'auto' | 'human'; seq: number } | null;
     taskClass: { class: TaskClass; seq: number } | null;
   };
+  /**
+   * Этап 12 (свёртка v14, `stage12.ts`): последний `task.stop`. Нет поля — остановку не меняли;
+   * действующую читает `boardStopOf` (поверх `created.boardEntry`). Все поля этапа 12
+   * необязательные: `initialState` их не заводит, свёртки до v14 их не знают.
+   */
+  stop?: { stop: BoardStop; seq: number };
+  /** Открытый перехват (`task.takeover`); `null` — закрыт возвратом. Нет поля — не было ни одного. */
+  takeover?: { unitId: string; copy: string; seq: number; chatTaskId?: string } | null;
+  /** Последний возврат ядру (`task.handback`): заметка человека уходит в бриф следующего шага. */
+  handback?: { note: string | null; seq: number };
+  /** Потеря входа маршрута по шагу (`route.login-lost`). */
+  loginLost?: Record<string, { routeId: string; seq: number }>;
 }
 
 /** Требование в свёртке (CD§10): вердикт выносит только `conductor/requirements` (02:57). */
@@ -331,6 +348,8 @@ export interface UnitPublication {
   backoff: (JournalDataV1['publish.backoff'] & { seq: number; at: number }) | null;
   /** seq применённой команды `publish-now` по этой единице (P96: ни вопроса, ни условия не снимает). */
   publishNowSeq: number | null;
+  /** Этап 12: конец MR у форжа (`publish.mr-state`); нет поля — MR открыт или его нет. */
+  mrState?: JournalDataV1['publish.mr-state'] & { seq: number };
 }
 
 /**

@@ -1,0 +1,106 @@
+{
+  "topic": "chat",
+  "scenario": "limit",
+  "frames": [
+    {
+      "id": "01-limit-card",
+      "side": "panel",
+      "file": "01-limit-card.png",
+      "masked": 0,
+      "width": 808,
+      "height": 246,
+      "shotAt": "2026-11-08T17:00:45.029Z",
+      "text": "Лимит подписки Окно откроется в 19:30. После сброса последнее сообщение уйдёт ещё раз, один раз, само — нажимать «Повторить» не нужно. Не ждать — перевести разговор кликом: Ждать сброса Другая модель: claude-sonnet-4-5 Перенести в codex Перенести в gemini",
+      "seal": {
+        "png": "f73e843431f28e01",
+        "text": "904ed932147c218c"
+      },
+      "en": {
+        "file": "01-limit-card.en.png",
+        "masked": 0,
+        "width": 808,
+        "height": 228,
+        "shotAt": "2026-11-08T17:01:26.240Z",
+        "text": "Subscription limit The window opens at 07:30 PM. After the reset the last message goes again, once, by itself — no need to press «Retry». Not waiting — move the conversation with a click: Wait for reset Other model: claude-sonnet-4-5 Move to codex Move to gemini",
+        "seal": {
+          "png": "af5b950b1577cecc",
+          "text": "1f83832e900bc85c"
+        }
+      },
+      "dark": {
+        "file": "01-limit-card.dark.png",
+        "masked": 0,
+        "width": 808,
+        "height": 246,
+        "shotAt": "2026-11-08T17:02:08.040Z",
+        "text": "Лимит подписки Окно откроется в 19:30. После сброса последнее сообщение уйдёт ещё раз, один раз, само — нажимать «Повторить» не нужно. Не ждать — перевести разговор кликом: Ждать сброса Другая модель: claude-sonnet-4-5 Перенести в codex Перенести в gemini",
+        "seal": {
+          "png": "c71eabdc799a54fd",
+          "text": "904ed932147c218c"
+        }
+      },
+      "darkEn": {
+        "file": "01-limit-card.dark.en.png",
+        "masked": 0,
+        "width": 808,
+        "height": 228,
+        "shotAt": "2026-11-08T17:02:49.022Z",
+        "text": "Subscription limit The window opens at 07:30 PM. After the reset the last message goes again, once, by itself — no need to press «Retry». Not waiting — move the conversation with a click: Wait for reset Other model: claude-sonnet-4-5 Move to codex Move to gemini",
+        "seal": {
+          "png": "37699f5c37622ed4",
+          "text": "1f83832e900bc85c"
+        }
+      }
+    },
+    {
+      "id": "02-board-button",
+      "side": "panel",
+      "file": "02-board-button.png",
+      "masked": 0,
+      "width": 876,
+      "height": 141,
+      "shotAt": "2026-11-08T17:00:45.709Z",
+      "text": "Почини сборку графиков C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 0 tok Доска · ждёт вас: 2 Настройки чата",
+      "seal": {
+        "png": "ac0684023ffd472b",
+        "text": "21b35a353ece9f0f"
+      },
+      "en": {
+        "file": "02-board-button.en.png",
+        "masked": 0,
+        "width": 876,
+        "height": 141,
+        "shotAt": "2026-11-08T17:01:26.940Z",
+        "text": "Fix the charts build C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 0 tok Board · waiting for you: 2 Chat settings",
+        "seal": {
+          "png": "e1a3ee5c89bff628",
+          "text": "64c49aae493ad031"
+        }
+      },
+      "dark": {
+        "file": "02-board-button.dark.png",
+        "masked": 0,
+        "width": 876,
+        "height": 141,
+        "shotAt": "2026-11-08T17:02:08.736Z",
+        "text": "Почини сборку графиков C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 Высокая Низкая Средняя Высокая Оч. высокая Максимум Локальная Агенты 1 0 tok Доска · ждёт вас: 2 Настройки чата",
+        "seal": {
+          "png": "9284f5458af92dd5",
+          "text": "21b35a353ece9f0f"
+        }
+      },
+      "darkEn": {
+        "file": "02-board-button.dark.en.png",
+        "masked": 0,
+        "width": 876,
+        "height": 141,
+        "shotAt": "2026-11-08T17:02:49.705Z",
+        "text": "Fix the charts build C:/work/orders-panel Claude-opus-5 Fable Opus Sonnet Haiku Claude Opus 5 · claude-opus-5 Claude Sonnet 4.5 · claude-sonnet-4-5 Claude Haiku 4.5 · claude-haiku-4-5 High Low Medium High Very high Max Local Agents 1 0 tok Board · waiting for you: 2 Chat settings",
+        "seal": {
+          "png": "74e9b38e1d65700d",
+          "text": "64c49aae493ad031"
+        }
+      }
+    }
+  ]
+}

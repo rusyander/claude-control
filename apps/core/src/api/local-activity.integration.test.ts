@@ -127,6 +127,16 @@ describe('core local activity api', () => {
     hop.stub.release();
     await answer;
     await until(() => hop?.host.ctx.activity?.snapshot()[0]?.inFlight === 0, 'flight closed');
+    // Опрос, начатый ещё в полёте, дочитывает своё: `/health`, затем `/slots` — второе чтение
+    // может прийти уже после закрытия полёта (так краснел прогон в Linux). Ждём, пока счётчики
+    // простоят 100 мс, а не снимаем их сразу; не стихающий опрос до этого не дойдёт вовсе.
+    let settled = JSON.stringify(facet.hits);
+    let changedAt = Date.now();
+    await until(() => {
+      const now = JSON.stringify(facet.hits);
+      if (now !== settled) [settled, changedAt] = [now, Date.now()];
+      return Date.now() - changedAt >= 100;
+    }, 'polls settled');
     const after = { ...facet.hits };
     await new Promise((done) => setTimeout(done, 300));
     // Ничего в полёте — сервер моделей не опрашивается вовсе.

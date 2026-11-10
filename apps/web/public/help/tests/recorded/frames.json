@@ -1,0 +1,206 @@
+{
+  "topic": "tests",
+  "scenario": "recorded",
+  "frames": [
+    {
+      "id": "01-list",
+      "side": "panel",
+      "file": "01-list.png",
+      "masked": 0,
+      "width": 1308,
+      "height": 437,
+      "shotAt": "2026-11-09T14:13:59.778Z",
+      "text": "Записанные проходы Ядро один раз проходит стенд в браузере, проход ложится спеком и кейсом. Дальше сценарий гоняется без модели; модель зовётся только на первом расхождении. Записать сценарий Окружение прогона По умолчанию Локально QA-стенд Прогнать все Все записанные сценарии прошли (2), модель не вызывалась. Вход на стенд прошёл Не записано: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Задача прохода Выход со стенда прошёл .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Задача прохода",
+      "seal": {
+        "png": "df503417f813ed7f",
+        "text": "96102bab8f39a0c3"
+      },
+      "en": {
+        "file": "01-list.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 437,
+        "shotAt": "2026-11-09T14:14:12.911Z",
+        "text": "Recorded walks The core walks the stand in a browser once; the walk becomes a spec and a case. After that the scenario replays without a model; the model is called only on the first mismatch. Record a scenario Replay environment Default Local QA stand Replay all All recorded scenarios passed (2); the model was not called. Log in to the stand passed Not recorded: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Walk task Log out of the stand passed .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Walk task",
+        "seal": {
+          "png": "8ce0522cf4331717",
+          "text": "f31d15e63a02a084"
+        }
+      },
+      "dark": {
+        "file": "01-list.dark.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 437,
+        "shotAt": "2026-11-09T14:14:26.176Z",
+        "text": "Записанные проходы Ядро один раз проходит стенд в браузере, проход ложится спеком и кейсом. Дальше сценарий гоняется без модели; модель зовётся только на первом расхождении. Записать сценарий Окружение прогона По умолчанию Локально QA-стенд Прогнать все Все записанные сценарии прошли (2), модель не вызывалась. Вход на стенд прошёл Не записано: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Задача прохода Выход со стенда прошёл .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Задача прохода",
+        "seal": {
+          "png": "7e7d437a48f65222",
+          "text": "96102bab8f39a0c3"
+        }
+      },
+      "darkEn": {
+        "file": "01-list.dark.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 437,
+        "shotAt": "2026-11-09T14:14:38.993Z",
+        "text": "Recorded walks The core walks the stand in a browser once; the walk becomes a spec and a case. After that the scenario replays without a model; the model is called only on the first mismatch. Record a scenario Replay environment Default Local QA stand Replay all All recorded scenarios passed (2); the model was not called. Log in to the stand passed Not recorded: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Walk task Log out of the stand passed .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Walk task",
+        "seal": {
+          "png": "c57581842f45def3",
+          "text": "f31d15e63a02a084"
+        }
+      }
+    },
+    {
+      "id": "02-record",
+      "side": "panel",
+      "file": "02-record.png",
+      "masked": 0,
+      "width": 652,
+      "height": 592,
+      "shotAt": "2026-11-09T14:14:00.937Z",
+      "text": "Записать сценарий Проход кончился: шагов 4, удавшихся 4, пробелов 1 Открыть задачу Название сценария Группа scenarios GUI Отмена Записать в кейс и спек",
+      "seal": {
+        "png": "f18cfc7f10a88f63",
+        "text": "a2b5220ab376e577"
+      },
+      "en": {
+        "file": "02-record.en.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-09T14:14:14.035Z",
+        "text": "Record a scenario The walk ended: steps 4, passed 4, gaps 1 Open the task Scenario name Group scenarios GUI Cancel Record into a case and a spec",
+        "seal": {
+          "png": "c67418fb981aecd9",
+          "text": "9f3ffcc96f0f4019"
+        }
+      },
+      "dark": {
+        "file": "02-record.dark.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-09T14:14:27.290Z",
+        "text": "Записать сценарий Проход кончился: шагов 4, удавшихся 4, пробелов 1 Открыть задачу Название сценария Группа scenarios GUI Отмена Записать в кейс и спек",
+        "seal": {
+          "png": "d206e1d782e4fb62",
+          "text": "a2b5220ab376e577"
+        }
+      },
+      "darkEn": {
+        "file": "02-record.dark.en.png",
+        "masked": 0,
+        "width": 652,
+        "height": 592,
+        "shotAt": "2026-11-09T14:14:40.169Z",
+        "text": "Record a scenario The walk ended: steps 4, passed 4, gaps 1 Open the task Scenario name Group scenarios GUI Cancel Record into a case and a spec",
+        "seal": {
+          "png": "3354b6257cf24a14",
+          "text": "9f3ffcc96f0f4019"
+        }
+      }
+    },
+    {
+      "id": "03-mismatch",
+      "side": "panel",
+      "file": "03-mismatch.png",
+      "masked": 0,
+      "width": 1308,
+      "height": 630,
+      "shotAt": "2026-11-09T14:14:05.668Z",
+      "text": "Записанные проходы Ядро один раз проходит стенд в браузере, проход ложится спеком и кейсом. Дальше сценарий гоняется без модели; модель зовётся только на первом расхождении. Записать сценарий Окружение прогона По умолчанию Локально QA-стенд Прогнать все Прогон встал на первом расхождении — дальше сценарии не запускались. Расхождение: «Вход на стенд» Шаг 5: в элемент data-testid «greeting» текст «Привет, demo» ✗ шаг 5: в элемент data-testid «greeting» текст «Привет, demo» Открыта одна задача прохода — она проходит стенд с этого шага Что сломалось — продукт или сам сценарий? Дефект продукта Сценарий устарел Вход на стенд прошёл Не записано: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Задача прохода Выход со стенда прошёл .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Задача прохода",
+      "seal": {
+        "png": "5cf9af29477dae32",
+        "text": "ade902e13fd5c20c"
+      },
+      "en": {
+        "file": "03-mismatch.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 630,
+        "shotAt": "2026-11-09T14:14:18.109Z",
+        "text": "Recorded walks The core walks the stand in a browser once; the walk becomes a spec and a case. After that the scenario replays without a model; the model is called only on the first mismatch. Record a scenario Replay environment Default Local QA stand Replay all The replay stopped at the first mismatch; later scenarios were not started. Mismatch: \"Log in to the stand\" Step 5: element data-testid \"greeting\" has text \"Hello, demo\" ✗ step 5: element data-testid \"greeting\" has text \"Hello, demo\" One walk task is open; it walks the stand from this step What broke: the product or the scenario itself? Product defect Scenario is stale Log in to the stand passed Not recorded: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Walk task Log out of the stand passed .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Walk task",
+        "seal": {
+          "png": "152b2e81401e240e",
+          "text": "fd97ed74b48b0725"
+        }
+      },
+      "dark": {
+        "file": "03-mismatch.dark.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 630,
+        "shotAt": "2026-11-09T14:14:31.383Z",
+        "text": "Записанные проходы Ядро один раз проходит стенд в браузере, проход ложится спеком и кейсом. Дальше сценарий гоняется без модели; модель зовётся только на первом расхождении. Записать сценарий Окружение прогона По умолчанию Локально QA-стенд Прогнать все Прогон встал на первом расхождении — дальше сценарии не запускались. Расхождение: «Вход на стенд» Шаг 5: в элемент data-testid «greeting» текст «Привет, demo» ✗ шаг 5: в элемент data-testid «greeting» текст «Привет, demo» Открыта одна задача прохода — она проходит стенд с этого шага Что сломалось — продукт или сам сценарий? Дефект продукта Сценарий устарел Вход на стенд прошёл Не записано: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Задача прохода Выход со стенда прошёл .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Задача прохода",
+        "seal": {
+          "png": "e408cf0731c367d6",
+          "text": "ade902e13fd5c20c"
+        }
+      },
+      "darkEn": {
+        "file": "03-mismatch.dark.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 630,
+        "shotAt": "2026-11-09T14:14:44.216Z",
+        "text": "Recorded walks The core walks the stand in a browser once; the walk becomes a spec and a case. After that the scenario replays without a model; the model is called only on the first mismatch. Record a scenario Replay environment Default Local QA stand Replay all The replay stopped at the first mismatch; later scenarios were not started. Mismatch: \"Log in to the stand\" Step 5: element data-testid \"greeting\" has text \"Hello, demo\" ✗ step 5: element data-testid \"greeting\" has text \"Hello, demo\" One walk task is open; it walks the stand from this step What broke: the product or the scenario itself? Product defect Scenario is stale Log in to the stand passed Not recorded: 2 .agent/tests/recorded/scenarios/scenarios-001.recorded.mjs Walk task Log out of the stand passed .agent/tests/recorded/scenarios/scenarios-002.recorded.mjs Walk task",
+        "seal": {
+          "png": "2c7875c0285fdfd7",
+          "text": "fd97ed74b48b0725"
+        }
+      }
+    },
+    {
+      "id": "04-rerecord",
+      "side": "panel",
+      "file": "04-rerecord.png",
+      "masked": 0,
+      "width": 1272,
+      "height": 207,
+      "shotAt": "2026-11-09T14:14:09.162Z",
+      "text": "Расхождение: «Вход на стенд» Шаг 5: в элемент data-testid «greeting» текст «Привет, demo» ✗ шаг 5: в элемент data-testid «greeting» текст «Привет, demo» Открыта одна задача прохода — она проходит стенд с этого шага Отмечено: сценарий устарел. Перезапишите его из нового прохода. Перезаписать из прохода",
+      "seal": {
+        "png": "6470740ba52fc283",
+        "text": "a31cb091fcf8b8f9"
+      },
+      "en": {
+        "file": "04-rerecord.en.png",
+        "masked": 0,
+        "width": 1272,
+        "height": 207,
+        "shotAt": "2026-11-09T14:14:22.370Z",
+        "text": "Mismatch: \"Log in to the stand\" Step 5: element data-testid \"greeting\" has text \"Hello, demo\" ✗ step 5: element data-testid \"greeting\" has text \"Hello, demo\" One walk task is open; it walks the stand from this step Marked as stale. Re-record it from the new walk. Re-record from the walk",
+        "seal": {
+          "png": "bb00647cc1d317ff",
+          "text": "4dba5444d588165f"
+        }
+      },
+      "dark": {
+        "file": "04-rerecord.dark.png",
+        "masked": 0,
+        "width": 1272,
+        "height": 207,
+        "shotAt": "2026-11-09T14:14:35.220Z",
+        "text": "Расхождение: «Вход на стенд» Шаг 5: в элемент data-testid «greeting» текст «Привет, demo» ✗ шаг 5: в элемент data-testid «greeting» текст «Привет, demo» Открыта одна задача прохода — она проходит стенд с этого шага Отмечено: сценарий устарел. Перезапишите его из нового прохода. Перезаписать из прохода",
+        "seal": {
+          "png": "f3dc5de8205f1500",
+          "text": "a31cb091fcf8b8f9"
+        }
+      },
+      "darkEn": {
+        "file": "04-rerecord.dark.en.png",
+        "masked": 0,
+        "width": 1272,
+        "height": 207,
+        "shotAt": "2026-11-09T14:14:48.247Z",
+        "text": "Mismatch: \"Log in to the stand\" Step 5: element data-testid \"greeting\" has text \"Hello, demo\" ✗ step 5: element data-testid \"greeting\" has text \"Hello, demo\" One walk task is open; it walks the stand from this step Marked as stale. Re-record it from the new walk. Re-record from the walk",
+        "seal": {
+          "png": "3937fa28a071106c",
+          "text": "4dba5444d588165f"
+        }
+      }
+    }
+  ]
+}

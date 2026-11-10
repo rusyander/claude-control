@@ -24,6 +24,13 @@ export {
   HALF_MADE_ANSWER_REASON,
   openAnswerTask,
 } from './answer-task.ts';
+export {
+  openAnswerTaskFromMr,
+  threadEvents,
+  type AnswerFromMrInput,
+  type AnswerMrPort,
+  type MrReader,
+} from './answer-from-mr.ts';
 export { openReviewTask, reviewRequestOf, type ReviewTaskInput } from './review-task.ts';
 export { basePinDetail, parseBasePin } from './base-pin.ts';
 export type * from './estimate.types.ts';

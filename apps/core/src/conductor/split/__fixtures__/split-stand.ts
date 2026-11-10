@@ -12,6 +12,7 @@ import type { LiveTask } from '../../../journal/resume.ts';
 import { newId } from '../../../lib/ids/uuidv7.ts';
 import { workTreeOf } from '../../../platform/git/common-dir.ts';
 import { pinBase, remotesOf } from '../../../platform/git/fetch.ts';
+import { runSoloWithoutSplitPoint } from '../flow.ts';
 
 /**
  * Стенд зоны D: настоящие репозитории git во временном каталоге (голый «удалённый» + клон),
@@ -82,6 +83,8 @@ export function testEnv(libraryDir: string): TestEnv {
       env.raised.push(raise);
       return raiseHumanPoint(task, raise);
     },
+    // Как в настоящей проводке: сценарий без точки деления делится соло на оценке.
+    soloWithoutSplitPoint: (task, scenario) => runSoloWithoutSplitPoint(task, scenario, env),
   };
   return env;
 }

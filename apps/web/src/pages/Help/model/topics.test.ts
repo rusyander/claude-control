@@ -31,6 +31,18 @@ describe('индекс справки', () => {
     }
   });
 
+  // Раздел-вид чужой страницы («Группы» — полосы доски ядра) ведёт туда же, куда пункт меню.
+  it('раздел с ключами адреса ведёт туда же, куда его пункт меню', () => {
+    const items = NAV_SECTIONS.flatMap((section) => section.items);
+    const groups = TOPICS.find((topic) => topic.id === 'groups');
+    const nav = items.find((item) => item.key === 'groups');
+    expect(groups?.pageSearch).toBeDefined();
+    expect({ path: groups?.pagePath, search: groups?.pageSearch }).toEqual({
+      path: nav?.path,
+      search: nav?.search,
+    });
+  });
+
   it('у каждого документа есть название и подпись в словаре', () => {
     for (const topic of TOPICS) {
       const texts = helpRu.topics[topic.id as keyof typeof helpRu.topics] as

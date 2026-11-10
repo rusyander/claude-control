@@ -20,7 +20,8 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
   const provider = getActiveProvider(store);
   // Активен другой CLI — разделы считаются по ЕГО файлам. Раньше обзор под Qwen
   // показывал цифры из `~/.claude`, а на машине без Claude — нули с чужой подписью.
-  // «Скрипты» и группы — разделы самой панели, они от провайдера не зависят.
+  // «Скрипты» — раздел самой панели, он от провайдера не зависит. Счёт групп обзор
+  // не отдаёт: плитка и меню «Группы» считают открытые дорожки групп ядра сами.
   if (provider.id !== 'claude') {
     return {
       provider: overviewProvider(provider),
@@ -28,7 +29,6 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
       // Привязку скрипта к событию знают только хуки Claude — «не привязан»
       // под другим CLI был бы ложной тревогой, поэтому только общее число.
       scripts: { total: readScripts(paths.hooks, []).length, unused: 0 },
-      groups: { total: store.getGroups().length },
     };
   }
   const rules = readRules(paths.claudeMd, store);
@@ -65,7 +65,6 @@ export function buildOverview(paths: ClaudePaths, store: AppStore): Overview {
       ask: permissions.filter((item) => item.decision === 'ask').length,
       deny: permissions.filter((item) => item.decision === 'deny').length,
     },
-    groups: { total: store.getGroups().length },
   };
 }
 

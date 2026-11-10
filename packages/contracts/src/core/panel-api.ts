@@ -1,5 +1,12 @@
 import { z } from 'zod';
 import { pathStepSchema } from '../group-path.ts';
+import {
+  boardEntryDraftSchema,
+  boardMoveShape,
+  moveMergeOk,
+  movePresetOk,
+  oneMoveTarget,
+} from './board.ts';
 import { commandProofSchema } from './commands.ts';
 import { uuidv7 } from './ids.ts';
 import type { CheckRecord, Profile } from './records.ts';
@@ -31,6 +38,8 @@ export const CORE_PANEL_ROUTES = [
   // передаёт Last-Event-ID (курсор `next`); без него — одна страница JSON.
   { method: 'GET', path: '/tasks/:id/sessions/:sid/stream', stream: true },
   { method: 'GET', path: '/tasks/:id/report' },
+  // Проход по стенду (этап 12, P177): шаги `browse.step`, пробелы и спек записи — `WalkReply`.
+  { method: 'GET', path: '/tasks/:id/walk' },
   // Проба сдачи копии единицы (s10 G16): тот же суд, что шаг публикации; читает `tests-cli delivery`.
   { method: 'GET', path: '/delivery' },
   { method: 'GET', path: '/routes' },
@@ -67,6 +76,15 @@ export const CORE_PANEL_ROUTES = [
   // Работа локальных CLI вне задач (этап 11): снимок и поток.
   { method: 'GET', path: '/local/activity' },
   { method: 'GET', path: '/local/activity/stream', stream: true },
+  // Доска задач (этап 12, P152, P159): карточки и записи; ход человека — `boardMoveBodySchema`.
+  { method: 'GET', path: '/board' },
+  { method: 'POST', path: '/board/move' },
+  // Новые записи доски (этап 12): «В очередь» формы запуска и импорт — `boardEntriesBodySchema`.
+  { method: 'POST', path: '/board/entries' },
+  // Входящие (этап 12, D16, P167): поиск по источнику и записи из выбранного или из `/task` Telegram —
+  // `inboxSearchQuerySchema`, `inboxCreateBodySchema` (`core/inbox`).
+  { method: 'GET', path: '/inbox/search' },
+  { method: 'POST', path: '/inbox' },
 ] as const satisfies readonly CorePanelRoute[];
 
 export interface CorePanelRoute {
@@ -291,6 +309,32 @@ export const saveScenarioBodySchema = z.strictObject({
 });
 
 export type SaveScenarioBody = z.infer<typeof saveScenarioBodySchema>;
+
+/**
+ * `POST /v1/board/move` (этап 12): ход человека на доске, суд полномочий `board-move`;
+ * доказательство — как у команды. Ход вне разрешённых — 409 со списком разрешённых (P152).
+ */
+export const boardMoveBodySchema = z
+  .strictObject({ ...boardMoveShape, proof: commandProofSchema })
+  .refine(oneMoveTarget, { message: 'exactly one of entryId, taskId' })
+  .refine(movePresetOk, { message: 'preset is set exactly on a set-preset move' })
+  .refine(moveMergeOk, {
+    message:
+      'entryIds is set exactly on a merge move of an entry, unique, without the entry itself',
+  });
+export type BoardMoveBody = z.infer<typeof boardMoveBodySchema>;
+
+/**
+ * `POST /v1/board/entries` (этап 12): человек кладёт записи во «Входящие» или сразу в очередь
+ * (`queue` — доказательство старта = этот ход, P183); суд полномочий `board-move`, ключ повтора `cmdId`.
+ */
+export const boardEntriesBodySchema = z.strictObject({
+  cmdId: uuidv7,
+  to: z.enum(['inbox', 'queue']),
+  entries: z.array(boardEntryDraftSchema).min(1).max(50),
+  proof: commandProofSchema,
+});
+export type BoardEntriesBody = z.infer<typeof boardEntriesBodySchema>;
 
 export interface ScenarioSaveReply {
   ref: ScenarioRef;

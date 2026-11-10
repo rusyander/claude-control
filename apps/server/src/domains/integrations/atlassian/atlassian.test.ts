@@ -9,7 +9,7 @@ import {
   toAccess,
   toConfluenceAccess,
 } from './client.ts';
-import { fromAdf, toAdf } from './adf.ts';
+import { fromAdf, toAdf } from '@agentdeck/trackers/adf';
 import {
   applyTransition,
   commentIssue,

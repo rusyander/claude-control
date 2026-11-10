@@ -29,15 +29,22 @@
  *   (`suiteKeysOf`) и считает «✗ 3/40». Тесты чужих наборов из того же вызова
  *   vitest отбрасываются — прогон каталога не трогает кейсы, которых не просили.
  *
+ * - `*.recorded.mjs` — записанный проход панели: `node <файл>` без аргументов, а `testName` кейса
+ *   сверяется с именем, которое спек объявляет первой строкой, буква в букву.
+ *
  *   node tools/qa/junit-run.mjs [--project .] [--out <junit.xml>] [--timeout-min 10]
- *     [--health <url>] <файл или каталог/>...
+ *     [--health <url>] [--max-failures <n>] <файл или каталог/>...
+ *
+ * `--max-failures` (или `JUNIT_RUN_MAX_FAILURES`) — после n проваленных тестов остальные файлы
+ * не запускаются и ложатся `<skipped>` «не запускался»: повтор встаёт на первом расхождении.
  *
  * Список длиннее строки команды (cmd.exe режет её на 8191 знаке) панель кладёт
  * в файл и называет его в `AGENTDECK_TEST_FILES` — по строке на путь.
  *
  * `--health` (или `JUNIT_RUN_HEALTH`) — адрес стенда: живая проверка ждёт его до
  * 90 с перед стартом, а красный итог, пока стенд пропадал, повторяется один раз;
- * не поднялся и повтор — `<skipped>` с причиной, а не провал.
+ * не поднялся и повтор — `<skipped>` с причиной, а не провал. «Пропадал» = два
+ * опроса подряд без ответа и неудачная перепроверка с долгим ожиданием (`watchStand`).
  *
  * Путь отчёта: `--out`, иначе `AGENTDECK_JUNIT_REPORT`, иначе
  * `test-results/junit.xml`. Прошлый отчёт удаляется ДО запуска: упавший
@@ -56,6 +63,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+
+/** Записанный проход панели и его строка-метка — те же, что пишет `recorded/codegen.ts` сервера. */
+const RECORDED_SUFFIX = '.recorded.mjs';
+const RECORDED_MARK = '// recorded-test: ';
+/** Живой набор vitest (`*.live.*`): идёт мимо журнала проверок — см. `liveEnv`. */
+const LIVE_FILE = /\.live\.[^/\\]*$/;
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -79,6 +92,12 @@ const timeoutMs = Number(option('--timeout-min') ?? 10) * 60_000;
 // Адрес стенда, без которого живые проверки не имеют смысла. Без флага
 // запускатель стенда не знает и судит только по коду выхода.
 const health = option('--health') ?? process.env.JUNIT_RUN_HEALTH;
+// После скольких проваленных тестов прогон встаёт (`--max-failures`, `JUNIT_RUN_MAX_FAILURES`);
+// без флага — гонится всё, как раньше.
+const maxFailures = positiveInt(
+  option('--max-failures') ?? process.env.JUNIT_RUN_MAX_FAILURES,
+  '--max-failures',
+);
 // Выбор кейсов — этому запуску, не его детям: тест, который сам поднимает junit-run над
 // временной библиотекой, иначе унаследовал бы чужой список и не нашёл своих кейсов
 // (прогон 717df261, 02.11: testing-103 красный только под `tests-cli run --case`).
@@ -100,8 +119,15 @@ mkdirSync(dirname(out), { recursive: true });
 
 const linked = casesByFile(project);
 const suites = [];
-for (const file of files) suites.push(await runFile(file, linked.get(file) ?? []));
-suites.push(...runSuiteDirs(dirs, linked));
+for (const file of files) {
+  // Предел провалов набран — остальные файлы не запускаются: повтор записанных проходов встаёт на
+  // первом расхождении, и модель зовут ровно на него, а не на хвост, упавший следом (P180).
+  if (halted()) suites.push(suiteOf(file, linked.get(file) ?? [], haltedOutcome()));
+  else suites.push(await runFile(file, linked.get(file) ?? []));
+}
+if (halted())
+  suites.push(...dirs.map((dir) => suiteOf(dir, linked.get(dir) ?? [], haltedOutcome())));
+else suites.push(...runSuiteDirs(dirs, linked));
 
 writeFileSync(out, toJUnit(suites), 'utf8');
 const all = suites.flatMap((suite) => suite.cases);
@@ -116,24 +142,104 @@ const notRun = skipped.length;
 // нет CLI) или стенд лежал. Один счётчик «из-за стенда» на оба посылал
 // человека чинить стенд, когда не хватало goose и kimi (foreign-steer, 10.10).
 const notChecked = skipped.filter((item) => item.message?.startsWith('Не проверено.')).length;
+const stopped = skipped.filter((item) => item.halted).length;
 console.log(
   `\njunit-run: файлов ${suites.length}, тестов ${all.length}, провалов ${failed.length}, ` +
-    `не проверено ${notChecked}, не засчитано из-за стенда ${notRun - notChecked}` +
+    `не проверено ${notChecked}, не засчитано из-за стенда ${notRun - notChecked - stopped}` +
+    `${stopped > 0 ? `, не запускалось после предела провалов ${stopped}` : ''}` +
     `${authored > 0 ? `, пропущено самими тестами ${authored}` : ''} → ${relative(project, out)}`,
 );
 // exitCode, а не exit(): выход посреди закрытия сокетов fetch роняет Node на
 // Windows (libuv `UV_HANDLE_CLOSING`, код 127).
 process.exitCode = failed.length > 0 || notRun > 0 ? 1 : 0;
 
-/** Стенд отвечает? Любой ответ ниже 500 (401 гейта тоже) — «жив». */
-async function standUp() {
+/** Целое больше нуля или пусто; иное — отказ до запуска, а не тихое «без предела». */
+function positiveInt(raw, name) {
+  if (raw === undefined || raw === '') return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1) {
+    console.error(`${name} ждёт целое больше нуля, пришло «${raw}».`);
+    process.exit(2);
+  }
+  return value;
+}
+
+/** Предел провалов набран: проваленных тестов в уже прогнанных файлах не меньше `maxFailures`. */
+function halted() {
+  if (maxFailures === undefined) return false;
+  const count = suites.flatMap((suite) => suite.cases).filter((item) => item.status === 'failed');
+  return count.length >= maxFailures;
+}
+
+function haltedOutcome() {
+  return {
+    status: 'skipped',
+    halted: true,
+    message: `Не запускался: прогон остановлен на первом расхождении (--max-failures ${maxFailures}).`,
+  };
+}
+
+/** Стенд отвечает? Любой ответ ниже 500 (401 гейта тоже) — «жив». `stop` обрывает ожидание. */
+async function standUp(waitMs = 3000, stop) {
   if (!health) return true;
+  const timeout = AbortSignal.timeout(waitMs);
   try {
-    const response = await fetch(health, { signal: AbortSignal.timeout(3000) });
+    const response = await fetch(health, {
+      signal: stop ? AbortSignal.any([timeout, stop]) : timeout,
+    });
     return response.status < 500;
   } catch {
     return false;
   }
+}
+
+/** Пауза, которую `stop` обрывает сразу. */
+function pause(ms, stop) {
+  return new Promise((done) => {
+    const timer = setTimeout(done, ms);
+    stop.addEventListener('abort', () => (clearTimeout(timer), done()), { once: true });
+  });
+}
+
+/**
+ * Присмотр за стендом, пока идёт проверка. Стенд «пропадал», только когда два опроса подряд без
+ * ответа И перепроверка с долгим ожиданием тоже не дозвалась: 09.11 настоящий провал testing-009
+ * записался «стенд пропадал» после ОДНОГО пропущенного опроса — панель считала lint по 4487 кейсам
+ * и не ответила за 3 с, хотя была жива. Перезапуск dev-watch закрывает порт — отказ приходит сразу,
+ * и перепроверка его не спасает. Опросы идут друг за другом, не внахлёст.
+ */
+function watchStand() {
+  const stop = new AbortController();
+  let downSamples = 0;
+  let streak = 0;
+  const step = async () => {
+    if (await standUp(3000, stop.signal)) return void (streak = 0);
+    if (stop.signal.aborted) return;
+    streak += 1;
+    if (streak < 2) return;
+    streak = 0;
+    if (!(await standUp(15_000, stop.signal)) && !stop.signal.aborted) downSamples += 1;
+  };
+  const loop = (async () => {
+    while (!stop.signal.aborted) {
+      await pause(2000, stop.signal);
+      if (!stop.signal.aborted) await step();
+    }
+  })();
+  return {
+    /**
+     * Проверка кончилась. Упала, когда последний опрос уже не дозвался, — ещё один опрос и
+     * перепроверка сейчас: проверка, упавшая из-за лёгшего стенда за секунды, иначе не успела бы
+     * набрать два пропуска подряд.
+     */
+    async finish(passed) {
+      stop.abort();
+      await loop;
+      if (passed || streak === 0) return downSamples;
+      if (!(await standUp(3000)) && !(await standUp(15_000))) downSamples += 1;
+      return downSamples;
+    },
+  };
 }
 
 /** Дождаться стенда (dev-watch перезапускает сервер на каждой записи): до 90 с. */
@@ -228,11 +334,37 @@ async function runFile(file, cases) {
     return suiteOf(file, cases, { status: 'failed', message: `Файл проверки не найден: ${file}` });
   }
   if (/\.(test|spec)\.tsx?$/.test(file)) return runVitest(file, cases);
+  if (file.endsWith(RECORDED_SUFFIX)) return runRecorded(file, cases);
   if (/\.(mjs|cjs|js)$/.test(file)) return runNodeByArgs(file, cases);
   return suiteOf(file, cases, {
     status: 'failed',
     message: `Не знаю, чем запускать ${file}: ожидается .mjs/.js/.cjs или *.test.ts`,
   });
+}
+
+/**
+ * Записанный проход панели (`*.recorded.mjs`, R3): `testName` кейса — не аргументы скрипта, а
+ * ПОЛНОЕ имя теста, которое спек объявляет о себе первой строкой (`// recorded-test: …`).
+ * Совпало буква в букву — один запуск без аргументов; нет — провал «тест не найден», а не
+ * зелёный чужого спека: кейс, привязанный куском имени, иначе проходил бы на любом файле.
+ */
+async function runRecorded(file, cases) {
+  const head = readFileSync(join(project, file), 'utf8').split(/\r?\n/, 1)[0] ?? '';
+  const mark = head.startsWith(RECORDED_MARK) ? head.slice(RECORDED_MARK.length).trim() : '';
+  const matching = cases.filter((item) => item.testName === mark);
+  const lost = cases.filter((item) => item.testName !== mark);
+  const suites = lost.map((item) =>
+    suiteOf(file, [item], {
+      status: 'failed',
+      message: mark
+        ? `Тест «${item.testName ?? ''}» не найден в ${file} (переименован?): спек объявляет «${mark}».`
+        : `${file} не объявляет имени теста (строки «${RECORDED_MARK.trim()}» нет) — запишите сценарий заново.`,
+    }),
+  );
+  if (matching.length > 0 || cases.length === 0) {
+    suites.push(await runNodeGuarded(file, matching, []));
+  }
+  return { name: file, cases: suites.flatMap((suite) => suite.cases) };
 }
 
 /**
@@ -299,22 +431,17 @@ function runNode(file, argv) {
   return new Promise((done) => {
     const child = spawn(process.execPath, [file, ...argv], { cwd: project, windowsHide: true });
     let output = '';
-    let downSamples = 0;
     let timedOut = false;
     child.stdout.on('data', (chunk) => (output += chunk));
     child.stderr.on('data', (chunk) => (output += chunk));
-    const poll = health
-      ? setInterval(async () => {
-          if (!(await standUp())) downSamples += 1;
-        }, 2000)
-      : undefined;
+    const watch = health ? watchStand() : undefined;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill();
     }, timeoutMs);
-    child.on('close', (code) => {
-      clearInterval(poll);
+    child.on('close', async (code) => {
       clearTimeout(timer);
+      const downSamples = watch ? await watch.finish(code === 0 && !timedOut) : 0;
       process.stdout.write(tail(output, 30));
       const seconds = (Date.now() - started) / 1000;
       const passed = code === 0 && !timedOut;
@@ -349,7 +476,7 @@ function runVitest(file, cases) {
   const target = relative(root, join(project, file)).split('\\').join('/');
   console.log(`\n▶ vitest ${target} (в ${relative(project, root) || '.'})`);
   const started = Date.now();
-  const result = spawnVitest(root, [target], report);
+  const result = spawnVitest(root, [target], report, LIVE_FILE.test(file) ? liveEnv() : undefined);
   const seconds = (Date.now() - started) / 1000;
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
   const busy = result.status !== 0 ? mutationBusy(output) : undefined;
@@ -533,7 +660,7 @@ function ownerSuite(file, known) {
  * vitest одной строкой: аргументы рядом с `shell: true` Node 24 помечает DEP0190 на
  * каждом вызове, а оболочка нужна ради npx.cmd на Windows.
  */
-function spawnVitest(root, targets, report) {
+function spawnVitest(root, targets, report, env) {
   const line = [
     'npx vitest run',
     ...targets.map(quoteArg),
@@ -547,7 +674,28 @@ function spawnVitest(root, targets, report) {
     timeout: timeoutMs,
     shell: true,
     windowsHide: true,
+    ...(env ? { env } : {}),
   });
+}
+
+/**
+ * Живой набор (`*.live.*`, как `*.live.integration.test.ts` ядра и сервера): вердикт зависит от
+ * того, чего нет в дереве, — стенд, Chromium, CLI. Журнал проверок (verify-ledger) повторяет
+ * зелёный по неизменному дереву, и 09.11.2026 `recorded.integration` дважды «прошёл» за 3 с:
+ * запись → повтор по стенду не шли. Такой файл идёт заново всегда — журнал снимается так же,
+ * как его снимает mustfail: обычный вход вместо входа под замком и пустой замок. Признак
+ * файла — `LIVE_FILE` в начале модуля (прогон идёт на верхнем уровне, до этой строки).
+ */
+function liveEnv() {
+  return {
+    ...process.env,
+    AGENTDECK_VERIFY_LEDGER: 'off',
+    AGENTDECK_VERIFY_LEDGER_LOCK: '',
+    NODE_OPTIONS: (process.env.NODE_OPTIONS ?? '').replace(
+      /([\\/]bin[\\/])preload-locked\.cjs/g,
+      '$1preload.cjs',
+    ),
+  };
 }
 
 /** cmd — двойные кавычки; sh — одинарные: в двойных он раскрывает `$` и обратные кавычки. */

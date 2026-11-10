@@ -1,3 +1,5 @@
+import type { DiffNotesSend } from '../../model/sendNotes.types';
+
 export interface ProjectCodeModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -8,4 +10,9 @@ export interface ProjectCodeModalProps {
    * обычно, просто без сравнения — новый чат ещё ничего не менял.
    */
   chatId?: string;
+  /**
+   * Отправка из чата для заметок к строкам правок: с ней у строк есть «+», под
+   * редактором — лоток «Сейчас» / «В очередь». Без неё окно кода как было.
+   */
+  notesSend?: DiffNotesSend;
 }

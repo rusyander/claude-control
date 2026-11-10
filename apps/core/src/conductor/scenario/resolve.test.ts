@@ -1,6 +1,7 @@
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { toolPlanFor } from '@agentdeck/contracts/core/model-tools';
 import { PRESET_IDS, scenarioProblems, scenarioSchema } from '@agentdeck/contracts/core/scenario';
 import { tempDir } from '../../journal/__fixtures__/journal-harness.ts';
 import {
@@ -31,16 +32,16 @@ function repo(name: string, file?: string): { repoKey: string; path: string } {
 }
 
 describe('scenario presets and library', () => {
-  it('ten presets (chat, ask, review-link and lead included), every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
+  it('eleven presets (chat, ask, review-link, lead and browser-walk included), every one schema-valid with no structural problem, ids = PRESET_IDS', () => {
     expect([...new Set(PRESETS.map((p) => p.id))].sort()).toEqual([...PRESET_IDS].sort());
     for (const p of PRESETS) {
       expect(scenarioSchema.safeParse(p).success).toBe(true);
       expect({ id: p.id, problems: scenarioProblems(p) }).toEqual({ id: p.id, problems: [] });
     }
-    expect(latestPresets()).toHaveLength(10);
+    expect(latestPresets()).toHaveLength(11);
   });
 
-  it('tracker-ticket@2 is lead@1 plus the tracker status step; @1 stays frozen and latest picks @2', () => {
+  it('tracker-ticket@2 is lead@1 plus the tracker status step; @1 and @2 stay frozen and latest picks @3', () => {
     const lead = PRESETS.find((p) => p.id === 'lead' && p.version === 1)!;
     const v1 = PRESETS.find((p) => p.id === 'tracker-ticket' && p.version === 1)!;
     const v2 = PRESETS.find((p) => p.id === 'tracker-ticket' && p.version === 2)!;
@@ -49,7 +50,39 @@ describe('scenario presets and library', () => {
     expect(v2.steps.find((s) => s.id === 'plan')!.onlyFor).toEqual(['M', 'L', 'XL']);
     expect(v1.steps.map((s) => s.id)[0]).toBe('intake');
     expect(v1.presetOf).toBeUndefined();
-    expect(latestPresets().find((p) => p.id === 'tracker-ticket')!.version).toBe(2);
+    expect(latestPresets().find((p) => p.id === 'tracker-ticket')!.version).toBe(3);
+  });
+
+  it('stage 12: lead@2 and tracker-ticket@3 add review-cross (max-quality only, cross of review, before fix); lead@1 is frozen', () => {
+    const lead1 = PRESETS.find((p) => p.id === 'lead' && p.version === 1)!;
+    const lead2 = PRESETS.find((p) => p.id === 'lead' && p.version === 2)!;
+    const v3 = PRESETS.find((p) => p.id === 'tracker-ticket' && p.version === 3)!;
+    expect(lead1.steps.map((s) => s.id)).not.toContain('review-cross');
+    const ids = lead2.steps.map((s) => s.id);
+    expect(ids.indexOf('review-cross')).toBe(ids.indexOf('review') + 1);
+    expect(ids.indexOf('review-cross')).toBeLessThan(ids.indexOf('fix'));
+    const cross = lead2.steps.find((s) => s.id === 'review-cross')!;
+    expect(cross).toMatchObject({
+      kind: 'review',
+      after: ['review'],
+      crossOf: 'review',
+      onlyProfile: ['max-quality'],
+      gate: [],
+    });
+    // Правки ждут только первое ревью: пропущенное второе путь задачи не меняет.
+    expect(lead2.steps.find((s) => s.id === 'fix')!.after).toEqual(['review']);
+    expect(v3.presetOf).toEqual({ id: 'lead', version: 2 });
+    expect(v3.steps.map((s) => s.id)).toEqual([...ids, 'tracker-status']);
+    expect(latestPresets().find((p) => p.id === 'lead')!.version).toBe(2);
+  });
+
+  it('stage 12: browser-walk is one read-only walk step at the ceiling tier, no delivery tail', () => {
+    const walk = PRESETS.find((p) => p.id === 'browser-walk')!;
+    expect(walk.version).toBe(1);
+    expect(walk.steps.map((s) => [s.id, s.kind, s.model.tier])).toEqual([
+      ['walk', 'walk', 'ceiling'],
+    ]);
+    expect(toolPlanFor('walk')?.builtins).toBe('read-only');
   });
 
   it('library versions are write-once: same text again is "same", another text is version-taken, preset id refused', async () => {

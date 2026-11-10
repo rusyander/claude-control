@@ -3,6 +3,7 @@ import { ResizeHandle } from '@shared/ui/resize-handle';
 import { ArtifactPreview, MediaImageCard } from '@features/ArtifactPreview';
 import { MediaDeckCard } from '@entities/Media';
 import { AgentNodePane } from '@entities/AgentTree';
+import { SitePreviewPane } from '@features/SitePreview';
 import type { ChatPreviewPaneProps } from './ChatPreviewPane.types';
 
 /**
@@ -13,6 +14,7 @@ import type { ChatPreviewPaneProps } from './ChatPreviewPane.types';
  */
 export function ChatPreviewPane({
   chatId,
+  site,
   artifact,
   image,
   deck,
@@ -24,17 +26,28 @@ export function ChatPreviewPane({
   onReviseDeck,
 }: ChatPreviewPaneProps) {
   const { t } = useTranslation();
+  const handle = (
+    <ResizeHandle
+      width={width}
+      min={320}
+      max={1000}
+      label={t('chat.resizePreview')}
+      onResize={onResize}
+    />
+  );
+  if (site) {
+    return (
+      <>
+        {handle}
+        <SitePreviewPane {...site} />
+      </>
+    );
+  }
   const media = Boolean(image ?? deck);
 
   return (
     <>
-      <ResizeHandle
-        width={width}
-        min={320}
-        max={1000}
-        label={t('chat.resizePreview')}
-        onResize={onResize}
-      />
+      {handle}
       {image && <MediaImageCard image={image} onClose={onClose} />}
       {!image && deck && (
         <MediaDeckCard

@@ -27,7 +27,11 @@ export function adoptRefusal(start: RoadStart, adapter: CliAdapter): AdoptRefusa
   if (!resume?.adopt) return null;
   if (resume.adopt.adapter !== start.adapterId) return 'resume_other_cli';
   if (!adapter.ownsTranscript) return 'resume_unproven';
-  const owned = adapter.ownsTranscript(start.pin, start.cwd, resume.conversationId);
+  const owned = adapter.ownsTranscript(
+    start.pin,
+    start.workDir ?? start.cwd,
+    resume.conversationId,
+  );
   if (owned === true) return null;
   return owned === false ? 'resume_not_owned' : 'resume_unreadable';
 }

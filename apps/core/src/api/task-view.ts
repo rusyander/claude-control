@@ -14,6 +14,8 @@ import type {
 } from '@agentdeck/contracts/core/task-view';
 import { spendOf, turnsOfLines, type PriceTable } from '../economy/price/index.ts';
 import type { TaskFoldState, UsageTotals } from '../journal/reduce/reduce.types.ts';
+import { stage12ViewOf } from './task-view-s12.ts';
+import { askFactsOf } from './task-view-asks.ts';
 
 /**
  * Вид задачи для панели (этап 9, 07:18-22): свёртка + строки журнала → `TaskView`. Чистая
@@ -168,6 +170,7 @@ export function reportOf(state: TaskFoldState, lines: readonly JournalLine[]): R
 
 export function taskViewOf(input: TaskViewInput): TaskView {
   const { state, lines, priceFor, table } = input;
+  const askFacts = askFactsOf(state, lines);
   const turnLines = lines.filter((l) => l.kind === 'turn.usage') as JournalLine<'turn.usage'>[];
   const linesBySession = new Map<string, JournalLine[]>();
   for (const line of turnLines) {
@@ -224,6 +227,8 @@ export function taskViewOf(input: TaskViewInput): TaskView {
       stepId: a.stepId,
       lateAnswer: a.lateAnswer,
       answer: a.answer ?? null,
+      defaultAction: a.defaultAction,
+      ...askFacts.get(askId),
     })),
     budgets: Object.values(state.budgets).map((b) => ({
       scope: b.scope,
@@ -251,6 +256,8 @@ export function taskViewOf(input: TaskViewInput): TaskView {
     // Этап 11 (W3-18): связь задачи — группа панели и родитель дочерней задачи XL.
     ...(state.created?.groupId ? { groupId: state.created.groupId } : {}),
     ...(state.created?.parentTaskId ? { parentTaskId: state.created.parentTaskId } : {}),
+    // Этап 12: остановка, перехват, MR единиц, ожидание окна — только при факте в журнале.
+    ...stage12ViewOf(state, lines),
   };
 }
 

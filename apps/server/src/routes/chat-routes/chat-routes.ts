@@ -70,7 +70,7 @@ export function registerChatRoutes(
   );
   // История агентов и ход субагента — у ядра (`/api/core/agents`, этап 11 W3-17), транскрипты не читаются.
   registerChatBrowseRoutes(app, ctx);
-  registerChatRunRoutes(app, ctx, registry, session, heldOf);
+  registerChatRunRoutes(app, ctx, registry, session, heldOf, coreHistory?.adopt);
   registerChatArtifactRoutes(app, ctx);
   registerChatCliRoutes(app, undefined, () => ctx.store);
   // Вопросы сессий из терминала и VS Code: сводка помечает те, что ждут

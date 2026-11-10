@@ -5,6 +5,7 @@ import type { WindowDecision } from '@agentdeck/contracts/core/economy';
 import type { SendOrigin } from '@agentdeck/contracts/core/user-layer';
 import type { SendImage } from '@agentdeck/contracts/core/ask';
 import type { LiveTask } from '../../journal/resume.ts';
+import type { ContourPolicy } from '../../policy/resolve/resolve.types.ts';
 import type { PublishNext } from '../next/next.types.ts';
 import type { RoutingEnv, StepRouting } from '../scenario/index.ts';
 import type { SeatPort } from '../schedule/schedule.types.ts';
@@ -144,7 +145,20 @@ export interface SessionEvents {
   /** Инструмент запрошен (`+1`) или вернул результат (`-1`): безопасная точка (G10). */
   tool(delta: 1 | -1): void;
   ended(): void;
+  /**
+   * Этап 12 (P170): ход кончился ошибкой с текстом CLI «войдите заново» (`CliAdapter.loginLost`).
+   * Зовётся ДО `turnEnded` того же хода; решает перечитанный вход (`conductor/human/login-ask.ts`).
+   */
+  loginLost?(text: string): void;
+  /**
+   * Этап 12 (L3): ход кончился ошибкой (любой: окно, сеть, вход). Зовётся ДО `turnEnded` того же
+   * хода; по нему новая сессия чата после снятия знает, что слово человека осталось без ответа.
+   */
+  turnError?(text: string): void;
 }
+
+/** Перечитанный вход маршрута: `unknown` — прочесть нельзя (тогда обычный путь сбоя хода). */
+export type LoginState = 'up' | 'absent' | 'unknown';
 
 /**
  * Дорога сессии для исполнителя: прикрепить прежнюю живую или запустить новую, послать, снять.
@@ -198,6 +212,11 @@ export interface RunDeps {
    * родитель XL кончается на запуске, как до Q-2.
    */
   xl?: XlPort;
+  /**
+   * Перечитать вход CLI маршрута после ошибки «войдите заново» (этап 12, P170). Нет порта —
+   * `unknown`: ход с такой ошибкой кончается обычным путём, вопроса пункта 4 нет.
+   */
+  loginState?(adapter: string, routeId: string): Promise<LoginState>;
 }
 
 /** Порт детей XL исполнителю: что знает журнал родителя и детей, и запуск следующей волны. */
@@ -218,6 +237,11 @@ export interface RunEconomy {
   windows(routeId: string): readonly WindowDecision[];
   /** Вход суда маршрута шага: окна всех маршрутов набора задачи (судья `tier` пропускает держащие). */
   routingEnv?(task: LiveTask): RoutingEnv;
+  /**
+   * Активный контур панели сейчас — тот же, что входит в `routingEnv`: суд `next` судит по нему
+   * второе ревью (другой CLI после контура, W3-D). Нет — без контура.
+   */
+  contour?(): ContourPolicy | undefined;
   /** Бриф сверх бюджета — причина с корзинами (03:136); `null` — в бюджете. До запуска сессии. */
   briefRefusal?(task: LiveTask, s: StepCtx, sections: readonly BriefSection[]): string | null;
   /**

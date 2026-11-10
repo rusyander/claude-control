@@ -8,6 +8,7 @@ import {
   groupsOf,
   isTelegramConnected,
   notifyBody,
+  quietValid,
   saveTelegramCard,
 } from './telegramCard';
 
@@ -91,6 +92,42 @@ describe('черновик карточки и два тела запроса', 
     expect(draft).not.toHaveProperty('withButtons');
     expect(answersBody(draft)).toEqual({ enabled: true, afterMinutes: 4, ownerId: '777' });
     expect(answersBody({ ...draft, waits: false }).enabled).toBe(false);
+  });
+
+  it('тихие часы: нет окна — галочка снята и ночь по умолчанию; включено — окно и «вопросы тоже» уходят в тело', () => {
+    const off = draftOfTelegram(settings(), answers());
+    expect(off).toMatchObject({
+      quietOn: false,
+      quietFrom: '23:00',
+      quietTo: '08:00',
+      quietAsks: false,
+    });
+    expect(notifyBody(off, true)).not.toHaveProperty('quiet');
+    const on = draftOfTelegram(
+      settings({ quiet: { from: '22:30', to: '07:15', asks: true } }),
+      answers(),
+    );
+    expect(on).toMatchObject({
+      quietOn: true,
+      quietFrom: '22:30',
+      quietTo: '07:15',
+      quietAsks: true,
+    });
+    expect(notifyBody({ ...on, quietFrom: ' 22:30 ' }, true).quiet).toEqual({
+      from: '22:30',
+      to: '07:15',
+      asks: true,
+    });
+    expect(notifyBody({ ...on, quietOn: false }, true)).not.toHaveProperty('quiet');
+  });
+
+  it('окно тишины годится только с двумя краями ЧЧ:ММ, и они не совпадают', () => {
+    expect(quietValid({ quietFrom: '23:00', quietTo: '08:00' })).toBe(true);
+    expect(quietValid({ quietFrom: '09:00', quietTo: '18:00' })).toBe(true);
+    expect(quietValid({ quietFrom: '23:00', quietTo: '23:00' })).toBe(false);
+    expect(quietValid({ quietFrom: '24:00', quietTo: '08:00' })).toBe(false);
+    expect(quietValid({ quietFrom: '7:00', quietTo: '08:00' })).toBe(false);
+    expect(quietValid({ quietFrom: '', quietTo: '08:00' })).toBe(false);
   });
 
   it('«Убирать отвеченное» убрано: отвеченное сворачивается само, в черновике и теле поля нет', () => {

@@ -108,9 +108,18 @@ export function coreChatCliOf(file: string, id: string): string {
   return readAll(file)[id]?.cli ?? 'claude';
 }
 
+/** Папка разговора по книге, чтением файла заново; без папки или незнакомый id — `undefined`. */
+export function coreChatCwdOf(file: string, id: string): string | undefined {
+  return SAFE_ID.test(id) ? readAll(file)[id]?.cwd : undefined;
+}
+
+/**
+ * Книга читает файл заново на каждый вопрос и каждую запись (чтение — правка — запись): писатель
+ * не один — усыновление разговора чата перехвата (`core-chat-adopt.ts`) пишет в тот же файл, и
+ * книга с записями в памяти стёрла бы его запись своей следующей.
+ */
 export function createCoreChatBook(file: string): CoreChatBook {
-  let entries = readAll(file);
-  const save = (): void => {
+  const save = (entries: Record<string, StoredEntry>): void => {
     mkdirSync(dirname(file), { recursive: true });
     const tmp = `${file}.${process.pid}.tmp`;
     writeFileSync(tmp, `${JSON.stringify(entries, null, 2)}\n`);
@@ -118,18 +127,19 @@ export function createCoreChatBook(file: string): CoreChatBook {
   };
   return {
     get(id) {
-      const e = entries[id];
+      const e = readAll(file)[id];
       return e?.taskId && e.stepId ? { taskId: e.taskId, stepId: e.stepId } : undefined;
     },
-    cliOf: (id) => entries[id]?.cli,
+    cliOf: (id) => readAll(file)[id]?.cli,
     set(id, entry: CoreChatEntry) {
       if (!SAFE_ID.test(id)) return;
+      const entries = readAll(file);
       const prior = entries[id];
       const cli = entry.cli ?? prior?.cli;
       const cwd = entry.cwd ?? prior?.cwd;
       const known = prior?.tasks ?? [];
       const tasks = known.includes(entry.taskId) ? known : [...known, entry.taskId];
-      entries = {
+      save({
         ...entries,
         [id]: {
           taskId: entry.taskId,
@@ -138,17 +148,16 @@ export function createCoreChatBook(file: string): CoreChatBook {
           tasks,
           ...(cwd ? { cwd } : {}),
         },
-      };
-      save();
+      });
     },
     forget(id) {
+      const entries = readAll(file);
       const e = entries[id];
       if (!e?.taskId) return;
       const { [id]: _gone, ...rest } = entries;
       // Задачи и папка остаются с CLI: история разговора не-Claude CLI — виды их сеансов у ядра.
       const kept = { ...(e.tasks ? { tasks: e.tasks } : {}), ...(e.cwd ? { cwd: e.cwd } : {}) };
-      entries = e.cli ? { ...rest, [id]: { cli: e.cli, ...kept } } : rest;
-      save();
+      save(e.cli ? { ...rest, [id]: { cli: e.cli, ...kept } } : rest);
     },
   };
 }

@@ -5,6 +5,7 @@ import { AnimatePresence } from 'motion/react';
 import { useToasts } from '@shared/lib/toast';
 import { ToastItem } from './toast-item';
 import { ToastDetailsModal } from './toast-details-modal';
+import { useToastHost } from './toast-host';
 import type { ToastDetails } from './toast-details-modal.types';
 import styles from './toast.module.scss';
 
@@ -23,11 +24,18 @@ export function Toaster() {
   const { t } = useTranslation();
   const { toasts, dismiss } = useToasts();
   const [details, setDetails] = useState<ToastDetails | null>(null);
+  // Открыто модальное окно — стопка внутри него (`toast-host.ts`) и вверху экрана: внизу справа
+  // у окна кнопки подвала («Сохранить», «В очередь»), и тост ложился ровно на них.
+  const dialog = useToastHost();
 
   return (
     <>
       {createPortal(
-        <ol className={styles.viewport} aria-label={t('notifications.title')}>
+        <ol
+          className={[styles.viewport, dialog ? styles.inDialog : ''].filter(Boolean).join(' ')}
+          aria-label={t('notifications.title')}
+          data-toast-host={dialog ? 'dialog' : 'page'}
+        >
           <AnimatePresence initial={false}>
             {toasts.map((toast) => (
               <ToastItem
@@ -39,7 +47,7 @@ export function Toaster() {
             ))}
           </AnimatePresence>
         </ol>,
-        document.body,
+        dialog ?? document.body,
       )}
 
       <ToastDetailsModal details={details} onClose={() => setDetails(null)} />

@@ -1,4 +1,5 @@
 import type { RelayPending, RelayState } from '@agentdeck/contracts/core/relay';
+import { askWaits } from '@agentdeck/contracts/core/waiting';
 import type { CoreRelay, CoreRelayDeps, CoreSseEvent, RelayTask } from './core-relay.types.ts';
 import { readRelayState, writeRelayState } from './state.ts';
 
@@ -31,6 +32,8 @@ const FALLBACK_TITLE = 'Задача ядра';
 interface AskLine {
   askId: string;
   question: string;
+  /** Блокирует ли вопрос (`askWaits`); у записи `pending` до этапа 12 поля нет — блокирует. */
+  waits?: boolean;
 }
 
 /** Строка журнала из `data:` — вопрос человеку или `null` (чужой вид, кривая строка). */
@@ -41,7 +44,16 @@ function askOf(event: CoreSseEvent): AskLine | null {
     const askId = line.data?.askId;
     const question = line.data?.question;
     if (line.kind !== 'human.asked' || typeof askId !== 'string') return null;
-    return { askId, question: typeof question === 'string' ? question : '' };
+    const defaultAction = line.data?.defaultAction;
+    return {
+      askId,
+      question: typeof question === 'string' ? question : '',
+      // Та же функция, что у доски и телефона (P153): блокирует только вопрос без умолчания.
+      waits: askWaits({
+        defaultAction:
+          typeof defaultAction === 'string' || defaultAction === null ? defaultAction : undefined,
+      }),
+    };
   } catch {
     return null;
   }
@@ -82,7 +94,8 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
     if (now - dirtyAt >= CURSOR_FLUSH_MS) persist();
   };
 
-  const ready = (): boolean => deps.ready?.() ?? true;
+  const ready = (waits: boolean): boolean => deps.ready?.(waits) ?? true;
+  const waitsOf = (ask: AskLine): boolean => ask.waits ?? true;
 
   /**
    * Одна попытка сообщить. `skipped` — каналов нет, не пробовали (ждать, пока появятся);
@@ -90,7 +103,7 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
    * не получал запрос каждые три секунды).
    */
   const attempt = async (task: RelayTask, ask: AskLine): Promise<'sent' | 'skipped' | 'failed'> => {
-    if (!ready()) return 'skipped';
+    if (!ready(waitsOf(ask))) return 'skipped';
     sending.add(ask.askId);
     try {
       const ok = await deps.deliver({
@@ -102,6 +115,7 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
           deepLink: deps.link(task.taskId, ask.askId),
         },
         question: ask.question,
+        waits: waitsOf(ask),
       });
       return ok ? 'sent' : 'failed';
     } catch (error) {
@@ -120,7 +134,12 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
       delivered.add(ask.askId);
       return;
     }
-    pending.set(ask.askId, { taskId, askId: ask.askId, question: ask.question });
+    pending.set(ask.askId, {
+      taskId,
+      askId: ask.askId,
+      question: ask.question,
+      waits: waitsOf(ask),
+    });
     if (result === 'failed') retryAt.set(ask.askId, Date.now() + RETRY_MS);
   };
 
@@ -159,7 +178,8 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
         changed = true;
         continue;
       }
-      if (!ready()) break;
+      // Канал смотрится по вопросу: для неблокирующего push не канал, а Telegram — канал.
+      if (!ready(waitsOf(item))) continue;
       if ((retryAt.get(item.askId) ?? 0) > Date.now() || sending.has(item.askId)) continue;
       let askState: string | null;
       try {
@@ -183,6 +203,15 @@ export function createCoreRelay(deps: CoreRelayDeps): CoreRelay {
   const follow = async (task: RelayTask, signal: AbortSignal): Promise<void> => {
     try {
       for await (const event of deps.core.events(task.taskId, state.cursors[task.taskId], signal)) {
+        if (deps.onLine) {
+          try {
+            await deps.onLine(task, event);
+          } catch (error) {
+            deps.log(
+              `core-relay: onLine ${task.taskId}: ${error instanceof Error ? error.message : error}`,
+            );
+          }
+        }
         const ask = askOf(event);
         if (ask) await relayAsk(task, ask, event.id);
         else remember(task.taskId, event.id);

@@ -20,7 +20,6 @@ const SRC = dirname(fileURLToPath(import.meta.url));
 
 const ALLOWED: Record<string, string> = {
   'conductor/copy/decide.ts': 'git stderr: the first `fatal:` line of a failed worktree add',
-  'economy/tier.ts': 'model-name glob of a route set (`*` wildcard), not prose',
   'routes/compat/compat.ts': 'route-id glob (`*` wildcard), not prose',
   'policy/human-point/human-point.ts': 'path normalisation: separators, drive letter, ./ ../',
   'policy/resolve/resolve.ts': 'route-id glob of an allowed set (`*` wildcard), not prose',

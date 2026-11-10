@@ -20,7 +20,10 @@
     "@agentdeck/sieves": "workspace:*",
     "@agentdeck/stub-forge": "workspace:*",
     "@agentdeck/stub-model": "workspace:*",
+    "@agentdeck/stub-tracker": "workspace:*",
+    "@agentdeck/trackers": "workspace:*",
     "fastify": "^5.10.0",
+    "playwright-core": "1.61.1",
     "smol-toml": "^1.7.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"

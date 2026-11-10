@@ -4,6 +4,8 @@ import type { Fact } from '@agentdeck/contracts/core/facts';
 import { isUuidv7 } from '@agentdeck/contracts/core/ids';
 import type { HealthReply, TaskReply, TasksReply } from '@agentdeck/contracts/core/panel-api';
 import type { Route, RoutePrice } from '@agentdeck/contracts/core/routes';
+import type { BoardPort } from '../conductor/board/board.types.ts';
+import type { InboxPort } from '../conductor/inbox/inbox.types.ts';
 import type { TaskRegistry } from '../conductor/tasks.ts';
 import {
   commandsInFlight,
@@ -31,6 +33,9 @@ import { registerAgents, type AgentsPort } from './agents.ts';
 import { registerAllocator, type AllocatorPort } from './allocator.ts';
 import { registerAsk, type AskPort } from './ask.ts';
 import { registerLocalActivity, type LocalActivityPort } from './local-activity.ts';
+import { registerBoardMove } from './board-move.ts';
+import { registerBoardView } from './board-view.ts';
+import { registerInbox } from './inbox.ts';
 import { registerTaskAttachments } from './attachments.ts';
 import { registerReviewLink, type ReviewLinkPort } from './review-link.ts';
 import { registerConfig } from './config.ts';
@@ -46,6 +51,7 @@ import type { RouteContext } from './route-context.types.ts';
 import { registerProfiles } from './profiles.ts';
 import { registerRecords } from './records.ts';
 import { registerReport } from './report.ts';
+import { registerWalk } from './walk.ts';
 import { registerDelivery } from './delivery.ts';
 import { registerMcpOffers, type McpOffersPort } from './mcp-offers.ts';
 import { registerRoutesView } from './routes.ts';
@@ -122,6 +128,16 @@ export interface ApiDeps {
   allocator?: () => AllocatorPort | undefined;
   /** Управляющий канал хоста звеньев для активности своей модели (этап 11); нет — 501. */
   localActivity?: () => LocalActivityPort | undefined;
+  /**
+   * Доска задач (этап 12, `bootstrap/board-wiring.ts`). Ручки `/v1/board*` регистрирует зона Z1;
+   * нет порта — они отвечают 501.
+   */
+  board?: () => BoardPort | undefined;
+  /**
+   * Входящие (этап 12, `bootstrap/inbox-wiring.ts`). Ручки `/v1/inbox*` регистрирует зона Z7;
+   * нет порта — они отвечают 501.
+   */
+  inbox?: () => InboxPort | undefined;
 }
 
 const READ_TOKENS: ReadonlySet<TokenClass> = new Set(['core', 'panel-bearer']);
@@ -250,6 +266,7 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   registerConfig(app, routeContext, () => deps.config?.());
   registerRecords(app, routeContext);
   registerReport(app, routeContext);
+  registerWalk(app, routeContext);
   registerDelivery(app, routeContext);
   registerProfiles(app, routeContext);
   registerRoutesView(app, routeContext, () => deps.routes?.());
@@ -262,6 +279,11 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
   registerAgents(app, routeContext, () => deps.agents?.());
   registerAllocator(app, routeContext, () => deps.allocator?.());
   registerLocalActivity(app, routeContext, () => deps.localActivity?.());
+  // Этап 12 (Z1): доска задач — снимок, ход человека, новые записи; нет проводки — 501.
+  registerBoardView(app, routeContext, () => deps.board?.());
+  registerBoardMove(app, routeContext, () => deps.board?.());
+  // Этап 12 (Z7): входящие — поиск по источнику и записи доски из выбранного; нет проводки — 501.
+  registerInbox(app, routeContext, () => deps.inbox?.());
 
   app.get<{ Querystring: { page?: string } }>('/v1/nonce', async (request, reply) => {
     if (!requireRead(request, reply)) return reply;
@@ -307,7 +329,13 @@ export function buildApi(deps: ApiDeps): FastifyInstance {
       }));
     const send = (result: CommandResult) =>
       reply.code(result.status === 'applied' ? 200 : commandStatus(result.code)).send(result);
-    const refused = await refuseBeforeOpen(deps.registry, command, token, proofOnce);
+    const refused = await refuseBeforeOpen(
+      deps.registry,
+      command,
+      token,
+      proofOnce,
+      deps.env.rework ? () => deps.env.rework?.() : undefined,
+    );
     if (refused) {
       return 'result' in refused
         ? send(refused.result)

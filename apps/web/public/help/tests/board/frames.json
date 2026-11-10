@@ -1,0 +1,56 @@
+{
+  "topic": "tests",
+  "scenario": "board",
+  "frames": [
+    {
+      "id": "01-to-board",
+      "side": "panel",
+      "file": "01-to-board.png",
+      "masked": 0,
+      "width": 1308,
+      "height": 441,
+      "shotAt": "2026-11-09T11:33:10.674Z",
+      "text": "прогон агент 08.11.2026, 15:00:00 local пройдено: 1 провалено: 1 заблокировано: 1 пропущено: 0 длительность: 20м 00с Отчёт .md Отчёт .csv Отчёт .pdf Куда опубликовать Страницей Confluence Комментарием в задаче Jira Опубликовать отчёт Перепрогнать провалившиеся (2) Сравнить с предыдущим провален Вход существующим пользователем шаг 2 кнопка осталась активной ожидалось: кнопка выключена · вышло: кнопка активна Регрессионный кейс На доску пройден Выход заблокирован Настройки нет доказательства",
+      "seal": {
+        "png": "e7c77269cac55947",
+        "text": "04f234a460011cb8"
+      },
+      "en": {
+        "file": "01-to-board.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 441,
+        "shotAt": "2026-11-09T11:33:28.256Z",
+        "text": "run agent 11/8/2026, 3:00:00 PM local passed: 1 failed: 1 blocked: 1 skipped: 0 duration: 20m 00s Report .md Report .csv Report .pdf Publish to As a Confluence page As a Jira comment Publish report Rerun the failures (2) Compare with the previous run failed Log in as an existing user step 2 the button stayed enabled expected: the button is disabled · got: the button is enabled Regression case To the board passed Log out blocked Settings no proof",
+        "seal": {
+          "png": "ecdec4c6ae831cd7",
+          "text": "37d93c0770d32bc5"
+        }
+      },
+      "dark": {
+        "file": "01-to-board.dark.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 441,
+        "shotAt": "2026-11-09T11:33:43.863Z",
+        "text": "прогон агент 08.11.2026, 15:00:00 local пройдено: 1 провалено: 1 заблокировано: 1 пропущено: 0 длительность: 20м 00с Отчёт .md Отчёт .csv Отчёт .pdf Куда опубликовать Страницей Confluence Комментарием в задаче Jira Опубликовать отчёт Перепрогнать провалившиеся (2) Сравнить с предыдущим провален Вход существующим пользователем шаг 2 кнопка осталась активной ожидалось: кнопка выключена · вышло: кнопка активна Регрессионный кейс На доску пройден Выход заблокирован Настройки нет доказательства",
+        "seal": {
+          "png": "e13f5f89e3348ce2",
+          "text": "04f234a460011cb8"
+        }
+      },
+      "darkEn": {
+        "file": "01-to-board.dark.en.png",
+        "masked": 0,
+        "width": 1308,
+        "height": 441,
+        "shotAt": "2026-11-09T11:34:01.879Z",
+        "text": "run agent 11/8/2026, 3:00:00 PM local passed: 1 failed: 1 blocked: 1 skipped: 0 duration: 20m 00s Report .md Report .csv Report .pdf Publish to As a Confluence page As a Jira comment Publish report Rerun the failures (2) Compare with the previous run failed Log in as an existing user step 2 the button stayed enabled expected: the button is disabled · got: the button is enabled Regression case To the board passed Log out blocked Settings no proof",
+        "seal": {
+          "png": "bea1816bca576046",
+          "text": "37d93c0770d32bc5"
+        }
+      }
+    }
+  ]
+}

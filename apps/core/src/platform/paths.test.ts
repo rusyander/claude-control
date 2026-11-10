@@ -8,6 +8,7 @@ import {
   longForm,
   normaliseSpelling,
   pathKey,
+  projectRootOf,
   samePath,
   stripLongPrefix,
 } from './paths.ts';
@@ -37,6 +38,16 @@ describe('P52 path identity — spelling matrix per OS (no disk)', () => {
   ];
   it.each(rows)('P52 %s (%s)', (_name, os, input, expected) => {
     expect(normaliseSpelling(input, os)).toBe(expected);
+  });
+
+  it('project root of a pinned repo: top + subPath by the OS rules, no subPath → the top as is', () => {
+    expect(projectRootOf({ path: 'C:\\w\\repo', subPath: 'apps/web' }, 'win32')).toBe(
+      'C:\\w\\repo\\apps\\web',
+    );
+    expect(projectRootOf({ path: '/srv/repo', subPath: 'apps/web' }, 'linux')).toBe(
+      '/srv/repo/apps/web',
+    );
+    expect(projectRootOf({ path: '/srv/repo' }, 'darwin')).toBe('/srv/repo');
   });
 
   it('P52 \\\\?\\ added only past MAX_PATH, stripped back to the plain form', () => {

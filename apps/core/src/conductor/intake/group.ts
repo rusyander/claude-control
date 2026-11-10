@@ -120,13 +120,16 @@ export type GroupOutcome = EstimateOutcome;
 /**
  * Оценка группы: приём каждого пункта ДО первой задачи (отказ любого — 422, задач нет), затем
  * пункты по порядку тем же `estimateTask`. Задача 0 не создалась — 422 с её причинами; позже —
- * ответ задачи 0 с причинами пропавших пунктов (задачи созданы, их не откатить).
+ * ответ задачи 0 с причинами пропавших пунктов (задачи созданы, их не откатить). `decorate` —
+ * посев поверх приёма каждого пункта (запись доски, этап 12): у не-ведущего пункта посева приёма нет,
+ * и без него старт с доски терял бы `boardEntry` задач группы.
  */
 export async function estimateGroup(
   body: EstimateBody,
   registry: TaskRegistry,
   env: SplitEnv,
   leadOf: (fields: EstimateFields) => LeadEstimate,
+  decorate: (seed: CreateSeed) => CreateSeed = (seed) => seed,
 ): Promise<GroupOutcome> {
   const items = groupItemsOf(body.fields) ?? [];
   const groupId = groupIdOf(body.cmdId);
@@ -139,7 +142,7 @@ export async function estimateGroup(
   const outcomes: EstimateOutcome[] = [];
   for (const [i, b] of bodies.entries()) {
     const lead = leads[i] as LeadEstimate;
-    const seed = seedWithGroup(lead.kind === 'lead' ? lead.seed : {}, groupId);
+    const seed = seedWithGroup(decorate(lead.kind === 'lead' ? lead.seed : {}), groupId);
     const out = await estimateTask(b, registry, env, seed);
     if (i === 0 && out.status === 422) return out;
     outcomes.push(out);

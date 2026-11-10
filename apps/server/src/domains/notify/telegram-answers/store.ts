@@ -174,6 +174,16 @@ export class AnswersStore {
     return key in this.data.sent;
   }
 
+  /**
+   * Забыть, что ожидание отправлено: следующая сверка пришлёт свежую копию. Нужно нажатию на
+   * вопрос ядра, чья подпись или вопрос разошлись с показанным (этап 12, P189).
+   */
+  forget(key: string): void {
+    if (!(key in this.data.sent)) return;
+    delete this.data.sent[key];
+    this.save();
+  }
+
   get lastSentAt(): number | undefined {
     return this.data.lastSentAt;
   }

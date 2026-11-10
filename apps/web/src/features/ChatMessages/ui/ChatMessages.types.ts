@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ChatMessage } from '@agentdeck/contracts';
 import type { MessageTiming } from '@agentdeck/contracts/chat-timing';
 import type { ChatTreeView, HandoffProposal } from '@agentdeck/contracts/chat-handoff';
@@ -130,6 +131,11 @@ export interface ChatMessagesProps {
   onCompact?: () => void;
   /** Контекст переполнен: продолжить в свежей сессии (родитель разделения уносит группы). */
   onFreshSession?: () => void;
+  /**
+   * Что страница ставит под карточкой ошибки хода (этап 12, L3: карточка лимита чата). Слот, а не
+   * импорт: соседний срез ленте недоступен.
+   */
+  errorAside?: ReactNode;
   /** Перечитать переписку из транскрипта — когда поток потерян, правда там. */
   onRefresh?: () => void;
   /** Вернуть ход, начатый новым разговором вместо остывшего, в старую сессию (R5). */

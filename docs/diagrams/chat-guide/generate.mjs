@@ -21,6 +21,8 @@
  *              ход переживает её перезапуск. На экране этого не видно.
  * Страница 2 (конвейер разделения) снята вместе с разделением: группы и деревья
  *              теперь сценарии ядра, их путь описывает справка «Ядро».
+ * Страница 5 — окно сайта: кто открывает прокси, почему выбор не подделать снаружи и что
+ *              уходит агенту (снимок показывает окно, но не путь выбора).
  * Страница 3 — вызов, который решал только человек (прежний путь, до ядра):
  *              запись D-n, отказ агенту с номером, ответ из любого места; решение
  *              теперь только записывается и работу не продолжает.
@@ -599,6 +601,282 @@ legend(p3, 60, bottomOf(p3) + 60, [
   { caption: 'решение человека', edgeColour: FLOW.human },
 ]);
 
+// ─── Страница 4: заметки к строкам правок ──────────────────────────────────
+
+const p4 = newPage('4. Заметки к строкам правок', 'p4');
+heading(
+  p4,
+  60,
+  30,
+  'Заметки к строкам правок',
+  'Замечания к правкам агента пишутся прямо у строки в окне «Код проекта» и уходят агенту одним сообщением — с файлом и номером строки у каждого.',
+  1500,
+);
+
+const NOTE_W = 330;
+const NG = 100;
+const nx = (i) => 60 + i * (NOTE_W + NG);
+// Ряд одной высоты — по самой высокой карточке: нижние края ровные, стрелки без ступенек.
+function notesRow(y, entries) {
+  const h = Math.max(...entries.map(([, , spec]) => cardH(spec, NOTE_W)));
+  return entries.map(([id, col, spec]) => card(p4, id, nx(col), y, NOTE_W, { ...spec, h }));
+}
+
+const [nCode] = notesRow(150, [
+  [
+    'n:code',
+    0,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Окно «Код проекта»',
+      lines: ['Изменённый файл; «+» у номера строки или «Заметка» над редактором.'],
+    },
+  ],
+  [
+    'n:draft',
+    1,
+    {
+      pal: C.human,
+      title: 'Заметка к строке',
+      lines: [
+        'Текст «Что поправить в этой строке?» — «Добавить».',
+        'Строка с заметкой отмечена точкой.',
+      ],
+    },
+  ],
+  [
+    'n:tray',
+    2,
+    {
+      pal: C.panel,
+      title: 'Лоток заметок',
+      lines: [
+        'Под редактором: файл:строка и текст, у каждой — убрать.',
+        'Черновики свои у каждого разговора.',
+      ],
+    },
+  ],
+  [
+    'n:send',
+    3,
+    {
+      pal: C.panel,
+      icon: 'shape=hexagon',
+      iconText: 'API',
+      title: 'Одно сообщение',
+      lines: [
+        'Все заметки — блоками «путь:строка» в одном тексте.',
+        'Лоток пустеет только после «принято»; отказ оставляет заметки на месте.',
+      ],
+    },
+  ],
+]);
+
+const NOTE_ROW2 = nCode.y + nCode.h + 110;
+const [, nNow, nQueue] = notesRow(NOTE_ROW2, [
+  [
+    'n:idle',
+    1,
+    {
+      pal: C.cli,
+      icon: 'shape=process',
+      iconText: 'CLI',
+      title: 'Агент свободен',
+      lines: ['«Сейчас» и «В очередь» значат одно: обычная отправка.'],
+    },
+  ],
+  [
+    'n:now',
+    2,
+    {
+      pal: C.cli,
+      title: 'Агент работает: «Сейчас»',
+      lines: ['Слово на ходу: ядро доставит его шагу на границе хода.'],
+    },
+  ],
+  [
+    'n:queue',
+    3,
+    {
+      pal: C.cli,
+      title: 'Агент работает: «В очередь»',
+      lines: ['Уйдёт следующим ходом; очередь переживает перезагрузку.'],
+    },
+  ],
+]);
+
+const nRight = (from, to, label, colour) =>
+  link(p4, from, to, label, { colour, exit: [1, 0.3], entry: [0, 0.3] });
+nRight('n:code', 'n:draft', 'щелчок у строки', FLOW.human);
+nRight('n:draft', 'n:tray', 'добавить', FLOW.human);
+nRight('n:tray', 'n:send', 'отправить', FLOW.human);
+link(p4, 'n:send', 'n:queue', 'идёт ход', {
+  colour: FLOW.fwd,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+link(p4, 'n:send', 'n:now', 'идёт ход', {
+  colour: FLOW.fwd,
+  exit: [0.25, 1],
+  entry: [0.5, 0],
+  points: [
+    { x: nQueue.x + nQueue.w * 0.25, y: NOTE_ROW2 - 30 },
+    { x: nNow.cx, y: NOTE_ROW2 - 30 },
+  ],
+});
+// Дальняя цель — верхний коридор: линии не пересекаются.
+link(p4, 'n:send', 'n:idle', 'хода нет', {
+  colour: FLOW.fwd,
+  exit: [0.1, 1],
+  entry: [0.5, 0],
+  points: [
+    { x: nQueue.x + nQueue.w * 0.1, y: NOTE_ROW2 - 60 },
+    { x: nx(1) + NOTE_W / 2, y: NOTE_ROW2 - 60 },
+  ],
+});
+
+routeEdges(p4);
+legend(p4, 60, bottomOf(p4) + 60, [
+  { caption: 'человек и то, что он делает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'панель', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'агентный CLI', fill: C.cli.tint, stroke: C.cli.line },
+  { caption: 'значок формы: карточка, сервер, процесс', fill: '#FFFFFF', stroke: C.cli.line },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'куда уходит сообщение', edgeColour: FLOW.fwd },
+]);
+
+// ─── Страница 5: окно сайта и выбор элемента ───────────────────────────────
+
+const p5 = newPage('5. Окно сайта и выбор элемента', 'p5');
+heading(
+  p5,
+  60,
+  30,
+  'Окно сайта и выбор элемента',
+  'Сайт проекта, запущенный панелью, открывается справа от чата через прокси панели; выбранный на нём элемент уходит агенту описанием вместе с сообщением.',
+  1500,
+);
+
+const sx = (i) => 60 + i * (NOTE_W + NG);
+function siteRow(y, entries) {
+  const h = Math.max(...entries.map(([, , spec]) => cardH(spec, NOTE_W)));
+  return entries.map(([id, col, spec]) => card(p5, id, sx(col), y, NOTE_W, { ...spec, h }));
+}
+
+const [sRun] = siteRow(150, [
+  [
+    's:run',
+    0,
+    {
+      pal: C.panel,
+      icon: 'shape=process',
+      iconText: 'dev',
+      title: 'Dev-сервер проекта',
+      lines: ['Запущен панелью («Dev-сервер»), адрес прочитан из его вывода.'],
+    },
+  ],
+  [
+    's:strip',
+    1,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Полоса «Сайт: имя»',
+      lines: ['Над лентой чата, пока сайт работает. Нажатие открывает окно справа.'],
+    },
+  ],
+  [
+    's:proxy',
+    2,
+    {
+      pal: C.panel,
+      icon: 'shape=hexagon',
+      iconText: 'API',
+      title: 'Прокси панели',
+      lines: [
+        '127.0.0.1, свой порт, только к этому dev-серверу.',
+        'Чужой адрес, CONNECT и чужой WebSocket — отказ. В страницу вставлен скрипт выбора.',
+      ],
+    },
+  ],
+  [
+    's:frame',
+    3,
+    {
+      pal: C.human,
+      title: 'Окно сайта',
+      lines: [
+        '«Выбрать элемент» — подсветка под курсором.',
+        'Щелчок выбирает, сайту не достаётся; Escape — отмена.',
+      ],
+    },
+  ],
+]);
+
+const SITE_ROW2 = sRun.y + sRun.h + 110;
+siteRow(SITE_ROW2, [
+  [
+    's:agent',
+    1,
+    {
+      pal: C.cli,
+      icon: 'shape=process',
+      iconText: 'CLI',
+      title: 'Сообщение агенту',
+      lines: ['Просьба человека и блок: адрес, селектор, тег, текст, место, разметка.'],
+    },
+  ],
+  [
+    's:chip',
+    2,
+    {
+      pal: C.human,
+      title: 'Чип в поле ввода',
+      lines: ['Тег и текст элемента; крестик снимает. Уходит вместе со следующим сообщением.'],
+    },
+  ],
+  [
+    's:check',
+    3,
+    {
+      pal: C.panel,
+      title: 'Проверка выбора',
+      lines: [
+        'Только от своего окна, с адреса прокси и со своим ключом окна.',
+        'Сервер скрывает секреты, режет разметку до 4 КБ, ставит адрес dev-сервера.',
+      ],
+    },
+  ],
+]);
+
+const sRight = (from, to, label, colour) =>
+  link(p5, from, to, label, { colour, exit: [1, 0.3], entry: [0, 0.3] });
+const sLeft = (from, to, label, colour) =>
+  link(p5, from, to, label, { colour, exit: [0, 0.5], entry: [1, 0.5] });
+sRight('s:run', 's:strip', 'сайт работает', FLOW.data);
+sRight('s:strip', 's:proxy', 'открыть', FLOW.human);
+sRight('s:proxy', 's:frame', 'страница со скриптом', FLOW.fwd);
+link(p5, 's:frame', 's:check', 'щелчок: выбор', {
+  colour: FLOW.human,
+  exit: [0.5, 1],
+  entry: [0.5, 0],
+});
+sLeft('s:check', 's:chip', 'описание', FLOW.fwd);
+sLeft('s:chip', 's:agent', 'отправить', FLOW.human);
+
+routeEdges(p5);
+legend(p5, 60, bottomOf(p5) + 60, [
+  { caption: 'человек и то, что он видит', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'панель', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'агентный CLI', fill: C.cli.tint, stroke: C.cli.line },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'что идёт дальше', edgeColour: FLOW.fwd },
+  { caption: 'состояние запуска', edgeColour: FLOW.data },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -627,14 +905,18 @@ const bounds = (p) => {
 
 const b1 = bounds(p1);
 const b3 = bounds(p3);
+const b4 = bounds(p4);
+const b5 = bounds(p5);
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p3, b3.w, b3.h)}\n` +
+  `${pageXml(p1, b1.w, b1.h)}\n${pageXml(p3, b3.w, b3.h)}\n${pageXml(p4, b4.w, b4.h)}\n` +
+  `${pageXml(p5, b5.w, b5.h)}\n` +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
 console.log(
-  `записано ${OUT}: страница 1 ${b1.w}×${b1.h}, ` +
-    `страница 3 ${b3.w}×${b3.h}, ячеек ${p1.cells.length + p3.cells.length}`,
+  `записано ${OUT}: страница 1 ${b1.w}×${b1.h}, страница 3 ${b3.w}×${b3.h}, ` +
+    `страница 4 ${b4.w}×${b4.h}, страница 5 ${b5.w}×${b5.h}, ` +
+    `ячеек ${p1.cells.length + p3.cells.length + p4.cells.length + p5.cells.length}`,
 );

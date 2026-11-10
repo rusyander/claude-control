@@ -15,7 +15,6 @@ import {
   restartRequestPrompt,
 } from '@agentdeck/contracts/chat-handoff';
 import { initiativePrompt } from '../domains/chat/initiative/initiative.ts';
-import { retryPrompt } from '../domains/chat/run-retry/run-retry.ts';
 import { buildPrompt } from '../domains/project-tests/prompt/prompt.ts';
 import {
   describeScope,
@@ -68,7 +67,6 @@ const MODEL_FILES: ModelFile[] = [
   { path: join(CONTRACTS, 'split-plan.ts') },
   { path: join(SRC, 'domains/chat/initiative/initiative.ts') },
   { path: join(SRC, 'domains/chat/children-brief/children-brief.ts') },
-  { path: join(SRC, 'domains/chat/run-retry/run-retry.ts') },
   { path: join(SRC, 'domains/chat/ChatPermissions/ChatPermissions.ts') },
   // Хвост запечатанного ответа агента панели уходит модели следующим ходом (F-50).
   { path: join(CONTRACTS, 'panel-agent-feed.ts') },
@@ -205,7 +203,6 @@ describe('всё, что панель шлёт модели, — по-англи
       restart: restartRequestPrompt('.agent/PROGRESS.md'),
       initiative: initiativePrompt({ handoffInitiative: true }),
       initiativeBare: initiativePrompt({ handoffInitiative: false }),
-      retry: retryPrompt('boom'),
       testsGenerate: buildPrompt(groups, { projectPath: '/p', mode: 'generate', groupId: 'gui' }),
       testsRun: buildPrompt(groups, { projectPath: '/p', mode: 'run' }),
       testsExplore: buildPrompt(groups, { projectPath: '/p', mode: 'explore' }),

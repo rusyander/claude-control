@@ -96,8 +96,15 @@ export function ToastItem({ toast, onDismiss, onShowDetails }: ToastItemProps) {
       animate="visible"
       exit="exit"
       transition={withReducedMotion({ duration: DURATION.normal, ease: EASE }, isReduced)}
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
+      // Пауза — от движения указателя по тосту, а не от его появления под курсором: тост отказа
+      // встаёт там, где человек только что нажал кнопку, и неподвижный курсор держал его вечно,
+      // закрывая ту же кнопку для повтора. Фокус внутри (клавиатура) — тоже пауза.
+      onPointerMove={() => setIsPaused(true)}
+      onPointerLeave={() => setIsPaused(false)}
+      onFocus={() => setIsPaused(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsPaused(false);
+      }}
     >
       <span className={styles.icon} aria-hidden="true">
         <Icon name={TONE_ICON[toast.tone]} size={20} />

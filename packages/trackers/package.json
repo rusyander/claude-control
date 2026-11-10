@@ -1,0 +1,21 @@
+{
+  "name": "@agentdeck/trackers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Клиенты трекеров задач (Jira) поверх порта отправки: типизированные отказы, без чтения диска и токена — общие для панели и входящих ядра",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

@@ -15,10 +15,3 @@ export interface RawTrackerIssue {
   /** Имя каждого поля по его id (`expand=names`): по нему находится поле критериев. */
   names?: Record<string, unknown>;
 }
-
-/** Связь задачи Jira (`issuelinks`): ключ соседней задачи — с одной из двух сторон. */
-export interface RawIssueLink {
-  type?: { outward?: unknown; inward?: unknown };
-  outwardIssue?: { key?: unknown };
-  inwardIssue?: { key?: unknown };
-}

@@ -9,8 +9,10 @@ import { ChatModelPicker } from '@features/ChatModelPicker';
 import { LocalModelToggle } from '@features/LocalModelToggle';
 import { ProjectRunnerControls } from '@features/ProjectRunner';
 import { DeliveryControl } from '@features/ProjectGit';
+import { useLimitChip } from '@features/ChatLimitCard';
 import { ChatHeaderMenu } from '../ChatHeaderMenu/ChatHeaderMenu';
 import { ProjectShelfButton } from './ProjectShelfButton/ProjectShelfButton';
+import { CoreBoardButton } from './CoreBoardButton/CoreBoardButton';
 import { useLineStarts } from '../model/useLineStarts';
 import { formatTime } from '../lib/formatTime';
 import type { ChatHeaderProps } from './ChatHeader.types';
@@ -66,6 +68,7 @@ export function ChatHeader({
   onAutoApproveChange,
   runStatus,
   errorOverflow,
+  limitHolds,
   onRetry,
   onContinue,
   onAllowAndContinue,
@@ -81,8 +84,10 @@ export function ChatHeader({
   const chatBarRef = useLineStarts<HTMLDivElement>();
   const projectBarRef = useLineStarts<HTMLDivElement>();
 
-  const showRetry = runStatus === 'error' && Boolean(chatId) && !errorOverflow;
+  const showRetry = runStatus === 'error' && Boolean(chatId) && !errorOverflow && !limitHolds;
   const showSpend = tokens > 0 || costUsd !== undefined;
+  // «лимит до чч:мм» — пока сброс впереди: после него подпись неправда (ревью этапа 12).
+  const showLimit = useLimitChip(limitResetsAt);
 
   return (
     <div className={styles.header}>
@@ -160,7 +165,7 @@ export function ChatHeader({
             {showSpend && (
               <Badge tone="neutral">{formatSpend(costUnit, tokens, costUsd ?? 0)}</Badge>
             )}
-            {limitResetsAt !== undefined && (
+            {showLimit && limitResetsAt !== undefined && (
               <Badge tone="info">
                 {t('chat.limitResets', { time: formatTime(limitResetsAt, i18n.language) })}
               </Badge>
@@ -169,6 +174,11 @@ export function ChatHeader({
 
           {/* Тумблеры прав, выгрузка, обновление и справка — за одной кнопкой у
               самого края: трогают их редко, а ряд шапки они забивали целиком. */}
+          {/* Доска задач ядра — кнопкой, а не вкладкой: правая колонка чата занята превью (D11). */}
+          <div className={styles.group}>
+            <CoreBoardButton />
+          </div>
+
           <div className={styles.group}>
             <ChatHeaderMenu
               {...(chatId ? { chatId } : {})}

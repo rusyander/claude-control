@@ -266,6 +266,8 @@ export const ROUTE_LEDGER: RouteLedger = {
   'GET /api/integrations/telegram/answers': 'human:secret',
   'PUT /api/integrations/telegram/answers': 'human:secret',
   'POST /api/integrations/telegram/answers/restart': 'human:secret',
+  // Привязка чата к ядру (отпечаток и имя владельца) — тем же классом, что настройка ответов.
+  'GET /api/integrations/telegram/answers/core-binding': 'human:secret',
   // Подключение по /start: подтверждение назначает чат уведомлений и владельца ответов.
   'GET /api/integrations/telegram/connect': 'human:secret',
   'POST /api/integrations/telegram/connect': 'human:secret',
@@ -434,6 +436,10 @@ export const ROUTE_LEDGER: RouteLedger = {
   'POST /api/project-runner/group': 'gap:P3',
   'POST /api/project-runner/start-all': 'gap:P3',
   'POST /api/project-runner/stop-all': 'gap:P3',
+  // site-preview/site-preview-routes.ts — окно сайта в чате и выбор элемента (D20): рамка
+  // и выбор есть только у окна панели, агенту нечем на них смотреть.
+  'POST /api/site-preview': 'gap:P3',
+  'POST /api/site-preview/:siteId/pick': 'internal:ui-state',
   // compose-routes.ts
   'GET /api/compose': 'gap:P3',
   'POST /api/compose/action': 'gap:P3',
@@ -502,6 +508,14 @@ export const ROUTE_LEDGER: RouteLedger = {
   'PUT /api/project-tests/automation': 'human:code-write',
   'DELETE /api/project-tests/automation': 'human:code-write',
   'POST /api/project-tests/e2e/adopt': 'gap:P3',
+  // project-tests/recorded-routes.ts — спек записи панель потом исполняет сама (code-write);
+  // проход по стенду и «Прогнать все» с задачей на расхождение тратят модель (paid). Список —
+  // состояние вкладки (кейсы и ход «Прогнать все»): ни одно действие агента его не читает.
+  'GET /api/project-tests/recorded': 'internal:ui-state',
+  'POST /api/project-tests/recorded': 'human:code-write',
+  'POST /api/project-tests/recorded/walk': 'human:paid',
+  'POST /api/project-tests/recorded/replay': 'human:paid',
+  'POST /api/project-tests/recorded/verdict': 'internal:ui-state',
   // Хук конца хода пишет в настройки CLI проекта команду, которую CLI потом
   // исполняет сам: включать и выключать его может только человек.
   'GET /api/project-tests/turn-hooks': 'internal:preview',
@@ -825,4 +839,16 @@ export const ROUTE_LEDGER: RouteLedger = {
   // ядра. Действия нет (W3-19): снимок нужен только телу оценки, а оценка — кнопка человека;
   // саму задачу агент уже читает `jira_issue`.
   'GET /api/core-intake/tracker-snapshot': 'gap:P3',
+  // Доска задач ядра (этап 12): чтение ведущему пока не нужно; ход на доске ставит задачу в
+  // очередь или в работу — полномочие человека (новая строка `human:`, D2 не задет).
+  'GET /api/core/board': 'gap:P3',
+  'POST /api/core/board/move': 'human:rights',
+  // Новые записи доски («В очередь», импорт) — тоже ход человека: очередь стартует сама.
+  'POST /api/core/board/entries': 'human:rights',
+  // Входящие ядра (этап 12, P167): поиск ведущему пока не нужен; записи из выбранного — ход
+  // человека (новая строка `human:`), как записи доски.
+  'GET /api/core/inbox/search': 'gap:P3',
+  'POST /api/core/inbox': 'human:rights',
+  // Проход по стенду задачи (этап 12, P177): шаги и спек записи; ведущему пока не нужен.
+  'GET /api/core/tasks/:id/walk': 'gap:P3',
 };

@@ -42,6 +42,7 @@ import { registerProjectRoutes } from '../routes/project-routes/project-routes.t
 import { registerProjectLocalRoutes } from '../routes/project-local-routes.ts';
 import { registerProviderProjectRoutes } from '../routes/provider-project-routes/provider-project-routes.ts';
 import { registerProjectRunnerRoutes } from '../routes/project-runner-routes/project-runner-routes.ts';
+import { registerSitePreviewRoutes } from '../routes/site-preview/site-preview-routes.ts';
 import { registerComposeRoutes } from '../routes/compose-routes/compose-routes.ts';
 import { registerBackendGuardRoutes } from '../routes/backend-guard-routes/backend-guard-routes.ts';
 import { registerDatabaseRoutes } from '../routes/database-routes/database-routes.ts';
@@ -209,6 +210,8 @@ export function buildRouteTable(runtime: Runtime, access: AccessGateDeps): Route
       }),
     (instance, context) => registerProviderChatRoutes(instance, context),
     (instance, context) => registerProjectRunnerRoutes(instance, context, projectRunner),
+    // Окно сайта в чате (D20): прокси только над запущенным этим реестром, закрывается с записью.
+    (instance, context) => registerSitePreviewRoutes(instance, context, projectRunner),
     // Compose проекта: реестр действий живёт внутри маршрутов — идущий docker
     // compose панели при выходе не гасим, контейнеры и так остаются как есть.
     (instance, context) => registerComposeRoutes(instance, context),

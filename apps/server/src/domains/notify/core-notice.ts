@@ -1,8 +1,11 @@
 import type { PushDevice } from '@agentdeck/contracts';
 import type { RelayNotice } from '@agentdeck/contracts/core/relay';
 import { maskSecretsInText } from '@agentdeck/dlp/secret-mask';
-import { PANEL_LINK_HOST, essenceLine, headLine } from './telegram-answers/compose.ts';
+import { essenceLine, headLine } from './telegram-answers/compose.ts';
 import { escapeHtml } from './telegram-answers/html.ts';
+
+// Ссылка на задачу ядра живёт рядом со ссылкой на чат: ею же подписано сообщение с кнопками.
+export { coreTaskLink } from './telegram-answers/compose.ts';
 
 /**
  * Вопрос ядра задач человеку — уведомление и ссылка, НЕ место ответа (этап 10, Q2/Q9). Ответ
@@ -14,16 +17,6 @@ import { escapeHtml } from './telegram-answers/html.ts';
  * Наружу (Expo, Telegram) уходят заголовок задачи и строка вопроса под маской секретов — как у
  * вопросов чата панели; ни путей, ни журнала.
  */
-
-/** Ссылка панели на задачу ядра с открытым вопросом (`/core?id=…&ask=…`, раздел задач ядра). */
-export function coreTaskLink(
-  taskId: string,
-  askId: string | null,
-  port = process.env.WEB_PORT ?? '8888',
-): string {
-  const ask = askId ? `&ask=${encodeURIComponent(askId)}` : '';
-  return `http://${PANEL_LINK_HOST}:${port}/core?id=${encodeURIComponent(taskId)}${ask}`;
-}
 
 /** Предел строки вопроса в Telegram: суть, а не весь текст. */
 const QUESTION_LIMIT = 300;
@@ -83,7 +76,7 @@ export function corePushMessages(
     data: {
       kind: 'core-ask',
       taskId: notice.taskId,
-      askId: notice.askId ?? '',
+      askId: notice.askId,
       ...(machineId ? { machineId } : {}),
     },
     sound: 'default',

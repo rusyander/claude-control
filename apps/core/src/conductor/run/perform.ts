@@ -1,5 +1,7 @@
 import type { TaskEvent } from '@agentdeck/contracts/core/states';
 import { continuationDecisionBody, tierDecisionBody } from '../../economy/records.ts';
+import type { TierDecision } from '../../economy/tier.types.ts';
+import { readHumanLedger } from '../human/ledger.ts';
 import { STEP_BUDGET_SCOPE } from '../../journal/reduce/stage4.ts';
 import type { LiveTask } from '../../journal/resume.ts';
 import { newId } from '../../lib/ids/uuidv7.ts';
@@ -76,6 +78,7 @@ async function runStep(ctx: PerformCtx, stepId: string): Promise<void> {
     return;
   }
   if (!fresh && ctx.task.state.observerParks[stepId]) journalReroute(ctx.task, where, routing);
+  else if (!fresh) journalMoved(ctx.task, where, routing);
   s.routing = routing;
   // Место сеанса (этап 11, P141) — до крючков брифа: ждущий шаг не собирает бриф на каждом
   // пробуждении. Нет места — строка `schedule` с держателем, исполнитель спит до освобождения.
@@ -160,6 +163,55 @@ function journalReroute(
       data: { decisionId: newId(), ...body, reasons: [...body.reasons, why] },
     });
   }
+}
+
+/** Вариант перевода был среди вариантов вопроса (`human.asked.options`). */
+function offered(
+  task: LiveTask,
+  askId: string,
+  o: { field: 'model' | 'adapter'; value: string },
+): boolean {
+  const label = `${o.field === 'adapter' ? 'cli' : 'model'}:${o.value}`;
+  return readHumanLedger(task).asks[askId]?.options.includes(label) === true;
+}
+
+/** Маршрут прошлой сессии шага сменился (правка человека или «платный при отказе»). */
+function routeMoved(task: LiveTask, stepId: string, tier: TierDecision & { ok: true }): boolean {
+  const prior = Object.values(task.state.sessions)
+    .filter((x) => x.stepId === stepId)
+    .at(-1);
+  return (
+    prior !== undefined &&
+    (prior.adapter !== tier.adapter ||
+      prior.route.kind !== tier.route.kind ||
+      prior.route.id !== tier.route.id)
+  );
+}
+
+/**
+ * Повтор шага после ожидания окна (этап 12, P169): у начатой задачи окно маршрут не двигает, сменить
+ * его мог только клик человека (`set-model`/`set-cli`, ответ точки 7) или «платный при отказе».
+ * Такой повтор пишет строку `tier` с причиной — экран видит, на чём шаг пошёл дальше и почему.
+ */
+function journalMoved(
+  task: LiveTask,
+  where: { stepId: string; unitId: string | null },
+  routing: StepRouting,
+): void {
+  const tier = routing.tier;
+  if (!tier.ok || !routeMoved(task, where.stepId, tier)) return;
+  const body = tierDecisionBody(tier);
+  task.append({
+    kind: 'decision',
+    actor: 'core',
+    ...(where.unitId ? { unitId: where.unitId } : {}),
+    stepId: where.stepId,
+    data: {
+      decisionId: newId(),
+      ...body,
+      reasons: [...body.reasons, 'the step resumes on a route other than its last session'],
+    },
+  });
 }
 
 /**
@@ -303,6 +355,21 @@ export async function perform(ctx: PerformCtx, a: NextAction): Promise<void> {
       return;
     }
     case 'answered':
+      // Клик человека на точке 7 (P169): правка задачи с основанием — id вопроса, затем шаг идёт.
+      // Только вариант, который вопрос предлагал: свой текст ответа маршрут не двигает.
+      if (a.override && offered(task, a.askId, a.override))
+        task.append({
+          kind: 'override.set',
+          actor: 'core',
+          data: {
+            cmdId: a.askId,
+            scope: 'task',
+            scopeId: task.taskId,
+            field: a.override.field,
+            value: a.override.value,
+            timing: 'now',
+          },
+        });
       stepMove(task, a.stepId, 'answered');
       return;
     case 'close-human-step':

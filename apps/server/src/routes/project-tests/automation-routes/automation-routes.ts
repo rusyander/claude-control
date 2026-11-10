@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { registerRecordedRoutes } from '../recorded-routes/recorded-routes.ts';
 import type {
   ProjectTestAutomationCommand,
   ProjectTestAutomationInfo,
@@ -36,6 +37,8 @@ import {
  * гонит прежнюю строку, а итог подписал бы новой.
  */
 export function registerTestAutomationRoutes(app: FastifyInstance, deps: TestsDeps): void {
+  // Записанные проходы — автотесты из прохода по стенду: регистрируются рядом со своей командой.
+  registerRecordedRoutes(app, deps);
   app.get<{ Querystring: { path?: string } }>('/api/project-tests/automation', (request, reply) => {
     const root = requireRoot(request.query.path, reply);
     if (!root) return reply;

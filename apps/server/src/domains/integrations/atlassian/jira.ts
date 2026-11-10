@@ -1,79 +1,38 @@
 import type { JiraIssue, JiraProject, JiraTransition } from '@agentdeck/contracts';
+import * as tracker from '@agentdeck/trackers/jira';
+import type { TrackerIssue } from '@agentdeck/trackers/jira.types';
 import { invalidField } from '../errors.ts';
-import { failedResponse, parseJson, type OutboundResponse } from '../http/http.ts';
-import { call, jiraApi, raw, type AtlassianAccess } from './client.ts';
-import { fromAdf, toAdf } from './adf.ts';
+import type { AtlassianAccess } from './client.ts';
+import { viaTracker } from './tracker-port.ts';
 
 /**
- * Jira: чтение задач и три записи, ради которых всё затевалось, — завести
- * дефект, дописать комментарий, перевести статус.
+ * Jira панели: чтение задач и три записи, ради которых всё затевалось, — завести дефект,
+ * дописать комментарий, перевести статус. Запросы, адреса и разбор — общий клиент
+ * `@agentdeck/trackers` (этап 12, D15: второго клиента Jira в дереве нет); здесь — проверка
+ * полей формы своим текстом и отказ трекера словами панели (`viaTracker`).
  *
  * Удалений здесь нет и не будет: панель не сносит чужие задачи ни при каких
  * условиях, даже по просьбе агента.
  */
 
-interface RawIssue {
-  key: string;
-  fields?: {
-    summary?: string;
-    status?: { name?: string; statusCategory?: { key?: string } };
-    issuetype?: { name?: string };
-    assignee?: { displayName?: string; name?: string };
-    updated?: string;
-    description?: unknown;
-  };
-}
-
-/** Поля, которые панель показывает в списке и в карточке задачи. */
-const ISSUE_FIELDS = 'summary,status,issuetype,assignee,updated,description';
-
-/**
- * Категория статуса — единственное, по чему можно судить о закрытости.
- *
- * Названия статусов у каждой команды свои («Готово», «Verified», «Закрыт», «Не
- * воспроизводится»), и сравнивать строки — гадание с любым исходом. Категорию
- * («new» / «indeterminate» / «done») Jira считает сама по своему рабочему
- * процессу, и незнакомое значение честнее выбросить, чем подогнать.
- */
-function toCategory(key: string | undefined): JiraIssue['statusCategory'] {
-  if (key === 'done' || key === 'new' || key === 'indeterminate') return key;
-  return undefined;
-}
-
-function toIssue(access: AtlassianAccess, issue: RawIssue): JiraIssue {
-  const fields = issue.fields ?? {};
+/** Карточка задачи панели — ровно поля контракта, без меток и связей входящих ядра. */
+function toIssue(issue: TrackerIssue): JiraIssue {
   return {
     key: issue.key,
-    summary: fields.summary ?? '',
-    status: fields.status?.name ?? '',
-    statusCategory: toCategory(fields.status?.statusCategory?.key),
-    type: fields.issuetype?.name ?? '',
-    assignee: fields.assignee?.displayName ?? fields.assignee?.name,
-    updatedAt: fields.updated,
-    url: `${access.baseUrl}/browse/${issue.key}`,
-    description: fromAdf(fields.description),
+    summary: issue.summary,
+    status: issue.status,
+    statusCategory: issue.statusCategory,
+    type: issue.type,
+    assignee: issue.assignee,
+    updatedAt: issue.updatedAt,
+    url: issue.url,
+    description: issue.description,
   };
 }
 
-/**
- * Проекты. У облака список идёт постранично через `/project/search`, у своей
- * установки — одним массивом на `/project`. Разные ответы, один смысл.
- */
-export async function listProjects(access: AtlassianAccess): Promise<JiraProject[]> {
-  const api = jiraApi(access);
-  if (access.deployment === 'cloud') {
-    const page = await call<{ values?: JiraProject[] }>(access, {
-      url: `${api}/project/search?maxResults=100`,
-      system: 'Jira',
-    });
-    return (page.values ?? []).map(pickProject);
-  }
-  const list = await call<JiraProject[]>(access, { url: `${api}/project`, system: 'Jira' });
-  return (list ?? []).map(pickProject);
-}
-
-function pickProject(project: JiraProject): JiraProject {
-  return { id: String(project.id), key: project.key, name: project.name };
+/** Проекты: облако — постранично `/project/search`, своя установка — массивом `/project`. */
+export function listProjects(access: AtlassianAccess): Promise<JiraProject[]> {
+  return viaTracker(access, (site, send) => tracker.listProjects(site, send));
 }
 
 export interface IssueSearch {
@@ -85,56 +44,27 @@ export interface IssueSearch {
 }
 
 /**
- * Поиск задач.
- *
- * Свободный текст экранируется и уходит как `text ~ "…"`: люди ищут словами, а
- * не JQL, и заставлять их писать запрос ради одной кнопки «привязать задачу» —
- * лишний барьер. Кто умеет JQL, присылает его и получает его же.
- *
- * У облака классический `/search` объявлен устаревшим в пользу `/search/jql`;
- * старые установки о новом пути не знают. Поэтому облако пробует новый путь и,
- * получив 404/410, честно повторяет на старом — а не отвечает «ничего не нашли».
+ * Поиск задач. Свободный текст уходит как `text ~ "…"`: люди ищут словами, а не JQL; кто умеет
+ * JQL, присылает его и получает его же. Облако пробует `/search/jql` и на 404/410 повторяет на
+ * классическом `/search` (это делает клиент).
  */
 export async function searchIssues(
   access: AtlassianAccess,
   search: IssueSearch,
 ): Promise<JiraIssue[]> {
-  const jql = search.jql?.trim() || (search.q?.trim() ? `text ~ ${quote(search.q.trim())}` : '');
+  const jql = tracker.jqlOf(search);
   if (!jql)
     throw invalidField('q', 'нужен текст поиска или JQL', 'request-search-or-jql-required', {
       field: 'q',
     });
-
-  const limit = Math.min(Math.max(search.limit ?? 25, 1), 100);
-  const api = jiraApi(access);
-  const query = `jql=${encodeURIComponent(jql)}&maxResults=${limit}&fields=${ISSUE_FIELDS}`;
-  const paths =
-    access.deployment === 'cloud'
-      ? [`${api}/search/jql?${query}`, `${api}/search?${query}`]
-      : [`${api}/search?${query}`];
-
-  let last: OutboundResponse | undefined;
-  for (const url of paths) {
-    const response = await raw(access, { url, system: 'Jira' });
-    if (response.ok) {
-      const page = parseJson<{ issues?: RawIssue[] }>('Jira', response);
-      return (page.issues ?? []).map((issue) => toIssue(access, issue));
-    }
-    last = response;
-    // «Нет такой ручки» — повод попробовать соседнюю; отказ по существу (401,
-    // 400 на кривом JQL) повторять бессмысленно, его надо показать человеку.
-    if (response.status !== 404 && response.status !== 410) break;
-  }
-
-  throw failedResponse('Jira', last!);
+  const issues = await viaTracker(access, (site, send) =>
+    tracker.searchIssues(site, send, { jql, limit: search.limit }),
+  );
+  return issues.map(toIssue);
 }
 
 export async function readIssue(access: AtlassianAccess, key: string): Promise<JiraIssue> {
-  const issue = await call<RawIssue>(access, {
-    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}?fields=${ISSUE_FIELDS}`,
-    system: 'Jira',
-  });
-  return toIssue(access, issue);
+  return toIssue(await viaTracker(access, (site, send) => tracker.readIssue(site, send, key)));
 }
 
 export interface NewIssue {
@@ -148,10 +78,7 @@ export interface NewIssue {
   priority?: string;
 }
 
-/**
- * Завести задачу. Описание уходит в том виде, который понимает диалект: облако
- * ждёт документ ADF, своя установка — обычный текст с вики-разметкой.
- */
+/** Завести задачу: облаку описание уходит документом ADF, своей установке — текстом. */
 export async function createIssue(access: AtlassianAccess, draft: NewIssue): Promise<JiraIssue> {
   if (!draft.projectKey.trim())
     throw invalidField('projectKey', 'не указан проект Jira', 'request-jira-project-missing', {
@@ -161,23 +88,7 @@ export async function createIssue(access: AtlassianAccess, draft: NewIssue): Pro
     throw invalidField('summary', 'не указан заголовок задачи', 'request-issue-title-missing', {
       field: 'summary',
     });
-
-  const created = await call<{ key: string }>(access, {
-    url: `${jiraApi(access)}/issue`,
-    method: 'POST',
-    system: 'Jira',
-    body: {
-      fields: {
-        project: { key: draft.projectKey.trim() },
-        summary: draft.summary.trim(),
-        issuetype: { name: draft.issueType?.trim() || 'Bug' },
-        description: access.deployment === 'cloud' ? toAdf(draft.description) : draft.description,
-        ...(draft.labels?.length ? { labels: draft.labels } : {}),
-        ...(draft.priority?.trim() ? { priority: { name: draft.priority.trim() } } : {}),
-      },
-    },
-  });
-  return readIssue(access, created.key);
+  return toIssue(await viaTracker(access, (site, send) => tracker.createIssue(site, send, draft)));
 }
 
 /** Комментарий к задаче — вторая из трёх разрешённых агенту записей. */
@@ -188,29 +99,11 @@ export async function commentIssue(
 ): Promise<void> {
   if (!body.trim())
     throw invalidField('body', 'пустой комментарий', 'request-comment-empty', { field: 'body' });
-  await call<unknown>(access, {
-    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/comment`,
-    method: 'POST',
-    system: 'Jira',
-    body: { body: access.deployment === 'cloud' ? toAdf(body) : body },
-  });
+  await viaTracker(access, (site, send) => tracker.commentIssue(site, send, key, body));
 }
 
-export async function listTransitions(
-  access: AtlassianAccess,
-  key: string,
-): Promise<JiraTransition[]> {
-  const payload = await call<{
-    transitions?: { id: string; name: string; to?: { name?: string } }[];
-  }>(access, {
-    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/transitions`,
-    system: 'Jira',
-  });
-  return (payload.transitions ?? []).map((item) => ({
-    id: String(item.id),
-    name: item.name,
-    ...(item.to?.name ? { to: item.to.name } : {}),
-  }));
+export function listTransitions(access: AtlassianAccess, key: string): Promise<JiraTransition[]> {
+  return viaTracker(access, (site, send) => tracker.listTransitions(site, send, key));
 }
 
 /**
@@ -224,15 +117,5 @@ export async function applyTransition(
 ): Promise<void> {
   if (!transitionId.trim())
     throw invalidField('id', 'не указан переход', 'request-transition-missing', { field: 'id' });
-  await call<unknown>(access, {
-    url: `${jiraApi(access)}/issue/${encodeURIComponent(key)}/transitions`,
-    method: 'POST',
-    system: 'Jira',
-    body: { transition: { id: transitionId.trim() } },
-  });
-}
-
-/** Строка в JQL: кавычки и обратные слэши внутри — экранируются. */
-function quote(value: string): string {
-  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  await viaTracker(access, (site, send) => tracker.applyTransition(site, send, key, transitionId));
 }

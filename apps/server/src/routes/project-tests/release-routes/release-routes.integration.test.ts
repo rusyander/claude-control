@@ -91,6 +91,39 @@ describe('project-tests release routes: заметка на языке пане�
     expect(document.red.map((item) => item.note)).toEqual([note]);
   });
 
+  // Экран называет язык сам: смена языка доходит до интерфейса раньше, чем PATCH
+  // настроек до сервера, и карточка под ключом «en» получала русский документ.
+  it.each([
+    ['ru', 'en', 'Milestone “1.4”: too early to ship'],
+    ['en', 'ru', 'Веха «1.4»: отдавать рано'],
+    ['en', 'xx', 'Milestone “1.4”: too early to ship'],
+  ])('настройка %s, экран просит %s — вердикт «%s»', async (saved, asked, verdict) => {
+    language = saved;
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/project-tests/release',
+      query: { path: project, release: '1.4', lang: asked },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const { document } = response.json<{ document: ProjectTestReleaseDocument }>();
+    expect(document.verdict.text.startsWith(verdict), document.verdict.text).toBe(true);
+  });
+
+  // Выгрузка — тем же правилом: ссылка экрана несёт его язык, настройка могла не дойти.
+  it.each([
+    ['ru', 'en', 'Milestone “1.4”: too early to ship'],
+    ['en', 'ru', 'Веха «1.4»: отдавать рано'],
+  ])('выгрузка md: настройка %s, ссылка просит %s — «%s»', async (saved, asked, verdict) => {
+    language = saved;
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/project-tests/release/export',
+      query: { path: project, release: '1.4', format: 'md', lang: asked },
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.body).toContain(verdict);
+  });
+
   // Файл и печать вехи — на языке панели того, кто выгружает, как отчёт по
   // прогону. Раньше документ был русским при английском интерфейсе.
   it.each([

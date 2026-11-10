@@ -20,7 +20,7 @@ const QWEN: ModelInfo[] = [
 ];
 const noop = () => {};
 
-function render(cli: string | undefined): string {
+function render(cli: string | undefined, over: Partial<ChatHeaderProps> = {}): string {
   const props: ChatHeaderProps = {
     chatTitle: 'разговор',
     isProjectContext: false,
@@ -59,6 +59,7 @@ function render(cli: string | undefined): string {
     canExport: false,
     onExport: noop,
     onRefresh: noop,
+    ...over,
   };
   return renderToStaticMarkup(
     <QueryClientProvider client={new QueryClient()}>
@@ -90,5 +91,21 @@ describe('ChatHeader — модель CLI разговора', () => {
 
   it('перехода «продолжить через ядро» в шапке нет', () => {
     expect(render('qwen')).not.toContain('data-chat-continue-in-core');
+  });
+});
+
+describe('ChatHeader — значок «лимит до …» (ревью этапа 12)', () => {
+  const nowSec = () => Math.floor(Date.now() / 1000);
+
+  it('сброс впереди — значок виден', () => {
+    expect(render(undefined, { limitResetsAt: nowSec() + 600 })).toContain('лимит до');
+  });
+
+  it('сброс уже прошёл — значка нет: окно открылось, подпись больше не правда', () => {
+    expect(render(undefined, { limitResetsAt: nowSec() - 60 })).not.toContain('лимит до');
+  });
+
+  it('сброс неизвестен (0) — значка нет', () => {
+    expect(render(undefined, { limitResetsAt: 0 })).not.toContain('лимит до');
   });
 });

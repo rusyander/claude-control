@@ -746,6 +746,774 @@ legend(p3, 60, bottomOf(p3) + 60, [
   { caption: 'обход по классу', edgeColour: FLOW.back, dashed: true },
 ]);
 
+// ─── Этап 12: доска, перехват, окно лимита, полосы групп ────────────────────
+
+/** Стрелка по ряду одной высоты: из правого края в левый на трети высоты — ровно, без ступенек. */
+function rowLink(p, from, to, label, colour) {
+  link(p, from, to, label, { colour, exit: [1, 0.3], entry: [0, 0.3] });
+}
+
+/** Стрелка вниз по одной колонке. */
+function downLink(p, from, to, label, colour, dashed = false) {
+  link(p, from, to, label, { colour, dashed, exit: [0.5, 1], entry: [0.5, 0] });
+}
+
+// ─── Страница 4: доска ──────────────────────────────────────────────────────
+
+const p4 = newPage('Доска', 'p4');
+heading(
+  p4,
+  60,
+  30,
+  'Доска: от записи до MR',
+  'Запись ждёт во «Входящих» и в «Очереди»; голову очереди ядро запускает само, когда пределы доски это позволяют. Стадию задачи двигает журнал ядра, а не руки.',
+  1570,
+);
+
+const [bIn] = evenRow(p4, 150, [
+  [
+    'b:in',
+    0,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Откуда записи',
+      lines: [
+        'Экран запуска — «В очередь» вместо оценки сразу.',
+        'Группа — одна запись; «Импорт пунктов» — прежний «Путь» как сценарий.',
+        'Трекер и форж — сами, во «Входящие»; Telegram — /task; «Тесты» — «На доску».',
+      ],
+    },
+  ],
+  [
+    'b:queue',
+    1,
+    {
+      pal: C.panel,
+      title: 'Входящие и Очередь',
+      lines: [
+        'Во «Входящих» запись разбирают: «В очередь» или «Отклонить».',
+        'В «Очереди» записи стоят по порядку; первая стартует первой.',
+      ],
+    },
+  ],
+  [
+    'b:start',
+    2,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Старт головы очереди',
+      lines: [
+        'Только пока в работе меньше предела (1, 2, 4 или 6; умолчание 2).',
+        'Доска не на паузе, за местные сутки стартов меньше предела, никто не ждёт ответа, если так настроено.',
+      ],
+    },
+  ],
+  [
+    'b:stages',
+    3,
+    {
+      pal: C.check,
+      title: 'Стадии по журналу',
+      lines: [
+        'Разбор, Работа, Ревью, Проверка, Готово к MR, MR, Влито.',
+        'Карточка, которой нужен человек, видна и в фильтре «Ждёт вас».',
+      ],
+    },
+  ],
+]);
+
+const B2 = bIn.y + bIn.h + 110;
+const [bConfig] = evenRow(p4, B2, [
+  [
+    'b:config',
+    1,
+    {
+      pal: C.store,
+      icon: 'shape=cylinder3;size=6',
+      iconText: 'board',
+      title: 'Раздел настроек «board»',
+      lines: [
+        'Пределы и остановка по умолчанию — «до MR».',
+        'Раздел не принят — действуют умолчания, над доской плашка «Умолчания» с причиной.',
+      ],
+    },
+  ],
+  [
+    'b:refused',
+    2,
+    {
+      pal: C.warn,
+      title: 'Старт не удался',
+      lines: [
+        'Карточка возвращается во «Входящие» с причиной ядра.',
+        'Место и суточный старт не потрачены.',
+      ],
+    },
+  ],
+  [
+    'b:window',
+    3,
+    {
+      pal: C.panel,
+      title: 'Окно карточки',
+      lines: [
+        'Факты задачи, вопросы, которые её держат, предложение окна лимита, ручное вмешательство.',
+        '«Где остановиться»: до плана, до MR, до конца; после MR не меняется.',
+      ],
+    },
+  ],
+]);
+
+rowLink(p4, 'b:in', 'b:queue', 'запись', FLOW.human);
+rowLink(p4, 'b:queue', 'b:start', 'голова', FLOW.fwd);
+rowLink(p4, 'b:start', 'b:stages', 'задача', FLOW.fwd);
+downLink(p4, 'b:start', 'b:refused', 'отказ', FLOW.back, true);
+downLink(p4, 'b:stages', 'b:window', 'щелчок', FLOW.human);
+link(p4, 'b:config', 'b:start', 'пределы', {
+  colour: FLOW.data,
+  dashed: true,
+  exit: [1, 0.3],
+  entry: [0, 0.75],
+  // Вверх — по середине промежутка между колонками, а не по краю карточки отказа.
+  points: [
+    { x: bConfig.x + bConfig.w + 50, y: bConfig.y + bConfig.h * 0.3 },
+    { x: bConfig.x + bConfig.w + 50, y: bIn.y + bIn.h * 0.75 },
+  ],
+});
+
+routeEdges(p4);
+legend(p4, 60, bottomOf(p4) + 60, [
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'что видно на доске', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'настройка ядра', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'отказ', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'данные', edgeColour: FLOW.data, dashed: true },
+  { caption: 'возврат', edgeColour: FLOW.back, dashed: true },
+]);
+
+// ─── Страница 5: ручное вмешательство ──────────────────────────────────────
+
+const p5 = newPage('Ручное вмешательство', 'p5');
+heading(
+  p5,
+  60,
+  30,
+  'Взять вручную и вернуть ядру',
+  'Перехват ставит задачу на безопасной точке и отдаёт её вам; возврат продолжает с прерванного шага. Доработка словами задачу не останавливает.',
+  1570,
+);
+
+const [tRun, , , tBack] = evenRow(p5, 150, [
+  [
+    't:run',
+    0,
+    {
+      pal: C.check,
+      icon: 'shape=process',
+      iconText: 'ядро',
+      title: 'Задача идёт',
+      lines: ['Шаг работает в копии задачи; карточка в своей стадии.'],
+    },
+  ],
+  [
+    't:take',
+    1,
+    {
+      pal: C.human,
+      title: '«Взять вручную»',
+      lines: [
+        'Ядро встаёт на ближайшей безопасной точке.',
+        'Место в работе освобождается, карточка — «ведёт человек».',
+      ],
+    },
+  ],
+  [
+    't:copy',
+    2,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Работа в копии',
+      lines: ['Сами или в чате «Открыть чат»: ему дана правка только этой копии.'],
+    },
+  ],
+  [
+    't:back',
+    3,
+    {
+      pal: C.human,
+      title: '«Вернуть ядру»',
+      lines: [
+        'Заметка «Что сделано» уходит следующему шагу.',
+        'Чат перехвата закрывается первым, затем ядро продолжает с прерванного шага.',
+      ],
+    },
+  ],
+]);
+
+const T2 = tRun.y + tRun.h + 110;
+const [tRework, , tDone] = evenRow(p5, T2, [
+  [
+    't:rework',
+    0,
+    {
+      pal: C.human,
+      title: '«На доработку»',
+      lines: ['Текст «Что доработать» — без перехвата.'],
+    },
+  ],
+  [
+    't:running',
+    1,
+    {
+      pal: C.check,
+      title: 'Задача ещё идёт',
+      lines: ['Сообщение получит текущий шаг на ближайшей границе хода.'],
+    },
+  ],
+  [
+    't:done',
+    2,
+    {
+      pal: C.check,
+      title: 'Задача готова, MR открыт',
+      lines: ['Открывается задача ответов по этому MR с вашим текстом.'],
+    },
+  ],
+]);
+
+rowLink(p5, 't:run', 't:take', 'перехват', FLOW.human);
+rowLink(p5, 't:take', 't:copy', 'копия ваша', FLOW.fwd);
+rowLink(p5, 't:copy', 't:back', 'готово', FLOW.human);
+link(p5, 't:back', 't:run', 'продолжает с прерванного шага', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0.5, 1],
+  entry: [0.5, 1],
+  points: [
+    { x: tBack.cx, y: tBack.y + tBack.h + 50 },
+    { x: tRun.cx, y: tBack.y + tBack.h + 50 },
+  ],
+});
+rowLink(p5, 't:rework', 't:running', 'идёт', FLOW.fwd);
+link(p5, 't:rework', 't:done', 'готово', {
+  colour: FLOW.fwd,
+  exit: [0.5, 1],
+  entry: [0.5, 1],
+  points: [
+    { x: tRework.cx, y: tRework.y + tRework.h + 40 },
+    { x: tDone.cx, y: tRework.y + tRework.h + 40 },
+  ],
+});
+
+routeEdges(p5);
+legend(p5, 60, bottomOf(p5) + 80, [
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'возврат ядру', edgeColour: FLOW.back, dashed: true },
+]);
+
+// ─── Страница 6: окно лимита ────────────────────────────────────────────────
+
+const p6 = newPage('Окно лимита', 'p6');
+heading(
+  p6,
+  60,
+  30,
+  'Окно лимита: чат и задача ядра',
+  'Маршрут отказал по лимиту — ни чат, ни задача сами маршрут не меняют. Ждать сброса можно без кликов, перевести — одним кликом.',
+  1570,
+);
+
+const [lChat] = evenRow(p6, 150, [
+  [
+    'w:chat',
+    0,
+    {
+      pal: C.panel,
+      icon: 'shape=card',
+      iconText: 'чат',
+      title: 'Сообщение в чате',
+      lines: ['Подписка ответила отказом по окну лимита.'],
+    },
+  ],
+  [
+    'w:card',
+    1,
+    {
+      pal: C.panel,
+      title: 'Карточка лимита',
+      lines: [
+        'В ленте разговора: когда окно откроется и чем перевести.',
+        'В шапке — время сброса; карточка уходит с первым ответом после сброса.',
+      ],
+    },
+  ],
+  [
+    'w:wait',
+    2,
+    {
+      pal: C.check,
+      title: '«Ждать сброса»',
+      lines: ['После сброса последнее сообщение уйдёт ещё раз — один раз, само.'],
+    },
+  ],
+  [
+    'w:carry',
+    3,
+    {
+      pal: C.human,
+      title: 'Перевести кликом',
+      lines: [
+        '«Другая модель» или «Перенести в» любой CLI с входом, кроме своего.',
+        'Перенос отменяет задачу ядра старого разговора, если там ждал повтор.',
+      ],
+    },
+  ],
+]);
+
+const W2 = lChat.y + lChat.h + 110;
+const [lStep] = evenRow(p6, W2, [
+  [
+    'w:step',
+    0,
+    {
+      pal: C.check,
+      icon: 'shape=process',
+      iconText: 'ядро',
+      title: 'Шаг задачи',
+      lines: ['Маршрут отказал по своему окну.'],
+    },
+  ],
+  [
+    'w:task',
+    1,
+    {
+      pal: C.panel,
+      title: 'Карточка «ждёт окна»',
+      lines: ['Стоит в «Ждёт вас»; в окне карточки — когда окно откроется и почему стоит.'],
+    },
+  ],
+  [
+    'w:reset',
+    2,
+    {
+      pal: C.check,
+      title: 'Окно открылось',
+      lines: ['Задача продолжает сама, тем же маршрутом.'],
+    },
+  ],
+  [
+    'w:move',
+    3,
+    {
+      pal: C.human,
+      title: 'Перевести задачу',
+      lines: ['Кнопки окна карточки: другой CLI или другая модель — командой ядру.'],
+    },
+  ],
+]);
+
+rowLink(p6, 'w:chat', 'w:card', 'отказ', FLOW.data);
+rowLink(p6, 'w:card', 'w:wait', 'ничего не делать', FLOW.fwd);
+rowLink(p6, 'w:step', 'w:task', 'отказ', FLOW.data);
+rowLink(p6, 'w:task', 'w:reset', 'сброс', FLOW.fwd);
+// «Не ждать» — вторая ветка той же карточки, а не шаг после сброса: идёт под рядом.
+const under = (from, to, row, label) =>
+  link(p6, from, to, label, {
+    colour: FLOW.human,
+    exit: [0.5, 1],
+    entry: [0.5, 1],
+    points: [
+      { x: p6.V.get(from).cx, y: row.y + row.h + 45 },
+      { x: p6.V.get(to).cx, y: row.y + row.h + 45 },
+    ],
+  });
+under('w:card', 'w:carry', lChat, 'не ждать');
+under('w:task', 'w:move', lStep, 'не ждать');
+
+routeEdges(p6);
+legend(p6, 60, bottomOf(p6) + 90, [
+  { caption: 'что видно на экране', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'само, без кликов', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'отказ маршрута', edgeColour: FLOW.data },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+]);
+
+// ─── Страница 7: полосы групп ───────────────────────────────────────────────
+
+const p7 = newPage('Полосы групп', 'p7');
+heading(
+  p7,
+  60,
+  30,
+  'Группы на доске',
+  'Группа больше не отдельная страница: её задачи идут по той же доске, полосой на группу. Прежние запуски видны только для чтения, прежний «Путь» переносится сценарием.',
+  1570,
+);
+
+const [gEntry] = evenRow(p7, 150, [
+  [
+    'g:entry',
+    0,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Группа «В очередь»',
+      lines: ['Несколько пунктов на экране запуска — одна запись доски.'],
+    },
+  ],
+  [
+    'g:tasks',
+    1,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Старт группы',
+      lines: ['Запись становится N задачами под одним номером группы.'],
+    },
+  ],
+  [
+    'g:lanes',
+    2,
+    {
+      pal: C.panel,
+      title: '«По группам»',
+      lines: [
+        'Полоса на группу с теми же столбцами; кнопки групп сужают доску до одной.',
+        'Число открытых полос — в меню и на «Обзоре».',
+      ],
+    },
+  ],
+  [
+    'g:closed',
+    3,
+    {
+      pal: C.panel,
+      title: '«Закрытые»',
+      lines: [
+        'Закрытые задачи и прежние запуски групп — только чтение.',
+        'Ядро прежние запуски не подхватывает.',
+      ],
+    },
+  ],
+]);
+
+const G2 = gEntry.y + gEntry.h + 110;
+const [, , gScenario] = evenRow(p7, G2, [
+  [
+    'g:old',
+    0,
+    {
+      pal: C.store,
+      icon: 'shape=cylinder3;size=6',
+      iconText: 'группы',
+      title: 'Прежняя группа с «Путём»',
+      lines: ['Шаги «Пути» по порядку.'],
+    },
+  ],
+  [
+    'g:import',
+    1,
+    {
+      pal: C.human,
+      title: '«Импорт пунктов»',
+      lines: ['Выбрать группу, просмотреть шаги сценария, сохранить.'],
+    },
+  ],
+  [
+    'g:scenario',
+    2,
+    {
+      pal: C.store,
+      title: 'Сценарий в библиотеке ядра',
+      lines: [
+        'Шаги «Пути» плюс проверка и публикация ядра.',
+        'Открывается экран запуска с ним — дальше «В очередь» или «Оценить».',
+      ],
+    },
+  ],
+]);
+
+rowLink(p7, 'g:entry', 'g:tasks', 'старт', FLOW.fwd);
+rowLink(p7, 'g:tasks', 'g:lanes', 'карточки', FLOW.data);
+rowLink(p7, 'g:lanes', 'g:closed', 'закрыта', FLOW.fwd);
+rowLink(p7, 'g:old', 'g:import', 'выбор', FLOW.human);
+rowLink(p7, 'g:import', 'g:scenario', 'сохранить', FLOW.fwd);
+link(p7, 'g:scenario', 'g:entry', 'экран запуска', {
+  colour: FLOW.back,
+  dashed: true,
+  exit: [0.5, 1],
+  entry: [0.5, 1],
+  points: [
+    { x: gScenario.cx, y: gScenario.y + gScenario.h + 50 },
+    { x: gEntry.x - 30, y: gScenario.y + gScenario.h + 50 },
+    { x: gEntry.x - 30, y: gEntry.y + gEntry.h + 50 },
+    { x: gEntry.cx, y: gEntry.y + gEntry.h + 50 },
+  ],
+});
+
+routeEdges(p7);
+legend(p7, 60, bottomOf(p7) + 80, [
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'что видно на доске', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'что хранится', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'данные', edgeColour: FLOW.data },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'назад к запуску', edgeColour: FLOW.back, dashed: true },
+]);
+
+// ─── Страница 8: входящие из трекера ───────────────────────────────────────
+
+const p8 = newPage('Входящие из трекера', 'p8');
+heading(
+  p8,
+  60,
+  30,
+  'Входящие: от тикета до MR',
+  'Ядро само опрашивает источники и кладёт новые тикеты во «Входящие» — по записи на тикет. Писать в тикет оно может одну строку и только с вашего разрешения из панели или с телефона.',
+  1570,
+);
+
+const [iSrc] = evenRow(p8, 150, [
+  [
+    'i:src',
+    0,
+    {
+      pal: C.store,
+      icon: 'shape=cylinder3;size=6',
+      iconText: 'трекер',
+      title: 'Источники',
+      lines: [
+        'Jira: метки, «назначенные на меня» или свой JQL.',
+        'GitLab: задачи, MR на ревью, мои MR с обсуждениями. GitHub — нет.',
+      ],
+    },
+  ],
+  [
+    'i:read',
+    1,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Опрос и поиск',
+      lines: [
+        'Опрос раз в N минут; «Найти в трекере» — по кнопке.',
+        'Запрос судит трекер, модель его не видит.',
+      ],
+    },
+  ],
+  [
+    'i:inbox',
+    2,
+    {
+      pal: C.panel,
+      title: '«Входящие» доски',
+      lines: [
+        'Одна запись на тикет: повтор не дублирует.',
+        'Сценарий — по виду тикета; сменить можно до старта.',
+      ],
+    },
+  ],
+  [
+    'i:mr',
+    3,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Работа и MR',
+      lines: [
+        'Старт по пределам доски, дальше — стадии по журналу.',
+        'MR открыт — карточка в «MR открыт».',
+      ],
+    },
+  ],
+]);
+
+const I2 = iSrc.y + iSrc.h + 110;
+evenRow(p8, I2, [
+  [
+    'i:unread',
+    1,
+    {
+      pal: C.warn,
+      title: 'Источник не ответил',
+      lines: [
+        'Список длиннее 500, нет доступа, 429 — записи доски не трогаются.',
+        'Retry-After — источник ждёт этот срок.',
+      ],
+    },
+  ],
+  [
+    'i:queue',
+    2,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'В очередь',
+      lines: ['Вы — «В очередь» или «Отклонить».', 'Или «Сам в очередь» у источника (выключено).'],
+    },
+  ],
+  [
+    'i:write',
+    3,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Запись в тикет',
+      lines: [
+        '«Ответ в тикет» включён — вопрос «Разрешить комментарий».',
+        'Отпускают только панель или телефон; из Telegram — нет.',
+      ],
+    },
+  ],
+]);
+
+rowLink(p8, 'i:src', 'i:read', 'тикеты', FLOW.data);
+rowLink(p8, 'i:read', 'i:inbox', 'новые', FLOW.fwd);
+rowLink(p8, 'i:inbox', 'i:mr', 'старт', FLOW.fwd);
+downLink(p8, 'i:read', 'i:unread', 'отказ', FLOW.back, true);
+downLink(p8, 'i:inbox', 'i:queue', 'разбор', FLOW.human);
+downLink(p8, 'i:mr', 'i:write', 'вопрос', FLOW.human);
+
+routeEdges(p8);
+legend(p8, 60, bottomOf(p8) + 60, [
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'что видно на доске', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'внешняя система', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'отказ', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'значок — чья это коробка', fill: '#FFFFFF', stroke: C.check.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'данные', edgeColour: FLOW.data },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'отказ', edgeColour: FLOW.back, dashed: true },
+]);
+
+// ─── Страница 9: связанные карточки ─────────────────────────────────────────
+
+const p9 = newPage('Связанные карточки', 'p9');
+heading(
+  p9,
+  60,
+  30,
+  'Связанные карточки: несколько тикетов — одна задача',
+  'Ядро только подсказывает, какие записи «Входящих» связаны. Объединяет человек ходом из окна записи; ядро проверяет ход и либо складывает записи в одну, либо отказывает с причиной.',
+  1570,
+);
+
+const [rFacts] = evenRow(p9, 150, [
+  [
+    'r:facts',
+    0,
+    {
+      pal: C.store,
+      icon: 'shape=cylinder3;size=6',
+      iconText: 'трекер',
+      title: 'Факты тикетов',
+      lines: [
+        'Общий эпик или родитель, связь задач, путь в обоих тикетах.',
+        'Метка, автор, заголовок — не связь.',
+      ],
+    },
+  ],
+  [
+    'r:hint',
+    1,
+    {
+      pal: C.check,
+      icon: 'shape=hexagon',
+      iconText: 'ядро',
+      title: 'Подсказка',
+      lines: ['Значок «связано: N» на плитке.', 'Само ядро не объединяет никогда.'],
+    },
+  ],
+  [
+    'r:pick',
+    2,
+    {
+      pal: C.human,
+      icon: 'shape=card',
+      iconText: 'вы',
+      title: 'Выбор в окне записи',
+      lines: [
+        'Все связанные отмечены по умолчанию.',
+        'Не больше 15 к этой записи — дальше отметки заперты.',
+      ],
+    },
+  ],
+  [
+    'r:task',
+    3,
+    {
+      pal: C.panel,
+      title: 'Одна задача',
+      lines: [
+        'Отмеченные сложены в эту запись со всеми тикетами.',
+        'Сложенные опросом обратно не приходят.',
+      ],
+    },
+  ],
+]);
+
+const R2 = rFacts.y + rFacts.h + 110;
+evenRow(p9, R2, [
+  [
+    'r:refused',
+    2,
+    {
+      pal: C.warn,
+      title: 'Отказ ядра',
+      lines: [
+        'Запись уже в очереди, запись MR, нет тикета.',
+        'Строка по-русски с ключом тикета; доска не тронута.',
+      ],
+    },
+  ],
+]);
+
+rowLink(p9, 'r:facts', 'r:hint', 'связи', FLOW.data);
+rowLink(p9, 'r:hint', 'r:pick', 'значок', FLOW.fwd);
+rowLink(p9, 'r:pick', 'r:task', '«Объединить»', FLOW.human);
+downLink(p9, 'r:pick', 'r:refused', 'отказ', FLOW.back, true);
+
+routeEdges(p9);
+legend(p9, 60, bottomOf(p9) + 60, [
+  { caption: 'человек решает', fill: C.human.tint, stroke: C.human.line },
+  { caption: 'ядро работает', fill: C.check.tint, stroke: C.check.line },
+  { caption: 'что видно на доске', fill: C.panel.tint, stroke: C.panel.line },
+  { caption: 'внешняя система', fill: C.store.tint, stroke: C.store.line },
+  { caption: 'отказ', fill: C.warn.tint, stroke: C.warn.line },
+  { caption: 'порядок', edgeColour: FLOW.fwd },
+  { caption: 'данные', edgeColour: FLOW.data },
+  { caption: 'действие человека', edgeColour: FLOW.human },
+  { caption: 'отказ', edgeColour: FLOW.back, dashed: true },
+]);
+
 // ─── Вывод ─────────────────────────────────────────────────────────────────
 
 function pageXml(p, width, height) {
@@ -772,16 +1540,13 @@ const bounds = (p) => {
   return { w: w + 60, h: h + 60 };
 };
 
-const b1 = bounds(p1);
-const b2 = bounds(p2);
-const b3 = bounds(p3);
+const all = [p1, p2, p3, p4, p5, p6, p7, p8, p9];
+const sized = all.map((p) => ({ p, ...bounds(p) }));
 const xml =
   '<mxfile host="app.diagrams.net" version="24.7.7">\n' +
-  `${pageXml(p1, b1.w, b1.h)}\n` +
-  `${pageXml(p2, b2.w, b2.h)}\n` +
-  `${pageXml(p3, b3.w, b3.h)}\n` +
+  sized.map(({ p, w, h }) => `${pageXml(p, w, h)}\n`).join('') +
   '</mxfile>\n';
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, xml, 'utf8');
-console.log(`записано ${OUT}: ${b1.w}×${b1.h}, ${b2.w}×${b2.h} и ${b3.w}×${b3.h}`);
+console.log(`записано ${OUT}: ${sized.map(({ w, h }) => `${w}×${h}`).join(', ')}`);

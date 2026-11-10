@@ -134,6 +134,8 @@ describe('core launch draft', () => {
     expect(opts.some((o) => o.value === 'preset:lead')).toBe(true);
     expect(opts.some((o) => o.value === 'preset:chat')).toBe(false);
     expect(opts.some((o) => o.value === 'preset:ask')).toBe(false);
+    // Проход по стенду (этап 12) открывают «Тесты», не экран запуска.
+    expect(opts.some((o) => o.value === 'preset:browser-walk')).toBe(false);
     expect(opts.at(-1)).toEqual({
       value: 'library:flow@2',
       label: 'Мой поток · v2',

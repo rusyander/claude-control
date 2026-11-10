@@ -14,7 +14,7 @@
  *    строка ошибки. Это и делает вердикт независимым от данных стенда: судится
  *    оболочка окна, а не то, сколько записей у человека.
  * Всё, кроме GET, до сервера не доходит (`requestGuard`), GET только читает;
- * разделы, которым нужны свои данные (группы, правила), подменяют их сами.
+ * разделы, которым нужны свои данные (доска ядра, правила), подменяют их сами.
  *
  * Ширины: 1440×900 и телефон 400×800 (там окно — лист во всю ширину).
  * Ненулевой код выхода — хоть одно окно сменило коробку. Раздел, чей обход не
@@ -25,11 +25,13 @@
  * проверка обязана покраснеть; зелёная с ним — значит, она ничего не ловит.
  *
  * Запуск: node tools/qa/check-modal-stability.mjs [--mutant] [--strict] [--json <файл>] [--only <часть пути>]
+ * В Git Bash `--only /core` превращается в путь Windows и не совпадает ни с одним разделом
+ * («Окон измерено: 0») — запускать с `MSYS_NO_PATHCONV=1`.
  */
 import { writeFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
-import { STUBBED } from './legacy-groups-stub.mjs';
+import { STUBBED } from './check-core-board.mjs';
 import { PANEL_PAGES, findCreateButton, openPanelPage, pageSlug } from './panel-pages.mjs';
 import {
   OLD_SIZING_CSS,

@@ -86,6 +86,8 @@ export const GEMINI_CAPS: AdapterCaps = {
   channels: GEMINI_CHANNELS,
   windowEvent: false,
   limitsChannel: null,
+  // Потерю входа (этап 12, P170) не называет: текста и чтения входа в наборе соответствия нет.
+  loginLost: false,
 };
 
 const varsChannel = (): EnvVarsChannel | undefined =>

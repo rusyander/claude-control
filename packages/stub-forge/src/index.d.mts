@@ -58,8 +58,32 @@ export type StubAct = ProjectRef &
         body?: string;
         draft?: boolean;
         headSha?: string;
+        labels?: string[];
+        /** Учётки-ревьюеры (имена). */
+        reviewers?: string[];
       }
-    | { type: 'mr-update'; mrIid: number; title?: string; body?: string }
+    | { type: 'mr-update'; mrIid: number; title?: string; body?: string; labels?: string[] }
+    | { type: 'mr-reviewers'; mrIid: number; reviewers: string[] }
+    | { type: 'mr-close'; mrIid: number }
+    | {
+        type: 'issue-open';
+        title: string;
+        body?: string;
+        labels?: string[];
+        /** Учётки-исполнители (имена). */
+        assignees?: string[];
+        createdAt?: number;
+        epic?: StubEpic;
+      }
+    | {
+        type: 'issue-update';
+        iid: number;
+        title?: string;
+        body?: string;
+        labels?: string[];
+        state?: 'opened' | 'closed';
+      }
+    | { type: 'issue-link'; iid: number; targetIid: number; targetProject?: string | number }
     | { type: 'note'; mrIid: number; body: string; threadId?: string; resolvable?: boolean }
     | { type: 'resolve'; mrIid: number; threadId: string; resolved?: boolean }
     | { type: 'push'; ref: string; sha?: string }
@@ -93,6 +117,36 @@ export interface StubMr {
   updatedAt: number;
   conflict: boolean;
   checking: boolean;
+  labels: string[];
+  reviewerIds: number[];
+}
+
+export interface StubEpic {
+  id: number;
+  iid: number;
+  groupId: number;
+  title?: string;
+}
+
+export interface StubIssue {
+  id: number;
+  iid: number;
+  projectId: number;
+  title: string;
+  body: string;
+  labels: string[];
+  assigneeIds: number[];
+  authorId: number;
+  state: 'opened' | 'closed';
+  createdAt: number;
+  updatedAt: number;
+  epic: StubEpic | null;
+}
+
+export interface StubIssueLink {
+  id: number;
+  source: { projectId: number; iid: number };
+  target: { projectId: number; iid: number };
 }
 
 export interface StubNote {
@@ -154,6 +208,8 @@ export interface StubSnapshot {
   discussions: StubDiscussion[];
   pipelines: StubPipeline[];
   events: StubEvent[];
+  issues: StubIssue[];
+  issueLinks: StubIssueLink[];
 }
 
 /** Строка следа (и `requests[]`); в файле следа нет `body`. */

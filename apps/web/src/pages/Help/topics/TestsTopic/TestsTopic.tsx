@@ -1,6 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Stack } from '@shared/ui/stack';
-import { Callout, FieldTable, HelpSection, OptionCards, StorageCard } from '../../ui';
+import {
+  Callout,
+  FieldTable,
+  GuideStep,
+  GuideSteps,
+  HelpSection,
+  HelpShot,
+  OptionCards,
+  StorageCard,
+} from '../../ui';
 import { TestsGuideSections } from '../TestsGuideSections/TestsGuideSections';
 import { TestsManualSections } from '../TestsManualSections/TestsManualSections';
 import { TestsSetupSection } from '../TestsSetupSection/TestsSetupSection';
@@ -10,6 +19,7 @@ import { TestsLimitsSections } from '../TestsLimitsSections/TestsLimitsSections'
 import { TestsNotesSection } from '../TestsNotesSection/TestsNotesSection';
 import { TestsE2eSection } from '../TestsE2eSection/TestsE2eSection';
 import { TestsBackendSection } from '../TestsBackendSection/TestsBackendSection';
+import { TestsRecordedSection } from '../TestsRecordedSection/TestsRecordedSection';
 
 /**
  * Документ раздела «Тесты» — рабочее место тестировщика целиком.
@@ -73,6 +83,9 @@ export function TestsTopic() {
 
       {/* go test, pytest, Gradle, Maven, cargo — своей командой проекта, без папки e2e. */}
       <TestsBackendSection />
+
+      {/* Записанные проходы по стенду: модель при записи и на первом расхождении. */}
+      <TestsRecordedSection />
 
       <HelpSection title={t('help.common.storageTitle')} caption={tr('storageCaption')}>
         <StorageCard
@@ -277,6 +290,16 @@ export function TestsTopic() {
             { name: tr('runsSession'), description: tr('runsSessionText'), isMono: false },
           ]}
         />
+      </HelpSection>
+
+      {/* Красный кейс → «Входящие» доски ядра (этап 12); кадр — `tools/help-shots/core-inbox.mjs`. */}
+      <HelpSection title={tr('boardTitle')} caption={tr('boardCaption')}>
+        <GuideSteps>
+          <GuideStep title={tr('boardOpen')} text={tr('boardOpenText')}>
+            <HelpShot topic="tests" scenario="board" frame="01-to-board" side="panel" />
+          </GuideStep>
+          <GuideStep title={tr('boardSend')} text={tr('boardSendText')} />
+        </GuideSteps>
       </HelpSection>
 
       {/* Провал без доказательства чинить нечем: это единственное место, где

@@ -157,6 +157,9 @@ export async function applyAnswer(
       if (outcome.ok && parseBody(reply.body).changed === false) return { ok: false, gone: true };
       return outcome;
     }
+    case 'coreAsk':
+      // Вопрос ядра задач идёт портом команд Telegram (`core-ask-press.ts`), не маршрутом панели.
+      return { ok: false, detail: 'вопрос ядра: ответ идёт портом команд Telegram' };
     case 'outsideQuestion':
       // Отвечают там, где сессия идёт: ход панели завёл бы её копию.
       return { ok: false, detail: 'вопрос сессии вне панели: ответ отсюда не доходит' };

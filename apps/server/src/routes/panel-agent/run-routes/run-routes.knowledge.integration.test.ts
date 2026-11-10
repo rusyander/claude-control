@@ -111,6 +111,10 @@ describe('ход агента панели: знание приложения в
     expect(onDisk.length).toBeGreaterThan(20);
     expect(missing).toEqual([]);
     expect(prompt).toContain('read_help_topic');
+    // Тема со страницей-константой и параметрами адреса (`routes.ts`): агент ведёт туда же,
+    // куда ссылка справки, — на полосы групп доски ядра, а не на голую доску.
+    const groups = prompt.split('\n').find((item) => item.startsWith('- groups: '));
+    expect(groups).toContain('(page /core?view=board&lane=group)');
   });
 
   it('правила раскрытия: что и как пользоваться — да; устройство, секреты, обход карточки — нет', async () => {

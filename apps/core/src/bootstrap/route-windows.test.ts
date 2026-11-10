@@ -101,3 +101,51 @@ describe('route windows: one window source per core', () => {
     }
   });
 });
+
+describe('route windows: the model list of a route for the tier offers', () => {
+  function modelsBook(answer: () => Fact<{ id: string }[]>) {
+    let reads = 0;
+    const route = {
+      read: {
+        models: (): Promise<Fact<{ id: string }[]>> => {
+          reads += 1;
+          return Promise.resolve(answer());
+        },
+      },
+    } as never;
+    return { reads: () => reads, routeOf: (id: string) => (id === 'r1' ? route : undefined) };
+  }
+
+  it('first ask starts the read and answers null; once read, the served ids; one read per route', async () => {
+    const book = modelsBook(() => ({ value: [{ id: 'stub-model' }, { id: 'stub-alt' }] }));
+    const w = createRouteWindows({ routeOf: book.routeOf, now: () => 0 });
+    expect(w.modelsOf('r1')).toBeNull();
+    await w.settled();
+    expect(w.modelsOf('r1')).toEqual(['stub-model', 'stub-alt']);
+    expect(w.modelsOf('r1')).toEqual(['stub-model', 'stub-alt']);
+    expect(book.reads()).toBe(1);
+  });
+
+  it('an unknown route or an absent/unknown list judges nothing (null) and is noted', async () => {
+    const notes: string[] = [];
+    let answer: Fact<{ id: string }[]> = { unknown: 'listing failed' };
+    const book = modelsBook(() => answer);
+    let now = 0;
+    const w = createRouteWindows({
+      routeOf: book.routeOf,
+      now: () => now,
+      retryMs: 1_000,
+      note: (e, d) => notes.push(`${e}:${String(d.reason)}`),
+    });
+    expect(w.modelsOf('nope')).toBeNull();
+    expect(w.modelsOf('r1')).toBeNull();
+    await w.settled();
+    expect(w.modelsOf('r1')).toBeNull();
+    answer = { absent: true };
+    now += 1_000;
+    expect(w.modelsOf('r1')).toBeNull();
+    await w.settled();
+    expect(w.modelsOf('r1')).toBeNull();
+    expect(notes).toEqual(['route.models.unknown:listing failed', 'route.models.unknown:absent']);
+  });
+});

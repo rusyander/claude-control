@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { ProjectTestRun } from '@agentdeck/contracts';
 import type { ServerContext } from '../../context.ts';
 import type { ChatRunRegistry } from '../../domains/chat/ChatRunRegistry/ChatRunRegistry.ts';
@@ -15,6 +15,7 @@ import { createCoreAskDelivery } from '../../domains/notify/core-ask-delivery.ts
 import { coreTaskLink } from '../../domains/notify/core-notice.ts';
 import { createOutsideDone } from '../../domains/notify/outside-done.ts';
 import { SentLog } from '../../domains/notify/telegram-answers/sent-log.ts';
+import { noticesStoreAt } from '../../domains/notify/telegram-notices/index.ts';
 import { writeLastSend } from '../../domains/notify/telegram-delivery.ts';
 import {
   createTelegramNotifier,
@@ -23,7 +24,12 @@ import {
 } from '../../domains/notify/telegram.ts';
 import { createWebhookNotifier } from '../../domains/notify/webhook.ts';
 import type { ProjectTestRunRegistry } from '../../domains/project-tests/project-tests.ts';
-import { createRunNotifier, sendExpoPush } from '../../domains/remote-notify.ts';
+import {
+  createPushOnce,
+  createRunNotifier,
+  sendExpoPush,
+  type PushOnce,
+} from '../../domains/remote-notify.ts';
 import { panelHomeDir } from '../../lib/brand.mjs';
 import { coreHomeOf } from '../../lib/hop-recorder.mjs';
 import { machineId } from '../../lib/machine-identity/machine-identity.ts';
@@ -61,11 +67,15 @@ export function wireNotify(ctx: ServerContext, deps: NotifyWiringDeps): NotifyWi
    * про устройства, ни про настройку — поэтому отправитель собирается здесь и
    * подаётся реестру тем же приёмом, что и оценка стоимости шага.
    */
+  // Один журнал push по вопросам на уведомитель чата и пересылку ядра (этап 12, P175): вопрос
+  // права задачи ядра в чате звонит один раз, кто бы о нём ни узнал первым.
+  const pushOnce = createPushOnce();
   const notifyRun = createRunNotifier({
     isEnabled: () => ctx.store.getSettings().remoteAccess.notify,
     devices: () => ctx.store.getPushDevices(),
     forget: (token) => ctx.store.removePushDevice(token),
     machineId: () => machineId(),
+    once: pushOnce,
   });
   /**
    * Второй адресат тех же событий — Telegram.
@@ -96,6 +106,8 @@ export function wireNotify(ctx: ServerContext, deps: NotifyWiringDeps): NotifyWi
         Boolean(ctx.store.getChatLink(key)?.parentChatId),
       ),
     onResult: (result) => writeLastSend(ctx.location.paths.appData, result),
+    // Тихие часы (этап 12, P194): удержанное — в общем файле уведомлений, переживает перезапуск.
+    held: noticesStoreAt(resolve(ctx.location.paths.appData)),
     // Номер отправленного — для /clear; уведомления сами не удаляются (это запись).
     onSent: (chatId, messageId, route) =>
       new SentLog(ctx.location.paths.appData).record({
@@ -149,7 +161,7 @@ export function wireNotify(ctx: ServerContext, deps: NotifyWiringDeps): NotifyWi
     telegram(outward);
     webhook(outward);
   });
-  const coreRelay = wireCoreRelay(ctx, telegramAnswersCover);
+  const coreRelay = wireCoreRelay(ctx, telegramAnswersCover, pushOnce);
   return {
     notifyRun,
     telegramAnswersCover,
@@ -170,6 +182,7 @@ export const CORE_RELAY_ENV = 'AGENTDECK_CORE_RELAY';
 function wireCoreRelay(
   ctx: ServerContext,
   cover: TelegramAnswersCover,
+  pushOnce: PushOnce,
   env: NodeJS.ProcessEnv = process.env,
 ): CoreRelay | null {
   if (env.VITEST || env[CORE_RELAY_ENV] === '0') return null;
@@ -179,6 +192,7 @@ function wireCoreRelay(
     telegram: () => ctx.store.getSettings().integrations.telegram,
     token: () => readToken(ctx.location.paths.appData, 'telegram'),
     answersCover: () => cover.covers(),
+    buttons: () => cover.coreButtons?.() ?? false,
     sentLog,
     pushEnabled: () => ctx.store.getSettings().remoteAccess.notify,
     devices: () => ctx.store.getPushDevices(),
@@ -187,6 +201,7 @@ function wireCoreRelay(
       sendExpoPush(messages, (token) => {
         ctx.store.removePushDevice(token);
       }),
+    pushOnce,
     onTelegramResult: (result) =>
       writeLastSend(ctx.location.paths.appData, {
         at: new Date().toISOString(),
@@ -198,9 +213,11 @@ function wireCoreRelay(
   const relay = createCoreRelay({
     core: createCoreAccess(() => coreHomeOf(env)),
     statePath: join(panelHomeDir(), RELAY_STATE_FILE),
-    deliver: ({ notice, question }) => channels.deliver(notice, question),
-    ready: () => channels.ready(),
+    deliver: ({ notice, question, waits }) => channels.deliver(notice, question, waits),
+    ready: (waits) => channels.ready(waits),
     link: (taskId, askId) => coreTaskLink(taskId, askId),
+    // Тот же поток — уведомлениям о задачах ядра (этап 12, P191): второго подписчика нет.
+    onLine: (task, event) => cover.coreLine?.(task, event),
     log,
   });
   relay.start();

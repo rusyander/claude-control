@@ -2,17 +2,17 @@
  * Переход агента панели попадает туда, где элемент действительно виден, и
  * страница показывает то, что записал агент (ревью 28.09: F-79, F-80, F-81, F-95, F-285).
  *
- * - Правило DLP открывается на вкладке правил, правило — на «Все», группа — на
- *   вкладке своей области (проектная — «В проектах», половина пары — карточка
- *   глобальной копии), хотя в памяти зрителя стоит другая вкладка. Незнакомая
- *   группа адрес не засоряет и вкладку не трогает.
+ * - Правило DLP открывается на вкладке правил, правило — на «Все», хотя в памяти
+ *   зрителя стоит другая вкладка. Группа (этап 12, D13: страница «Группы» свёрнута
+ *   в доску) — доска ядра полосами групп с подсвеченной полосой этой группы;
+ *   незнакомая группа — те же полосы без подсветки, адрес чист.
  * - /dlp без правок человека показывает правила, которые записал агент, и не
  *   горит «не сохранено»; с правками человека — черновик цел и сказано, что
  *   правила изменились в другом месте.
  * - Подпись проекта в окне агента следует за выбором на странице тестов.
  * - Карточка интеграции показывается, а фокус не уходит в её поле настроек (F-285).
  *
- * API агента, DLP, правил и групп подменены; любая иная запись (не GET) до
+ * API агента, DLP, правил и доски ядра подменены; любая иная запись (не GET) до
  * сервера не доходит — прогон не трогает конфигурацию человека. Реестр проектов
  * читается со стенда как есть (только чтение).
  *
@@ -21,7 +21,7 @@
  */
 import { chromium } from 'playwright';
 import { bypassOnboarding } from './bypass-onboarding.mjs';
-import { installLegacyGroupsStub } from './legacy-groups-stub.mjs';
+import { BOARD_GROUP, installCoreBoardStub } from './check-core-board.mjs';
 
 const BASE = process.env.APP_URL ?? 'http://localhost:8888';
 const onlyAt = process.argv.indexOf('--only');
@@ -120,7 +120,8 @@ await page.route('**/api/**', (route) => {
     .catch(() => undefined);
 });
 await bypassOnboarding(page);
-await installLegacyGroupsStub(page);
+// Доска ядра (полосы групп) и сетка прежних групп «Закрытых» — подмена доски.
+await installCoreBoardStub(page);
 await page.route('**/api/agent/**', (route) => {
   const path = new URL(route.request().url()).pathname;
   if (path.endsWith('/run')) {
@@ -203,9 +204,10 @@ const shown = (selector) =>
     )
     .then(() => true)
     .catch(() => false);
-const openPage = async (route, focus) => {
+/** `landsOn` — путь, куда ведёт переход, если раздел свёрнут в другой (`/groups` → `/core`). */
+const openPage = async (route, focus, landsOn = route.split('?')[0]) => {
   await emit({ type: 'agent-open-page', page: focus ? { route, focus } : { route } });
-  await page.waitForURL((url) => url.pathname === route.split('?')[0], { timeout: 10_000 });
+  await page.waitForURL((url) => url.pathname === landsOn, { timeout: 10_000 });
 };
 
 await page.goto(`${BASE}/`);
@@ -304,46 +306,30 @@ if (wants('rules-tab')) {
   check(await shown('[data-agent-anchor="qa-rule-on"]'), 'карточка включённого правила показана');
 }
 
-// ── F-80: группа — вкладка своей области ──
+// ── F-80 → D13: страница «Группы» свёрнута в доску — группа = полоса группы ядра ──
 if (wants('groups-tab')) {
-  const selectedTab = () =>
-    page
-      .getByRole('tablist', { name: /^(Разделы групп|Group sections)$/ })
-      .getByRole('tab', { selected: true })
-      .innerText();
+  const lanesUrl = () => {
+    const s = search();
+    return new URL(page.url()).pathname === '/core' && s.view === 'board' && s.lane === 'group';
+  };
   await page.goto(`${BASE}/`);
-  await remember('agentdeck.groups.tab', 'global');
-  await openPage('/groups', 'qa-site-docs');
-  check(await shown('[data-agent-anchor="qa-site-docs"]'), 'карточка проектной группы показана');
+  await openPage('/groups', BOARD_GROUP, '/core');
+  check(lanesUrl(), 'агент открыл /groups → доска полосами групп', page.url());
   check(
-    /В проектах/.test(await selectedTab()),
-    'открыта вкладка «В проектах»',
-    await selectedTab(),
+    await shown(`[data-board-lane-group="${BOARD_GROUP}"][data-agent-anchor="${BOARD_GROUP}"]`),
+    'полоса группы ядра показана (якорь агента)',
   );
-  check(!('show' in search()), '?show= ушёл из адреса', JSON.stringify(search()));
+  check(!('show' in search()), 'в адресе нет прежнего ?show=', JSON.stringify(search()));
 
+  // Негатив: незнакомая группа — те же полосы, адрес чист, подсветки нет.
   await page.goto(`${BASE}/`);
-  await remember('agentdeck.groups.tab', 'project');
-  await openPage('/groups', 'qa-shop-order');
-  check(
-    await shown('[data-agent-anchor-alias="qa-shop-order"]'),
-    'проектная половина пары показана карточкой глобальной копии',
-  );
-  check(/Глобальн/.test(await selectedTab()), 'пара — на «Глобальных»', await selectedTab());
-
-  // Негатив: незнакомая группа — вкладка человека, адрес чист.
-  await page.goto(`${BASE}/`);
-  await remember('agentdeck.groups.tab', 'project');
-  await openPage('/groups', 'qa-no-such-group');
+  await openPage('/groups', 'qa-no-such-group', '/core');
+  await page.locator('[data-board-lane-group]').first().waitFor({ timeout: 10_000 });
   await page.waitForTimeout(1_500);
+  check(lanesUrl(), 'незнакомая группа: полосы групп доски', page.url());
   check(
-    /В проектах/.test(await selectedTab()),
-    'незнакомая группа: вкладка не тронута',
-    await selectedTab(),
-  );
-  check(
-    !('show' in search()),
-    'незнакомая группа: ?show= ушёл из адреса',
+    (await page.locator('[data-agent-highlight]').count()) === 0 && !('show' in search()),
+    'незнакомая группа: подсветки нет, адрес чист',
     JSON.stringify(search()),
   );
 }

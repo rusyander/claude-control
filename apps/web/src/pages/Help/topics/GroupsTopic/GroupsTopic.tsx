@@ -4,14 +4,15 @@ import { GroupsGuideSections } from '../GroupsGuideSections/GroupsGuideSections'
 import { GroupsLimitsSections } from '../GroupsLimitsSections/GroupsLimitsSections';
 
 /**
- * Документ раздела «Группы» (этап 10): работу ведёт ядро, прежние группы — только для чтения.
+ * Документ раздела «Группы» (этап 12): страницы групп больше нет — группы задач ядра идут
+ * полосами по доске, `/groups` ведёт туда же; прежние запуски — только чтение.
  *
- * Порядок: что изменилось → страница в кадрах → что не переносится в ядро → где лежат данные.
- * «Что изменилось» стоит первым намеренно: читатель приходит с привычкой прежнего раздела
+ * Порядок: что изменилось → полосы на доске в кадрах → что не переносится в ядро → где лежат
+ * данные. «Что изменилось» стоит первым намеренно: читатель приходит с привычкой прежнего раздела
  * (создать, включить, запустить группу) и должен сразу узнать, что этих действий больше нет.
  *
- * `GroupsGuideSections` держит три кадра страницы, `GroupsLimitsSections` — что ядро от
- * прежней группы не берёт.
+ * `GroupsGuideSections` держит кадры полос, «Закрытых» и импорта, `GroupsLimitsSections` — что
+ * ядро от прежней группы не берёт.
  */
 export function GroupsTopic() {
   const { t } = useTranslation();
@@ -30,9 +31,9 @@ export function GroupsTopic() {
           minWidth={320}
           items={[
             { title: tr('whatCore'), text: tr('whatCoreText') },
+            { title: tr('whatLanes'), text: tr('whatLanesText') },
             { title: tr('whatReadOnly'), text: tr('whatReadOnlyText') },
             { title: tr('whatImport'), text: tr('whatImportText') },
-            { title: tr('whatRuns'), text: tr('whatRunsText') },
           ]}
         />
       </HelpSection>

@@ -9,7 +9,8 @@
  *    или с телефона» и ссылка панели именно на эту задачу и этот вопрос (`/core?id=…&ask=…`).
  * 2. Курсор и отправленный вопрос записаны в `<дом панели>/core-relay.json`, ожидание пусто.
  * 3. Жёсткий перезапуск панели посреди открытого вопроса — второго сообщения нет.
- * 4. Reply владельца на это сообщение ответом НЕ становится: бот отвечает отказом, где названы
+ * 4. Чат ядру не привязан (`telegram.owner` не задан; кнопки после привязки — `check-telegram-core.mjs`):
+ *    reply владельца на это сообщение ответом НЕ становится: бот отвечает отказом, где названы
  *    панель и телефон, вопрос в виде задачи остаётся открытым.
  *
  * Вопрос в журнале — кодом ядра до его старта (`core-ask-seed.mjs`); токен бота и выключенная
@@ -18,9 +19,9 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { createServer } from 'node:http';
 import { join } from 'node:path';
-import { freePort, REPO, runOnStand, wait } from './throwaway-stand.mjs';
+import { REPO, runOnStand, wait } from './throwaway-stand.mjs';
+import { startBotStub } from './telegram-bot-stub.mjs';
 
 const { writeToken } = await import('../../apps/server/src/domains/integrations/store/store.ts');
 
@@ -29,60 +30,16 @@ const TOKEN = '7000003:QA_relay_token_secret_ABCDEFGH';
 const TITLE = 'Пересылка вопроса ядра';
 
 // ---- заглушка Bot API ---------------------------------------------------------------------------
-const bot = { calls: [], updates: [], nextMessageId: 900, nextUpdateId: 1 };
-const tgPort = await freePort();
-const tg = createServer((req, res) => {
-  const chunks = [];
-  req.on('data', (chunk) => chunks.push(chunk));
-  req.on('end', async () => {
-    let body = {};
-    try {
-      body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    } catch {
-      // пустое тело — тоже вызов
-    }
-    const method = /^\/bot[^/]+\/(\w+)/.exec(req.url ?? '')?.[1] ?? '';
-    const send = (status, payload) => {
-      res.writeHead(status, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(payload));
-    };
-    const ok = (result) => send(200, { ok: true, result });
-    switch (method) {
-      case 'getMe':
-        return ok({ id: 7000003, is_bot: true, username: 'qa_relay_bot', first_name: 'QA' });
-      case 'getWebhookInfo':
-        return ok({ url: '', pending_update_count: 0 });
-      case 'getUpdates': {
-        const offset = Number(body.offset ?? 0);
-        if (offset > 0) bot.updates = bot.updates.filter((u) => u.update_id >= offset);
-        for (let i = 0; i < 8; i += 1) {
-          if (bot.updates.length > 0) return ok(bot.updates);
-          await wait(100);
-        }
-        return ok([]);
-      }
-      case 'sendMessage': {
-        const messageId = bot.nextMessageId++;
-        bot.calls.push({ method, body, messageId });
-        return ok({
-          message_id: messageId,
-          chat: { id: Number(body.chat_id) },
-          date: Math.floor(Date.now() / 1000),
-        });
-      }
-      case 'editMessageText':
-      case 'answerCallbackQuery':
-      case 'deleteWebhook':
-      case 'setMyCommands':
-      case 'deleteMessage':
-      case 'deleteMessages':
-        return ok(true);
-      default:
-        return send(404, { ok: false, error_code: 404, description: 'Not Found' });
-    }
-  });
+const tgStub = await startBotStub({
+  botId: 7000003,
+  username: 'qa_relay_bot',
+  tokens: [TOKEN],
+  owner: OWNER,
+  firstMessageId: 900,
 });
-await new Promise((done) => tg.listen(tgPort, '127.0.0.1', done));
+const { bot } = tgStub;
+const tgPort = tgStub.port;
+const tg = { close: () => void tgStub.close() };
 
 const sent = () => bot.calls.filter((call) => call.method === 'sendMessage');
 const asksSent = () => sent().filter((call) => String(call.body.text).includes('Ядро ждёт ответа'));
@@ -165,7 +122,7 @@ try {
         text.includes(`/core?id=${taskId}&amp;ask=${askId}`),
         text,
       );
-      check('сообщение без кнопок (ответить в Telegram нельзя)', !first?.body.reply_markup);
+      check('сообщение без кнопок (чат ядру не привязан)', !first?.body.reply_markup);
 
       const state = await until(() =>
         readState()?.delivered?.includes(askId) ? readState() : null,
@@ -193,7 +150,7 @@ try {
       });
       check('ответы из Telegram включены', answers.status === 200, answers.text.slice(0, 300));
       const before = sent().length;
-      bot.updates.push({
+      tgStub.push({
         update_id: bot.nextUpdateId++,
         message: {
           message_id: 7001,

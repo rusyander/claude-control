@@ -115,6 +115,7 @@ export const coreScenarioRu = {
     report: 'Отчёт',
     'ask-human': 'Вопрос человеку',
     custom: 'Свой шаг',
+    walk: 'Проход по стенду',
   },
   tier: {
     'lower-if-mechanical': 'Проще для механики',

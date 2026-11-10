@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commandsFor, globsOf } from './askCommands';
-import type { AskCardAsk } from './askCommands.types';
+import { commandsFor, globsOf, type AskCardAsk } from '@agentdeck/contracts/core/ask-commands';
 
 /** Выбор на карточке вопроса → команды ядра: какой командой уходит каждый вид ответа. */
 
